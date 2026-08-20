@@ -49,8 +49,8 @@ Import/Export in Log tab takes JSON rows: {club,power,lie,windSpeed,windDeg,ende
 
 ## Roadmap (rough priority)
 1. Screenshot ingestion (tools/ scaffolded, synthetic-verified): measure gauge fill in pixels → exact power; distance readout via digit templates; batch → import JSON. Blocked on first real captures for ROI/gauge/digit calibration. Still to add: wind-arrow direction, club/lie from HUD, red-overswing detection, result-popup distance ROI.
-2. Map upgrade from user captures: median-stack 2–3 tee frames with aim line swung L/C/R to remove the line; register to current fractional coords.
-3. Greens from captures: diff plain vs B-grid frame → green boundary; the grid is STATIC shading (lighter = higher), so slope = luminance gradient of ONE grid frame → direction+magnitude → pre-paint the 9×9 grid. (Old two-frame dot-motion plan was wrong — no motion in NSS.)
+2. Map upgrade from user captures: median-stack 2–3 tee frames with aim line swung L/C/R to remove the aim dots; register to current fractional coords. (Minimap panel ≈255×305 px of a 720p frame vs current 219×270 stored maps — modest resolution gain, big cleanliness gain.)
+3. Greens from ZOOMED minimap captures, 2 per hole (agreed protocol): plain green view + heightmap/Terrain view. Diff → green boundary; shading → slope direction+magnitude → pre-paint the 9×9 grid. Pins catalogued from the same zoomed frames; only NEW pin spots need repeat captures. (In-world B-grid also static shading, lighter = higher — fallback source. Old two-frame dot-motion plan was wrong — no motion in NSS.)
 4. Aim ticks: calibrate deg/tick (sweep across a calibrated green counting ticks), then output aim in clicks.
 5. Tree clearance table (club×bars vs tree style) once empirical data exists; per-hole wind multipliers for holes 13/18 if residuals demand.
 

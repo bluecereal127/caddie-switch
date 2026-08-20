@@ -457,11 +457,11 @@ function HoleMap({ holeNum, line, onLine, markers, onMarkers, markerMode, aimPre
    H18=1, Specials=6, everywhere else assume the A/B pair. */
 const PIN_GOAL = { 1: 3, 18: 1, 19: 6, 20: 6, 21: 6 };
 const CAP_ITEMS = [
-  { key: "mini", label: "Minimap", goal: () => 1, hint: "One clean full-hole minimap frame → map upgrade." },
-  { key: "tee", label: "Tee ×3 (L/C/R)", goal: () => 3, hint: "3 tee frames, camera fixed, aim line swung left / center / right — median-stack erases the line." },
-  { key: "plain", label: "Green plain", goal: () => 1, hint: "Green WITHOUT the B-grid (boundary comes from diffing vs the grid frame)." },
-  { key: "grid", label: "Green B-grid", goal: () => 1, hint: "Green WITH the B elevation grid — its light/dark shading is the height map (grid is static; darker = lower)." },
-  { key: "pin", label: "Pin spots", goal: (n) => PIN_GOAL[n] ?? 2, hint: "Each distinct pin location seen across rounds (a B-grid frame with the pin visible counts)." },
+  { key: "mini", label: "Minimap", goal: () => 1, hint: "One clean full-hole minimap frame (no zoom) — registration reference for the map upgrade." },
+  { key: "tee", label: "Tee ×3 (L/C/R)", goal: () => 3, hint: "One-time: 2–3 tee frames, camera fixed, aim line swung left / center / right — median-stack erases the aim dots → new hole map." },
+  { key: "plain", label: "Green zoom", goal: () => 1, hint: "ZOOMED minimap green view, plain — pairs with the heightmap frame to trace the green boundary." },
+  { key: "grid", label: "Green heightmap", goal: () => 1, hint: "ZOOMED minimap green view with the heightmap/Terrain overlay — shading becomes the 9×9 slope grid." },
+  { key: "pin", label: "Pin spots", goal: (n) => PIN_GOAL[n] ?? 2, hint: "Each distinct pin location seen across rounds — any zoomed green frame with the pin visible counts; only NEW pins need repeat visits." },
 ];
 const capGoalSum = (n) => CAP_ITEMS.reduce((s, it) => s + it.goal(n), 0);
 const capDoneSum = (n, cap) => CAP_ITEMS.reduce((s, it) => s + Math.min(cap?.[it.key] ?? 0, it.goal(n)), 0);
