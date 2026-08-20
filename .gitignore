@@ -6,3 +6,5 @@ tools/_inspect/
 tools/gauge-cal.json
 # raw Switch captures (big binaries; inbox = new, imported = already ingested)
 captures/
+# Netlify API token for tools/autosync.ps1 — never commit
+tools/netlify.json

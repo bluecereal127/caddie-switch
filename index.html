@@ -8,6 +8,23 @@
   </head>
   <body>
     <div id="root"></div>
+    <!-- Netlify Forms drop-box for the iPhone capture-upload Shortcut.
+         Netlify registers forms by parsing built HTML, so this must live here
+         even though no human ever sees it. One file per field is a Netlify
+         rule; the Shortcut sends one zip in "batch". tools/autosync.ps1 polls
+         the submissions API, downloads, unzips into captures/inbox. -->
+    <form name="captures" data-netlify="true" netlify-honeypot="bot-field" hidden aria-hidden="true">
+      <input type="hidden" name="form-name" value="captures" />
+      <input type="text" name="bot-field" />
+      <input type="text" name="session" />
+      <input type="file" name="batch" />
+      <input type="file" name="file1" />
+      <input type="file" name="file2" />
+      <input type="file" name="file3" />
+      <input type="file" name="file4" />
+      <input type="file" name="file5" />
+      <input type="file" name="file6" />
+    </form>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

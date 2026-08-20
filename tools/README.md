@@ -32,6 +32,35 @@ captures (original `16digits-` name, or exactly 1280×720) so personal photos
 are never touched. Files the phone renamed get a file-time prefix so
 chronological ordering survives.
 
+**Fully wireless — iPhone share sheet → Netlify Form → autosync (the
+pogolist/mccullough pattern).** One-time setup:
+
+1. index.html ships a hidden Netlify form named `captures` (deployed with the
+   site — nothing to do).
+2. Netlify token: app.netlify.com → User settings → Applications → New access
+   token. Copy `tools/netlify.example.json` → `tools/netlify.json` (gitignored)
+   and paste it. Set `"site"` only if the token sees multiple sites.
+3. Build the iOS Shortcut (once, ~2 minutes):
+   - Shortcuts app → + → name it **Caddie Upload** → shortcut settings →
+     enable **Show in Share Sheet**, accept **Images**.
+   - Action 1: **Make Archive** — input *Shortcut Input*, format *.zip*.
+   - Action 2: **Get Contents of URL** —
+     URL `https://YOUR-SITE.netlify.app/`, Method **POST**,
+     Request Body **Form**, with fields:
+     `form-name` (Text) = `captures`, `batch` (File) = *Archive*.
+   - Action 3 (optional): **Show Notification** — "captures uploaded".
+4. On the PC leave the watcher running in its own console window:
+   `npm run autosync` (or double-click `tools\autosync.cmd`).
+
+Per session after that: Photos → select the screenshots → Share → **Caddie
+Upload**. Within a minute the watcher downloads the batch, unzips it into
+`captures/inbox/` (names normalized for chronological ingest order), and
+deletes the remote submission once every byte is verified locally
+(`-KeepRemote` disables deletion). Keep a batch under ~7 MB (~12 screenshots)
+— Netlify rejects requests over 8 MB; just share in two rounds if bigger.
+If a batch never arrives, check the form's **spam** folder in the Netlify UI
+once — Akismet occasionally quarantines scripted submissions.
+
 **Then:** `npm run ingest` reads `captures/inbox/` and writes
 `captures/rows.json` for the Log-tab importer (after setup below is done).
 
