@@ -679,7 +679,9 @@ export default function App() {
       hole: Number(form.hole) || 0, stroke: Number(form.stroke) || 1,
       raw: { speed: sp, deg: form.windDeg },
     };
-    if (s.power <= 0 || s.carry <= 0) return;
+    // gauge is 4 bars max and observed wind tops out at 31 mph — refuse
+    // impossible rows instead of silently fitting the model to typos
+    if (s.power <= 0 || s.power > 4 || s.carry <= 0 || sp < 0 || sp > 31) return;
     const nextShots = [s, ...shots];
     const nextClubs = clubs.map((c) => fitClub(c, nextShots));
     setShots(nextShots); setClubs(nextClubs);
@@ -1325,7 +1327,7 @@ export default function App() {
                 </div>
                 <div>
                   <label className="text-xs font-bold">Gauge power hit</label>
-                  <input type="number" step="0.05" className={inputCls} style={inputStyle} value={form.power} onChange={(e) => setForm({ ...form, power: e.target.value })} />
+                  <input type="number" step="0.05" min="0" max="4" className={inputCls} style={inputStyle} value={form.power} onChange={(e) => setForm({ ...form, power: e.target.value })} />
                 </div>
                 <div>
                   <label className="text-xs font-bold">Lie</label>
@@ -1335,7 +1337,7 @@ export default function App() {
                 </div>
                 <div>
                   <label className="text-xs font-bold">Wind (mph)</label>
-                  <input type="number" className={inputCls} style={inputStyle} value={form.windSpeed} onChange={(e) => setForm({ ...form, windSpeed: e.target.value })} />
+                  <input type="number" min="0" max="31" className={inputCls} style={inputStyle} value={form.windSpeed} onChange={(e) => setForm({ ...form, windSpeed: e.target.value })} />
                 </div>
                 <div>
                   <label className="text-xs font-bold">Ended (yd)</label>
