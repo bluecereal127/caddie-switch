@@ -1413,8 +1413,6 @@ export default function App() {
         {/* ================= GUIDE ================= */}
         {tab === "guide" && (() => {
           const steps = [
-            ["Verify par", (n) => true, "All 21 verified ✓ — only revisit if the game ever disagrees with a tile's par badge."],
-            ["Capture sweep", (n) => capDoneSum(n, captures[n]) >= capGoalSum(n), "Per hole: tee ×3 (aim swung L/C/R, one showing the 'yd to go' badge), zoomed green plain, zoomed green heightmap. Upload via the phone Shortcut — that's the only manual part."],
             ["Green box + slopes", (n) => !!holesMeta[n].green?.box && (holesMeta[n].green?.grid ?? []).some((r) => r.some(([x, y]) => x || y)), "AUTO (pipeline): boundary + slope grid extracted from your zoomed green captures. Manual paint in Holes → ⚙ stays available as an override."],
             ["Pins", (n) => (holesMeta[n].pins?.length ?? 0) > 0, "AUTO (pipeline): read from zoomed green captures; new pin spots get appended as later uploads show them."],
             ["Map scale", (n) => !!holesMeta[n].scale, "AUTO (pipeline): tee 'yd to go' ÷ tee→pin distance on the map. (Manual fallback: Solver → tap ball, tap target, type the in-game distance → Set.)"],
@@ -1437,7 +1435,7 @@ export default function App() {
                     </div>
                   ))}
                 </div>
-                <h3 className="disp text-sm font-bold mb-1">Progress (steps 2,3,4,5,7,8 auto-tracked)</h3>
+                <h3 className="disp text-sm font-bold mb-1">Progress (auto-tracked; Trees has no tracker)</h3>
                 <div className="overflow-x-auto rounded-2xl border-2" style={{ borderColor: T.line, background: "#fff" }}>
                   <table className="w-full text-[11px]">
                     <thead><tr className="disp text-left" style={{ background: T.sky }}>
@@ -1449,7 +1447,7 @@ export default function App() {
                           <td className="px-2 py-1 font-bold">H{n}</td>
                           {steps.map(([nm, done], i) => (
                             <td key={i} className="px-1 py-1 text-center">
-                              {i === 0 || i === 5 ? <span className="opacity-40">—</span>
+                              {i === 3 ? <span className="opacity-40">—</span>
                                 : done(n) ? <span style={{ color: T.turf }}>●</span> : <span className="opacity-25">○</span>}
                             </td>
                           ))}
