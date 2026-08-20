@@ -51,7 +51,17 @@ foreach ($item in $new) {
   $target = Join-Path $Dest $item.Name
   $tries = 0
   while (-not (Test-Path $target) -and $tries -lt 120) { Start-Sleep -Milliseconds 250; $tries++ }
-  if (Test-Path $target) { $copied++; Write-Host "  + $($item.Name)" }
+  if (Test-Path $target) {
+    # CopyHere is async and creates the file before it finishes streaming
+    # (matters for videos) — wait until the size stops growing
+    $size = -1; $tries = 0
+    while ($tries -lt 400) {
+      $s = (Get-Item $target -ErrorAction SilentlyContinue).Length
+      if ($s -gt 0 -and $s -eq $size) { break }
+      $size = $s; $tries++; Start-Sleep -Milliseconds 300
+    }
+    $copied++; Write-Host "  + $($item.Name)"
+  }
   else { Write-Host "  ! timed out waiting for $($item.Name)" -ForegroundColor Yellow }
 }
 Write-Host "Copied $copied new file(s) to $Dest" -ForegroundColor Green

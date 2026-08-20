@@ -18,12 +18,17 @@ $ErrorActionPreference = "Stop"
 Add-Type -AssemblyName System.Drawing
 
 if (-not $Source) {
-  $candidates = @(
-    (Join-Path $env:OneDrive "Pictures\Camera Roll"),
-    (Join-Path $env:OneDrive "Pictures\Screenshots"),
-    (Join-Path $env:USERPROFILE "Pictures\iCloud Photos\Photos"),
-    (Join-Path $env:USERPROFILE "Pictures\Camera Roll")
-  ) | Where-Object { $_ -and (Test-Path $_) }
+  # build the list defensively: Join-Path throws on an empty base under
+  # ErrorActionPreference=Stop, and a one-element Where-Object result is a
+  # scalar string ($x[0] would index a CHARACTER), hence the @() around it
+  $roots = @()
+  if ($env:OneDrive) {
+    $roots += (Join-Path $env:OneDrive "Pictures\Camera Roll")
+    $roots += (Join-Path $env:OneDrive "Pictures\Screenshots")
+  }
+  $roots += (Join-Path $env:USERPROFILE "Pictures\iCloud Photos\Photos")
+  $roots += (Join-Path $env:USERPROFILE "Pictures\Camera Roll")
+  $candidates = @($roots | Where-Object { Test-Path $_ })
   if ($candidates.Count -eq 0) {
     Write-Host "No sync folder found automatically - pass one with -Source <path>" -ForegroundColor Yellow
     exit 1
@@ -34,10 +39,16 @@ Write-Host "Sweeping: $Source"
 New-Item -ItemType Directory -Force $Dest | Out-Null
 $importedDir = Join-Path (Split-Path $Dest -Parent) "imported"
 
-$have = @{}
+$have = @{}      # exact names we already hold
+$haveOrig = @{}  # "originalName|size" for files we renamed with a time prefix —
+                 # keyed this way because cloud sync can shift LastWriteTime
+                 # between runs, which would change the synthesized name
 foreach ($d in @($Dest, $importedDir)) {
   if (Test-Path $d) {
-    Get-ChildItem $d -Recurse -File | ForEach-Object { $have[$_.Name] = $true }
+    Get-ChildItem $d -Recurse -File | ForEach-Object {
+      $have[$_.Name] = $true
+      if ($_.Name -match "^\d{16}-(.+)$") { $haveOrig["$($matches[1])|$($_.Length)"] = $true }
+    }
   }
 }
 
@@ -58,10 +69,11 @@ foreach ($f in $files) {
   # normalize: keep original Switch names, otherwise prefix file time for sort order
   $name = $f.Name
   if ($name -notmatch "^\d{16}-") { $name = "{0:yyyyMMddHHmmss}00-{1}" -f $f.LastWriteTime, $f.Name }
-  if ($have[$f.Name] -or $have[$name]) { continue }
+  if ($have[$f.Name] -or $have[$name] -or $haveOrig["$($f.Name)|$($f.Length)"]) { continue }
   if (-not (Test-SwitchCapture $f)) { continue }
   Copy-Item $f.FullName (Join-Path $Dest $name)
   $have[$name] = $true
+  $haveOrig["$($f.Name)|$($f.Length)"] = $true
   $copied++
   Write-Host "  + $name"
 }

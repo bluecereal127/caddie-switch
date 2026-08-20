@@ -26,10 +26,20 @@ function Gate() {
 
   const submit = async (e) => {
     e.preventDefault();
-    if ((await sha256Hex(pw)) === PASS_HASH) {
+    // crypto.subtle only exists in secure contexts (https/localhost). On plain
+    // http (e.g. `vite --host` from a phone on the LAN) the gate would
+    // otherwise throw and silently never unlock — it's casual deterrence
+    // only, so just wave those through.
+    if (!window.crypto?.subtle) {
       try { localStorage.setItem(GATE_KEY, PASS_HASH); } catch {}
-      setUnlocked(true);
-    } else { setErr(true); setPw(""); }
+      setUnlocked(true); return;
+    }
+    try {
+      if ((await sha256Hex(pw)) === PASS_HASH) {
+        try { localStorage.setItem(GATE_KEY, PASS_HASH); } catch {}
+        setUnlocked(true);
+      } else { setErr(true); setPw(""); }
+    } catch { setErr(true); }
   };
 
   if (unlocked) return <App />;
