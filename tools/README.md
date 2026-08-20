@@ -41,25 +41,36 @@ pogolist/mccullough pattern).** One-time setup:
    token. Copy `tools/netlify.example.json` → `tools/netlify.json` (gitignored)
    and paste it. Set `"site"` only if the token sees multiple sites.
 3. Build the iOS Shortcut (once, ~2 minutes):
-   - Shortcuts app → + → name it **Caddie Upload** → shortcut settings →
-     enable **Show in Share Sheet**, accept **Images**.
+   - Shortcuts app → + → name it **Caddie Upload** → tap the (i) info panel →
+     enable **Show in Share Sheet**. The first card must read
+     "Receive **Images** … from **Share Sheet**" — if it says "from
+     **Nowhere**", share-sheet input is off and the zip will be EMPTY.
+     Trim the accepted types to Images.
    - Action 1: **Make Archive** — input *Shortcut Input*, format *.zip*.
    - Action 2: **Get Contents of URL** —
-     URL `https://YOUR-SITE.netlify.app/`, Method **POST**,
-     Request Body **Form**, with fields:
-     `form-name` (Text) = `captures`, `batch` (File) = *Archive*.
+     URL `https://caddie-switch.netlify.app/`, Method **POST**,
+     Request Body **Form**, with exactly two fields:
+     - `form-name` (Text) = `captures`
+     - `batch` (**File** type) = tap the value → *Select Variable* → the
+       **Archive** output of action 1 (don't leave it on "Choose", and don't
+       cram both names into one field)
    - Action 3 (optional): **Show Notification** — "captures uploaded".
-4. On the PC leave the watcher running in its own console window:
-   `npm run autosync` (or double-click `tools\autosync.cmd`).
+4. PC side is automatic: `npm run autosync:install` registers the
+   **CaddieAutosync** scheduled task — starts hidden at every logon, restarts
+   itself if it dies, and logs to `captures\autosync.log`. (Already installed
+   on this machine.) For a visible console instead: `npm run autosync` or
+   `tools\autosync.cmd`. Remove the task with
+   `Unregister-ScheduledTask -TaskName CaddieAutosync -Confirm:$false`.
 
 Per session after that: Photos → select the screenshots → Share → **Caddie
-Upload**. Within a minute the watcher downloads the batch, unzips it into
-`captures/inbox/` (names normalized for chronological ingest order), and
-deletes the remote submission once every byte is verified locally
-(`-KeepRemote` disables deletion). Keep a batch under ~7 MB (~12 screenshots)
-— Netlify rejects requests over 8 MB; just share in two rounds if bigger.
-If a batch never arrives, check the form's **spam** folder in the Netlify UI
-once — Akismet occasionally quarantines scripted submissions.
+Upload** — that's the only manual step; within a minute the background task
+downloads the batch, unzips it into `captures/inbox/` (names normalized for
+chronological ingest order), and deletes the remote submission once every
+byte is verified locally (`-KeepRemote` disables deletion). Keep a batch
+under ~7 MB (~12 screenshots) — Netlify rejects requests over 8 MB; just
+share in two rounds if bigger. If a batch never arrives, check
+`captures\autosync.log`, then the form's **spam** folder in the Netlify UI —
+Akismet occasionally quarantines scripted submissions.
 
 **Then:** `npm run ingest` reads `captures/inbox/` and writes
 `captures/rows.json` for the Log-tab importer (after setup below is done).

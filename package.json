@@ -10,6 +10,7 @@
     "pull:usb": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/pull-switch.ps1",
     "pull:sync": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/pull-synced.ps1",
     "autosync": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/autosync.ps1",
+    "autosync:install": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/install-autosync-task.ps1",
     "ingest": "node tools/ingest.mjs captures/inbox --out captures/rows.json"
   },
   "dependencies": {

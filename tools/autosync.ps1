@@ -29,14 +29,28 @@ $tmpRoot = Join-Path $root "captures\.autosync-tmp"
 $statePath = Join-Path $root "captures\.autosync-state.json"
 New-Item -ItemType Directory -Force $inbox | Out-Null
 
+# console + captures\autosync.log (the scheduled task runs hidden, so the log
+# is the only place to see what happened; trimmed when it passes ~1 MB)
+$logPath = Join-Path $root "captures\autosync.log"
+function Log($msg, $color) {
+  if ($color) { Write-Host $msg -ForegroundColor $color } else { Write-Host $msg }
+  try {
+    if ((Test-Path $logPath) -and (Get-Item $logPath).Length -gt 1MB) {
+      $tail = Get-Content $logPath -Tail 200
+      Set-Content -Path $logPath -Value $tail -Encoding utf8
+    }
+    Add-Content -Path $logPath -Value "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') $msg" -Encoding utf8
+  } catch {}
+}
+
 $cfgPath = Join-Path $PSScriptRoot "netlify.json"
 if (-not (Test-Path $cfgPath)) {
-  Write-Host "Missing tools\netlify.json - copy netlify.example.json and paste your token." -ForegroundColor Yellow
+  Log "Missing tools\netlify.json - copy netlify.example.json and paste your token." "Yellow"
   exit 1
 }
 $cfg = Get-Content $cfgPath -Raw | ConvertFrom-Json
 if (-not $cfg.token -or $cfg.token -like "*PASTE*") {
-  Write-Host "tools\netlify.json has no real token yet." -ForegroundColor Yellow
+  Log "tools\netlify.json has no real token yet." "Yellow"
   exit 1
 }
 $H = @{ Authorization = "Bearer $($cfg.token)" }
@@ -47,19 +61,19 @@ $api = "https://api.netlify.com/api/v1"
 # ForEach-Object re-emission forces real enumeration. Same below.
 try { $sites = @((Invoke-RestMethod "$api/sites" -Headers $H) | ForEach-Object { $_ }) }
 catch {
-  Write-Host "Netlify API rejected the token or is unreachable: $($_.Exception.Message)" -ForegroundColor Yellow
+  Log "Netlify API rejected the token or is unreachable: $($_.Exception.Message)" "Yellow"
   exit 1
 }
 $site = $null
 if ($cfg.site) { $site = $sites | Where-Object { $_.name -eq $cfg.site -or $_.custom_domain -eq $cfg.site -or $_.default_domain -eq $cfg.site } | Select-Object -First 1 }
 elseif ($sites.Count -eq 1) { $site = $sites[0] }
 if ($null -eq $site) {
-  Write-Host "Could not pick a site. Sites this token sees:" -ForegroundColor Yellow
-  $sites | ForEach-Object { Write-Host "  $($_.name)  ($($_.default_domain))" }
-  Write-Host "Set `"site`" in tools\netlify.json to one of those names."
+  Log "Could not pick a site. Sites this token sees:" "Yellow"
+  $sites | ForEach-Object { Log "  $($_.name)  ($($_.default_domain))" }
+  Log "Set `"site`" in tools\netlify.json to one of those names."
   exit 1
 }
-Write-Host "Watching form 'captures' on $($site.default_domain) (every ${IntervalSec}s, Ctrl+C to stop)" -ForegroundColor Green
+Log "Watching form 'captures' on $($site.default_domain) (every ${IntervalSec}s)" "Green"
 
 # processed-submission memory
 $state = @{}
@@ -119,7 +133,7 @@ function Process-Submission($sub) {
     if ($have[$name] -or $have[$f.Name]) { continue }
     Copy-Item $f.FullName (Join-Path $inbox $name)
     $have[$name] = $true; $copied++
-    Write-Host "    + $name"
+    Log "    + $name"
   }
   Remove-Item -Recurse -Force $tmp
   return $copied
@@ -130,30 +144,30 @@ while ($true) {
     $forms = @((Invoke-RestMethod "$api/sites/$($site.id)/forms" -Headers $H) | ForEach-Object { $_ })
     $form = $forms | Where-Object { $_.name -eq "captures" } | Select-Object -First 1
     if ($null -eq $form) {
-      Write-Host "$(Get-Date -Format HH:mm:ss) form 'captures' not registered yet - deploy the site once with the hidden form in index.html"
+      Log "form 'captures' not registered yet - deploy the site once with the hidden form in index.html"
     } else {
       $subs = @((Invoke-RestMethod "$api/forms/$($form.id)/submissions" -Headers $H) | ForEach-Object { $_ })
       $new = @($subs | Where-Object { -not $state.ContainsKey($_.id) })
       if ($new.Count -gt 0) {
-        Write-Host "$(Get-Date -Format HH:mm:ss) $($new.Count) new submission(s)"
+        Log "$($new.Count) new submission(s)"
         foreach ($sub in $new) {
           try {
             $n = Process-Submission $sub
-            Write-Host "  submission $($sub.id): $n file(s) -> captures\inbox"
+            Log "  submission $($sub.id): $n file(s) -> captures\inbox"
             if (-not $KeepRemote) {
               Invoke-RestMethod "$api/submissions/$($sub.id)" -Headers $H -Method Delete | Out-Null
             }
             $state[$sub.id] = $true; Save-State
           } catch {
-            Write-Host "  submission $($sub.id) failed: $($_.Exception.Message) (kept remote, will retry)" -ForegroundColor Yellow
+            Log "  submission $($sub.id) failed: $($_.Exception.Message) (kept remote, will retry)" "Yellow"
           }
         }
       } else {
-        Write-Host "$(Get-Date -Format HH:mm:ss) nothing new"
+        Write-Host "$(Get-Date -Format HH:mm:ss) nothing new"  # console only - don't bloat the log
       }
     }
   } catch {
-    Write-Host "$(Get-Date -Format HH:mm:ss) poll error: $($_.Exception.Message)" -ForegroundColor Yellow
+    Log "poll error: $($_.Exception.Message)" "Yellow"
   }
   if ($Once) { break }
   Start-Sleep -Seconds $IntervalSec
