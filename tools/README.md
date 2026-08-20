@@ -85,10 +85,11 @@ only exact when the line points at the pin; on doglegs tick the aim onto the
 flag (1–2 ticks of error is negligible, <0.1%) or leave `ended` blank.
 
 Keep strict A,B,A,B order; the pipeline pairs address→result by gauge fill and
-warns on anything unpaired. **Don't capture putts for this pipeline** — the
-putter shows no power on the bar (game8-confirmed), so a putt frame would be
-misclassified as an address frame and derail the pairing. Putts feed the putt
-solver via painted greens, not the shot log.
+warns on anything unpaired. Putts included: the putter bar shows no fill
+during the stroke but displays the final fill once the putt is made
+(player-confirmed), so a result frame taken after the putt classifies
+correctly. (Putt data mainly serves the putt solver via painted greens, but
+the frames don't break pairing.)
 
 ## One-time setup order
 

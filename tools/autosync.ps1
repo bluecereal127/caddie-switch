@@ -42,8 +42,10 @@ if (-not $cfg.token -or $cfg.token -like "*PASTE*") {
 $H = @{ Authorization = "Bearer $($cfg.token)" }
 $api = "https://api.netlify.com/api/v1"
 
-# resolve site once
-try { $sites = @(Invoke-RestMethod "$api/sites" -Headers $H) }
+# resolve site once. NOTE: PS 5.1 Invoke-RestMethod emits a JSON array as ONE
+# object, so @(IRM ...) double-wraps and Where-Object never filters — the
+# ForEach-Object re-emission forces real enumeration. Same below.
+try { $sites = @((Invoke-RestMethod "$api/sites" -Headers $H) | ForEach-Object { $_ }) }
 catch {
   Write-Host "Netlify API rejected the token or is unreachable: $($_.Exception.Message)" -ForegroundColor Yellow
   exit 1
@@ -62,7 +64,7 @@ Write-Host "Watching form 'captures' on $($site.default_domain) (every ${Interva
 # processed-submission memory
 $state = @{}
 if (Test-Path $statePath) {
-  foreach ($id in @(Get-Content $statePath -Raw | ConvertFrom-Json)) { $state[$id] = $true }
+  foreach ($id in @((Get-Content $statePath -Raw | ConvertFrom-Json) | ForEach-Object { $_ })) { $state[$id] = $true }
 }
 function Save-State { Set-Content -Path $statePath -Value (ConvertTo-Json @($state.Keys)) -Encoding utf8 }
 
@@ -125,12 +127,12 @@ function Process-Submission($sub) {
 
 while ($true) {
   try {
-    $forms = @(Invoke-RestMethod "$api/sites/$($site.id)/forms" -Headers $H)
+    $forms = @((Invoke-RestMethod "$api/sites/$($site.id)/forms" -Headers $H) | ForEach-Object { $_ })
     $form = $forms | Where-Object { $_.name -eq "captures" } | Select-Object -First 1
     if ($null -eq $form) {
       Write-Host "$(Get-Date -Format HH:mm:ss) form 'captures' not registered yet - deploy the site once with the hidden form in index.html"
     } else {
-      $subs = @(Invoke-RestMethod "$api/forms/$($form.id)/submissions" -Headers $H)
+      $subs = @((Invoke-RestMethod "$api/forms/$($form.id)/submissions" -Headers $H) | ForEach-Object { $_ })
       $new = @($subs | Where-Object { -not $state.ContainsKey($_.id) })
       if ($new.Count -gt 0) {
         Write-Host "$(Get-Date -Format HH:mm:ss) $($new.Count) new submission(s)"
