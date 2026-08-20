@@ -200,6 +200,23 @@ while ($true) {
       } else {
         Write-Host "$(Get-Date -Format HH:mm:ss) nothing new"  # console only - don't bloat the log
       }
+      # Akismet quarantines rapid scripted posts (it once ate 82 of them
+      # silently). Rescue anything in spam that looks like a capture upload:
+      # honeypot empty + at least one file field. Marking ham moves it to the
+      # verified list, which the NEXT poll ingests normally.
+      $spam = @((Invoke-RestMethod "$api/forms/$($form.id)/submissions?state=spam&per_page=100" -Headers $H) | ForEach-Object { $_ })
+      $rescued = 0
+      foreach ($s in $spam) {
+        $hasFile = $false
+        foreach ($p in $s.data.PSObject.Properties) {
+          if ($p.Value -is [System.Management.Automation.PSCustomObject] -and $p.Value.url) { $hasFile = $true }
+        }
+        if ($hasFile -and -not $s.data.'bot-field') {
+          try { Invoke-RestMethod "$api/submissions/$($s.id)/ham" -Headers $H -Method Put | Out-Null; $rescued++ }
+          catch { Log "  ham-rescue failed for $($s.id): $($_.Exception.Message)" "Yellow" }
+        }
+      }
+      if ($rescued -gt 0) { Log "rescued $rescued submission(s) from the spam folder" }
     }
   } catch {
     Log "poll error: $($_.Exception.Message)" "Yellow"
