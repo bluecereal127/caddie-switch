@@ -451,6 +451,47 @@ function HoleMap({ holeNum, line, onLine, markers, onMarkers, markerMode, aimPre
 }
 
 /* ---------------- main app ---------------- */
+/* ---- capture catalog (screenshot inventory per hole, for tools/ pipeline) ----
+   Manual checklist — the app can't see files on disk. Tap a cell to bump the
+   count; it wraps past the goal back to 0. Pin goals from WSR data: H1=3,
+   H18=1, Specials=6, everywhere else assume the A/B pair. */
+const PIN_GOAL = { 1: 3, 18: 1, 19: 6, 20: 6, 21: 6 };
+const CAP_ITEMS = [
+  { key: "mini", label: "Minimap", goal: () => 1, hint: "One clean full-hole minimap frame → map upgrade." },
+  { key: "tee", label: "Tee ×3 (L/C/R)", goal: () => 3, hint: "3 tee frames, camera fixed, aim line swung left / center / right — median-stack erases the line." },
+  { key: "plain", label: "Green plain", goal: () => 1, hint: "Green WITHOUT the B-grid (boundary comes from diffing vs the grid frame)." },
+  { key: "grid", label: "Green B-grid", goal: () => 1, hint: "Green WITH the B elevation grid — its light/dark shading is the height map (grid is static; darker = lower)." },
+  { key: "pin", label: "Pin spots", goal: (n) => PIN_GOAL[n] ?? 2, hint: "Each distinct pin location seen across rounds (a B-grid frame with the pin visible counts)." },
+];
+const capGoalSum = (n) => CAP_ITEMS.reduce((s, it) => s + it.goal(n), 0);
+const capDoneSum = (n, cap) => CAP_ITEMS.reduce((s, it) => s + Math.min(cap?.[it.key] ?? 0, it.goal(n)), 0);
+
+function CaptureChecklist({ n, cap, onTap }) {
+  return (
+    <div>
+      <div className="disp text-xs font-bold mb-1">📷 Capture catalog</div>
+      <div className="space-y-1">
+        {CAP_ITEMS.map((it) => {
+          const goal = it.goal(n), have = Math.min(cap?.[it.key] ?? 0, goal), done = have >= goal;
+          return (
+            <button key={it.key} onClick={() => onTap(n, it.key, (cap?.[it.key] ?? 0) >= goal ? 0 : (cap?.[it.key] ?? 0) + 1)}
+              className="w-full text-left rounded-lg border px-2 py-1 text-[11px] flex items-center gap-2"
+              style={{ borderColor: done ? T.turf : T.line, background: done ? "#EDF7EF" : "#fff" }}
+              title={it.hint}>
+              <span className="mono" style={{ color: done ? T.turf : T.ink, opacity: done ? 1 : 0.7 }}>
+                {Array.from({ length: goal }, (_, i) => (i < have ? "●" : "○")).join("")}
+              </span>
+              <span className="font-bold">{it.label}</span>
+              {done && <span style={{ color: T.turf }}>✓</span>}
+            </button>
+          );
+        })}
+      </div>
+      <div className="text-[10px] opacity-60 mt-1">Tap to count captures as you take them (wraps to 0). Hover/long-press a row for what & why.</div>
+    </div>
+  );
+}
+
 export default function App() {
   const [tab, setTab] = useState("holes");
   const [clubs, setClubs] = useState(DEFAULT_CLUBS);
@@ -462,6 +503,7 @@ export default function App() {
   });
   const [rounds, setRounds] = useState([]);
   const [activeRound, setActiveRound] = useState(null);
+  const [captures, setCaptures] = useState({});
   const [saveState, setSaveState] = useState("");
   const [openHole, setOpenHole] = useState(null);
   const [holeMarkerEdit, setHoleMarkerEdit] = useState(false);
@@ -528,16 +570,22 @@ export default function App() {
           return m;
         });
         if (d.activeRound) setActiveRound(d.activeRound);
+        if (d.captures) setCaptures(d.captures);
       }
     })();
   }, []);
 
   const persist = async (patch = {}) => {
-    const data = { clubs, shots, holesMeta, rounds, activeRound, parFixV3: true, mapV4: true, treesV9: true, ...patch };
+    const data = { clubs, shots, holesMeta, rounds, activeRound, captures, parFixV3: true, mapV4: true, treesV9: true, ...patch };
     try {
       await window.storage.set(STORE_KEY, JSON.stringify(data));
       setSaveState("saved"); setTimeout(() => setSaveState(""), 1500);
     } catch { setSaveState("save failed — kept for this session"); setTimeout(() => setSaveState(""), 2500); }
+  };
+
+  const setCap = (n, key, val) => {
+    const next = { ...captures, [n]: { ...(captures[n] ?? {}), [key]: val } };
+    setCaptures(next); persist({ captures: next });
   };
 
   /* ---- map geometry ---- */
@@ -1047,6 +1095,9 @@ export default function App() {
                           <div className="flex items-center justify-between mt-1">
                             <div className="disp font-bold text-sm">H{n}</div>
                             <div className="flex items-center gap-1">
+                              {(() => { const d = capDoneSum(n, captures[n]), g = capGoalSum(n); return (
+                                <span className="mono text-[10px] font-bold" style={{ color: d >= g ? T.turf : "#B8860B" }} title="captures cataloged (⚙ for the checklist)">📷{d}/{g}</span>
+                              ); })()}
                               {m.blocked.length > 0 && <span className="text-[10px] font-bold" style={{ color: T.flag }}>🌲{m.blocked.length}</span>}
                               <button onClick={(e) => { e.stopPropagation(); setOpenHole(open ? null : n); setHoleMarkerEdit(false); setPinEdit(false); }}
                                 className="disp text-[10px] font-bold px-1.5 py-0.5 rounded-full border-2" style={chip(open)} title="setup & history">⚙</button>
@@ -1100,6 +1151,7 @@ export default function App() {
                               </div>
                               <textarea className="w-full rounded-xl border-2 p-2 text-xs" style={{ borderColor: T.line }} rows={4}
                                 defaultValue={m.note} onBlur={(e) => setNote(n, e.target.value)} />
+                              <CaptureChecklist n={n} cap={captures[n]} onTap={setCap} />
                               <div>
                                 <div className="disp text-xs font-bold mb-1">Blocked lines</div>
                                 {m.blocked.length === 0 && <div className="text-[11px] opacity-60">None — mark them from the Solver.</div>}
@@ -1403,6 +1455,55 @@ export default function App() {
                       ))}
                     </tbody>
                   </table>
+                </div>
+              </section>
+              <section>
+                <h2 className="disp text-lg font-bold mb-1">Capture catalog — screenshots still needed</h2>
+                <p className="text-xs opacity-80 mb-2">
+                  Raw Switch captures feed the tools/ pipeline (maps, greens, pins). The app can't see your capture
+                  folder, so tap a cell each time you take one — it wraps past the goal back to 0. Amber = missing.
+                </p>
+                <div className="overflow-x-auto rounded-2xl border-2 mb-2" style={{ borderColor: T.line, background: "#fff" }}>
+                  <table className="w-full text-[11px]">
+                    <thead><tr className="disp text-left" style={{ background: T.sky }}>
+                      <th className="px-2 py-1.5">Hole</th>
+                      {CAP_ITEMS.map((it) => <th key={it.key} className="px-1 py-1.5 text-center" title={it.hint}>{it.label}</th>)}
+                      <th className="px-2 py-1.5 text-right">Done</th>
+                    </tr></thead>
+                    <tbody>
+                      {Array.from({ length: 21 }, (_, i) => i + 1).map((n) => {
+                        const cap = captures[n], d = capDoneSum(n, cap), g = capGoalSum(n);
+                        return (
+                          <tr key={n} style={{ borderTop: `1px solid ${T.line}` }}>
+                            <td className="px-2 py-1 font-bold">H{n}</td>
+                            {CAP_ITEMS.map((it) => {
+                              const goal = it.goal(n), have = Math.min(cap?.[it.key] ?? 0, goal), done = have >= goal;
+                              return (
+                                <td key={it.key} className="px-1 py-0.5 text-center">
+                                  <button onClick={() => setCap(n, it.key, (cap?.[it.key] ?? 0) >= goal ? 0 : (cap?.[it.key] ?? 0) + 1)}
+                                    className="mono font-bold px-1.5 py-0.5 rounded-md"
+                                    style={{ color: done ? T.turf : "#B8860B", background: done ? "#EDF7EF" : "#FDF6E3" }}>
+                                    {have}/{goal}
+                                  </button>
+                                </td>
+                              );
+                            })}
+                            <td className="mono px-2 py-1 text-right font-bold" style={{ color: d >= g ? T.turf : "#B8860B" }}>{d}/{g}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="space-y-1">
+                  {CAP_ITEMS.map((it) => (
+                    <div key={it.key} className="text-[11px] rounded-lg border px-2 py-1" style={{ borderColor: T.line, background: "#fff" }}>
+                      <b>{it.label}</b> — <span className="opacity-80">{it.hint}</span>
+                    </div>
+                  ))}
+                  <div className="text-[11px] rounded-lg border px-2 py-1" style={{ borderColor: T.line, background: "#fff" }}>
+                    <b>Shot logging</b> — <span className="opacity-80">2 captures per shot: at address (distance + wind on screen), then at the result pop-up (gauge fill + distance remaining). Shot Assist on = perfectly straight, maxable bars.</span>
+                  </div>
                 </div>
               </section>
               <section className="rounded-2xl border-2 p-4" style={{ borderColor: T.line, background: "#fff" }}>

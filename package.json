@@ -1,12 +1,15 @@
 {
   "name": "caddie-switch",
   "private": true,
-  "version": "13.0.0",
+  "version": "14.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "pull:usb": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/pull-switch.ps1",
+    "pull:sync": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/pull-synced.ps1",
+    "ingest": "node tools/ingest.mjs captures/inbox --out captures/rows.json"
   },
   "dependencies": {
     "react": "^18.3.1",
@@ -14,6 +17,8 @@
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.1",
+    "jpeg-js": "^0.4.4",
+    "pngjs": "^7.0.0",
     "vite": "^5.4.8"
   }
 }
