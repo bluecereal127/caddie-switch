@@ -48,12 +48,12 @@ sweeps: restart the track → same wind → test club after club from identical
 positions. Sideways miss optional; blank = skipped.
 Import/Export in Log tab takes JSON rows: {club,power,lie,windSpeed,windDeg,ended,side?,hole?,stroke?}.
 
-## Roadmap (rough priority)
-1. Screenshot ingestion (tools/ scaffolded, synthetic-verified): measure gauge fill in pixels → exact power; distance readout via digit templates; batch → import JSON. Blocked on first real captures for ROI/gauge/digit calibration. Still to add: wind-arrow direction, club/lie from HUD, red-overswing detection, result-popup distance ROI.
-2. Map upgrade from user captures: median-stack 2–3 tee frames with aim line swung L/C/R to remove the aim dots; register to current fractional coords. (Minimap panel ≈255×305 px of a 720p frame vs current 219×270 stored maps — modest resolution gain, big cleanliness gain.)
-3. Greens from ZOOMED minimap captures, 2 per hole (agreed protocol): plain green view + heightmap/Terrain view. Diff → green boundary; shading → slope direction+magnitude → pre-paint the 9×9 grid. Pins catalogued from the same zoomed frames; only NEW pin spots need repeat captures. (In-world B-grid also static shading, lighter = higher — fallback source. Old two-frame dot-motion plan was wrong — no motion in NSS.)
-4. Aim ticks: calibrate deg/tick (sweep across a calibrated green counting ticks), then output aim in clicks.
-5. Tree clearance table (club×bars vs tree style) once empirical data exists; per-hole wind multipliers for holes 13/18 if residuals demand.
+## Roadmap (agreed phases — user wants everything derived silently from uploads)
+**Phase 1 — cataloging sweep** (user capturing; ~6 frames/hole, protocol in tools/README):
+glyph templates from real frames → frame classifier (address / popup / tee-map / green-plain / green-heightmap, hole ID from the "Hole N Par N" banner) → auto-tick the capture catalog; median-stack tee frames → new hole maps registered to current fractional coords (re-seed trees from them); zoomed green plain+heightmap diff → green box + pre-painted 9×9 slope grid; pins read from the same zoomed frames (new spots appended as later uploads show them); map scale auto-derived = tee "yd to go" ÷ tee→pin map distance.
+**Derived-data bridge** (the app cannot see local files; autosync is the bridge): pipeline writes `public/derived.json` (per-hole: catalog ticks, green box+grid, pins, scale, version stamps) → commit/push → Netlify deploy → app fetches `/derived.json` on load and merges into localStorage; newer manual edit beats older derived value and vice versa.
+**Phase 2 — shot model**: 2 captures/shot (address + result pop-up) → Log rows (power from teal gauge fill — Shot Assist keeps the bar straight; popup distance chain gives ended; popup title gives next lie). Club maxes via Shot Assist full swings; wind fits; controlled sweeps via the restart-same-wind trick. Wind-arrow direction templates. Red-overswing detection.
+**Phase 3 —** per-hole elevation offsets from fit residuals (holes 8/12/17 first); aim-tick deg/click calibration → aim in clicks; tree clearance table (club×bars vs tree style).
 
 ## Conventions
 - All positions fractional (0–1) relative to the hole map image.

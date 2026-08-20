@@ -88,13 +88,19 @@ One-time per hole, tracked in the app (Guide tab → Capture catalog):
 
 1. **From the tee**: 2–3 frames with the camera fixed and the aim line swung
    left / center / right — median-stacking erases the aim dots and yields the
-   new hole map, registered to the existing fractional coords.
+   new hole map, registered to the existing fractional coords. Make sure at
+   least one of them shows the "**NNN yd to go**" badge under the player name
+   (it alternates with "Stroke 1") — that number auto-calibrates the hole's
+   yards-per-pixel scale.
 2. **Zoomed minimap green view, plain** — one frame.
 3. **Zoomed minimap green view with the heightmap/Terrain overlay** — one
    frame. Diffing 2 vs 3 traces the green boundary; the shading becomes the
-   pre-painted 9×9 slope grid.
+   pre-painted 9×9 slope grid. The pin flag in these frames is how pins get
+   cataloged — nothing extra to do.
 
-Pins are read from the same zoomed green frames; on later rounds only NEW pin
+~6 frames/hole × 21 holes ≈ 130 captures; upload in batches of 10 as you go.
+Keep the "Hole N  Par N" banner visible in every frame — it's how the
+classifier knows which hole a frame belongs to. On later rounds only NEW pin
 locations need a capture. Shot Assist ON keeps the power bar straight in all
 frames, which also simplifies gauge reading.
 

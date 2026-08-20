@@ -1411,13 +1411,13 @@ export default function App() {
         {/* ================= GUIDE ================= */}
         {tab === "guide" && (() => {
           const steps = [
-            ["Verify par", (n) => true, "Holes tab → tap the par badge if it doesn't match the game (defaults are from the hole-select screen)."],
-            ["Set green corners", (n) => !!holesMeta[n].green?.box, "Holes → hole → ⛳ Set green corners → tap two opposite corners of the green."],
-            ["Calibrate distance", (n) => !!holesMeta[n].scale, "Solver → tap ball at the tee, tap any target, type the in-game distance readout → Set. Once per hole."],
-            ["Catalog pins", (n) => (holesMeta[n].pins?.length ?? 0) > 0, "Solver → 📍 add pins → tap each pin spot you see across rounds (up to 6). Select today's before solving."],
-            ["Paint green slopes", (n) => (holesMeta[n].green?.grid ?? []).some((r) => r.some(([x, y]) => x || y)), "In-game press B on the green; Holes → hole → paint → drag each cell downhill (drag length = steepness)."],
-            ["Review trees", (n) => true, "Auto-seeded from the maps — Holes → hole → 🌲 edit: tap wrong ones to delete, tap to add missed ones."],
-            ["Log shots", (n) => holeStats[n].shots > 0, "Log tab after each swing: hole, stroke, club, gauge power, wind, carry, offline. Aim straight when calibrating."],
+            ["Verify par", (n) => true, "All 21 verified ✓ — only revisit if the game ever disagrees with a tile's par badge."],
+            ["Capture sweep", (n) => capDoneSum(n, captures[n]) >= capGoalSum(n), "Per hole: tee ×3 (aim swung L/C/R, one showing the 'yd to go' badge), zoomed green plain, zoomed green heightmap. Upload via the phone Shortcut — that's the only manual part."],
+            ["Green box + slopes", (n) => !!holesMeta[n].green?.box && (holesMeta[n].green?.grid ?? []).some((r) => r.some(([x, y]) => x || y)), "AUTO (pipeline): boundary + slope grid extracted from your zoomed green captures. Manual paint in Holes → ⚙ stays available as an override."],
+            ["Pins", (n) => (holesMeta[n].pins?.length ?? 0) > 0, "AUTO (pipeline): read from zoomed green captures; new pin spots get appended as later uploads show them."],
+            ["Map scale", (n) => !!holesMeta[n].scale, "AUTO (pipeline): tee 'yd to go' ÷ tee→pin distance on the map. (Manual fallback: Solver → tap ball, tap target, type the in-game distance → Set.)"],
+            ["Trees", (n) => true, "AUTO (pipeline): re-seeded from the upgraded maps. Spot-check in Holes → ⚙ only if a solver line looks wrong."],
+            ["Log shots", (n) => holeStats[n].shots > 0, "Phase 2: two captures per shot (address + result pop-up) — the pipeline turns them into Log rows."],
             ["Play & score", (n) => holeStats[n].times > 0, "Rounds → Start a round → enter strokes as you play. Mark blocked lines from the Solver when a rec hits trees."],
           ];
           return (
@@ -1460,8 +1460,9 @@ export default function App() {
               <section>
                 <h2 className="disp text-lg font-bold mb-1">Capture catalog — screenshots still needed</h2>
                 <p className="text-xs opacity-80 mb-2">
-                  Raw Switch captures feed the tools/ pipeline (maps, greens, pins). The app can't see your capture
-                  folder, so tap a cell each time you take one — it wraps past the goal back to 0. Amber = missing.
+                  Raw Switch captures feed the tools/ pipeline (maps, greens, pins). Until the auto-classifier ships
+                  with the site's derived-data feed, tap a cell as you take each shot — it wraps past the goal back
+                  to 0. Amber = missing. Once the pipeline lands these tick themselves from your uploads.
                 </p>
                 <div className="overflow-x-auto rounded-2xl border-2 mb-2" style={{ borderColor: T.line, background: "#fff" }}>
                   <table className="w-full text-[11px]">
