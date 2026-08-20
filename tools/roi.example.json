@@ -1,22 +1,43 @@
 {
-  "_comment": "Copy to tools/roi.json and tune with `node tools/inspect.mjs <capture>`. All rects are [x, y, w, h] as FRACTIONS of the frame (same convention as the app's map coords), so 720p and 1080p captures both work. The values below are rough guesses for NSS golf's HUD layout — they WILL need adjusting against a real capture.",
+  "_comment": "Copy to tools/roi.json and tune with `node tools/inspect.mjs <capture>`. All rects are [x, y, w, h] as FRACTIONS of the frame. These values were measured off the first real 1280x720 NSS captures (2026-08-20): two frame types exist. ADDRESS frames carry hole/par, stroke-or-distance badge, club name, wind; RESULT POPUP frames carry the landing lie title, distance-remaining line, and the power gauge still showing its fill (teal = filled, white outline = empty).",
   "gauge": {
-    "rect": [0.055, 0.18, 0.045, 0.62],
+    "rect": [0.09, 0.5, 0.15, 0.4],
     "axis": "y",
     "fillFrom": "bottom",
-    "_comment": "Power meter. axis y + fillFrom bottom = vertical bar filling upward."
+    "_comment": "Search window only — the bar TILTS with controller angle and shifts position between frames, so the reader must auto-locate the teal/outline column inside this window rather than assume a fixed rect. Quarter dots + orange top dot mark the 4 bars."
   },
-  "distance": {
-    "rect": [0.78, 0.075, 0.13, 0.06],
+  "popupTitle": {
+    "rect": [0.35, 0.26, 0.3, 0.09],
     "polarity": "light",
-    "_comment": "Distance-to-pin HUD number (yards). polarity light = bright digits on dark."
+    "_comment": "Result popup lie title: Fairway / Green / Rough / Bunker... = the NEXT shot's lie."
+  },
+  "popupDistance": {
+    "rect": [0.39, 0.41, 0.22, 0.055],
+    "polarity": "light",
+    "_comment": "Result popup line like '93 yd to go' / '49.9 ft to go' (FEET on the green - divide by 3). Letters and digits both need templates; parse the leading number + unit."
   },
   "windSpeed": {
-    "rect": [0.46, 0.05, 0.08, 0.06],
-    "polarity": "light"
+    "rect": [0.845, 0.16, 0.075, 0.048],
+    "polarity": "light",
+    "_comment": "'6 mph' under the top-right wind circle on ADDRESS frames."
   },
   "windArrow": {
-    "rect": [0.4, 0.03, 0.05, 0.09],
-    "_comment": "Arrow glyph box. Direction read is not implemented yet; learn 8 rotated templates once captures exist."
+    "rect": [0.82, 0.035, 0.12, 0.125],
+    "_comment": "Top-right wind arrow circle on ADDRESS frames. 8 orientations -> template match (not implemented yet)."
+  },
+  "club": {
+    "rect": [0.79, 0.92, 0.19, 0.05],
+    "polarity": "light",
+    "_comment": "Selected club name label (Driver/Spoon/...) bottom-right on ADDRESS frames."
+  },
+  "holePar": {
+    "rect": [0.02, 0.04, 0.19, 0.05],
+    "polarity": "light",
+    "_comment": "'Hole 3  Par 5' banner top-left on ADDRESS frames."
+  },
+  "strokeBadge": {
+    "rect": [0.058, 0.218, 0.155, 0.05],
+    "polarity": "light",
+    "_comment": "Badge under the player name: alternates 'Stroke N' and 'NNN yd to go' on ADDRESS frames."
   }
 }

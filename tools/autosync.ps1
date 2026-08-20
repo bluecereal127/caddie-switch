@@ -29,8 +29,22 @@ $tmpRoot = Join-Path $root "captures\.autosync-tmp"
 $statePath = Join-Path $root "captures\.autosync-state.json"
 New-Item -ItemType Directory -Force $inbox | Out-Null
 
-# console + captures\autosync.log (the scheduled task runs hidden, so the log
-# is the only place to see what happened; trimmed when it passes ~1 MB)
+try { $Host.UI.RawUI.WindowTitle = "Caddie autosync" } catch {}
+
+# disable console QuickEdit so an accidental click inside the window can't
+# select text and freeze the loop (the classic "it stopped because I clicked
+# it" trap); Ctrl+C still stops it deliberately
+try {
+  $sig = '[DllImport("kernel32.dll")] public static extern IntPtr GetStdHandle(int h); [DllImport("kernel32.dll")] public static extern bool GetConsoleMode(IntPtr h, out uint m); [DllImport("kernel32.dll")] public static extern bool SetConsoleMode(IntPtr h, uint m);'
+  $k = Add-Type -MemberDefinition $sig -Name ConMode -Namespace Win32 -PassThru
+  $hIn = $k::GetStdHandle(-10); $mode = [uint32]0
+  if ($k::GetConsoleMode($hIn, [ref]$mode)) {
+    $k::SetConsoleMode($hIn, ($mode -band (-bnot [uint32]0x40)) -bor [uint32]0x80) | Out-Null
+  }
+} catch {}
+
+# console + captures\autosync.log (also survives the window being closed;
+# trimmed when it passes ~1 MB)
 $logPath = Join-Path $root "captures\autosync.log"
 function Log($msg, $color) {
   if ($color) { Write-Host $msg -ForegroundColor $color } else { Write-Host $msg }
@@ -55,6 +69,13 @@ if (-not $cfg.token -or $cfg.token -like "*PASTE*") {
 }
 $H = @{ Authorization = "Bearer $($cfg.token)" }
 $api = "https://api.netlify.com/api/v1"
+
+# single-instance lock — two pollers collide on tmp files and double-download
+$mutex = New-Object System.Threading.Mutex($false, "CaddieAutosyncMutex")
+if (-not $mutex.WaitOne(0)) {
+  Log "another autosync instance is already running - exiting" "Yellow"
+  exit 0
+}
 
 # resolve site once. NOTE: PS 5.1 Invoke-RestMethod emits a JSON array as ONE
 # object, so @(IRM ...) double-wraps and Where-Object never filters — the
@@ -82,12 +103,20 @@ if (Test-Path $statePath) {
 }
 function Save-State { Set-Content -Path $statePath -Value (ConvertTo-Json @($state.Keys)) -Encoding utf8 }
 
-function Get-HaveNames {
-  $have = @{}
+# dedupe index: names AND content hashes. iOS gives every share of the same
+# photo a fresh UUID suffix, so a re-shared batch has all-new filenames —
+# only the content hash catches those.
+function Get-HaveIndex {
+  $names = @{}; $hashes = @{}
   foreach ($d in @($inbox, $importedDir)) {
-    if (Test-Path $d) { Get-ChildItem $d -Recurse -File | ForEach-Object { $have[$_.Name] = $true } }
+    if (Test-Path $d) {
+      Get-ChildItem $d -Recurse -File | ForEach-Object {
+        $names[$_.Name] = $true
+        $hashes[(Get-FileHash $_.FullName -Algorithm MD5).Hash] = $true
+      }
+    }
   }
-  $have
+  @{ names = $names; hashes = $hashes }
 }
 
 function Download-File($url, $dest) {
@@ -124,15 +153,21 @@ function Process-Submission($sub) {
     }
   }
 
-  $have = Get-HaveNames
+  $have = Get-HaveIndex
   $copied = 0; $seq = 0
   foreach ($f in $staged) {
+    # The Switch app names photos "YYYYMMDD-<ULID>"; iOS appends a fresh UUID
+    # per share. Canonicalize to the stable stem: chronological sort order
+    # (ULIDs are time-ordered) AND name-level dedupe across re-shares.
     $name = $f.Name
-    if ($name -notmatch "^\d{16}-") { $name = "{0}{1:d2}-{2}" -f $stamp, $seq, $f.Name }
+    if ($name -match "(\d{8}-[0-9A-HJKMNP-TV-Z]{26})") { $name = $matches[1] + $f.Extension.ToLower() }
+    elseif ($name -notmatch "^\d{16}-") { $name = "{0}{1:d2}-{2}" -f $stamp, $seq, $f.Name }
     $seq++
-    if ($have[$name] -or $have[$f.Name]) { continue }
+    if ($have.names[$name] -or $have.names[$f.Name]) { continue }
+    $hash = (Get-FileHash $f.FullName -Algorithm MD5).Hash
+    if ($have.hashes[$hash]) { continue }
     Copy-Item $f.FullName (Join-Path $inbox $name)
-    $have[$name] = $true; $copied++
+    $have.names[$name] = $true; $have.hashes[$hash] = $true; $copied++
     Log "    + $name"
   }
   Remove-Item -Recurse -Force $tmp

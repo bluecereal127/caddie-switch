@@ -1,6 +1,8 @@
 # One-time install of the CaddieAutosync scheduled task, so the watcher runs
-# by itself: starts hidden at every logon, restarts if it dies, no console to
-# babysit. Activity is visible in captures\autosync.log.
+# by itself: starts at every logon in a VISIBLE console (titled "Caddie
+# autosync") — deliberately not hidden, so it's never forgotten once the
+# project winds down — and restarts if it dies. Also logs to
+# captures\autosync.log.
 #
 #   npm run autosync:install     (re-run any time; it updates in place)
 #
@@ -10,7 +12,7 @@ $ErrorActionPreference = "Stop"
 $script = Join-Path $PSScriptRoot "autosync.ps1"
 
 $action = New-ScheduledTaskAction -Execute "powershell.exe" `
-  -Argument "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$script`""
+  -Argument "-NoProfile -ExecutionPolicy Bypass -WindowStyle Normal -File `"$script`""
 $trigger = New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME
 $settings = New-ScheduledTaskSettingsSet `
   -RestartCount 100 -RestartInterval (New-TimeSpan -Minutes 1) `
@@ -22,4 +24,4 @@ Register-ScheduledTask -TaskName "CaddieAutosync" -Action $action -Trigger $trig
   -Force | Out-Null
 Start-ScheduledTask -TaskName "CaddieAutosync"
 $t = Get-ScheduledTask -TaskName "CaddieAutosync"
-Write-Host "Task installed (state: $($t.State)). Runs hidden at every logon; log: captures\autosync.log" -ForegroundColor Green
+Write-Host "Task installed (state: $($t.State)). Visible console at every logon; log: captures\autosync.log" -ForegroundColor Green
