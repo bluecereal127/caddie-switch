@@ -46,15 +46,22 @@ pogolist/mccullough pattern).** One-time setup:
      "Receive **Images** … from **Share Sheet**" — if it says "from
      **Nowhere**", share-sheet input is off and the zip will be EMPTY.
      Trim the accepted types to Images.
-   - Action 1: **Make Archive** — input *Shortcut Input*, format *.zip*.
-   - Action 2: **Get Contents of URL** —
+   - Action 1: **Repeat with Each** — input *Shortcut Input*.
+   - Inside the repeat: **Get Contents of URL** —
      URL `https://caddie-switch.netlify.app/`, Method **POST**,
      Request Body **Form**, with exactly two fields:
      - `form-name` (Text) = `captures`
-     - `batch` (**File** type) = tap the value → *Select Variable* → the
-       **Archive** output of action 1 (don't leave it on "Choose", and don't
-       cram both names into one field)
-   - Action 3 (optional): **Show Notification** — "captures uploaded".
+     - `file1` (**File** type) = tap the value → *Select Variable* →
+       **Repeat Item** (don't leave it on "Choose")
+   - After the repeat (optional): **Show Notification** — "captures uploaded".
+
+   One POST per image = no batch can ever hit Netlify's 8 MB request cap
+   (a single 720p capture is ~0.3 MB), submissions are free on current
+   Netlify plans, and autosync's content-hash dedupe makes retries or
+   overlapping shares harmless. (The older single-zip variant — Make
+   Archive → one POST with a `batch` File field — still works and autosync
+   handles both, but it fails outright if the zip tops 8 MB, so the
+   per-image loop is the recommended shape.)
 4. PC side is automatic: `npm run autosync:install` registers the
    **CaddieAutosync** scheduled task — starts hidden at every logon, restarts
    itself if it dies, and logs to `captures\autosync.log`. (Already installed

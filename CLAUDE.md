@@ -11,6 +11,7 @@ v13 and now diverges (v14: capture catalog); the web repo is the source of truth
 - `src/maps.js` — 21 hole minimaps as base64 JPEG (from rufusmccoot/SwitchSportsGolfCaddy, MIT + slices of the official hole chart). Fractional coordinates everywhere, so images can be swapped for higher-res without losing data.
 - `src/storage.js` — window.storage shim (async get/set/delete/list over localStorage, key prefix `caddie:`; app data lives under `caddie:sss-golf-solver-v2`).
 - `tools/` — screenshot ingestion pipeline (pure Node; see tools/README.md). Scaffolded + verified on synthetic frames; ROIs/gauge cal/digit templates await first real captures.
+- Capture platform: user plays on a Switch 2, but NSS is a backward-compat Switch 1 title, so album captures are 1280×720 (Switch 2 games capture 1920×1080; no setting changes this — Nintendo support a_id 68408). All measured ROIs assume 720p frames; rects are fractional anyway.
 
 ## Model
 carry = a · power · (1 + h · tailwind_mph); sidedrift = c · crosswind_mph · power.
