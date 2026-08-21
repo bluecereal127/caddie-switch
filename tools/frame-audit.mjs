@@ -39,6 +39,7 @@ for (const file of existsSync(join(D, "greens")) ? readdirSync(join(D, "greens")
   if (!file.endsWith(".json")) continue;
   const g = rd(join(D, "greens", file), {});
   for (const s of g.sessions ?? []) { add(s.plain, "greenPair"); add(s.hmap, "greenPair"); }
+  for (const f of g.fringeFrames ?? []) add(f, "greenFringe");
   add(g.sources?.plain, "greenPair"); add(g.sources?.heightmap, "greenPair");
 }
 for (const r of shots.rows ?? []) { add(r.addrFile, "shotAddress"); add(r.popupFile, "shotPopup"); }

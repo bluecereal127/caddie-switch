@@ -19,6 +19,7 @@ import { fileURLToPath } from "node:url";
 import { loadImage, savePng, px, colorDist } from "./lib/image.mjs";
 import { panelRect, cropRect } from "./lib/panel.mjs";
 import { sessions, fileMs } from "./lib/ulid.mjs";
+import { surfaceMask, findPin } from "./lib/greensurface.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const INBOX = join(ROOT, "captures", "inbox") + "/";
@@ -221,6 +222,12 @@ function extractPair(hole, plainFile, hmapFile) {
   const w = plain.width, h = plain.height;
   const { mask, size, inLegend } = greenMask(plain, hmap);
   if (size < 800) return { error: `mask too small (${size}px)` };
+  // Zoom-mismatch guard: pairing by nearest-in-time can marry a plain and a
+  // heightmap captured at different zooms (the player zooms in progressively
+  // during one visit). The Terrain diff then lights up the entire panel
+  // instead of just the recoloured surface — seen at 66k of 76k px. A green
+  // never occupies half the panel at these zooms.
+  if (size > 0.42 * w * h) return { error: `mask too large (${size}px) — plain/heightmap zoom mismatch` };
 
   // bbox
   let x0 = w, y0 = h, x1 = 0, y1 = 0;
@@ -396,16 +403,63 @@ for (let hole = 1; hole <= 21; hole++) {
   // to the single best mask when a hole has only one pair.
   const PN = 160;
   const occ = new Float32Array(PN * PN), seen = new Float32Array(PN * PN);
-  for (const e of pool) {
-    const { mask, bbox } = e.r, mw = e.r.plain.width;
+  const normalize = (mask, bbox, mw) => {
     const bw = bbox.x1 - bbox.x0, bh = bbox.y1 - bbox.y0;
-    if (bw < 4 || bh < 4) continue;
+    if (bw < 4 || bh < 4) return null;
+    const out = new Uint8Array(PN * PN);
     for (let gy = 0; gy < PN; gy++) for (let gx = 0; gx < PN; gx++) {
       const sx = Math.round(bbox.x0 + ((gx + 0.5) / PN) * bw);
       const sy = Math.round(bbox.y0 + ((gy + 0.5) / PN) * bh);
-      seen[gy * PN + gx]++;
-      if (mask[sy * mw + sx]) occ[gy * PN + gx]++;
+      out[gy * PN + gx] = mask[sy * mw + sx] ? 1 : 0;
     }
+    return out;
+  };
+  const absorb = (nrm) => { for (let i = 0; i < PN * PN; i++) { seen[i]++; if (nrm[i]) occ[i]++; } };
+  for (const e of pool) {
+    const nrm = normalize(e.r.mask, e.r.bbox, e.r.plain.width);
+    if (nrm) absorb(nrm);
+  }
+
+  // PLAIN-ONLY FRAMES also get a say. A green capture with no usable Terrain
+  // counterpart used to be dead weight; the surface is drawn with a grid of
+  // squares and the fringe around it is flat, so the boundary is a texture
+  // edge that needs no heightmap (tools/lib/greensurface.mjs, scored at mean
+  // IoU 0.787 against the diff masks by tools/validate-fringe.mjs). Held to a
+  // conservative erode so it can only fill a notch, never inflate the
+  // outline. Only pairs that SUCCEEDED count as using their plain — a plain
+  // whose partner was thrown out for a zoom mismatch deserves this path.
+  const usedPlain = new Set(extracted.map((e) => e.plainF));
+  let soloUsed = 0;
+  const fringeFrames = [];
+  if (pool.length) {
+    // reference shape from the pairs, bbox-normalized. Gate solo frames on
+    // SHAPE agreement, not pixel area: zoom varies legitimately between
+    // captures, so a lower-zoom frame has a genuinely smaller green and an
+    // area test rejects perfectly good frames (it rejected H16's).
+    const refN = new Uint8Array(PN * PN);
+    for (let i = 0; i < PN * PN; i++) refN[i] = occ[i] > 0 ? 1 : 0;
+    for (const f of frames) {
+      if (f.frameType !== "greenPlain" || usedPlain.has(f.file)) continue;
+      let img;
+      try { img = crop(f.file); } catch { continue; }
+      const s = surfaceMask(img, { erodeR: 4 });
+      if (!s) { console.log(`H${hole} ${f.file.slice(-12)}: fringe found no flag to seed from`); continue; }
+      let x0 = img.width, y0 = img.height, x1 = -1, y1 = -1;
+      for (let y = 0; y < img.height; y++) for (let x = 0; x < img.width; x++)
+        if (s.mask[y * img.width + x]) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+      if (x1 - x0 < 8 || y1 - y0 < 8) continue;
+      const bbox = { x0, y0, x1, y1 };
+      const nrm = normalize(s.mask, bbox, img.width);
+      if (!nrm) continue;
+      let inter = 0, uni = 0;
+      for (let i = 0; i < PN * PN; i++) { const a = refN[i], b = nrm[i]; if (a || b) uni++; if (a && b) inter++; }
+      const iou = uni ? inter / uni : 0;
+      if (iou < 0.65) { console.log(`H${hole} ${f.file.slice(-12)}: fringe shape disagrees with the paired outline (IoU ${iou.toFixed(2)})`); continue; }
+      absorb(nrm); soloUsed++; fringeFrames.push(f.file);
+      const p = findPin(img);
+      if (p) pins.push({ gx: +((p.x - x0) / (x1 - x0)).toFixed(4), gy: +((p.y - y0) / (y1 - y0)).toFixed(4) });
+    }
+    if (soloUsed) console.log(`H${hole}: +${soloUsed} plain-only frame(s) via fringe`);
   }
   // union, then a light majority guard: a cell claimed by exactly one pair
   // out of many is more likely a stray than a covered notch
@@ -437,7 +491,7 @@ for (let hole = 1; hole <= 21; hole++) {
   writeFileSync(join(OUT, `${id}.json`), JSON.stringify({
     hole, sources: { plain: final.plainF, heightmap: final.hmapF },
     panelBbox: r.bbox, gridN: GRID_N, grid: fusedGrid ?? r.grid, fusedFrom,
-    poly, polyFrom: pool.length, fusedArea: +fusedArea.toFixed(4),
+    poly, polyFrom: pool.length + soloUsed, fringeFrames, fusedArea: +fusedArea.toFixed(4),
     pins, sessions: sessionDetails,
     convention: "grid[row][col]=[dx,dy] downhill, +x right +y down, normalized to the green's own max slope; pin gx/gy fractional within bbox",
   }, null, 2));
