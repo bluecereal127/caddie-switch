@@ -117,6 +117,81 @@ const heightOf = (p, lut) => {
   return best.h;
 };
 
+// Trace the outer boundary of a 0/1 mask and simplify it to a polygon in
+// normalized 0-1 coords. The app has represented greens as a rectangle; real
+// greens are lobed, and the fringe (player-confirmed: a continuous band that
+// wraps every green, never touching water or OB) marks a true polygon edge.
+function traceOutline(src, sw, sh, maxPts = 44) {
+  // Pad by 1: the mask is normalized to its own bounding box, so it always
+  // touches all four edges, and a boundary walk that starts on the array edge
+  // stalls immediately (it did — 3 points, every time).
+  const w = sw + 2, h = sh + 2;
+  const mask = new Uint8Array(w * h);
+  for (let y = 0; y < sh; y++) for (let x = 0; x < sw; x++) mask[(y + 1) * w + (x + 1)] = src[y * sw + x];
+  const lab = new Int32Array(w * h).fill(-1);
+  let best = -1, bestSize = 0, n = 0;
+  for (let i = 0; i < w * h; i++) {
+    if (!mask[i] || lab[i] >= 0) continue;
+    const st = [i]; lab[i] = n;
+    let size = 0;
+    while (st.length) {
+      const q = st.pop(); size++;
+      const x = q % w, y = (q / w) | 0;
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const nx = x + dx, ny = y + dy;
+        if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+        const k = ny * w + nx;
+        if (mask[k] && lab[k] < 0) { lab[k] = n; st.push(k); }
+      }
+    }
+    if (size > bestSize) { bestSize = size; best = n; }
+    n++;
+  }
+  if (best < 0 || bestSize < 40) return null;
+  const M = (x, y) => x >= 0 && y >= 0 && x < w && y < h && lab[y * w + x] === best;
+  let sx = -1, sy = -1;
+  outer: for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (M(x, y)) { sx = x; sy = y; break outer; }
+
+  // Moore-neighbour boundary walk
+  const dirs = [[1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1], [0, -1], [1, -1]];
+  const pts = [];
+  // dir is the direction just travelled; the walk searches clockwise from the
+  // backtrack, (dir+5)%8. The start pixel is topmost-then-leftmost, so the
+  // pixel we conceptually came from is due WEST, which means dir = 0 (east).
+  // Seeding any other value makes the walk turn straight back into the start
+  // and quit after ~3 points.
+  let cx = sx, cy = sy, dir = 0;
+  for (let guard = 0; guard < 8 * w * h; guard++) {
+    pts.push([cx, cy]);
+    let found = false;
+    for (let k = 0; k < 8; k++) {
+      const d = (dir + 5 + k) % 8;
+      const nx = cx + dirs[d][0], ny = cy + dirs[d][1];
+      if (M(nx, ny)) { cx = nx; cy = ny; dir = d; found = true; break; }
+    }
+    if (!found || (cx === sx && cy === sy)) break;
+  }
+  if (pts.length < 8) return null;
+
+  // Douglas-Peucker, tightened until it fits the point budget
+  const dp = (a, b, eps) => {
+    if (b - a < 2) return [pts[a]];
+    const [x1, y1] = pts[a], [x2, y2] = pts[b];
+    const dx = x2 - x1, dy = y2 - y1, len = Math.hypot(dx, dy) || 1;
+    let far = -1, fd = -1;
+    for (let i = a + 1; i < b; i++) {
+      const d = Math.abs((pts[i][0] - x1) * dy - (pts[i][1] - y1) * dx) / len;
+      if (d > fd) { fd = d; far = i; }
+    }
+    if (fd <= eps) return [pts[a]];
+    return [...dp(a, far, eps), ...dp(far, b, eps)];
+  };
+  let eps = 0.6, out = dp(0, pts.length - 1, eps);
+  while (out.length > maxPts && eps < 12) { eps *= 1.4; out = dp(0, pts.length - 1, eps); }
+  const cl = (v) => Math.min(1, Math.max(0, v));
+  return out.map(([x, y]) => [+cl((x - 1 + 0.5) / sw).toFixed(4), +cl((y - 1 + 0.5) / sh).toFixed(4)]);
+}
+
 // downhill slope vectors from central differences over cell heights,
 // normalized to the green's own max slope
 function slopeGrid(cellH) {
@@ -311,15 +386,62 @@ for (let hole = 1; hole <= 21; hole++) {
   if (!final) continue;
   const { r } = final;
   const id = `h${String(hole).padStart(2, "0")}`;
+
+  // FUSE THE OUTLINE the same way the heights fuse. A flag can only ever
+  // subtract green — it hides the surface under it, and the Terrain diff
+  // reads that as "not green", biting a notch out of the boundary wherever
+  // the pin stood. It can never add green. So a cell is green if ANY pair
+  // saw it green, resampled into a shared bbox-normalized grid, and pairs
+  // shot at different pin positions cover each other's notches. Falls back
+  // to the single best mask when a hole has only one pair.
+  const PN = 160;
+  const occ = new Float32Array(PN * PN), seen = new Float32Array(PN * PN);
+  for (const e of pool) {
+    const { mask, bbox } = e.r, mw = e.r.plain.width;
+    const bw = bbox.x1 - bbox.x0, bh = bbox.y1 - bbox.y0;
+    if (bw < 4 || bh < 4) continue;
+    for (let gy = 0; gy < PN; gy++) for (let gx = 0; gx < PN; gx++) {
+      const sx = Math.round(bbox.x0 + ((gx + 0.5) / PN) * bw);
+      const sy = Math.round(bbox.y0 + ((gy + 0.5) / PN) * bh);
+      seen[gy * PN + gx]++;
+      if (mask[sy * mw + sx]) occ[gy * PN + gx]++;
+    }
+  }
+  // union, then a light majority guard: a cell claimed by exactly one pair
+  // out of many is more likely a stray than a covered notch
+  const fusedMask = new Uint8Array(PN * PN);
+  for (let i = 0; i < PN * PN; i++)
+    fusedMask[i] = occ[i] > 0 && (seen[i] < 3 || occ[i] >= 1) ? 1 : 0;
+  // largest component only, then close pinholes
+  const poly = traceOutline(fusedMask, PN, PN);
+  const fusedArea = fusedMask.reduce((s, v) => s + v, 0) / (PN * PN);
+  // overlay the FUSED polygon (cyan) on the best pair's debug view, next to
+  // that pair's own outline (red) — the gap between them is what the flag hid
+  if (poly) {
+    const D = r.dbg, bw = r.bbox.x1 - r.bbox.x0, bh = r.bbox.y1 - r.bbox.y0;
+    const put = (x, y) => {
+      if (x < 0 || y < 0 || x >= D.width || y >= D.height) return;
+      const i = (Math.round(y) * D.width + Math.round(x)) * 4;
+      D.data[i] = 0; D.data[i + 1] = 230; D.data[i + 2] = 255;
+    };
+    for (let i = 0; i < poly.length; i++) {
+      const a = poly[i], b = poly[(i + 1) % poly.length];
+      const ax = r.bbox.x0 + a[0] * bw, ay = r.bbox.y0 + a[1] * bh;
+      const bx = r.bbox.x0 + b[0] * bw, by = r.bbox.y0 + b[1] * bh;
+      const steps = Math.ceil(Math.hypot(bx - ax, by - ay));
+      for (let t = 0; t <= steps; t++) put(ax + (bx - ax) * t / steps, ay + (by - ay) * t / steps);
+    }
+  }
   savePng(join(OUT, `${id}-mask.png`), r.dbg);
   savePng(join(OUT, `${id}-height.png`), r.hv);
   writeFileSync(join(OUT, `${id}.json`), JSON.stringify({
     hole, sources: { plain: final.plainF, heightmap: final.hmapF },
     panelBbox: r.bbox, gridN: GRID_N, grid: fusedGrid ?? r.grid, fusedFrom,
+    poly, polyFrom: pool.length, fusedArea: +fusedArea.toFixed(4),
     pins, sessions: sessionDetails,
     convention: "grid[row][col]=[dx,dy] downhill, +x right +y down, normalized to the green's own max slope; pin gx/gy fractional within bbox",
   }, null, 2));
-  console.log(`H${hole}: mask=${r.maskSize}px bbox=[${r.bbox.x0},${r.bbox.y0}..${r.bbox.x1},${r.bbox.y1}] pins=${pins.length} ${pins.map((p) => `(${p.gx},${p.gy})`).join(" ")}`);
+  console.log(`H${hole}: mask=${r.maskSize}px poly=${poly ? poly.length + "pts" : "-"} from ${pool.length} pair(s) fill=${(100 * fusedArea).toFixed(0)}% pins=${pins.length}`);
   results.push(hole);
 }
 console.log(`extracted ${results.length}/21 greens`);

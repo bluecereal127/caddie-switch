@@ -219,7 +219,7 @@ for (let hole = 1; hole <= 21; hole++) {
     const pr = projectGreenBox(det, zoom, meta.pin, s.pinPx, s.bboxPx, kLo, kHi);
     if (!anchor || pr.r > anchor.r) anchor = { ...pr, session: s };
   }
-  let greenBox = null, pins = [];
+  let greenBox = null, greenPoly = null, pins = [];
   let box = null;
   if (anchor && anchor.r > 0.22) {
     const { k, session, ox, oy } = anchor;
@@ -241,6 +241,12 @@ for (let hole = 1; hole <= 21; hole++) {
     // overlay was unreadable. Averaging each cluster also sharpens the
     // estimate: more observations of a spot now means a better fix on it,
     // not more clutter.
+    // the fused green outline, projected the same way (bbox-normalized ->
+    // map fraction). A polygon, not a rectangle: greens are lobed, and the
+    // fringe that wraps every green is a real boundary.
+    if (g.poly) greenPoly = g.poly.map(([nx, ny]) => [
+      +((box.x0 + nx * (box.x1 - box.x0)) / W).toFixed(4),
+      +((box.y0 + ny * (box.y1 - box.y0)) / H).toFixed(4)]);
     const raw = g.pins.map((p) => ({
       x: (box.x0 + p.gx * (box.x1 - box.x0)) / W,
       y: (box.y0 + p.gy * (box.y1 - box.y0)) / H }));
@@ -261,7 +267,7 @@ for (let hole = 1; hole <= 21; hole++) {
   }
   const zoomAspect = (g.panelBbox.x1 - g.panelBbox.x0) / (g.panelBbox.y1 - g.panelBbox.y0);
   const mapAspect = box ? (box.x1 - box.x0) / (box.y1 - box.y0) : null;
-  derived.holes[hole] = { scale: meta.scaleYdPerPx, yards: meta.yards, greenBox,
+  derived.holes[hole] = { scale: meta.scaleYdPerPx, yards: meta.yards, greenBox, greenPoly,
     grid: quantizeGrid(g.grid), pins,
     tee: meta.tee ? { x: +(meta.tee.x / img.width).toFixed(4), y: +(meta.tee.y / img.height).toFixed(4) } : null };
   console.log(`H${hole}: k=${anchor?.k?.toFixed(2)} r=${anchor?.r?.toFixed(2)} box=${box ? `${box.x0},${box.y0}..${box.x1},${box.y1}` : "MISS"} aspect map=${mapAspect?.toFixed(2) ?? "-"} zoom=${zoomAspect.toFixed(2)} pins=${pins.length}`);

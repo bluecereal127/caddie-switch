@@ -375,7 +375,7 @@ function GreenCanvas({ mapSrc, green, mode, onGrid, ball, cup, onTap, path, aimP
 }
 
 /* ---------------- clickable hole map ---------------- */
-function HoleMap({ holeNum, line, onLine, markers, onMarkers, markerMode, aimPreview, cornerMode, onCorner, greenBox, pins = [], curPinId = null, pinMode = false, onPins, distLabel = null, windBadge = null, teePos = null, stopMarker = null, showTrees = true }) {
+function HoleMap({ holeNum, line, onLine, markers, onMarkers, markerMode, aimPreview, cornerMode, onCorner, greenBox, greenPoly = null, pins = [], curPinId = null, pinMode = false, onPins, distLabel = null, windBadge = null, teePos = null, stopMarker = null, showTrees = true }) {
   const imgRef = useRef(null);
   const [dims, setDims] = useState({ w: 113, h: 140 });
   const src = HOLE_MAPS[holeNum];
@@ -456,8 +456,13 @@ function HoleMap({ holeNum, line, onLine, markers, onMarkers, markerMode, aimPre
         {b && t && aimPreview && (
           <line x1={b.x} y1={b.y} x2={aimPreview.x * 100} y2={aimPreview.y * 100} stroke={T.sand} strokeWidth="1" strokeDasharray="1.5 1.5" />
         )}
-        {greenBox && <rect x={greenBox.x0 * 100} y={greenBox.y0 * 100} width={(greenBox.x1 - greenBox.x0) * 100} height={(greenBox.y1 - greenBox.y0) * 100}
-          fill="rgba(234,217,164,0.15)" stroke={T.sand} strokeWidth="0.8" strokeDasharray="2 1.5" />}
+        {/* the traced green outline when we have one — greens are lobed, and
+            the fringe gives a real boundary; the box is the fallback */}
+        {greenPoly && greenPoly.length > 2
+          ? <polygon points={greenPoly.map(([x, y]) => `${x * 100},${y * 100}`).join(" ")}
+              fill="rgba(234,217,164,0.15)" stroke={T.sand} strokeWidth="0.8" strokeDasharray="2 1.5" />
+          : greenBox && <rect x={greenBox.x0 * 100} y={greenBox.y0 * 100} width={(greenBox.x1 - greenBox.x0) * 100} height={(greenBox.y1 - greenBox.y0) * 100}
+              fill="rgba(234,217,164,0.15)" stroke={T.sand} strokeWidth="0.8" strokeDasharray="2 1.5" />}
         {teePos && (
           <g transform={`translate(${teePos.x * 100} ${teePos.y * 100})`}>
             <circle r="3.4" fill="rgba(20,48,29,0.55)" />
@@ -646,6 +651,7 @@ export default function App() {
               if (dh.scale != null && (fresh || cur.scale == null)) cur.scale = dh.scale;
               if (dh.tee && (fresh || !cur.tee)) cur.tee = dh.tee;
               if (dh.greenBox && (fresh || !cur.green.box)) cur.green.box = dh.greenBox;
+              if (dh.greenPoly && (fresh || !cur.green.poly)) cur.green.poly = dh.greenPoly;
               const gridEmpty = !(cur.green.grid ?? []).some((r) => r.some(([x, y]) => x || y));
               if (dh.grid && (fresh || gridEmpty)) cur.green.grid = dh.grid;
               const pins = [...(cur.pins ?? [])];
@@ -1007,6 +1013,7 @@ export default function App() {
                     markers={holesMeta[hole].markers} onMarkers={(m) => setMarkers(hole, m)}
                     markerMode={markerMode} aimPreview={aimPreview}
                     greenBox={holesMeta[hole].green?.box ?? null}
+                    greenPoly={holesMeta[hole].green?.poly ?? null}
                     pins={holesMeta[hole].pins} curPinId={holesMeta[hole].curPin}
                     pinMode={false} onPins={(p) => setPins(hole, p)}
                     distLabel={geo ? (scale ? `${Math.round(geo.srcPx * scale)} yd` : "? yd") : null}
@@ -1307,6 +1314,7 @@ export default function App() {
                                 markerMode={holeMarkerEdit} aimPreview={null}
                                 cornerMode={cornerMode} onCorner={(fx, fy) => handleCorner(n, fx, fy)}
                                 greenBox={m.green?.box ?? null}
+                                greenPoly={m.green?.poly ?? null}
                                 pins={m.pins} curPinId={m.curPin}
                                 pinMode={pinEdit} onPins={(p) => setPins(n, p)} />
                               <button onClick={() => { setHoleMarkerEdit(!holeMarkerEdit); setPinEdit(false); }} className="w-full mt-2 py-1.5 rounded-xl border-2 text-xs font-bold" style={chip(holeMarkerEdit)}>
