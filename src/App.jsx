@@ -505,7 +505,7 @@ function HoleMap({ holeNum, line, onLine, markers, onMarkers, markerMode, aimPre
             <text y="1.5" textAnchor="middle" fontSize={m.auto ? 3.8 : 4.5}>🌲</text>
           </g>
         ))}
-        {b && <circle cx={b.x} cy={b.y} r="1.7" fill="#fff" stroke={T.ink} strokeWidth="0.6" />}
+        {b && <circle cx={b.x} cy={b.y} r="1.5" fill="#fff" stroke={T.ink} strokeWidth="0.6" />}
         {t && <g transform={`translate(${t.x} ${t.y})`} style={{ pointerEvents: "auto", cursor: draggingT ? "grabbing" : "grab" }}>
           <circle r="2.8" fill="none" stroke={T.flag} strokeWidth="1.1" />
           <circle r="0.9" fill={T.flag} />

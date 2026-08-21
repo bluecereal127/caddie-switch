@@ -43,7 +43,7 @@ const medianStack = (crops) => {
 // which keeps residue whenever 2 of 3 frames share the overlay.
 const darkenStack = (crops, excludeMasks = null) => {
   const { width: w, height: h } = crops[0];
-  const out = { width: w, height: h, data: Buffer.alloc(w * h * 4, 255) };
+  const out = { width: w, height: h, data: Buffer.alloc(w * h * 4, 255), holes: new Uint8Array(w * h) };
   const n = crops.length;
   const lum = new Array(n), idx = new Array(n);
   for (let p = 0; p < w * h; p++) {
@@ -57,8 +57,11 @@ const darkenStack = (crops, excludeMasks = null) => {
     }
     let srcK;
     if (m === 0) {
-      // every frame has an overlay near here (overlapping flags from close
-      // pin positions): source from the frame whose own flag is FARTHEST
+      // every frame has an overlay here (all frames share one pin, or the
+      // compass corner). Mark it a hole — the caller inpaints flag zones and
+      // blits the compass — and lay down the farthest-own-flag frame's pixel
+      // as a base underneath.
+      out.holes[p] = 1;
       const x = p % w, y = (p / w) | 0;
       let best = 0, bd = -1;
       for (let k = 0; k < n; k++) {
@@ -79,6 +82,53 @@ const darkenStack = (crops, excludeMasks = null) => {
     out.data[j] = src[j]; out.data[j + 1] = src[j + 1]; out.data[j + 2] = src[j + 2]; out.data[j + 3] = 255;
   }
   return out;
+};
+
+// Onion-peel inpaint: fill masked pixels layer by layer from the average of
+// their already-known neighbours, then a light 3×3 blur over the filled
+// region to hide the radial streaks the peel leaves. Used to scrub the flag
+// zone on holes where every pooled frame shares one pin — real art replaces
+// it automatically once a second-pin session exists.
+const onionInpaint = (img, holes) => {
+  const w = img.width, h = img.height, d = img.data;
+  let remaining = [];
+  for (let p = 0; p < w * h; p++) if (holes[p]) remaining.push(p);
+  if (!remaining.length) return;
+  const unknown = Uint8Array.from(holes);
+  const region = remaining.slice();
+  while (remaining.length) {
+    const layer = [];
+    for (const p of remaining) {
+      const x = p % w, y = (p / w) | 0;
+      let r = 0, g = 0, b = 0, c = 0;
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+        if (!dx && !dy) continue;
+        const nx = x + dx, ny = y + dy;
+        if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+        const np = ny * w + nx;
+        if (unknown[np]) continue;
+        const j = np * 4; r += d[j]; g += d[j + 1]; b += d[j + 2]; c++;
+      }
+      if (c) layer.push([p, r / c, g / c, b / c]);
+    }
+    if (!layer.length) break; // fully enclosed by image edge — give up
+    for (const [p, r, g, b] of layer) {
+      const j = p * 4; d[j] = Math.round(r); d[j + 1] = Math.round(g); d[j + 2] = Math.round(b);
+      unknown[p] = 0;
+    }
+    remaining = remaining.filter((p) => unknown[p]);
+  }
+  const src = Buffer.from(d);
+  for (const p of region) {
+    const x = p % w, y = (p / w) | 0;
+    let r = 0, g = 0, b = 0, c = 0;
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+      const nx = x + dx, ny = y + dy;
+      if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+      const j = (ny * w + nx) * 4; r += src[j]; g += src[j + 1]; b += src[j + 2]; c++;
+    }
+    const j = p * 4; d[j] = Math.round(r / c); d[j + 1] = Math.round(g / c); d[j + 2] = Math.round(b / c);
+  }
 };
 
 // per-frame exclusion mask: that frame's own pin flag (bright pink cluster +
@@ -289,19 +339,29 @@ for (let hole = 1; hole <= 21; hole++) {
   const overlays = poolCrops.map(overlayMask);
   const image = darkenStack(poolCrops, { masks: overlays.map((o) => o.mask), flags: overlays.map((o) => o.flag) });
   // NO flag composite: the app draws pins itself. Where every pooled frame
-  // shares one pin the baked flag survives for now; a second-pin upload for
-  // that hole scrubs it automatically (user's chosen approach).
+  // shares one pin, the flag zone has no clean source — inpaint it from the
+  // surrounding art; a second-pin upload replaces the fill with real pixels.
   // (A near-black backdrop transform was tried here and reverted — the
   // user prefers the game's native backdrop.)
   // compass: locked 0-mph patch when available, else the detection stack's own
   const corner = findCompassCorner(stacked);
   const locked = lockedCompass(hole);
+  const cRect = locked?.rect ?? (corner != null ? compassRect(stacked, corner) : null);
+  if (cRect) // compass zone is also all-excluded but gets blitted below — skip it
+    for (let y = cRect.y0; y <= cRect.y1; y++)
+      for (let x = cRect.x0; x <= cRect.x1; x++) image.holes[y * image.width + x] = 0;
+  onionInpaint(image, image.holes);
   if (locked) {
     blitRect(image, locked.img, locked.rect, { x0: 0, y0: 0, x1: locked.img.width - 1, y1: locked.img.height - 1 });
   } else if (corner != null) {
     blitRect(image, stacked, compassRect(stacked, corner));
   }
   savePng(`${OUT}/h${String(hole).padStart(2, "0")}.png`, image);
+  // detection copy (median stack, flag intact): the green→map projection in
+  // build-derived correlates against the flag/hole darks the display art no
+  // longer has — keep them available separately (not shipped; captures/ is
+  // gitignored).
+  savePng(`${OUT}/h${String(hole).padStart(2, "0")}.det.png`, stacked);
   // badge yardage from any frame in the SAME session (map or green frames)
   const sameSession = manifest.frames.filter((f) => f.hole === hole);
   const inSess = sessions(sameSession).find((s) => s.some((f) => f.file === use[0].file)) ?? [];

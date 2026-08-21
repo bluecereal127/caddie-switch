@@ -184,6 +184,11 @@ mkdirSync(join(D, "boxes"), { recursive: true });
 for (let hole = 1; hole <= 21; hole++) {
   const id = `h${String(hole).padStart(2, "0")}`;
   const img = loadImage(join(D, "maps", `${id}.png`));
+  // projection correlates against the detection stack (flag/hole intact) —
+  // the display art has the flag inpainted away, which starves the matcher
+  // of its strongest dark landmark on pin-less holes
+  let det = img;
+  try { det = loadImage(join(D, "maps", `${id}.det.png`)); } catch {}
   const meta = mapsMeta.find((m) => m.hole === hole);
   const g = JSON.parse(readFileSync(join(D, "greens", `${id}.json`), "utf8"));
 
@@ -211,7 +216,7 @@ for (let hole = 1; hole <= 21; hole++) {
   for (const s of (anchorPool.length ? anchorPool : g.sessions)) {
     const zimg = loadImage(join(INBOX, s.plain));
     const zoom = cropRect(zimg, panelRect(zimg));
-    const pr = projectGreenBox(img, zoom, meta.pin, s.pinPx, s.bboxPx, kLo, kHi);
+    const pr = projectGreenBox(det, zoom, meta.pin, s.pinPx, s.bboxPx, kLo, kHi);
     if (!anchor || pr.r > anchor.r) anchor = { ...pr, session: s };
   }
   let greenBox = null, pins = [];
