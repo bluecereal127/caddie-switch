@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { HOLE_MAPS } from "./maps.js";
+import { MAP_XFORM_V5 } from "./mapxform.js";
 
 
 /* ============================================================
@@ -571,12 +572,65 @@ export default function App() {
         });
         if (d.activeRound) setActiveRound(d.activeRound);
         if (d.captures) setCaptures(d.captures);
+        // mapV5: maps.js swapped from the 219x270 originals to 250x304
+        // median-stacked captures; migrate stored fractional positions with
+        // the per-hole registration transforms (fNew = fOld*a + b)
+        if (!d.mapV5) setHolesMeta((prev) => {
+          const m = { ...prev };
+          for (let n = 1; n <= 21; n++) {
+            const t = MAP_XFORM_V5[n];
+            if (!t || !m[n]) continue;
+            const tx = (p) => ({ ...p, x: p.x * t.ax + t.bx, y: p.y * t.ay + t.by });
+            m[n] = { ...m[n],
+              markers: (m[n].markers ?? []).map(tx),
+              pins: (m[n].pins ?? []).map(tx),
+              green: m[n].green?.box ? { ...m[n].green, box: {
+                x0: m[n].green.box.x0 * t.ax + t.bx, x1: m[n].green.box.x1 * t.ax + t.bx,
+                y0: m[n].green.box.y0 * t.ay + t.by, y1: m[n].green.box.y1 * t.ay + t.by } } : m[n].green,
+              // old scale was yd per 219-px-map pixel; convert to the new px space
+              scale: m[n].scale != null ? m[n].scale * 219 / (250 * t.ax) : null,
+            };
+          }
+          return m;
+        });
       }
+      // derived.json: capture-pipeline output shipped with the deploy
+      // (scales, green boxes, slope grids, pins). First time it applies
+      // wholesale (derivedV1); afterwards it only fills empty slots and
+      // appends unseen pins, so newer manual edits survive.
+      try {
+        const res = await fetch("/derived.json");
+        if (res.ok) {
+          const der = await res.json();
+          const fresh = !d?.derivedV1;
+          setHolesMeta((prev) => {
+            const m = { ...prev };
+            for (const [nStr, dh] of Object.entries(der.holes ?? {})) {
+              const n = +nStr;
+              if (!m[n]) continue;
+              const cur = { ...m[n], green: { ...(m[n].green ?? emptyGreen()) } };
+              if (dh.scale != null && (fresh || cur.scale == null)) cur.scale = dh.scale;
+              if (dh.greenBox && (fresh || !cur.green.box)) cur.green.box = dh.greenBox;
+              const gridEmpty = !(cur.green.grid ?? []).some((r) => r.some(([x, y]) => x || y));
+              if (dh.grid && (fresh || gridEmpty)) cur.green.grid = dh.grid;
+              const pins = [...(cur.pins ?? [])];
+              for (const p of dh.pins ?? []) {
+                if (!pins.some((q) => Math.hypot(q.x - p.x, q.y - p.y) < 0.02))
+                  pins.push({ id: `d${n}-${pins.length}`, x: p.x, y: p.y });
+              }
+              cur.pins = pins;
+              if (!cur.curPin && pins.length) cur.curPin = pins[pins.length - 1].id;
+              m[n] = cur;
+            }
+            return m;
+          });
+        }
+      } catch {}
     })();
   }, []);
 
   const persist = async (patch = {}) => {
-    const data = { clubs, shots, holesMeta, rounds, activeRound, captures, parFixV3: true, mapV4: true, treesV9: true, ...patch };
+    const data = { clubs, shots, holesMeta, rounds, activeRound, captures, parFixV3: true, mapV4: true, treesV9: true, mapV5: true, derivedV1: true, ...patch };
     try {
       await window.storage.set(STORE_KEY, JSON.stringify(data));
       setSaveState("saved"); setTimeout(() => setSaveState(""), 1500);
@@ -589,7 +643,7 @@ export default function App() {
   };
 
   /* ---- map geometry ---- */
-  const MAP_W = 219, MAP_H = 270; // source px of the hole map images
+  const MAP_W = 250, MAP_H = 304; // source px of the hole map images (mapV5 stacked captures)
   const geo = useMemo(() => {
     if (!line.ball || !line.target) return null;
     const dx = (line.target.x - line.ball.x) * MAP_W;

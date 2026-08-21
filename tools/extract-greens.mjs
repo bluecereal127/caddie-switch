@@ -235,13 +235,19 @@ for (let hole = 1; hole <= 21; hole++) {
     s.some((f) => f.frameType === "greenPlain") && s.some((f) => f.frameType === "greenHeightmap"));
   if (!sess.length) { console.log(`H${hole}: no plain+heightmap pair`); continue; }
   const pins = [];
+  const sessionDetails = [];
   let final = null;
   for (const s of sess) {
     const plainF = s.find((f) => f.frameType === "greenPlain").file;
     const hmapF = s.find((f) => f.frameType === "greenHeightmap").file;
     const r = extractPair(hole, plainF, hmapF);
     if (r.error) { console.log(`H${hole} session: ${r.error}`); continue; }
-    if (r.pin) pins.push(r.pin);
+    if (r.pin) {
+      pins.push(r.pin);
+      sessionDetails.push({ plain: plainF, hmap: hmapF, bboxPx: r.bbox,
+        pinPx: { x: +(r.bbox.x0 + r.pin.gx * (r.bbox.x1 - r.bbox.x0)).toFixed(1),
+                 y: +(r.bbox.y0 + r.pin.gy * (r.bbox.y1 - r.bbox.y0)).toFixed(1) } });
+    }
     final = { r, plainF, hmapF };
   }
   if (!final) continue;
@@ -251,7 +257,7 @@ for (let hole = 1; hole <= 21; hole++) {
   savePng(join(OUT, `${id}-height.png`), r.hv);
   writeFileSync(join(OUT, `${id}.json`), JSON.stringify({
     hole, sources: { plain: final.plainF, heightmap: final.hmapF },
-    panelBbox: r.bbox, gridN: GRID_N, grid: r.grid, pins,
+    panelBbox: r.bbox, gridN: GRID_N, grid: r.grid, pins, sessions: sessionDetails,
     convention: "grid[row][col]=[dx,dy] downhill, +x right +y down, normalized to the green's own max slope; pin gx/gy fractional within bbox",
   }, null, 2));
   console.log(`H${hole}: mask=${r.maskSize}px bbox=[${r.bbox.x0},${r.bbox.y0}..${r.bbox.x1},${r.bbox.y1}] pins=${pins.length} ${pins.map((p) => `(${p.gx},${p.gy})`).join(" ")}`);

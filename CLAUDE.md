@@ -8,7 +8,9 @@ v13 and now diverges (v14: capture catalog); the web repo is the source of truth
 ## Files
 - `src/App.jsx` — entire app (~1300 lines): solver, hole maps, greens, rounds, log, clubs, guide, capture catalog.
 - `src/main.jsx` — mount point + client-side password gate (SHA-256 vs PASS_HASH; casual deterrence only — change via `node tools/hash-password.mjs <pw>`; deliberately kept out of App.jsx).
-- `src/maps.js` — 21 hole minimaps as base64 JPEG (from rufusmccoot/SwitchSportsGolfCaddy, MIT + slices of the official hole chart). Fractional coordinates everywhere, so images can be swapped for higher-res without losing data.
+- `src/maps.js` — AUTO-GENERATED (tools/build-derived.mjs): 21 hole minimaps as base64 JPEG, 250×304, median-stacked from the user's captures (mapV5; replaced the 219×270 rufusmccoot/chart set). Fractional coordinates everywhere.
+- `src/mapxform.js` — AUTO-GENERATED per-hole old→new fractional transforms used once by the mapV5 migration.
+- `public/derived.json` — AUTO-GENERATED capture-pipeline output (per-hole scale, green box, quantized 9×9 slope grid, pins, tee). App fetches it on load: first application is wholesale (derivedV1 flag), afterwards fill-empty + append-new-pins so manual edits survive. Regenerate: extract-maps → extract-greens → build-derived.
 - `src/storage.js` — window.storage shim (async get/set/delete/list over localStorage, key prefix `caddie:`; app data lives under `caddie:sss-golf-solver-v2`).
 - `tools/` — screenshot ingestion pipeline (pure Node; see tools/README.md). Scaffolded + verified on synthetic frames; ROIs/gauge cal/digit templates await first real captures.
 - Capture platform: user plays on a Switch 2, but NSS is a backward-compat Switch 1 title, so album captures are 1280×720 (Switch 2 games capture 1920×1080; no setting changes this — Nintendo support a_id 68408). All measured ROIs assume 720p frames; rects are fractional anyway.
@@ -32,6 +34,7 @@ grid per green (MU=1.35, SLOPE_G=1.1, capture radius 0.22 yd, max capture speed 
 - Restarting a hole (local play) restarts its 3-hole track with IDENTICAL wind. Outcomes are deterministic: same club/power/aim/wind → pixel-identical ball position (player-confirmed with driver, 9i, and putter across restarts).
 - Green B-grid is a STATIC shaded overlay — lighter = higher, darker = lower (game8 guide + player confirmation). No flowing dots/motion, unlike some other golf games.
 - Putter bar shows no fill during the backstroke but displays the final fill once the putt is made (player-confirmed) — post-stroke capture frames work for putts too.
+- All in-game distance readouts ("NNN yd to go", distance-to-pin) are FLAT level-ground distances — elevation never enters them (player-confirmed). They live in the same plane as the minimap, so map-scale calibration (yards ÷ map pixels) is exact on every hole; elevation only shifts actual carry.
 
 ## Data-entry protocol (why the Log tab looks like it does)
 Ended = distance-to-pin(before) − (after); valid at any power if straight, but
@@ -57,5 +60,5 @@ glyph templates from real frames → frame classifier (address / popup / tee-map
 
 ## Conventions
 - All positions fractional (0–1) relative to the hole map image.
-- Never bump storage keys without migration; flags used so far: parFixV3, mapV4, treesV9. Additive optional keys (e.g. `captures`, the per-hole screenshot catalog) need no flag.
+- Never bump storage keys without migration; flags used so far: parFixV3, mapV4, treesV9, mapV5 (map swap + coordinate transform), derivedV1 (derived.json applied wholesale once). Additive optional keys (e.g. `captures`, the per-hole screenshot catalog) need no flag.
 - Validate App.jsx with @babel/parser (jsx plugin) before shipping any edit.
