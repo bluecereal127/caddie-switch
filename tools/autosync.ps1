@@ -119,6 +119,32 @@ function Get-HaveIndex {
   @{ names = $names; hashes = $hashes }
 }
 
+# After new files land: classify them (template OCR, no agents), and if any
+# catalog frames (map/green/heightmap) were recognized, rebuild the derived
+# data and push — Netlify redeploys, the app picks it up on next load.
+function Invoke-Pipeline {
+  try {
+    $out = & node (Join-Path $PSScriptRoot "classify.mjs") | Out-String
+    foreach ($line in ($out -split "`n")) { if ($line.Trim()) { Log ("  " + $line.Trim()) } }
+    if ($out -match "CLASSIFIED catalog=(\d+)") {
+      $n = [int]$matches[1]
+      if ($n -gt 0) {
+        Log "pipeline: $n new catalog frame(s) - rebuilding derived data"
+        & node (Join-Path $PSScriptRoot "extract-maps.mjs") | Out-Null
+        & node (Join-Path $PSScriptRoot "extract-greens.mjs") | Out-Null
+        & node (Join-Path $PSScriptRoot "build-derived.mjs") | Out-Null
+        $changed = git -C $root status --porcelain -- src/maps.js src/mapxform.js public/derived.json
+        if ($changed) {
+          git -C $root add src/maps.js src/mapxform.js public/derived.json | Out-Null
+          git -C $root commit -m "Auto: derived data refresh from new captures" -m "Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>" | Out-Null
+          git -C $root push origin main | Out-Null
+          Log "pipeline: pushed derived-data refresh (site redeploying)" "Green"
+        } else { Log "pipeline: no derived-data changes" }
+      }
+    }
+  } catch { Log "pipeline error: $($_.Exception.Message)" "Yellow" }
+}
+
 function Download-File($url, $dest) {
   try { Invoke-WebRequest -Uri $url -Headers $H -OutFile $dest -UseBasicParsing }
   catch { Invoke-WebRequest -Uri "$url`?access_token=$($cfg.token)" -OutFile $dest -UseBasicParsing }
@@ -185,9 +211,11 @@ while ($true) {
       $new = @($subs | Where-Object { -not $state.ContainsKey($_.id) })
       if ($new.Count -gt 0) {
         Log "$($new.Count) new submission(s)"
+        $batchCopied = 0
         foreach ($sub in $new) {
           try {
             $n = Process-Submission $sub
+            $batchCopied += $n
             Log "  submission $($sub.id): $n file(s) -> captures\inbox"
             if (-not $KeepRemote) {
               Invoke-RestMethod "$api/submissions/$($sub.id)" -Headers $H -Method Delete | Out-Null
@@ -197,6 +225,7 @@ while ($true) {
             Log "  submission $($sub.id) failed: $($_.Exception.Message) (kept remote, will retry)" "Yellow"
           }
         }
+        if ($batchCopied -gt 0) { Invoke-Pipeline }
       } else {
         Write-Host "$(Get-Date -Format HH:mm:ss) nothing new"  # console only - don't bloat the log
       }

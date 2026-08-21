@@ -1,4 +1,4 @@
-// Image I/O + pixel helpers for the ingestion tools.
+﻿// Image I/O + pixel helpers for the ingestion tools.
 // Pure JS decoders only (pngjs, jpeg-js) so nothing native to build on Windows.
 import { readFileSync, writeFileSync } from "node:fs";
 import { PNG } from "pngjs";
@@ -86,6 +86,50 @@ export function binarize(img, polarity = "light") {
 
 export const colorDist = (a, b) =>
   Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+
+// Binarizer tuned for the game's HUD text: white glyphs with a dark outline.
+// A pixel is ink when it's near-white AND a dark outline pixel sits within
+// 2px - clouds/sky are bright but have no dark edging, busy backgrounds
+// don't fool it the way Otsu does.
+export function binarizeText(img) {
+  const w = img.width, h = img.height;
+  const dark = new Uint8Array(w * h), bin = new Uint8Array(w * h);
+  for (let i = 0, j = 0; i < w * h; i++, j += 4) {
+    const mx = Math.max(img.data[j], img.data[j + 1], img.data[j + 2]);
+    if (mx < 130) dark[i] = 1;
+  }
+  const bright = new Uint8Array(w * h);
+  const stack = [];
+  for (let y = 0; y < h; y++)
+    for (let x = 0; x < w; x++) {
+      const j = (y * w + x) * 4;
+      const mn = Math.min(img.data[j], img.data[j + 1], img.data[j + 2]);
+      // floor keeps antialiasing halo pixels out so tight kerning gaps
+      // survive and neighboring glyphs don't merge
+      if (mn < 205) continue;
+      bright[y * w + x] = 1;
+      let edged = false;
+      for (let dy = -2; dy <= 2 && !edged; dy++)
+        for (let dx = -2; dx <= 2; dx++) {
+          const nx = x + dx, ny = y + dy;
+          if (nx >= 0 && ny >= 0 && nx < w && ny < h && dark[ny * w + nx]) { edged = true; break; }
+        }
+      if (edged) { bin[y * w + x] = 1; stack.push(y * w + x); }
+    }
+  // flood edge-seeded ink into connected bright pixels so thick glyph
+  // interiors (further than 2px from the outline) still fill
+  while (stack.length) {
+    const j = stack.pop();
+    const jx = j % w, jy = (j / w) | 0;
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const nx = jx + dx, ny = jy + dy;
+      if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+      const k = ny * w + nx;
+      if (bright[k] && !bin[k]) { bin[k] = 1; stack.push(k); }
+    }
+  }
+  return { bin, width: w, height: h };
+}
 
 // Median RGB of one scanline of a crop, perpendicular to `axis`.
 // axis "y": line = row y across full width. axis "x": line = column x.
