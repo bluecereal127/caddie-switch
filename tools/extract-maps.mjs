@@ -95,16 +95,18 @@ const overlayMask = (crop) => {
   const w = crop.width, h = crop.height;
   const mask = new Uint8Array(w * h);
   let flag = null;
-  // Aim line: white/cyan dots and the line itself. Masking these matters more
-  // the MORE aims a pool covers — the swept line is grass in most frames and
-  // line in a few, which reads as motion and carves a strip out of the
-  // fairway. Excluded per frame, the remaining frames agree and it stays art.
-  // Sand (min ~165) and pale water (min ~150) fall under the min-channel
-  // floor, so neither is caught.
+  // Aim line: measured on real frames it is CYAN — samples run (49,239,249),
+  // (55,235,255), (63,232,241) — with a white core and the white ball dot.
+  // An all-channels-bright test misses it entirely (r is ~50), so match cyan
+  // explicitly. Masking this matters more the MORE aims a pool covers: the
+  // swept line is grass in most frames and line in a few, which reads as
+  // motion and carves a strip out of the fairway (H10). Pale lake water sits
+  // near (150,220,215), so the r<120 floor keeps water out of the mask.
   for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
     const p = px(crop, x, y);
-    const bright = Math.min(p[0], p[1], p[2]) > 185 && p[2] > 185;
-    if (!bright && !isPointerYellow(p)) continue;
+    const cyan = p[0] < 120 && p[1] > 215 && p[2] > 225;
+    const white = Math.min(p[0], p[1], p[2]) > 185 && p[2] > 185;
+    if (!cyan && !white && !isPointerYellow(p)) continue;
     for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) {
       const nx = x + dx, ny = y + dy;
       if (nx >= 0 && ny >= 0 && nx < w && ny < h) mask[ny * w + nx] = 1;

@@ -97,11 +97,29 @@ now support that:
 - extract-maps POOL_MAX = 16 (was a flat `slice(-9)` of the most recent).
   Frames are chosen by farthest-point selection on a downsampled signature,
   so the pool is the most VISUALLY DIFFERENT 16, not the newest 16.
-- overlayMask also masks each frame's aim line (white/cyan, min-channel>185,
-  +2px) and avatar. This is load-bearing once aims vary: the swept line is
-  grass in most frames and line in a few, which reads as motion and carved a
-  strip out of H10's fairway. Sand (min ~165) and pale water (min ~150) sit
-  under the floor, so neither is caught.
+- overlayMask also masks each frame's aim line and avatar (+2px). This is
+  load-bearing once aims vary: the swept line is grass in most frames and
+  line in a few, which reads as motion and carved a strip out of H10's
+  fairway. MEASURED: the aim line is CYAN — (49,239,249), (55,235,255) — so
+  the test is r<120 && g>215 && b>225, plus a white test for its core and the
+  ball dot. An all-channels-bright test misses it completely (r is ~50); that
+  bug shipped briefly. Pale lake water is ~(150,220,215), which the r<120
+  floor excludes.
+
+### Frame-eligibility facts (measured 2026-08-21, don't re-derive)
+- Two TEE frames of the same hole are ~94% pixel-identical (H1): the map
+  layer registers exactly, only the 3D world and the overlays differ. This is
+  what makes motion segmentation work.
+- A tee frame vs a MID-ROUND frame of the same hole is ~5% identical: the
+  minimap re-frames (zoom/pan) as you advance up the hole. Mid-round frames
+  are therefore unusable in the stack and in the motion map — the existing
+  tee-only filter is correct and must stay. 56 of the 215 map frames in the
+  inbox are mid-round and are excluded for this reason, not by oversight.
+- Framing follows POSITION, not club. Club selection at the tee only changes
+  the aim line's length, so clubbing down (wedge) is safe and mildly helpful.
+- Stroke-1 frame counts per hole (2026-08-21): H10=12, H12=7, H11=6, H9=5,
+  most others 2-4. H12 has 7 tee frames that are near-identical — plenty of
+  frames, no aim variety — which is exactly why it reads ~0% motion.
 Self-correcting: a hole whose panel is genuinely all art (H12) keeps reading
 ~0% motion no matter how much the aim varies, and stays whole — while a hole
 that does have world behind it starts cutting as soon as varied frames land.
