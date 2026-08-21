@@ -308,6 +308,45 @@ for (let hole = 1; hole <= 21; hole++) {
   const poolCrops = (pool.length >= 2 ? pool : use).map((f) => { const img = loadImage(INBOX + f.file); return cropRect(img, panelRect(img)); });
   const overlays = poolCrops.map(overlayMask);
   const image = darkenStack(poolCrops, { masks: overlays.map((o) => o.mask), flags: overlays.map((o) => o.flag) });
+
+  // MOTION MAP: the panel composites the hole's map layer over the LIVE 3D
+  // world, and aiming rotates the camera — so across pooled frames the world
+  // behind the panel churns while the map layer is pixel-identical. Per-pixel
+  // luma range over the pool therefore segments map-art from world far more
+  // reliably than any color rule (dark OB rough and water are art and read as
+  // static; a bright distant shore is world and reads as moving). Consumed by
+  // matte-maps; the aim line and avatar also move, but they sit INSIDE the
+  // art and get closed by the enclosed-region fill there.
+  {
+    const w = image.width, h = image.height;
+    const vm = { width: w, height: h, data: Buffer.alloc(w * h * 4, 255) };
+    const N = poolCrops.length;
+    const L = poolCrops.map((c) => {
+      const a = new Float32Array(w * h);
+      for (let p = 0, j = 0; p < w * h; p++, j += 4)
+        a[p] = 0.299 * c.data[j] + 0.587 * c.data[j + 1] + 0.114 * c.data[j + 2];
+      return a;
+    });
+    // Plain range, no outlier rejection. Dropping "disagreeing" frames was
+    // tried and is actively wrong here: when most of the pool shares one aim,
+    // the median IS that aim, so the few frames that re-aimed — the only ones
+    // carrying any motion signal — are exactly the ones flagged as outliers
+    // (H1 lost 2 of 7 that way and went blind). A pool with a genuinely
+    // misregistered frame instead reads as mostly-moving, and the hole falls
+    // through to the override path.
+    for (let p = 0; p < w * h; p++) {
+      let lo = 1e9, hi = -1e9, m = 0;
+      for (let k = 0; k < N; k++) {
+        if (overlays[k].mask[p]) continue;
+        const v = L[k][p];
+        if (v < lo) lo = v; if (v > hi) hi = v; m++;
+      }
+      const v = m >= 2 ? Math.min(255, Math.round(hi - lo)) : 0;
+      const j = p * 4;
+      vm.data[j] = vm.data[j + 1] = vm.data[j + 2] = v;
+    }
+    savePng(`${OUT}/h${String(hole).padStart(2, "0")}.var.png`, vm);
+  }
   // NO flag composite: the app draws pins itself. Where every pooled frame
   // shares one pin, the flag zone has no clean source — inpaint it from the
   // surrounding art; a second-pin upload replaces the fill with real pixels.

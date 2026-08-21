@@ -375,7 +375,7 @@ function GreenCanvas({ mapSrc, green, mode, onGrid, ball, cup, onTap, path, aimP
 }
 
 /* ---------------- clickable hole map ---------------- */
-function HoleMap({ holeNum, line, onLine, markers, onMarkers, markerMode, aimPreview, cornerMode, onCorner, greenBox, pins = [], curPinId = null, pinMode = false, onPins, distLabel = null, windBadge = null, teePos = null, stopMarker = null, showPins = true, showTrees = true }) {
+function HoleMap({ holeNum, line, onLine, markers, onMarkers, markerMode, aimPreview, cornerMode, onCorner, greenBox, pins = [], curPinId = null, pinMode = false, onPins, distLabel = null, windBadge = null, teePos = null, stopMarker = null, showTrees = true }) {
   const imgRef = useRef(null);
   const [dims, setDims] = useState({ w: 113, h: 140 });
   const src = HOLE_MAPS[holeNum];
@@ -487,8 +487,11 @@ function HoleMap({ holeNum, line, onLine, markers, onMarkers, markerMode, aimPre
             </g>
           );
         })()}
-        {showPins && pins.map((p, i) => {
+        {pins.map((p, i) => {
           const cur = p.id === curPinId;
+          // during play only the pin in use is drawn; pin-edit mode shows the
+          // whole catalog so spots can be picked, added or removed
+          if (!cur && !pinMode) return null;
           return (
             <g key={p.id} transform={`translate(${p.x * 100} ${p.y * 100})`}>
               {cur && <circle r="4" fill="none" stroke="#fff" strokeWidth="0.9" />}
@@ -558,7 +561,6 @@ export default function App() {
   const [line, setLine] = useState({ ball: null, target: null });
   const [markerMode, setMarkerMode] = useState(false);
   const [selRec, setSelRec] = useState(null); // rec card tapped -> stop-marker preview on map
-  const [showPins, setShowPins] = useState(true);
   const [showTrees, setShowTrees] = useState(true);
   const [calInput, setCalInput] = useState("");
 
@@ -1010,7 +1012,7 @@ export default function App() {
                     distLabel={geo ? (scale ? `${Math.round(geo.srcPx * scale)} yd` : "? yd") : null}
                     teePos={holesMeta[hole].tee ?? null}
                     stopMarker={stopPoint}
-                    showPins={showPins} showTrees={showTrees} />
+                    showTrees={showTrees} />
                 </div>
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   <div className="rounded-xl border-2 p-2" style={{ borderColor: T.line, background: "#fff" }}>
@@ -1064,9 +1066,6 @@ export default function App() {
                     </button>
                   </div>
                   <div className="flex gap-2 mt-1.5">
-                    <button onClick={() => setShowPins(!showPins)} className="flex-1 py-1 rounded-xl border-2 text-[11px] font-bold" style={chip(showPins)}>
-                      🚩 pins {showPins ? "shown" : "hidden"}
-                    </button>
                     <button onClick={() => setShowTrees(!showTrees)} className="flex-1 py-1 rounded-xl border-2 text-[11px] font-bold" style={chip(showTrees)}>
                       🌲 trees {showTrees ? "shown" : "hidden"}
                     </button>

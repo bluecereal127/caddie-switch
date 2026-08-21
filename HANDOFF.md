@@ -19,8 +19,9 @@ capture pipeline; after editing autosync.ps1 restart it (Stop/Start-ScheduledTas
 - Greens: boundary + fused multi-session height field → 9×9 grid; pins
   accumulate. Shots: address+popup pairs → importable Log rows w/ bearing.
 - Solver UX: 1500px shell, 3-col solver on xl; tee-default draggable target,
-  windDeg N-up canonical, draggable rec bars, pins/trees hide toggles,
-  ball dot r=1.5.
+  windDeg N-up canonical, draggable rec bars, trees hide toggle, ball dot
+  r=1.5. Pins: only the SELECTED pin draws during play (the whole catalog
+  shows only in pin-edit mode) — the show/hide-pins toggle is gone.
 
 ## NEW DIRECTION — map art pass (user-validated 2026-08-21)
 User A/B-tested externally on one map JPEG:
@@ -46,29 +47,47 @@ tools/matte-maps.mjs — standalone preview tool, writes to
 captures/derived/matte-preview/ (hNN.rgba.png transparent 500×608,
 hNN.white.png on white, hNN.mask.png debug, _sheet.png all-21 contact sheet).
 NOT wired into the pipeline; nothing shipped yet (black-backdrop lesson).
+
+HARD REQUIREMENT (user, 2026-08-21): the cutout must KEEP water and the
+out-of-bounds dark rough. They are hole art, not backdrop.
+
 How it works, and what was learned tuning it:
-- HUD first: the dial+caption rect (compass corner detection shared with
-  extract-maps) is replaced by a MIRROR of the band above it. Needed because
-  on holes whose art reaches the panel floor (H13) the HUD is welded to the
-  art component and no island rule can drop it. Onion-inpainting that rect
-  instead left flat streaks — reflection keeps the grass texture.
-- Art/backdrop split: NO global threshold works. Measured
-    H12/H8  backdrop L~72 S~0.55 vs art L~150 S~0.50  (luma separates)
-    H20/H21 backdrop L~60 S~0.80 vs art L~130 S~0.55  (saturation separates)
-  Backdrop is the dimmed live world: darker AND more saturated (the dim
-  overlay crushes one channel toward 0, pushing saturation UP). So
-  score = luma − 90·sat, then per-hole Otsu (T_BIAS −4). Per-hole thresholds
-  land anywhere from 4 to 77 — that spread is why globals failed.
-- Flood from a ring inset FRAME=3 px: the crop's outer pixels are the panel's
-  own pale chrome, which walls a border flood out of the image entirely
-  (symptom: 98% "art", everything hole-filled).
-- Then: components → keep largest + islands ≥300px not in a HUD corner →
-  fill enclosed non-art → dilate 2px to reclaim the dark rim → 2× lanczos
-  upscale + unsharp 0.45 → bilinear alpha (soft edge).
-- RESULT 17/21 clean. Stragglers: H8 (bright lake-shore terraces kept),
-  H18 (fragments), H17 (backdrop ridge strands), H13 (keeps its dark plateau
-  — arguably correct art — and the mirror patch is faintly visible); minor
-  water-colored leaks on H4/H15.
+- Backdrop = the LIVE 3D WORLD the panel is composited over, and aiming
+  rotates the camera, so across pooled frames the world churns while the map
+  layer is pixel-identical. extract-maps writes that per-pixel luma range to
+  captures/derived/maps/hNN.var.png and the matte segments on MOTION.
+- Colour rules were tried first and are dead ends — recorded so nobody
+  retries them: dark OB rough and water are art but read as "dim", so every
+  luma/saturation threshold either keeps the world or eats the rough. Even
+  per-hole Otsu on (luma − 90·sat) fails: H12's panel is ~all art and Otsu
+  must split something, so it halved the hole.
+- Motion alone leaves rectangular slabs: nothing is visible moving INSIDE a
+  uniform hillside (aperture problem). Fixed by growing the world through
+  colour continuity (≤17 sum-|dRGB|) but ONLY across smooth pixels
+  (Sobel < 10) — art carries stripes and outlines, world slabs are
+  featureless, so the growth stops at the cutout.
+- Seeds are gated: only moving components ≥600px may seed the world. Stray
+  movers (aim dots clipped by the panel edge) otherwise open a door for the
+  growth to swallow a hole whose map fills the panel.
+- Opening (r=2) on the motion mask first: the aim line and dots move too and
+  give the flood a 2px catwalk into the fairway, carving the line out.
+- Flood from a ring inset FRAME=3px: the crop's outer pixels are the panel's
+  pale chrome, which walls a border flood out entirely (symptom: 98% "art").
+- If <2% of the panel moved, the pool never re-aimed and a cutout would be a
+  guess — the panel is kept whole (H12, correctly: it IS all art).
+- HUD: dial disk (r+11) + NEUTRAL-white caption glyphs are onion-inpainted
+  then blurred. The caption test must require low saturation — "pale" alone
+  masked H12's pale cyan lake and filled it with rough (this was the
+  bottom-right artifact the user spotted). Whatever the dial covered is
+  genuinely unknown (no frame ever shows it), so the fill is invention;
+  blurred it reads as out-of-focus terrain instead of a hard wedge.
+- DEAD END, do not retry: dropping "outlier" frames before measuring motion.
+  When most of the pool shares one aim the median IS that aim, so the few
+  re-aimed frames — the only ones carrying signal — get flagged. H1 lost 2 of
+  7 and went blind.
+- RESULT: rough/water now retained. Stragglers for the override path: H8
+  (fragments; its pool has a misregistered frame → 82% "moving"), H19 and
+  H21 (one world slab each survives), plus small nibbles on H3/H10/H13/H14.
 - Premium-art option (user liked the Cloudinary AI result): support
   captures/derived/maps-override/hNN.png — if present, build-derived uses it
   as the hole's art (geometry/pins still from stacks). Hand-feed the external
