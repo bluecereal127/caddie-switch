@@ -437,7 +437,13 @@ for (let hole = 1; hole <= 21; hole++) {
     const d = Math.hypot(pin.x - tee.x, pin.y - tee.y);
     scale = +(yards / d).toFixed(3); // yd per stacked-map pixel
   }
-  results.push({ hole, frames: use.map((f) => f.file), w: stacked.width, h: stacked.height,
+  // record exactly which frames were consumed, so tools/frame-audit.mjs can
+  // tell you why any given capture did or did not affect this hole's map
+  results.push({ hole, frames: use.map((f) => f.file),
+    pool: pool.map((f) => f.file),
+    teeCandidates: tees.map((f) => f.file),
+    mapFramesSeen: allMaps.map((f) => f.file),
+    w: stacked.width, h: stacked.height,
     pin, tee: tee ? { x: +tee.x.toFixed(1), y: +tee.y.toFixed(1) } : null, yards, scaleYdPerPx: scale });
   console.log(`H${hole}: stacked ${use.length} frames; pin=${pin ? `${pin.x},${pin.y}` : "?"} tee=${tee ? `${Math.round(tee.x)},${Math.round(tee.y)}` : "?"} yards=${yards ?? "?"} scale=${scale ?? "?"}`);
 }

@@ -137,6 +137,7 @@ for (const f of frames) {
       cur = { hole: f.hole, stroke: 1, before: null, lie: "tee", session: sessionId };
     }
     const a = readAddress(f);
+    a.file = f.file;
     cur.addr = a;
     if (a.badgeYd != null) cur.before = a.badgeYd;
     continue;
@@ -182,8 +183,11 @@ function pushRow(f, cur, a, power, ended, flags) {
   if (!a.club) flags.push("missingClub");
   if (a.windMph == null) flags.push("missingWindSpeed");
   if (a.windDeg == null && (a.windMph ?? 0) > 2) flags.push("missingWindDeg");
+  // popupFile/addrFile are what frame-audit joins on: a capture counts as
+  // "used for shot data" only if it actually produced a row here
   rows.push({
     id: (f.originalFile ?? f.file).match(/([0-9A-HJKMNP-TV-Z]{26})/)?.[1] ?? f.file,
+    popupFile: f.file, addrFile: a.file ?? null,
     hole: cur.hole, stroke: cur.stroke, club: a.club, power, lie: cur.lie,
     windSpeed: a.windMph ?? 0, windDeg: a.windDeg ?? 0, ended,
     bearing: a.bearing ?? undefined,
