@@ -291,16 +291,8 @@ for (let hole = 1; hole <= 21; hole++) {
   // NO flag composite: the app draws pins itself. Where every pooled frame
   // shares one pin the baked flag survives for now; a second-pin upload for
   // that hole scrubs it automatically (user's chosen approach).
-  // dark backdrop: the panel's translucent teal backdrop -> near-black for
-  // contrast (backdrop is dark, desaturated, blue-leaning; the OB ring art
-  // is darker GREEN, so require b >= g)
-  for (let i = 0; i < image.width * image.height * 4; i += 4) {
-    const r = image.data[i], g = image.data[i + 1], b = image.data[i + 2];
-    const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
-    if (mx < 100 && b >= g - 4 && mx - mn < 45) {
-      image.data[i] = 7; image.data[i + 1] = 10; image.data[i + 2] = 9;
-    }
-  }
+  // (A near-black backdrop transform was tried here and reverted — the
+  // user prefers the game's native backdrop.)
   // compass: locked 0-mph patch when available, else the detection stack's own
   const corner = findCompassCorner(stacked);
   const locked = lockedCompass(hole);

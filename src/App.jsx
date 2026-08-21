@@ -375,7 +375,7 @@ function GreenCanvas({ mapSrc, green, mode, onGrid, ball, cup, onTap, path, aimP
 }
 
 /* ---------------- clickable hole map ---------------- */
-function HoleMap({ holeNum, line, onLine, markers, onMarkers, markerMode, aimPreview, cornerMode, onCorner, greenBox, pins = [], curPinId = null, pinMode = false, onPins, distLabel = null, windBadge = null, teePos = null, stopMarker = null }) {
+function HoleMap({ holeNum, line, onLine, markers, onMarkers, markerMode, aimPreview, cornerMode, onCorner, greenBox, pins = [], curPinId = null, pinMode = false, onPins, distLabel = null, windBadge = null, teePos = null, stopMarker = null, showPins = true, showTrees = true }) {
   const imgRef = useRef(null);
   const [dims, setDims] = useState({ w: 113, h: 140 });
   const src = HOLE_MAPS[holeNum];
@@ -447,12 +447,6 @@ function HoleMap({ holeNum, line, onLine, markers, onMarkers, markerMode, aimPre
         onLoad={(e) => setDims({ w: e.target.naturalWidth, h: e.target.naturalHeight })} />
       <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 100 100" preserveAspectRatio="none">
         {b && t && <line x1={b.x} y1={b.y} x2={t.x} y2={t.y} stroke="#fff" strokeWidth="1" strokeDasharray="2.5 2" />}
-        {t && (
-          <g transform={`translate(${t.x} ${t.y})`} style={{ pointerEvents: "auto", cursor: draggingT ? "grabbing" : "grab" }}>
-            <circle r="3.1" fill="rgba(255,255,255,0.22)" stroke="#fff" strokeWidth="0.8" />
-            <circle r="0.9" fill="#fff" />
-          </g>
-        )}
         {b && t && distLabel && (
           <g transform={`translate(${(b.x + t.x) / 2} ${(b.y + t.y) / 2})`}>
             <rect x="-11" y="-4.5" width="22" height="8" rx="2" fill="rgba(20,48,29,0.85)" />
@@ -493,7 +487,7 @@ function HoleMap({ holeNum, line, onLine, markers, onMarkers, markerMode, aimPre
             </g>
           );
         })()}
-        {pins.map((p, i) => {
+        {showPins && pins.map((p, i) => {
           const cur = p.id === curPinId;
           return (
             <g key={p.id} transform={`translate(${p.x * 100} ${p.y * 100})`}>
@@ -505,14 +499,14 @@ function HoleMap({ holeNum, line, onLine, markers, onMarkers, markerMode, aimPre
             </g>
           );
         })}
-        {markers.map((m) => (
+        {showTrees && markers.map((m) => (
           <g key={m.id} transform={`translate(${m.x * 100} ${m.y * 100})`} opacity={m.auto ? 0.85 : 1}>
             <circle r={m.auto ? 2.6 : 3.2} fill="#0B3D1E" stroke="#fff" strokeWidth={m.auto ? 0.4 : 0.7} />
             <text y="1.5" textAnchor="middle" fontSize={m.auto ? 3.8 : 4.5}>🌲</text>
           </g>
         ))}
-        {b && <circle cx={b.x} cy={b.y} r="2.6" fill="#fff" stroke={T.ink} strokeWidth="0.8" />}
-        {t && <g transform={`translate(${t.x} ${t.y})`}>
+        {b && <circle cx={b.x} cy={b.y} r="1.7" fill="#fff" stroke={T.ink} strokeWidth="0.6" />}
+        {t && <g transform={`translate(${t.x} ${t.y})`} style={{ pointerEvents: "auto", cursor: draggingT ? "grabbing" : "grab" }}>
           <circle r="2.8" fill="none" stroke={T.flag} strokeWidth="1.1" />
           <circle r="0.9" fill={T.flag} />
         </g>}
@@ -564,6 +558,8 @@ export default function App() {
   const [line, setLine] = useState({ ball: null, target: null });
   const [markerMode, setMarkerMode] = useState(false);
   const [selRec, setSelRec] = useState(null); // rec card tapped -> stop-marker preview on map
+  const [showPins, setShowPins] = useState(true);
+  const [showTrees, setShowTrees] = useState(true);
   const [calInput, setCalInput] = useState("");
 
   const empty = { club: "driver", power: "3.5", lie: "tee", windSpeed: "0", windDeg: 0, carry: "", lateral: "", hole: 0, stroke: 1 };
@@ -1013,7 +1009,8 @@ export default function App() {
                     pinMode={false} onPins={(p) => setPins(hole, p)}
                     distLabel={geo ? (scale ? `${Math.round(geo.srcPx * scale)} yd` : "? yd") : null}
                     teePos={holesMeta[hole].tee ?? null}
-                    stopMarker={stopPoint} />
+                    stopMarker={stopPoint}
+                    showPins={showPins} showTrees={showTrees} />
                 </div>
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   <div className="rounded-xl border-2 p-2" style={{ borderColor: T.line, background: "#fff" }}>
@@ -1064,6 +1061,14 @@ export default function App() {
                     </button>
                     <button onClick={() => setMarkerMode(!markerMode)} className="flex-1 py-1.5 rounded-xl border-2 font-bold" style={chip(markerMode)}>
                       🌲 {markerMode ? "tap: add / remove" : "Edit trees"}
+                    </button>
+                  </div>
+                  <div className="flex gap-2 mt-1.5">
+                    <button onClick={() => setShowPins(!showPins)} className="flex-1 py-1 rounded-xl border-2 text-[11px] font-bold" style={chip(showPins)}>
+                      🚩 pins {showPins ? "shown" : "hidden"}
+                    </button>
+                    <button onClick={() => setShowTrees(!showTrees)} className="flex-1 py-1 rounded-xl border-2 text-[11px] font-bold" style={chip(showTrees)}>
+                      🌲 trees {showTrees ? "shown" : "hidden"}
                     </button>
                   </div>
                 </div>
