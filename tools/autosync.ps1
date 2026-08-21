@@ -126,12 +126,13 @@ function Invoke-Pipeline {
   try {
     $out = & node (Join-Path $PSScriptRoot "classify.mjs") | Out-String
     foreach ($line in ($out -split "`n")) { if ($line.Trim()) { Log ("  " + $line.Trim()) } }
-    if ($out -match "CLASSIFIED catalog=(\d+)") {
-      $n = [int]$matches[1]
+    if ($out -match "CLASSIFIED catalog=(\d+) other=(\d+)") {
+      $n = [int]$matches[1] + [int]$matches[2]   # pop-ups count too: they carry shots
       if ($n -gt 0) {
-        Log "pipeline: $n new catalog frame(s) - rebuilding derived data"
+        Log "pipeline: $n new frame(s) - rebuilding derived data"
         & node (Join-Path $PSScriptRoot "extract-maps.mjs") | Out-Null
         & node (Join-Path $PSScriptRoot "extract-greens.mjs") | Out-Null
+        & node (Join-Path $PSScriptRoot "assemble-shots.mjs") | Out-Null
         & node (Join-Path $PSScriptRoot "build-derived.mjs") | Out-Null
         $changed = git -C $root status --porcelain -- src/maps.js src/mapxform.js public/derived.json
         if ($changed) {

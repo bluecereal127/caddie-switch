@@ -589,6 +589,24 @@ export default function App() {
             }
             return m;
           });
+          // assembled shot rows from the capture pipeline -> auto-Log
+          // (deduped by pop-up-frame id; wind is aim-relative, deg 0 = tail)
+          if (Array.isArray(der.shots) && der.shots.length) {
+            setShots((prevShots) => {
+              const have = new Set(prevShots.map((s) => s.id));
+              const add = der.shots.filter((r) => r.club && !have.has(r.id)).map((r) => {
+                const rad = ((r.windDeg ?? 0) * Math.PI) / 180;
+                return { id: r.id, club: r.club, power: r.power, lie: r.lie,
+                  wAlong: (r.windSpeed ?? 0) * Math.cos(rad), wCross: (r.windSpeed ?? 0) * Math.sin(rad),
+                  carry: r.ended, lateral: null, hole: r.hole ?? 0, stroke: r.stroke ?? 1,
+                  raw: { speed: r.windSpeed ?? 0, deg: r.windDeg ?? 0 } };
+              });
+              if (!add.length) return prevShots;
+              const next = [...add, ...prevShots];
+              setClubs((prevClubs) => prevClubs.map((c) => fitClub(c, next)));
+              return next;
+            });
+          }
         }
       } catch {}
     })();
