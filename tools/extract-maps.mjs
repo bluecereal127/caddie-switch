@@ -36,6 +36,90 @@ const medianStack = (crops) => {
   return out;
 };
 
+// Darken-stack: per pixel, copy the RGB of the frame with the LOWEST
+// luminance (2nd-lowest for larger pools, to dodge dark outliers). The aim
+// line/dots and the avatar are always BRIGHTER than the terrain they cover,
+// so one clean frame at a pixel is enough to erase them — unlike the median,
+// which keeps residue whenever 2 of 3 frames share the overlay.
+const darkenStack = (crops, excludeMasks = null) => {
+  const { width: w, height: h } = crops[0];
+  const out = { width: w, height: h, data: Buffer.alloc(w * h * 4, 255) };
+  const n = crops.length;
+  const lum = new Array(n), idx = new Array(n);
+  for (let p = 0; p < w * h; p++) {
+    const j = p * 4;
+    let m = 0;
+    for (let k = 0; k < n; k++) {
+      if (excludeMasks && excludeMasks.masks[k] && excludeMasks.masks[k][p]) continue;
+      const d = crops[k].data;
+      lum[m] = 0.299 * d[j] + 0.587 * d[j + 1] + 0.114 * d[j + 2];
+      idx[m] = k; m++;
+    }
+    let srcK;
+    if (m === 0) {
+      // every frame has an overlay near here (overlapping flags from close
+      // pin positions): source from the frame whose own flag is FARTHEST
+      const x = p % w, y = (p / w) | 0;
+      let best = 0, bd = -1;
+      for (let k = 0; k < n; k++) {
+        const f = excludeMasks?.flags?.[k];
+        const d = f ? Math.hypot(x - f.x, y - f.y) : 0;
+        if (d > bd) { bd = d; best = k; }
+      }
+      srcK = best;
+    } else {
+      // darkest (2nd-darkest in big pools) among the clean frames
+      const pick = Math.min(m - 1, m >= 5 ? 1 : 0);
+      for (let a = 1; a < m; a++) { const key = lum[a], kk = idx[a]; let b = a - 1;
+        while (b >= 0 && lum[b] > key) { lum[b + 1] = lum[b]; idx[b + 1] = idx[b]; b--; }
+        lum[b + 1] = key; idx[b + 1] = kk; }
+      srcK = idx[pick];
+    }
+    const src = crops[srcK].data;
+    out.data[j] = src[j]; out.data[j + 1] = src[j + 1]; out.data[j + 2] = src[j + 2]; out.data[j + 3] = 255;
+  }
+  return out;
+};
+
+// per-frame exclusion mask: that frame's own pin flag (bright pink cluster +
+// pole below) and its wind compass (whichever corner it sat in) — so those
+// regions get sourced from frames where the overlay was elsewhere
+const overlayMask = (crop) => {
+  const w = crop.width, h = crop.height;
+  const mask = new Uint8Array(w * h);
+  let flag = null;
+  // flag
+  let sx = 0, sy = 0, c = 0;
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++)
+    if (isFlagPink(px(crop, x, y))) { sx += x; sy += y; c++; }
+  if (c >= 4) {
+    const fx = sx / c, fy = sy / c;
+    flag = { x: fx, y: fy };
+    for (let y = Math.max(0, fy - 14); y <= Math.min(h - 1, fy + 26); y++)
+      for (let x = Math.max(0, fx - 14); x <= Math.min(w - 1, fx + 14); x++)
+        mask[Math.round(y) * w + Math.round(x)] = 1;
+  }
+  // compass (either corner)
+  const r = CR * w, cy = CCY * h;
+  for (const cx of [0.168 * w, 0.832 * w]) {
+    let ring = 0;
+    for (let a = 0; a < 36; a++) {
+      const th = (a / 36) * 2 * Math.PI;
+      for (let rr = r - 5; rr <= r + 3; rr++) {
+        const x = Math.round(cx + rr * Math.cos(th)), y = Math.round(cy + rr * Math.sin(th));
+        if (x < 0 || y < 0 || x >= w || y >= h) continue;
+        const p = px(crop, x, y);
+        if (Math.min(p[0], p[1], p[2]) > 165) { ring++; break; }
+      }
+    }
+    if (ring < 14) continue;
+    for (let y = Math.max(0, cy - r - 4); y <= Math.min(h - 1, cy + r + 30); y++)
+      for (let x = Math.max(0, cx - r - 6); x <= Math.min(w - 1, cx + r + 6); x++)
+        mask[Math.round(y) * w + Math.round(x)] = 1;
+  }
+  return { mask, flag };
+};
+
 // centroid+extent of pixels matching a predicate. The wind compass lives
 // INSIDE the panel (bottom-right in map mode) and its arrow is yellow at
 // 10-19 mph and pink at 20+ — the exact colors of the tee pointer and the
@@ -88,6 +172,78 @@ const prev = (() => {
   try { return JSON.parse(readFileSync(`${OUT}/../maps.json`, "utf8")).holes; } catch { return []; }
 })();
 
+// Compass policy (user's call): keep the game's own compass baked in. By
+// default it's composited crisply from the single-session detection stack;
+// the first time a 0-mph tee frame exists for a hole, that frame's compass
+// rect is saved to captures/derived/compass0/ and locked in forever (same
+// hole + same corner = identical background art, so the rect transplant is
+// seamless). The flag is composited from the detection stack the same way,
+// so pooled multi-pin stacks can't ghost it.
+const CR = 0.108, CCY = 0.822;
+function findCompassCorner(img) {
+  const w = img.width, h = img.height, r = CR * w, cy = CCY * h;
+  const score = (cx) => {
+    let s = 0;
+    for (let a = 0; a < 72; a++) {
+      const th = (a / 72) * 2 * Math.PI;
+      for (let rr = r - 5; rr <= r + 3; rr++) {
+        const x = Math.round(cx + rr * Math.cos(th)), y = Math.round(cy + rr * Math.sin(th));
+        if (x < 0 || y < 0 || x >= w || y >= h) continue;
+        const p = px(img, x, y);
+        if (Math.min(p[0], p[1], p[2]) > 165) { s++; break; }
+      }
+    }
+    return s;
+  };
+  const L = score(0.168 * w), R = score(0.832 * w);
+  if (Math.max(L, R) < 25) return null;
+  return L >= R ? 0.168 * w : 0.832 * w;
+}
+const compassRect = (img, cx) => {
+  const w = img.width, h = img.height, r = CR * w, cy = CCY * h;
+  return { x0: Math.max(0, Math.round(cx - r - 18)), y0: Math.max(0, Math.round(cy - r - 4)),
+           x1: Math.min(w - 1, Math.round(cx + r + 18)), y1: Math.min(h - 1, Math.round(cy + r + 30)) };
+};
+const blitRect = (dst, src, rect, srcRect = null) => {
+  const s = srcRect ?? rect;
+  for (let y = 0; y <= rect.y1 - rect.y0; y++)
+    for (let x = 0; x <= rect.x1 - rect.x0; x++) {
+      const di = ((rect.y0 + y) * dst.width + rect.x0 + x) * 4;
+      const si = ((s.y0 + y) * src.width + s.x0 + x) * 4;
+      dst.data[di] = src.data[si]; dst.data[di + 1] = src.data[si + 1]; dst.data[di + 2] = src.data[si + 2];
+    }
+};
+const C0DIR = `${OUT}/../compass0`;
+mkdirSync(C0DIR, { recursive: true });
+function lockedCompass(hole) {
+  const id = `h${String(hole).padStart(2, "0")}`;
+  try {
+    const meta = JSON.parse(readFileSync(`${C0DIR}/${id}.json`, "utf8"));
+    return { img: loadImage(`${C0DIR}/${id}.png`), rect: meta.rect };
+  } catch {}
+  // any 0-mph tee frame in the manifest locks this hole's compass now
+  const zero = manifest.frames.find((f) => f.hole === hole && f.frameType === "map" && f.windMph === 0);
+  if (!zero) return null;
+  try {
+    const src = loadImage(INBOX + zero.file);
+    const crop = cropRect(src, panelRect(src));
+    const cx = findCompassCorner(crop);
+    if (cx == null) return null;
+    const rect = compassRect(crop, cx);
+    const tile = { width: rect.x1 - rect.x0 + 1, height: rect.y1 - rect.y0 + 1,
+      data: Buffer.alloc((rect.x1 - rect.x0 + 1) * (rect.y1 - rect.y0 + 1) * 4, 255) };
+    for (let y = 0; y < tile.height; y++)
+      for (let x = 0; x < tile.width; x++) {
+        const si = ((rect.y0 + y) * crop.width + rect.x0 + x) * 4, di = (y * tile.width + x) * 4;
+        tile.data[di] = crop.data[si]; tile.data[di + 1] = crop.data[si + 1]; tile.data[di + 2] = crop.data[si + 2];
+      }
+    savePng(`${C0DIR}/${id}.png`, tile);
+    writeFileSync(`${C0DIR}/${id}.json`, JSON.stringify({ rect, source: zero.file }));
+    console.log(`H${hole}: locked 0-mph compass from ${zero.file}`);
+    return { img: tile, rect };
+  } catch { return null; }
+}
+
 const results = [];
 for (let hole = 1; hole <= 21; hole++) {
   const allMaps = manifest.frames.filter((f) => f.hole === hole && f.frameType === "map");
@@ -121,23 +277,32 @@ for (let hole = 1; hole <= 21; hole++) {
     use = fallback; stacked = medianStack(crops);
   }
 
-  // IMAGE from a cross-session pool (up to 9 newest tee frames): sessions
-  // aim differently, so pooling scrubs aim-line/avatar ghosts that a single
-  // 3-frame session can leave (2/3 agreement keeps a pixel). Flags may
-  // differ per round and blur out — fine, the app draws pins itself.
-  // Detection (pin/tee/scale) stays on the single-session stack above.
-  let image = stacked;
-  const pool = tees.slice(-9);
-  if (pool.length >= 5) {
-    const poolCrops = pool.map((f) => { const img = loadImage(INBOX + f.file); return cropRect(img, panelRect(img)); });
-    const pooled = medianStack(poolCrops);
-    if (aimResidue(pooled) < 60) image = pooled;
-  }
-  savePng(`${OUT}/h${String(hole).padStart(2, "0")}.png`, image);
-
   const flag = findCluster(stacked, isFlagPink);
   const pin = flag ? pinBase(stacked, flag) : null;
   const tee = findCluster(stacked, isPointerYellow);
+
+  // IMAGE via darken-stack over a cross-session pool of tee frames —
+  // erases aim line/dots and avatar wherever at least one frame is clean.
+  // Detection (pin/tee/scale) stays on the single-session median above.
+  const pool = tees.slice(-9);
+  const poolCrops = (pool.length >= 2 ? pool : use).map((f) => { const img = loadImage(INBOX + f.file); return cropRect(img, panelRect(img)); });
+  const overlays = poolCrops.map(overlayMask);
+  const image = darkenStack(poolCrops, { masks: overlays.map((o) => o.mask), flags: overlays.map((o) => o.flag) });
+  // composite the flag crisply from the detection stack (one flag, no ghosts)
+  if (flag) {
+    const fr = { x0: Math.max(0, Math.round(flag.x - 16)), y0: Math.max(0, Math.round(flag.y - 16)),
+                 x1: Math.min(image.width - 1, Math.round(flag.x + 16)), y1: Math.min(image.height - 1, Math.round((pin?.y ?? flag.maxY) + 6)) };
+    blitRect(image, stacked, fr);
+  }
+  // compass: locked 0-mph patch when available, else the detection stack's own
+  const corner = findCompassCorner(stacked);
+  const locked = lockedCompass(hole);
+  if (locked) {
+    blitRect(image, locked.img, locked.rect, { x0: 0, y0: 0, x1: locked.img.width - 1, y1: locked.img.height - 1 });
+  } else if (corner != null) {
+    blitRect(image, stacked, compassRect(stacked, corner));
+  }
+  savePng(`${OUT}/h${String(hole).padStart(2, "0")}.png`, image);
   // badge yardage from any frame in the SAME session (map or green frames)
   const sameSession = manifest.frames.filter((f) => f.hole === hole);
   const inSess = sessions(sameSession).find((s) => s.some((f) => f.file === use[0].file)) ?? [];

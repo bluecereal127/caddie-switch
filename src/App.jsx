@@ -380,7 +380,38 @@ function HoleMap({ holeNum, line, onLine, markers, onMarkers, markerMode, aimPre
   const [dims, setDims] = useState({ w: 113, h: 140 });
   const src = HOLE_MAPS[holeNum];
 
+  const dragMoved = useRef(false);
+  const fracOf = (e, el) => {
+    const r = el.getBoundingClientRect();
+    const pt = e.touches ? e.touches[0] : e;
+    return { x: Math.min(1, Math.max(0, (pt.clientX - r.left) / r.width)),
+             y: Math.min(1, Math.max(0, (pt.clientY - r.top) / r.height)) };
+  };
+  // grab-and-drag the target marker
+  const onDown = (e) => {
+    if (cornerMode || pinMode || markerMode || !line.target) return;
+    const el = e.currentTarget;
+    const f = fracOf(e, el);
+    if (Math.hypot(f.x - line.target.x, f.y - line.target.y) >= 0.07) return;
+    e.preventDefault();
+    const ball = line.ball;
+    const mv = (ev) => {
+      if (ev.cancelable) ev.preventDefault();
+      dragMoved.current = true;
+      onLine({ ball, target: fracOf(ev, el) });
+    };
+    const up = () => {
+      window.removeEventListener("mousemove", mv); window.removeEventListener("touchmove", mv);
+      setTimeout(() => { dragMoved.current = false; }, 0);
+    };
+    window.addEventListener("mousemove", mv);
+    window.addEventListener("touchmove", mv, { passive: false });
+    window.addEventListener("mouseup", up, { once: true });
+    window.addEventListener("touchend", up, { once: true });
+  };
+
   const click = (e) => {
+    if (dragMoved.current) { dragMoved.current = false; return; }
     const r = e.currentTarget.getBoundingClientRect();
     const fx = (e.clientX - r.left) / r.width;
     const fy = (e.clientY - r.top) / r.height;
@@ -407,11 +438,18 @@ function HoleMap({ holeNum, line, onLine, markers, onMarkers, markerMode, aimPre
 
   // aim preview point: rotate the aim offset (yd → map fraction handled by parent via aimPreview.fx/fy)
   return (
-    <div className="relative rounded-xl overflow-hidden select-none" style={{ border: `3px solid ${T.turfDeep}`, cursor: "crosshair" }} onClick={click}>
+    <div className="relative rounded-xl overflow-hidden select-none touch-none" style={{ border: `3px solid ${T.turfDeep}`, cursor: "crosshair" }}
+      onClick={click} onMouseDown={onDown} onTouchStart={onDown}>
       <img ref={imgRef} src={src} alt={`Hole ${holeNum} map`} className="w-full block" draggable={false}
         onLoad={(e) => setDims({ w: e.target.naturalWidth, h: e.target.naturalHeight })} />
       <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 100 100" preserveAspectRatio="none">
         {b && t && <line x1={b.x} y1={b.y} x2={t.x} y2={t.y} stroke="#fff" strokeWidth="1" strokeDasharray="2.5 2" />}
+        {t && (
+          <g transform={`translate(${t.x} ${t.y})`}>
+            <circle r="3.1" fill="rgba(255,255,255,0.22)" stroke="#fff" strokeWidth="0.8" />
+            <circle r="0.9" fill="#fff" />
+          </g>
+        )}
         {b && t && distLabel && (
           <g transform={`translate(${(b.x + t.x) / 2} ${(b.y + t.y) / 2})`}>
             <rect x="-11" y="-4.5" width="22" height="8" rx="2" fill="rgba(20,48,29,0.85)" />
@@ -949,7 +987,6 @@ export default function App() {
                     pins={holesMeta[hole].pins} curPinId={holesMeta[hole].curPin}
                     pinMode={false} onPins={(p) => setPins(hole, p)}
                     distLabel={geo ? (scale ? `${Math.round(geo.srcPx * scale)} yd` : "? yd") : null}
-                    windBadge={lie !== "green" ? { deg: windMode === "map" ? windDeg : (shotBearing != null ? (windDeg + shotBearing) % 360 : windDeg), speed: windSpeed } : null}
                     teePos={holesMeta[hole].tee ?? null}
                     stopMarker={stopPoint} />
                 </div>

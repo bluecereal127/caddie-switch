@@ -16,7 +16,8 @@ import { fileURLToPath } from "node:url";
 import { loadImage, cropFrac, binarizeText } from "./lib/image.mjs";
 import { segmentGlyphs, normalizeGlyph, loadTemplates } from "./lib/digits.mjs";
 import { readPopupGauge, binarizeTitle, POPUP_ROIS } from "./lib/popup.mjs";
-import { readWindArrow } from "./lib/wind.mjs";
+import { readWindArrow, readMapWindArrow } from "./lib/wind.mjs";
+import { panelRect, cropRect } from "./lib/panel.mjs";
 import { fileMs } from "./lib/ulid.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -104,9 +105,16 @@ function readAddress(f) {
     if (t.length >= 4 && (t.match(/\?/g) ?? []).length <= 1) club = t;
   }
   const arrow = readWindArrow(img);
+  // the panel's own compass is NORTH-relative; with the aim-relative arrow
+  // this yields the shot's map bearing (45° steps): B = mapDeg - aimDeg
+  let bearing = null;
+  if (arrow && f.frameType === "map") {
+    const mapArrow = readMapWindArrow(cropRect(img, panelRect(img)));
+    if (mapArrow) bearing = ((mapArrow.deg - arrow.deg) % 360 + 360) % 360;
+  }
   const badgeYd = f.badge?.match(/^(\d+) yd/) ? parseInt(f.badge) : null;
   return { club: clubId(club), clubRaw: club, windMph: f.windMph ?? null,
-    windDeg: arrow ? arrow.deg : (f.windMph === 0 ? 0 : null), badgeYd };
+    windDeg: arrow ? arrow.deg : (f.windMph === 0 ? 0 : null), badgeYd, bearing };
 }
 
 // ---- walk sessions ----
@@ -178,6 +186,7 @@ function pushRow(f, cur, a, power, ended, flags) {
     id: (f.originalFile ?? f.file).match(/([0-9A-HJKMNP-TV-Z]{26})/)?.[1] ?? f.file,
     hole: cur.hole, stroke: cur.stroke, club: a.club, power, lie: cur.lie,
     windSpeed: a.windMph ?? 0, windDeg: a.windDeg ?? 0, ended,
+    bearing: a.bearing ?? undefined,
     flags: flags.length ? flags : undefined,
     importable: !!a.club && power > 0 && (a.windDeg != null || (a.windMph ?? 0) <= 2),
   });
