@@ -55,14 +55,14 @@ pogolist/mccullough pattern).** One-time setup:
        **Archive** from action 1
    - Action 3 (optional): **Show Notification** — "captures uploaded".
 
-   ZIP BATCHING IS MANDATORY for quota reasons: Netlify meters form
-   submissions per month and bills overage packs (the free allowance is
-   small — a 50% warning arrived after one day of per-image posting).
-   One share = one submission regardless of image count. Keep a share to
-   **20 images or fewer** (~6 MB; Netlify rejects requests over 8 MB) and
-   just share twice for bigger sets. Autosync still accepts per-image
-   posts (`file1` field) if one ever arrives, but don't use that shape
-   routinely.
+   TRANSPORT (2026-08-20): uploads no longer touch Netlify Forms. An edge
+   function (netlify/edge-functions/upload.js) intercepts POST / before
+   Forms sees it and stores every file field into the "captures" blob
+   store; autosync drains the store each poll. Nothing is metered at this
+   scale (edge invocations + Blobs are effectively free), so BOTH Shortcut
+   shapes are fine — per-image loop or zip batch, no quota concerns, no
+   Shortcut changes ever needed. The hidden form in index.html stays only
+   as a legacy fallback (autosync still polls it + rescues its spam).
 4. PC side is automatic: `npm run autosync:install` registers the
    **CaddieAutosync** scheduled task — starts hidden at every logon, restarts
    itself if it dies, and logs to `captures\autosync.log`. (Already installed
