@@ -117,35 +117,9 @@ const heightOf = (p, lut) => {
   return best.h;
 };
 
-function extractPair(hole, plainFile, hmapFile) {
-  const plain = crop(plainFile), hmap = crop(hmapFile);
-  const w = plain.width, h = plain.height;
-  const { mask, size, inLegend } = greenMask(plain, hmap);
-  if (size < 800) return { error: `mask too small (${size}px)` };
-
-  // bbox
-  let x0 = w, y0 = h, x1 = 0, y1 = 0;
-  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++)
-    if (mask[y * w + x]) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
-
-  // heights
-  const lut = legendLUT(hmap);
-  const cellH = Array.from({ length: GRID_N }, () => new Array(GRID_N).fill(null));
-  const cw = (x1 - x0 + 1) / GRID_N, ch = (y1 - y0 + 1) / GRID_N;
-  for (let gy = 0; gy < GRID_N; gy++)
-    for (let gx = 0; gx < GRID_N; gx++) {
-      let sum = 0, n = 0, tot = 0;
-      for (let y = Math.floor(y0 + gy * ch); y < y0 + (gy + 1) * ch; y++)
-        for (let x = Math.floor(x0 + gx * cw); x < x0 + (gx + 1) * cw; x++) {
-          tot++;
-          // legend-zone pixels are occluded on the heightmap frame — they
-          // count for the mask/bbox but can't contribute height
-          if (mask[y * w + x] && !inLegend(x, y)) { sum += heightOf(px(hmap, x, y), lut); n++; }
-        }
-      if (n > 0.12 * tot) cellH[gy][gx] = sum / n;
-    }
-
-  // downhill slope vectors from central differences over cell heights
+// downhill slope vectors from central differences over cell heights,
+// normalized to the green's own max slope
+function slopeGrid(cellH) {
   const at = (gy, gx) => (gy >= 0 && gy < GRID_N && gx >= 0 && gx < GRID_N) ? cellH[gy][gx] : null;
   const grid = Array.from({ length: GRID_N }, () => Array.from({ length: GRID_N }, () => [0, 0]));
   let maxMag = 0;
@@ -164,6 +138,40 @@ function extractPair(hole, plainFile, hmapFile) {
   for (const v of rawVec) {
     if (maxMag > 1e-6) grid[v.gy][v.gx] = [+(v.vx / maxMag).toFixed(3), +(v.vy / maxMag).toFixed(3)];
   }
+  return grid;
+}
+
+function extractPair(hole, plainFile, hmapFile) {
+  const plain = crop(plainFile), hmap = crop(hmapFile);
+  const w = plain.width, h = plain.height;
+  const { mask, size, inLegend } = greenMask(plain, hmap);
+  if (size < 800) return { error: `mask too small (${size}px)` };
+
+  // bbox
+  let x0 = w, y0 = h, x1 = 0, y1 = 0;
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++)
+    if (mask[y * w + x]) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+
+  // heights (+ per-cell sample counts, used as fusion weights across
+  // sessions — the height field never changes, so frames are fusable)
+  const lut = legendLUT(hmap);
+  const cellH = Array.from({ length: GRID_N }, () => new Array(GRID_N).fill(null));
+  const cellN = Array.from({ length: GRID_N }, () => new Array(GRID_N).fill(0));
+  const cw = (x1 - x0 + 1) / GRID_N, ch = (y1 - y0 + 1) / GRID_N;
+  for (let gy = 0; gy < GRID_N; gy++)
+    for (let gx = 0; gx < GRID_N; gx++) {
+      let sum = 0, n = 0, tot = 0;
+      for (let y = Math.floor(y0 + gy * ch); y < y0 + (gy + 1) * ch; y++)
+        for (let x = Math.floor(x0 + gx * cw); x < x0 + (gx + 1) * cw; x++) {
+          tot++;
+          // legend-zone pixels are occluded on the heightmap frame — they
+          // count for the mask/bbox but can't contribute height
+          if (mask[y * w + x] && !inLegend(x, y)) { sum += heightOf(px(hmap, x, y), lut); n++; }
+        }
+      if (n > 0.12 * tot) { cellH[gy][gx] = sum / n; cellN[gy][gx] = n; }
+    }
+
+  const grid = slopeGrid(cellH);
 
   // pin: pole base from the heightmap frame. The wind compass floats to
   // whichever bottom corner avoids the green, and its arrow is pink at
@@ -224,7 +232,7 @@ function extractPair(hole, plainFile, hmapFile) {
     hset(Math.round(cx), Math.round(cy), [0, 0, 255]);
   }
 
-  return { plain, hmap, mask, bbox: { x0, y0, x1, y1 }, grid, pin, dbg, hv, maskSize: size };
+  return { plain, hmap, mask, bbox: { x0, y0, x1, y1 }, grid, pin, dbg, hv, maskSize: size, cellH, cellN };
 }
 
 const results = [];
@@ -254,11 +262,29 @@ for (let hole = 1; hole <= 21; hole++) {
     }
     extracted.push({ r, plainF, hmapF, cropped, area: r.maskSize });
   }
-  // grid source: the highest-resolution UNCROPPED green (largest mask area);
-  // grids are bbox-normalized so they transfer across zoom levels
+  // grid source: FUSE cell heights across every uncropped session — the
+  // height field never changes, sessions differ only in zoom (resolution)
+  // and where the legend happened to occlude, so a weighted average both
+  // denoises and fills legend holes. Grids are bbox-normalized, so cells
+  // align across zoom levels.
   const clean = extracted.filter((e) => !e.cropped);
   const pool = clean.length ? clean : extracted;
   const final = pool.length ? pool.reduce((a, b) => (b.area > a.area ? b : a)) : null;
+  let fusedGrid = null, fusedFrom = 0;
+  if (pool.length) {
+    const fusedH = Array.from({ length: GRID_N }, () => new Array(GRID_N).fill(null));
+    for (let gy = 0; gy < GRID_N; gy++)
+      for (let gx = 0; gx < GRID_N; gx++) {
+        let sum = 0, wsum = 0;
+        for (const e of pool) {
+          const h = e.r.cellH[gy][gx], n = e.r.cellN[gy][gx];
+          if (h != null && n > 0) { sum += h * n; wsum += n; }
+        }
+        if (wsum > 0) fusedH[gy][gx] = sum / wsum;
+      }
+    fusedGrid = slopeGrid(fusedH);
+    fusedFrom = pool.length;
+  }
   if (!final) continue;
   const { r } = final;
   const id = `h${String(hole).padStart(2, "0")}`;
@@ -266,7 +292,8 @@ for (let hole = 1; hole <= 21; hole++) {
   savePng(join(OUT, `${id}-height.png`), r.hv);
   writeFileSync(join(OUT, `${id}.json`), JSON.stringify({
     hole, sources: { plain: final.plainF, heightmap: final.hmapF },
-    panelBbox: r.bbox, gridN: GRID_N, grid: r.grid, pins, sessions: sessionDetails,
+    panelBbox: r.bbox, gridN: GRID_N, grid: fusedGrid ?? r.grid, fusedFrom,
+    pins, sessions: sessionDetails,
     convention: "grid[row][col]=[dx,dy] downhill, +x right +y down, normalized to the green's own max slope; pin gx/gy fractional within bbox",
   }, null, 2));
   console.log(`H${hole}: mask=${r.maskSize}px bbox=[${r.bbox.x0},${r.bbox.y0}..${r.bbox.x1},${r.bbox.y1}] pins=${pins.length} ${pins.map((p) => `(${p.gx},${p.gy})`).join(" ")}`);
