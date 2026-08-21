@@ -70,14 +70,56 @@ const pinBase = (img, flag) => {
   return best ?? { x: flag.x, y: flag.maxY + 8 };
 };
 
+// residue check: leftover aim-line pixels (bright cyan dots) in a stacked
+// map mean the session's frames shared an aim and the median kept the line
+const aimResidue = (img) => {
+  let c = 0;
+  const cx = 0.832 * img.width, cy = 0.822 * img.height, r = 0.15 * img.width;
+  for (let y = 0; y < img.height; y++)
+    for (let x = 0; x < img.width; x++) {
+      if ((x - cx) * (x - cx) + (y - cy) * (y - cy) < r * r) continue; // compass
+      const p = px(img, x, y);
+      if (p[2] > 235 && p[1] > 210 && p[0] < 150) c++;
+    }
+  return c;
+};
+
+const prev = (() => {
+  try { return JSON.parse(readFileSync(`${OUT}/../maps.json`, "utf8")).holes; } catch { return []; }
+})();
+
 const results = [];
 for (let hole = 1; hole <= 21; hole++) {
-  const maps = manifest.frames.filter((f) => f.hole === hole && f.frameType === "map");
-  if (!maps.length) { console.log(`H${hole}: no map frames`); continue; }
-  const sess = sessions(maps).filter((s) => s.length >= 2);
-  const use = sess.length ? sess[sess.length - 1] : sessions(maps).pop();
-  const crops = use.map((f) => { const img = loadImage(INBOX + f.file); return cropRect(img, panelRect(img)); });
-  const stacked = medianStack(crops);
+  const allMaps = manifest.frames.filter((f) => f.hole === hole && f.frameType === "map");
+  if (!allMaps.length) { console.log(`H${hole}: no map frames`); continue; }
+  // TEE frames only: mid-round address frames also classify as "map" but
+  // their avatar sits mid-fairway and their aim is wherever the player was
+  // aiming — stacking those corrupts tee detection and can bake aim lines.
+  // Tee = badge "Stroke 1" or a yardage near the hole's full length.
+  const maxYd = Math.max(...allMaps.map((f) => (f.badge?.match(/^(\d+) yd/) ?? [])[1] ?? 0).map(Number));
+  const isTee = (f) => {
+    if (!f.badge) return false;
+    if (/^Stroke 1$/.test(f.badge)) return true;
+    const yd = parseInt(f.badge);
+    return Number.isFinite(yd) && maxYd > 0 && yd >= 0.88 * maxYd;
+  };
+  const tees = allMaps.filter(isTee);
+  const candidates = sessions(tees).filter((s) => s.length >= 2).reverse(); // latest first
+  let use = null, stacked = null;
+  for (const s of candidates) {
+    const crops = s.map((f) => { const img = loadImage(INBOX + f.file); return cropRect(img, panelRect(img)); });
+    const st = medianStack(crops);
+    const res = aimResidue(st);
+    if (res < 60) { use = s; stacked = st; break; }
+    console.log(`H${hole}: session of ${s.length} rejected (aim residue ${res})`);
+  }
+  if (!stacked) {
+    const old = prev.find((p) => p.hole === hole);
+    if (old) { console.log(`H${hole}: keeping previous stack`); results.push(old); continue; }
+    const fallback = sessions(tees.length ? tees : allMaps).pop();
+    const crops = fallback.map((f) => { const img = loadImage(INBOX + f.file); return cropRect(img, panelRect(img)); });
+    use = fallback; stacked = medianStack(crops);
+  }
   savePng(`${OUT}/h${String(hole).padStart(2, "0")}.png`, stacked);
 
   const flag = findCluster(stacked, isFlagPink);
