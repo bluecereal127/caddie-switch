@@ -120,7 +120,20 @@ for (let hole = 1; hole <= 21; hole++) {
     const crops = fallback.map((f) => { const img = loadImage(INBOX + f.file); return cropRect(img, panelRect(img)); });
     use = fallback; stacked = medianStack(crops);
   }
-  savePng(`${OUT}/h${String(hole).padStart(2, "0")}.png`, stacked);
+
+  // IMAGE from a cross-session pool (up to 9 newest tee frames): sessions
+  // aim differently, so pooling scrubs aim-line/avatar ghosts that a single
+  // 3-frame session can leave (2/3 agreement keeps a pixel). Flags may
+  // differ per round and blur out — fine, the app draws pins itself.
+  // Detection (pin/tee/scale) stays on the single-session stack above.
+  let image = stacked;
+  const pool = tees.slice(-9);
+  if (pool.length >= 5) {
+    const poolCrops = pool.map((f) => { const img = loadImage(INBOX + f.file); return cropRect(img, panelRect(img)); });
+    const pooled = medianStack(poolCrops);
+    if (aimResidue(pooled) < 60) image = pooled;
+  }
+  savePng(`${OUT}/h${String(hole).padStart(2, "0")}.png`, image);
 
   const flag = findCluster(stacked, isFlagPink);
   const pin = flag ? pinBase(stacked, flag) : null;

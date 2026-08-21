@@ -375,7 +375,7 @@ function GreenCanvas({ mapSrc, green, mode, onGrid, ball, cup, onTap, path, aimP
 }
 
 /* ---------------- clickable hole map ---------------- */
-function HoleMap({ holeNum, line, onLine, markers, onMarkers, markerMode, aimPreview, cornerMode, onCorner, greenBox, pins = [], curPinId = null, pinMode = false, onPins, distLabel = null }) {
+function HoleMap({ holeNum, line, onLine, markers, onMarkers, markerMode, aimPreview, cornerMode, onCorner, greenBox, pins = [], curPinId = null, pinMode = false, onPins, distLabel = null, windBadge = null, teePos = null, stopMarker = null }) {
   const imgRef = useRef(null);
   const [dims, setDims] = useState({ w: 113, h: 140 });
   const src = HOLE_MAPS[holeNum];
@@ -423,6 +423,35 @@ function HoleMap({ holeNum, line, onLine, markers, onMarkers, markerMode, aimPre
         )}
         {greenBox && <rect x={greenBox.x0 * 100} y={greenBox.y0 * 100} width={(greenBox.x1 - greenBox.x0) * 100} height={(greenBox.y1 - greenBox.y0) * 100}
           fill="rgba(234,217,164,0.15)" stroke={T.sand} strokeWidth="0.8" strokeDasharray="2 1.5" />}
+        {teePos && (
+          <g transform={`translate(${teePos.x * 100} ${teePos.y * 100})`}>
+            <circle r="3.4" fill="rgba(20,48,29,0.55)" />
+            <path d="M0,-2.4 L0.72,-0.74 2.5,-0.74 1.06,0.36 1.6,2.1 0,1.05 -1.6,2.1 -1.06,0.36 -2.5,-0.74 -0.72,-0.74 Z" fill="#FFD447" stroke="#8a6d1a" strokeWidth="0.25" />
+          </g>
+        )}
+        {stopMarker && (
+          <g transform={`translate(${stopMarker.x * 100} ${stopMarker.y * 100})`}>
+            <circle r="3.2" fill="none" stroke="#fff" strokeWidth="0.9" />
+            <circle r="1.2" fill="#fff" />
+            <circle r="4.6" fill="none" stroke="rgba(255,255,255,0.45)" strokeWidth="0.5" strokeDasharray="1.4 1.2" />
+          </g>
+        )}
+        {windBadge && (() => {
+          const col = windBadge.speed >= 20 ? "#F06BB8" : windBadge.speed >= 10 ? "#E8D24A" : "#5AC8E8";
+          return (
+            <g transform="translate(86 80)">
+              <circle r="10.5" fill="rgba(10,25,16,0.72)" stroke="rgba(255,255,255,0.7)" strokeWidth="0.7" />
+              {windBadge.speed > 0 ? (
+                <g transform={`rotate(${windBadge.deg})`}>
+                  <path d="M0,-6.2 L3.1,-1.6 1.35,-1.6 1.35,5.4 -1.35,5.4 -1.35,-1.6 -3.1,-1.6 Z" fill={col} stroke="rgba(0,0,0,0.45)" strokeWidth="0.4" />
+                </g>
+              ) : (
+                <circle r="1.4" fill={col} />
+              )}
+              <text y="15.6" textAnchor="middle" fontSize="4.6" fontWeight="700" fill="#fff">{windBadge.speed} mph</text>
+            </g>
+          );
+        })()}
         {pins.map((p, i) => {
           const cur = p.id === curPinId;
           return (
@@ -493,6 +522,7 @@ export default function App() {
   const [lie, setLie] = useState("tee");
   const [line, setLine] = useState({ ball: null, target: null });
   const [markerMode, setMarkerMode] = useState(false);
+  const [selRec, setSelRec] = useState(null); // rec card tapped -> stop-marker preview on map
   const [calInput, setCalInput] = useState("");
 
   const empty = { club: "driver", power: "3.5", lie: "tee", windSpeed: "0", windDeg: 0, carry: "", lateral: "", hole: 0, stroke: 1 };
@@ -575,6 +605,7 @@ export default function App() {
               if (!m[n]) continue;
               const cur = { ...m[n], green: { ...(m[n].green ?? emptyGreen()) } };
               if (dh.scale != null && (fresh || cur.scale == null)) cur.scale = dh.scale;
+              if (dh.tee && (fresh || !cur.tee)) cur.tee = dh.tee;
               if (dh.greenBox && (fresh || !cur.green.box)) cur.green.box = dh.greenBox;
               const gridEmpty = !(cur.green.grid ?? []).some((r) => r.some(([x, y]) => x || y));
               if (dh.grid && (fresh || gridEmpty)) cur.green.grid = dh.grid;
@@ -642,7 +673,12 @@ export default function App() {
     }
   }, [geo, scale, lie]);
 
-  useEffect(() => { setLine({ ball: null, target: null }); setMarkerMode(false); setPutt({ ball: null, cup: null }); }, [hole]);
+  // the tee box is the default hitting position (derived tee when known)
+  useEffect(() => {
+    const tee = holesMeta[hole]?.tee ?? null;
+    setLine({ ball: tee ? { x: tee.x, y: tee.y } : null, target: null });
+    setMarkerMode(false); setPutt({ ball: null, cup: null }); setSelRec(null);
+  }, [hole]);  // eslint-disable-line
   useEffect(() => {
     if (lie !== "green" || putt.cup) return;
     const meta = holesMeta[hole];
@@ -653,7 +689,20 @@ export default function App() {
     if (gx >= 0 && gx <= 1 && gy >= 0 && gy <= 1) setPutt((p) => (p.cup ? p : { ...p, cup: { x: gx, y: gy } }));
   }, [lie, hole, holesMeta, putt.cup]);
 
-  const relWindDeg = windMode === "map" && geo ? ((windDeg - geo.bearing) % 360 + 360) % 360 : windDeg;
+  // default alignment when no target is drawn: the game's default line ≈
+  // ball(tee) → current pin; keeps N-up wind convertible without tapping
+  const defaultBearing = useMemo(() => {
+    const from = line.ball ?? holesMeta[hole]?.tee ?? null;
+    const meta = holesMeta[hole];
+    const pin = (meta?.pins ?? []).find((p) => p.id === meta?.curPin) ?? meta?.pins?.[0] ?? null;
+    if (!from || !pin) return null;
+    const dx = (pin.x - from.x) * MAP_W, dy = (pin.y - from.y) * MAP_H;
+    return ((Math.atan2(dx, -dy) * 180) / Math.PI + 360) % 360;
+  }, [line.ball, holesMeta, hole]);
+  const shotBearing = geo?.bearing ?? defaultBearing;
+  const relWindDeg = windMode === "map"
+    ? (shotBearing != null ? ((windDeg - shotBearing) % 360 + 360) % 360 : windDeg)
+    : windDeg;
 
   const activeWindRules = useMemo(
     () => (lie === "green" ? [] : matchWindRules(hole, stroke, windSpeed, relWindDeg)),
@@ -676,6 +725,16 @@ export default function App() {
     const ox = Math.cos(th) * offPx, oy = Math.sin(th) * offPx;
     return { x: line.target.x + ox / MAP_W, y: line.target.y + oy / MAP_H };
   }, [geo, scale, bestRec, line]);
+
+  // where the ball should STOP for the current distance, along the drawn
+  // line or the default alignment — the in-game-meter mockup on the minimap
+  const stopPoint = useMemo(() => {
+    if (selRec == null || !scale || !line.ball || shotBearing == null || !(dist > 0)) return null;
+    const th = (shotBearing * Math.PI) / 180;
+    const pxLen = dist / scale;
+    return { x: line.ball.x + (Math.sin(th) * pxLen) / MAP_W,
+             y: line.ball.y - (Math.cos(th) * pxLen) / MAP_H };
+  }, [selRec, scale, line.ball, shotBearing, dist]);
 
   const greenNow = holesMeta[hole]?.green;
   const greenYd = useMemo(() => {
@@ -889,12 +948,15 @@ export default function App() {
                     greenBox={holesMeta[hole].green?.box ?? null}
                     pins={holesMeta[hole].pins} curPinId={holesMeta[hole].curPin}
                     pinMode={false} onPins={(p) => setPins(hole, p)}
-                    distLabel={geo ? (scale ? `${Math.round(geo.srcPx * scale)} yd` : "? yd") : null} />
+                    distLabel={geo ? (scale ? `${Math.round(geo.srcPx * scale)} yd` : "? yd") : null}
+                    windBadge={lie !== "green" ? { deg: windMode === "map" ? windDeg : (shotBearing != null ? (windDeg + shotBearing) % 360 : windDeg), speed: windSpeed } : null}
+                    teePos={holesMeta[hole].tee ?? null}
+                    stopMarker={stopPoint} />
                 </div>
                 <div className="col-span-2 space-y-2 text-xs">
                   <div className="rounded-xl border-2 p-2" style={{ borderColor: T.line, background: "#fff" }}>
                     {!line.ball && <span className="font-semibold">Tap the map where your <b>ball</b> is.</span>}
-                    {line.ball && !line.target && <span className="font-semibold">Now tap your <b>target</b> landing spot.</span>}
+                    {line.ball && !line.target && <span className="font-semibold">Tap your <b>target</b> on the map — or just type the distance to use the game's default line.</span>}
                     {geo && (
                       <div className="space-y-1">
                         <div className="mono font-bold text-sm">
@@ -928,11 +990,17 @@ export default function App() {
                       </button>
                     )}
                   </div>
-                  <button onClick={() => setLine({ ball: null, target: null })} className="w-full py-1.5 rounded-xl border-2 font-bold" style={chip(false)}>
-                    Clear line
-                  </button>
-                  {scale && <button onClick={() => { const next = { ...holesMeta, [hole]: { ...holesMeta[hole], scale: null } }; setHolesMeta(next); persist({ holesMeta: next }); }}
-                    className="w-full py-1 rounded-xl text-[10px] opacity-60 underline">recalibrate scale</button>}
+                  <div className="flex gap-2">
+                    {holesMeta[hole].tee && (
+                      <button onClick={() => setLine({ ball: { ...holesMeta[hole].tee }, target: null })}
+                        className="flex-1 py-1.5 rounded-xl border-2 font-bold" style={chip(line.ball && holesMeta[hole].tee && Math.hypot(line.ball.x - holesMeta[hole].tee.x, line.ball.y - holesMeta[hole].tee.y) < 0.01)}>
+                        ⛳ From tee
+                      </button>
+                    )}
+                    <button onClick={() => setLine({ ball: holesMeta[hole].tee ? { ...holesMeta[hole].tee } : null, target: null })} className="flex-1 py-1.5 rounded-xl border-2 font-bold" style={chip(false)}>
+                      Clear line
+                    </button>
+                  </div>
                 </div>
               </div>
               <div className="rounded-xl border-2 px-3 py-2 text-xs" style={{ borderColor: T.sand, background: "#FFFDF4" }}>
@@ -956,6 +1024,10 @@ export default function App() {
                       if (geo && !scale && v > 0) {
                         const next = { ...holesMeta, [hole]: { ...holesMeta[hole], scale: v / geo.srcPx } };
                         setHolesMeta(next); persist({ holesMeta: next });
+                      } else if (line.target) {
+                        // typing a distance = "I'm on the game's default line,
+                        // not a drawn adjustment" — drop the drawn target
+                        setLine((l) => ({ ...l, target: null }));
                       }
                       if (lie !== "green" && maxReach) v = Math.min(v, Math.floor(maxReach.yd));
                       setDist(v);
@@ -1012,8 +1084,8 @@ export default function App() {
                       onChange={(e) => setWindSpeed(Math.max(0, Math.min(31, Math.round(parseFloat(e.target.value) || 0))))} />
                     <div className="text-xs mt-1 opacity-70">
                       {windMode === "map"
-                        ? geo ? `Copy the minimap arrow. Relative to your line: ${relWindDeg.toFixed(0)}°` : "Copy the minimap arrow (draw a line to convert)."
-                        : "Arrow = where the wind blows, up = tailwind."}
+                        ? shotBearing != null ? `Copy the minimap arrow (N-up, snaps to 8). Relative to your ${geo ? "line" : "default line to the pin"}: ${relWindDeg.toFixed(0)}°` : "Copy the minimap arrow (add a pin or draw a line to convert)."
+                        : "Arrow = where the wind blows, up = tailwind. Prefer N-up mode — it matches the game's 8 directions exactly."}
                     </div>
                   </div>
                 </div>
@@ -1060,12 +1132,23 @@ export default function App() {
                 {recs.map((r, i) => {
                   const isBest = i === 0 && !r.blocked;
                   return (
-                    <div key={r.club.id} className="rounded-2xl border-2 p-4 relative overflow-hidden"
-                      style={{ borderColor: r.blocked ? T.flag : isBest ? T.turf : T.line, background: r.blocked ? "#FFF6F6" : "#fff" }}>
+                    <div key={r.club.id} onClick={() => setSelRec(selRec === i ? null : i)}
+                      className="rounded-2xl border-2 p-4 relative overflow-hidden cursor-pointer"
+                      style={{ borderColor: r.blocked ? T.flag : selRec === i ? T.turfDeep : isBest ? T.turf : T.line,
+                        background: r.blocked ? "#FFF6F6" : selRec === i ? "#F3FAF5" : "#fff",
+                        boxShadow: selRec === i ? `0 0 0 1px ${T.turfDeep}` : undefined }}>
                       {isBest && <div className="absolute top-0 right-0 disp text-[10px] font-bold px-2 py-1 rounded-bl-xl text-white" style={{ background: T.turf }}>BEST</div>}
                       {r.blocked && <div className="absolute top-0 right-0 disp text-[10px] font-bold px-2 py-1 rounded-bl-xl text-white" style={{ background: T.flag }}>🌲 BLOCKED</div>}
-                      <div className="disp text-base font-bold">{r.club.name}</div>
-                      {r.blocked && <div className="text-[11px] font-semibold mt-0.5" style={{ color: T.flag }}>Marked on stroke {r.blocked.stroke}: {r.blocked.note}</div>}
+                      <div className="disp text-base font-bold">{r.club.name}{selRec === i && <span className="text-[10px] font-semibold ml-2 opacity-60">● stop point shown on map</span>}</div>
+                      {r.blocked && (
+                        <div className="text-[11px] font-semibold mt-0.5 flex items-center gap-2" style={{ color: T.flag }}>
+                          <span>Marked on stroke {r.blocked.stroke}: {r.blocked.note}</span>
+                          <button onClick={(e) => { e.stopPropagation(); unblock(hole, r.blocked.id); }}
+                            className="px-2 py-0.5 rounded-lg border-2 font-bold" style={{ borderColor: T.flag, color: T.flag, background: "#fff" }}>
+                            ✕ unblock
+                          </button>
+                        </div>
+                      )}
                       <div className="mt-2 grid grid-cols-3 gap-2 text-center">
                         <div>
                           <div className="mono text-xl font-semibold">{fmtPow(r.power)}</div>
@@ -1095,7 +1178,7 @@ export default function App() {
                           {r.calibrated > 0 ? `calibrated (${r.calibrated} shots)` : "default numbers — calibrate this club"}
                         </div>
                         {!r.blocked && (
-                          <button onClick={() => markBlocked(r)} className="text-[11px] font-bold px-2 py-1 rounded-lg border-2" style={{ borderColor: T.line }}>
+                          <button onClick={(e) => { e.stopPropagation(); markBlocked(r); }} className="text-[11px] font-bold px-2 py-1 rounded-lg border-2" style={{ borderColor: T.line }}>
                             🌲 Mark blocked
                           </button>
                         )}
