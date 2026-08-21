@@ -26,7 +26,7 @@ grid per green (MU=1.35, SLOPE_G=1.1, capture radius 0.22 yd, max capture speed 
 - Lies cap the usable BAR; distance per bar is unchanged below the cap. Rough = 3 bars (all clubs). Sand: wedge 3, irons 2, spoon/driver 1 (player-confirmed, hardcoded in BUNKER_CAPS). Putter uncapped, dead roll in sand.
 - Driver & spoon can NEVER backspin. Spin strength scales with swing power (official) → capped lies also cap spin.
 - Wind: exactly 8 directions (N/NE/E/SE/S/SW/W/NW), integer mph, observed 0–31 (odd values exist in NSS; WSR was even-only 0–30). Arrow color: blue <10, yellow 10–19, pink 20+. At 0 mph direction is still readable from the pin flag.
-- Pins: finite fixed spots per hole. WSR data: most holes have score-gated sets (harder "A pins" on good score, easier "B" on bad); H1=3 pins, H18=1, Specials 6. NSS assumed similar.
+- Pins: finite fixed spots per hole. WSR data: most holes have score-gated sets (harder "A pins" on good score, easier "B" on bad); H1=3 pins, H18=1, Specials 6. NSS has MORE spots than WSR's A/B model (player reports well over 2 per hole); the pipeline accumulates every distinct pin seen in uploaded green captures, uncapped (dedupe radius 0.02 map-fraction).
 - Over-swinging a capped bar = red bar + wobble/curve; solver treats caps as hard.
 - Minimap meter dots = flat-terrain carry; elevation shifts real distance (notably holes 8, 12, 17).
 - Community wind-route rules encoded in WIND_RULES (H7/10/12/14/15/16/18/21).
