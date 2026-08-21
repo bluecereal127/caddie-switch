@@ -951,7 +951,7 @@ export default function App() {
       `}</style>
 
       <header className="px-5 pt-6 pb-4" style={{ background: `linear-gradient(135deg, ${T.turfDeep}, ${T.turf})` }}>
-        <div className="max-w-4xl mx-auto flex items-center justify-between flex-wrap gap-2">
+        <div className="max-w-[1500px] mx-auto flex items-center justify-between flex-wrap gap-2">
           <div>
             <div className="disp text-2xl font-bold text-white tracking-tight">Caddie<span style={{ color: T.sand }}>·</span>Switch</div>
             <div className="text-xs text-white/80 mt-0.5">{shots.length} shots · {rounds.length} rounds</div>
@@ -968,12 +968,12 @@ export default function App() {
         </div>
       </header>
 
-      <main className="max-w-4xl mx-auto px-5 py-6">
+      <main className="max-w-[1500px] mx-auto px-5 py-6">
         {saveState && <div className="mb-3 text-xs font-semibold" style={{ color: T.turfDeep }}>{saveState}</div>}
 
         {/* ================= SOLVER ================= */}
         {tab === "solver" && (
-          <div className="grid md:grid-cols-2 gap-6">
+          <div className="grid md:grid-cols-2 xl:grid-cols-[1.15fr_1fr_1.1fr] gap-6">
             <section className="space-y-3">
               <div className="flex gap-3">
                 <div className="flex-1">
@@ -1073,6 +1073,8 @@ export default function App() {
                   </div>
                 </div>
               </div>
+            </section>
+            <section className="space-y-3">
               <div className="rounded-xl border-2 px-3 py-2 text-xs" style={{ borderColor: T.sand, background: "#FFFDF4" }}>
                 <span className="disp font-bold">Hole {hole} · Par {holesMeta[hole].par}: </span>{holesMeta[hole].note}
               </div>
