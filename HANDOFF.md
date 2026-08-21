@@ -39,6 +39,10 @@ capture pipeline; after editing autosync.ps1 restart it (Stop/Start-ScheduledTas
 - Bundle grows ~4×maps (~2MB total) — acceptable.
 
 ### 2. Lie classification from the minimap + editable masks
+- NOTE: the near-black backdrop transform was REVERTED (commit e3262a2) —
+  user prefers the native backdrop. The classifier below must detect the
+  native translucent-teal backdrop itself (dark, desaturated, blue-leaning)
+  instead of relying on a painted black.
 - New tools/extract-lies.mjs: classify each FINAL map image pixel →
   downsample ×4 → grid ~63×76, codes: 0 OB/unknown, 1 fairway, 2 rough,
   3 bunker, 4 green, 5 water, 6 backdrop(black).
