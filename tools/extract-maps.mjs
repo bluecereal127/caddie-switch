@@ -12,7 +12,7 @@
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { loadImage, savePng, px } from "./lib/image.mjs";
+import { loadImage, savePng, px, onionInpaint } from "./lib/image.mjs";
 import { panelRect, cropRect } from "./lib/panel.mjs";
 import { sessions } from "./lib/ulid.mjs";
 
@@ -84,53 +84,6 @@ const darkenStack = (crops, excludeMasks = null) => {
   return out;
 };
 
-// Onion-peel inpaint: fill masked pixels layer by layer from the average of
-// their already-known neighbours, then a light 3×3 blur over the filled
-// region to hide the radial streaks the peel leaves. Used to scrub the flag
-// zone on holes where every pooled frame shares one pin — real art replaces
-// it automatically once a second-pin session exists.
-const onionInpaint = (img, holes) => {
-  const w = img.width, h = img.height, d = img.data;
-  let remaining = [];
-  for (let p = 0; p < w * h; p++) if (holes[p]) remaining.push(p);
-  if (!remaining.length) return;
-  const unknown = Uint8Array.from(holes);
-  const region = remaining.slice();
-  while (remaining.length) {
-    const layer = [];
-    for (const p of remaining) {
-      const x = p % w, y = (p / w) | 0;
-      let r = 0, g = 0, b = 0, c = 0;
-      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
-        if (!dx && !dy) continue;
-        const nx = x + dx, ny = y + dy;
-        if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
-        const np = ny * w + nx;
-        if (unknown[np]) continue;
-        const j = np * 4; r += d[j]; g += d[j + 1]; b += d[j + 2]; c++;
-      }
-      if (c) layer.push([p, r / c, g / c, b / c]);
-    }
-    if (!layer.length) break; // fully enclosed by image edge — give up
-    for (const [p, r, g, b] of layer) {
-      const j = p * 4; d[j] = Math.round(r); d[j + 1] = Math.round(g); d[j + 2] = Math.round(b);
-      unknown[p] = 0;
-    }
-    remaining = remaining.filter((p) => unknown[p]);
-  }
-  const src = Buffer.from(d);
-  for (const p of region) {
-    const x = p % w, y = (p / w) | 0;
-    let r = 0, g = 0, b = 0, c = 0;
-    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
-      const nx = x + dx, ny = y + dy;
-      if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
-      const j = (ny * w + nx) * 4; r += src[j]; g += src[j + 1]; b += src[j + 2]; c++;
-    }
-    const j = p * 4; d[j] = Math.round(r / c); d[j + 1] = Math.round(g / c); d[j + 2] = Math.round(b / c);
-  }
-};
-
 // per-frame exclusion mask: that frame's own pin flag (bright pink cluster +
 // pole below) and its wind compass (whichever corner it sat in) — so those
 // regions get sourced from frames where the overlay was elsewhere
@@ -138,16 +91,33 @@ const overlayMask = (crop) => {
   const w = crop.width, h = crop.height;
   const mask = new Uint8Array(w * h);
   let flag = null;
-  // flag
-  let sx = 0, sy = 0, c = 0;
+  // Flag: the pink cloth's own bbox plus the pole hanging below it, dilated a
+  // few px for the antialias halo. A fixed box was used here before; on
+  // single-pin holes (where this becomes the inpaint hole) a box that wide
+  // straddles green AND backdrop and the fill came out a gray smear.
+  let sx = 0, sy = 0, c = 0, bx0 = w, bx1 = -1, by0 = h, by1 = -1;
   for (let y = 0; y < h; y++) for (let x = 0; x < w; x++)
-    if (isFlagPink(px(crop, x, y))) { sx += x; sy += y; c++; }
+    if (isFlagPink(px(crop, x, y))) {
+      sx += x; sy += y; c++;
+      if (x < bx0) bx0 = x; if (x > bx1) bx1 = x;
+      if (y < by0) by0 = y; if (y > by1) by1 = y;
+    }
   if (c >= 4) {
-    const fx = sx / c, fy = sy / c;
-    flag = { x: fx, y: fy };
-    for (let y = Math.max(0, fy - 14); y <= Math.min(h - 1, fy + 26); y++)
-      for (let x = Math.max(0, fx - 14); x <= Math.min(w - 1, fx + 14); x++)
-        mask[Math.round(y) * w + Math.round(x)] = 1;
+    flag = { x: sx / c, y: sy / c };
+    // pole: dark/white column under the cloth, down to the pin base
+    const px0 = Math.max(0, Math.round(flag.x) - 4), px1 = Math.min(w - 1, Math.round(flag.x) + 5);
+    let poleBottom = by1;
+    for (let y = by1; y < Math.min(h, by1 + 18); y++)
+      for (let x = px0; x <= px1; x++) {
+        const p = px(crop, x, y);
+        const dark = Math.max(p[0], p[1], p[2]) < 80;
+        const pale = Math.min(p[0], p[1], p[2]) > 170;
+        if (dark || pale) { poleBottom = y; break; }
+      }
+    const PAD = 3;
+    const x0 = Math.max(0, Math.min(bx0, px0) - PAD), x1 = Math.min(w - 1, Math.max(bx1, px1) + PAD);
+    const y0 = Math.max(0, by0 - PAD), y1 = Math.min(h - 1, poleBottom + PAD);
+    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) mask[y * w + x] = 1;
   }
   // compass (either corner)
   const r = CR * w, cy = CCY * h;

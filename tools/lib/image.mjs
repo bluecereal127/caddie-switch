@@ -87,6 +87,56 @@ export function binarize(img, polarity = "light") {
 export const colorDist = (a, b) =>
   Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
 
+// Onion-peel inpaint: fill masked pixels layer by layer from the median of
+// their already-known neighbours (median, not mean — a mean blends the two
+// sides of a hole into gray mush when they differ), then a light blur over
+// the filled region to hide the radial streaks the peel leaves. Mutates img.
+export function onionInpaint(img, holes) {
+  const w = img.width, h = img.height, d = img.data;
+  let remaining = [];
+  for (let p = 0; p < w * h; p++) if (holes[p]) remaining.push(p);
+  if (!remaining.length) return;
+  const unknown = Uint8Array.from(holes);
+  const region = remaining.slice();
+  const mid = (a) => { a.sort((u, v) => u - v); return a[a.length >> 1]; };
+  while (remaining.length) {
+    const layer = [];
+    for (const p of remaining) {
+      const x = p % w, y = (p / w) | 0;
+      const r = [], g = [], b = [];
+      for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) {
+        if (!dx && !dy) continue;
+        const nx = x + dx, ny = y + dy;
+        if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+        const np = ny * w + nx;
+        if (unknown[np]) continue;
+        const j = np * 4; r.push(d[j]); g.push(d[j + 1]); b.push(d[j + 2]);
+      }
+      // only advance from pixels with a solid known neighbourhood, so the
+      // peel walks inward evenly instead of spiking along one thin arm
+      if (r.length >= 3) layer.push([p, mid(r), mid(g), mid(b)]);
+    }
+    if (!layer.length) break; // fully enclosed by the image edge — give up
+    for (const [p, r, g, b] of layer) {
+      const j = p * 4; d[j] = r; d[j + 1] = g; d[j + 2] = b;
+      unknown[p] = 0;
+    }
+    remaining = remaining.filter((p) => unknown[p]);
+  }
+  const src = Buffer.from(d);
+  for (const p of region) {
+    const x = p % w, y = (p / w) | 0;
+    let r = 0, g = 0, b = 0, c = 0;
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+      const nx = x + dx, ny = y + dy;
+      if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+      const j = (ny * w + nx) * 4; r += src[j]; g += src[j + 1]; b += src[j + 2]; c++;
+    }
+    const j = p * 4;
+    d[j] = Math.round(r / c); d[j + 1] = Math.round(g / c); d[j + 2] = Math.round(b / c);
+  }
+}
+
 // Binarizer tuned for the game's HUD text: white glyphs with a dark outline.
 // A pixel is ink when it's near-white AND a dark outline pixel sits within
 // 2px - clouds/sky are bright but have no dark edging, busy backgrounds

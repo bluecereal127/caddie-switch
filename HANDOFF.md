@@ -42,25 +42,42 @@ instead of sourcing the farthest-flag frame (which baked the flag). Flags are
 gone from all 21 maps NOW; multi-pin uploads still overwrite with real art.
 
 ### Step B — matte + upscale in-pipeline (PROTOTYPED, awaiting user sign-off)
-tools/matte-maps.mjs (standalone preview tool this session):
-- 2× lanczos upscale of the stacked RGB first, then matte (mirrors the
-  winning external order), unsharp on RGB.
-- Backdrop matte: border flood-fill on "dimmed" predicate (low luma), art
-  islands (dark trees) survive because flood is border-connected only;
-  saturated-green guard blocks leaks through edge-touching trees; alpha
-  feather ~2px keeps the soft dark cutout edge.
-- Output: RGBA PNG. App maps.js would switch base64 JPEG → PNG data URLs
-  (alpha needed; size check before shipping — if heavy, try WebP encode or
-  composite onto the card cream #FFFDF4).
-- DO NOT ship to maps.js/derived.json until the user approves previews
-  (lesson learned from the black-backdrop revert).
-- Premium-art option (user has taste for the Cloudinary AI result): support
+tools/matte-maps.mjs — standalone preview tool, writes to
+captures/derived/matte-preview/ (hNN.rgba.png transparent 500×608,
+hNN.white.png on white, hNN.mask.png debug, _sheet.png all-21 contact sheet).
+NOT wired into the pipeline; nothing shipped yet (black-backdrop lesson).
+How it works, and what was learned tuning it:
+- HUD first: the dial+caption rect (compass corner detection shared with
+  extract-maps) is replaced by a MIRROR of the band above it. Needed because
+  on holes whose art reaches the panel floor (H13) the HUD is welded to the
+  art component and no island rule can drop it. Onion-inpainting that rect
+  instead left flat streaks — reflection keeps the grass texture.
+- Art/backdrop split: NO global threshold works. Measured
+    H12/H8  backdrop L~72 S~0.55 vs art L~150 S~0.50  (luma separates)
+    H20/H21 backdrop L~60 S~0.80 vs art L~130 S~0.55  (saturation separates)
+  Backdrop is the dimmed live world: darker AND more saturated (the dim
+  overlay crushes one channel toward 0, pushing saturation UP). So
+  score = luma − 90·sat, then per-hole Otsu (T_BIAS −4). Per-hole thresholds
+  land anywhere from 4 to 77 — that spread is why globals failed.
+- Flood from a ring inset FRAME=3 px: the crop's outer pixels are the panel's
+  own pale chrome, which walls a border flood out of the image entirely
+  (symptom: 98% "art", everything hole-filled).
+- Then: components → keep largest + islands ≥300px not in a HUD corner →
+  fill enclosed non-art → dilate 2px to reclaim the dark rim → 2× lanczos
+  upscale + unsharp 0.45 → bilinear alpha (soft edge).
+- RESULT 17/21 clean. Stragglers: H8 (bright lake-shore terraces kept),
+  H18 (fragments), H17 (backdrop ridge strands), H13 (keeps its dark plateau
+  — arguably correct art — and the mirror patch is faintly visible); minor
+  water-colored leaks on H4/H15.
+- Premium-art option (user liked the Cloudinary AI result): support
   captures/derived/maps-override/hNN.png — if present, build-derived uses it
-  as the hole's art (geometry/pins still from stacks). User can hand-feed
-  Cloudinary output per hole once; restacks won't clobber it.
-- When shipped: wire matte into build-derived (or extract-maps), keep
-  MAP_W/MAP_H = 250×304 in App.jsx (coordinate space unchanged; only the
-  IMAGE resolution doubles), add own-SVG compass to HoleMap, retire compass0.
+  as the hole's art (geometry/pins still from stacks). Hand-feed the external
+  upscale+cutout for stragglers once; restacks won't clobber it.
+- When shipping: maps.js must switch base64 JPEG → PNG/WebP data URLs (alpha),
+  check bundle size (~2MB at 2× with alpha; else composite on card cream
+  #FFFDF4), keep MAP_W/MAP_H = 250×304 in App.jsx (coordinate space is
+  unchanged — only image resolution doubles), add the app's own SVG compass
+  to HoleMap, then retire compass0 farming.
 
 ## QUEUE (after the art pass)
 
