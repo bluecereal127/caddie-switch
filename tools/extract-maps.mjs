@@ -23,6 +23,9 @@ mkdirSync(OUT, { recursive: true });
 
 const manifest = JSON.parse(readFileSync(`${ROOT}/captures/classification.json`, "utf8"));
 
+// how many tee frames may enter one hole's stack (chosen for aim diversity)
+const POOL_MAX = 16;
+
 const medianStack = (crops) => {
   const { width: w, height: h } = crops[0];
   const out = { width: w, height: h, data: Buffer.alloc(w * h * 4, 255) };
@@ -85,12 +88,28 @@ const darkenStack = (crops, excludeMasks = null) => {
 };
 
 // per-frame exclusion mask: that frame's own pin flag (bright pink cluster +
-// pole below) and its wind compass (whichever corner it sat in) — so those
-// regions get sourced from frames where the overlay was elsewhere
+// pole below), its aim line, and its wind compass (whichever corner it sat
+// in) — so those regions get sourced from frames where the overlay was
+// elsewhere, and so they never count as "motion"
 const overlayMask = (crop) => {
   const w = crop.width, h = crop.height;
   const mask = new Uint8Array(w * h);
   let flag = null;
+  // Aim line: white/cyan dots and the line itself. Masking these matters more
+  // the MORE aims a pool covers — the swept line is grass in most frames and
+  // line in a few, which reads as motion and carves a strip out of the
+  // fairway. Excluded per frame, the remaining frames agree and it stays art.
+  // Sand (min ~165) and pale water (min ~150) fall under the min-channel
+  // floor, so neither is caught.
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const p = px(crop, x, y);
+    const bright = Math.min(p[0], p[1], p[2]) > 185 && p[2] > 185;
+    if (!bright && !isPointerYellow(p)) continue;
+    for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) {
+      const nx = x + dx, ny = y + dy;
+      if (nx >= 0 && ny >= 0 && nx < w && ny < h) mask[ny * w + nx] = 1;
+    }
+  }
   // Flag: the pink cloth's own bbox plus the pole hanging below it, dilated a
   // few px for the antialias halo. A fixed box was used here before; on
   // single-pin holes (where this becomes the inpaint hole) a box that wide
@@ -304,7 +323,42 @@ for (let hole = 1; hole <= 21; hole++) {
   // IMAGE via darken-stack over a cross-session pool of tee frames —
   // erases aim line/dots and avatar wherever at least one frame is clean.
   // Detection (pin/tee/scale) stays on the single-session median above.
-  const pool = tees.slice(-9);
+  //
+  // The pool is chosen for AIM DIVERSITY, not recency. Both things that make
+  // these maps clean — a clean pixel somewhere under every overlay, and the
+  // motion signal that separates map art from the 3D world underneath — come
+  // from frames whose aim differs. Nine consecutive frames from one session
+  // are often nine near-identical views, so take the most recent frame and
+  // then greedily add whichever remaining frame looks least like the ones
+  // already picked (farthest-point selection on a downsampled signature).
+  const poolOf = (frames) => {
+    if (frames.length <= POOL_MAX) return frames;
+    const sig = frames.map((f) => {
+      const img = loadImage(INBOX + f.file), c = cropRect(img, panelRect(img));
+      const SW = 32, SH = 39, s = new Float32Array(SW * SH);
+      for (let y = 0; y < SH; y++) for (let x = 0; x < SW; x++) {
+        const sx = Math.floor(x * c.width / SW), sy = Math.floor(y * c.height / SH);
+        const j = (sy * c.width + sx) * 4;
+        s[y * SW + x] = 0.299 * c.data[j] + 0.587 * c.data[j + 1] + 0.114 * c.data[j + 2];
+      }
+      return s;
+    });
+    const dist = (a, b) => { let d = 0; for (let i = 0; i < a.length; i++) d += Math.abs(a[i] - b[i]); return d / a.length; };
+    const picked = [frames.length - 1];
+    while (picked.length < POOL_MAX) {
+      let best = -1, bestD = -1;
+      for (let i = 0; i < frames.length; i++) {
+        if (picked.includes(i)) continue;
+        let mn = Infinity;
+        for (const k of picked) mn = Math.min(mn, dist(sig[i], sig[k]));
+        if (mn > bestD) { bestD = mn; best = i; }
+      }
+      if (best < 0) break;
+      picked.push(best);
+    }
+    return picked.sort((a, b) => a - b).map((i) => frames[i]);
+  };
+  const pool = poolOf(tees);
   const poolCrops = (pool.length >= 2 ? pool : use).map((f) => { const img = loadImage(INBOX + f.file); return cropRect(img, panelRect(img)); });
   const overlays = poolCrops.map(overlayMask);
   const image = darkenStack(poolCrops, { masks: overlays.map((o) => o.mask), flags: overlays.map((o) => o.flag) });

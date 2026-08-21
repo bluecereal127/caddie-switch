@@ -86,8 +86,27 @@ How it works, and what was learned tuning it:
   re-aimed frames — the only ones carrying signal — get flagged. H1 lost 2 of
   7 and went blind.
 - RESULT: rough/water now retained. Stragglers for the override path: H8
-  (fragments; its pool has a misregistered frame → 82% "moving"), H19 and
-  H21 (one world slab each survives), plus small nibbles on H3/H10/H13/H14.
+  (fragments; its pool has a misregistered frame → ~80% "moving"), H19 and
+  H21 (one world slab each survives), plus small edge nibbles.
+
+### The capture lever (tell the user before they grind captures)
+Quality here is driven by AIM DIVERSITY at the tee, not frame count. Every
+distinct aim rotates the camera, so more of the world underneath churns and
+the motion signal sharpens; frames that share an aim add nothing. Two knobs
+now support that:
+- extract-maps POOL_MAX = 16 (was a flat `slice(-9)` of the most recent).
+  Frames are chosen by farthest-point selection on a downsampled signature,
+  so the pool is the most VISUALLY DIFFERENT 16, not the newest 16.
+- overlayMask also masks each frame's aim line (white/cyan, min-channel>185,
+  +2px) and avatar. This is load-bearing once aims vary: the swept line is
+  grass in most frames and line in a few, which reads as motion and carved a
+  strip out of H10's fairway. Sand (min ~165) and pale water (min ~150) sit
+  under the floor, so neither is caught.
+Self-correcting: a hole whose panel is genuinely all art (H12) keeps reading
+~0% motion no matter how much the aim varies, and stays whole — while a hole
+that does have world behind it starts cutting as soon as varied frames land.
+What aim rotation CANNOT recover: the terrain under the wind dial. It is
+occluded in every frame, so that fill stays invented (inpaint + blur).
 - Premium-art option (user liked the Cloudinary AI result): support
   captures/derived/maps-override/hNN.png — if present, build-derived uses it
   as the hole's art (geometry/pins still from stacks). Hand-feed the external
