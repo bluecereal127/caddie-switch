@@ -179,12 +179,20 @@ function Process-Submission($sub) {
     }
   }
 
+  $copied = Ingest-Staged $staged $stamp
+  Remove-Item -Recurse -Force $tmp
+  return $copied
+}
+
+# Shared ingest: canonicalize names, dedupe by name + content hash, copy to
+# the inbox. The Switch app names photos "YYYYMMDD-<ULID>"; iOS appends a
+# fresh UUID per share — canonicalizing to the stable stem gives
+# chronological sort order (ULIDs are time-ordered) AND name-level dedupe
+# across re-shares.
+function Ingest-Staged($staged, $stamp) {
   $have = Get-HaveIndex
   $copied = 0; $seq = 0
   foreach ($f in $staged) {
-    # The Switch app names photos "YYYYMMDD-<ULID>"; iOS appends a fresh UUID
-    # per share. Canonicalize to the stable stem: chronological sort order
-    # (ULIDs are time-ordered) AND name-level dedupe across re-shares.
     $name = $f.Name
     if ($name -match "(\d{8}-[0-9A-HJKMNP-TV-Z]{26})") { $name = $matches[1] + $f.Extension.ToLower() }
     elseif ($name -notmatch "^\d{16}-") { $name = "{0}{1:d2}-{2}" -f $stamp, $seq, $f.Name }
@@ -196,11 +204,53 @@ function Process-Submission($sub) {
     $have.names[$name] = $true; $have.hashes[$hash] = $true; $copied++
     Log "    + $name"
   }
-  Remove-Item -Recurse -Force $tmp
+  return $copied
+}
+
+# Drain the "captures" blob store filled by the edge function (uploads now
+# bypass Netlify Forms entirely so nothing is metered). Blob keys look like
+# "<ms>-<rand>-<originalName>"; download, unzip if needed, ingest, delete.
+function Sync-Blobs {
+  $copied = 0
+  try {
+    $list = Invoke-RestMethod "$api/blobs/$($site.id)/site:captures" -Headers $H
+    $keys = @($list.blobs | Where-Object { $_ } | ForEach-Object { $_.key })
+    if (-not $keys.Count) { return 0 }
+    Log "$($keys.Count) blob upload(s)"
+    $mediaExt = "^\.(jpg|jpeg|png|mp4)$"
+    foreach ($k in $keys) {
+      try {
+        $tmp = Join-Path $tmpRoot ("blob_" + [Guid]::NewGuid().ToString("n"))
+        New-Item -ItemType Directory -Force $tmp | Out-Null
+        $fn = ($k -replace "^\d+-\d+-", "")
+        if (-not $fn) { $fn = $k }
+        $local = Join-Path $tmp $fn
+        Invoke-WebRequest -Uri "$api/blobs/$($site.id)/site:captures/$k" -Headers $H -OutFile $local -UseBasicParsing
+        $staged = @()
+        if ($fn -match "\.zip$") {
+          $exDir = Join-Path $tmp "x"
+          Expand-Archive -Path $local -DestinationPath $exDir -Force
+          $staged = @(Get-ChildItem $exDir -Recurse -File | Where-Object { $_.Extension -match $mediaExt } | Sort-Object Name)
+        } elseif ((Get-Item $local).Extension -match $mediaExt) {
+          $staged = @(Get-Item $local)
+        }
+        $stamp = (Get-Date).ToString("yyyyMMddHHmmss")
+        $n = Ingest-Staged $staged $stamp
+        $copied += $n
+        Invoke-RestMethod "$api/blobs/$($site.id)/site:captures/$k" -Headers $H -Method Delete | Out-Null
+        Remove-Item -Recurse -Force $tmp
+      } catch {
+        Log "  blob $k failed: $($_.Exception.Message) (kept, will retry)" "Yellow"
+      }
+    }
+  } catch {
+    Log "blob poll error: $($_.Exception.Message)" "Yellow"
+  }
   return $copied
 }
 
 while ($true) {
+  $cycleCopied = 0
   try {
     $forms = @((Invoke-RestMethod "$api/sites/$($site.id)/forms" -Headers $H) | ForEach-Object { $_ })
     $form = $forms | Where-Object { $_.name -eq "captures" } | Select-Object -First 1
@@ -211,11 +261,10 @@ while ($true) {
       $new = @($subs | Where-Object { -not $state.ContainsKey($_.id) })
       if ($new.Count -gt 0) {
         Log "$($new.Count) new submission(s)"
-        $batchCopied = 0
         foreach ($sub in $new) {
           try {
             $n = Process-Submission $sub
-            $batchCopied += $n
+            $cycleCopied += $n
             Log "  submission $($sub.id): $n file(s) -> captures\inbox"
             if (-not $KeepRemote) {
               Invoke-RestMethod "$api/submissions/$($sub.id)" -Headers $H -Method Delete | Out-Null
@@ -225,9 +274,6 @@ while ($true) {
             Log "  submission $($sub.id) failed: $($_.Exception.Message) (kept remote, will retry)" "Yellow"
           }
         }
-        if ($batchCopied -gt 0) { Invoke-Pipeline }
-      } else {
-        Write-Host "$(Get-Date -Format HH:mm:ss) nothing new"  # console only - don't bloat the log
       }
       # Akismet quarantines rapid scripted posts (it once ate 82 of them
       # silently). Rescue anything in spam that looks like a capture upload:
@@ -247,6 +293,10 @@ while ($true) {
       }
       if ($rescued -gt 0) { Log "rescued $rescued submission(s) from the spam folder" }
     }
+    # primary upload path now: the edge function's blob store
+    $cycleCopied += Sync-Blobs
+    if ($cycleCopied -gt 0) { Invoke-Pipeline }
+    else { Write-Host "$(Get-Date -Format HH:mm:ss) nothing new" }  # console only
   } catch {
     Log "poll error: $($_.Exception.Message)" "Yellow"
   }
