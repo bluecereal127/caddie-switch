@@ -18,7 +18,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadImage, savePng, px, colorDist } from "./lib/image.mjs";
 import { panelRect, cropRect } from "./lib/panel.mjs";
-import { sessions } from "./lib/ulid.mjs";
+import { sessions, fileMs } from "./lib/ulid.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const INBOX = join(ROOT, "captures", "inbox") + "/";
@@ -245,11 +245,34 @@ for (let hole = 1; hole <= 21; hole++) {
   const pins = [];
   const sessionDetails = [];
   const extracted = [];
-  for (const s of sess) {
-    const plainF = s.find((f) => f.frameType === "greenPlain").file;
-    const hmapF = s.find((f) => f.frameType === "greenHeightmap").file;
+  // PAIR EVERY FRAME, not just the first of each kind. This used to take
+  // s.find(plain) + s.find(heightmap) and drop the rest, so a session with 5
+  // plains and 8 heightmaps yielded ONE pair and 11 dead frames. Each
+  // heightmap is matched to its nearest plain in time and vice versa (the
+  // Terrain toggle means the counterpart is the adjacent capture); a frame
+  // may serve in more than one pair, which is harmless — every pair is an
+  // independent observation of a height field that never changes.
+  const stamp = (f) => fileMs(f.originalFile ?? f.file) ?? 0;
+  const pairsOf = (s) => {
+    const plains = s.filter((f) => f.frameType === "greenPlain");
+    const hmaps = s.filter((f) => f.frameType === "greenHeightmap");
+    if (!plains.length || !hmaps.length) return [];
+    const nearest = (f, pool) =>
+      pool.reduce((best, c) => Math.abs(stamp(c) - stamp(f)) < Math.abs(stamp(best) - stamp(f)) ? c : best);
+    const seen = new Set(), out = [];
+    const push = (p, hm) => {
+      const k = `${p.file}|${hm.file}`;
+      if (seen.has(k)) return;
+      seen.add(k); out.push([p.file, hm.file]);
+    };
+    for (const hm of hmaps) push(nearest(hm, plains), hm);
+    for (const p of plains) push(p, nearest(p, hmaps));
+    return out;
+  };
+  const pairs = sess.flatMap(pairsOf);
+  for (const [plainF, hmapF] of pairs) {
     const r = extractPair(hole, plainF, hmapF);
-    if (r.error) { console.log(`H${hole} session: ${r.error}`); continue; }
+    if (r.error) { console.log(`H${hole} pair ${plainF.slice(-12)}+${hmapF.slice(-12)}: ${r.error}`); continue; }
     // the zoom level grows as the player nears the green — a cropped green
     // (mask at the panel border) must never supply the grid
     const cw = r.plain.width, ch = r.plain.height;

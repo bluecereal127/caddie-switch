@@ -12,6 +12,11 @@ v13 and now diverges (v14: capture catalog); the web repo is the source of truth
 - `src/mapxform.js` — AUTO-GENERATED per-hole old→new fractional transforms used once by the mapV5 migration.
 - `public/derived.json` — AUTO-GENERATED capture-pipeline output (per-hole scale, green box, quantized 9×9 slope grid, pins, tee). App fetches it on load: first application is wholesale (derivedV1 flag), afterwards fill-empty + append-new-pins so manual edits survive. Regenerate: extract-maps → extract-greens → build-derived.
 - `src/storage.js` — window.storage shim (async get/set/delete/list over localStorage, key prefix `caddie:`; app data lives under `caddie:sss-golf-solver-v2`).
+- `tools/frame-audit.mjs` — read-only: joins every stage's record of what it
+  consumed and reports, per capture, which roles it holds (mapPool, mapDetect,
+  teeBench, greenPair, shotAddress, shotPopup, labelled) or that it is inert.
+  Run it before concluding a frame is unused; `--list` names them, `--json`
+  writes captures/derived/frame-audit.json.
 - `tools/` — screenshot ingestion pipeline (pure Node; see tools/README.md). Scaffolded + verified on synthetic frames; ROIs/gauge cal/digit templates await first real captures.
 - Capture platform: user plays on a Switch 2, but NSS is a backward-compat Switch 1 title, so album captures are 1280×720 (Switch 2 games capture 1920×1080; no setting changes this — Nintendo support a_id 68408). All measured ROIs assume 720p frames; rects are fractional anyway.
 
@@ -32,6 +37,16 @@ grid per green (MU=1.35, SLOPE_G=1.1, capture radius 0.22 yd, max capture speed 
 - Community wind-route rules encoded in WIND_RULES (H7/10/12/14/15/16/18/21).
 - Shot Assist (Options → User Settings → Other; local play only) locks the swing perfectly straight AND allows maxing the bars — player-confirmed. It's the calibration tool.
 - Restarting a hole (local play) restarts its 3-hole track with IDENTICAL wind. Outcomes are deterministic: same club/power/aim/wind → pixel-identical ball position (player-confirmed with driver, 9i, and putter across restarts).
+- Every green is ringed by a FRINGE (player-confirmed): a band roughly the
+  colour of fairway but distinct, wrapping the entire green without a break.
+  Outside it is fairway or rough — never water, never OB dark rough. The
+  fringe's inner edge is therefore a true polygon boundary for the green
+  (the grid-squared, lighter surface inside it), and a far better mask than
+  any bounding box. Terrain view recolours only the green itself, not the
+  fringe, so the fringe survives in both plain and heightmap frames.
+- Greens are drawn with a visible GRID of squares on the putting surface —
+  a known-scale lattice, so it doubles as a registration cue when aligning
+  green captures taken at different zoom levels.
 - Green B-grid is a STATIC shaded overlay — lighter = higher, darker = lower (game8 guide + player confirmation). No flowing dots/motion, unlike some other golf games.
 - Putter bar shows no fill during the backstroke but displays the final fill once the putt is made (player-confirmed) — post-stroke capture frames work for putts too.
 - All in-game distance readouts ("NNN yd to go", distance-to-pin) are FLAT level-ground distances — elevation never enters them (player-confirmed). They live in the same plane as the minimap, so map-scale calibration (yards ÷ map pixels) is exact on every hole; elevation only shifts actual carry.

@@ -234,10 +234,22 @@ for (let hole = 1; hole <= 21; hole++) {
       x1: Math.min(W - 1, Math.round(c1.x)), y1: Math.min(H - 1, Math.round(c1.y)) };
     greenBox = { x0: +(box.x0 / W).toFixed(4), y0: +(box.y0 / H).toFixed(4),
       x1: +(box.x1 / W).toFixed(4), y1: +(box.y1 / H).toFixed(4) };
-    // pins via bbox-normalized coords — zoom-invariant across sessions
-    pins = g.pins.map((p) => ({
-      x: +((box.x0 + p.gx * (box.x1 - box.x0)) / W).toFixed(4),
-      y: +((box.y0 + p.gy * (box.y1 - box.y0)) / H).toFixed(4) }));
+    // pins via bbox-normalized coords — zoom-invariant across sessions —
+    // then CLUSTERED at the app's own 0.02 radius. Every pair that sees the
+    // same flag reports it, so one spot captured six times used to ship as
+    // six pins; the app deduped on merge but derived.json lied and the debug
+    // overlay was unreadable. Averaging each cluster also sharpens the
+    // estimate: more observations of a spot now means a better fix on it,
+    // not more clutter.
+    const raw = g.pins.map((p) => ({
+      x: (box.x0 + p.gx * (box.x1 - box.x0)) / W,
+      y: (box.y0 + p.gy * (box.y1 - box.y0)) / H }));
+    const clusters = [];
+    for (const p of raw) {
+      const c = clusters.find((q) => Math.hypot(q.x / q.n - p.x, q.y / q.n - p.y) < 0.02);
+      if (c) { c.x += p.x; c.y += p.y; c.n++; } else clusters.push({ x: p.x, y: p.y, n: 1 });
+    }
+    pins = clusters.map((c) => ({ x: +(c.x / c.n).toFixed(4), y: +(c.y / c.n).toFixed(4), n: c.n }));
     // debug overlay
     const dbg = { width: W, height: H, data: Buffer.from(img.data) };
     const set = (x, y) => { if (x < 0 || y < 0 || x >= W || y >= H) return; const i = (y * W + x) * 4; dbg.data[i] = 30; dbg.data[i + 1] = 120; dbg.data[i + 2] = 255; };
