@@ -290,7 +290,7 @@ function extractPair(hole, plainFile, hmapFile) {
       const nx = x + dx, ny = y + dy;
       return nx < 0 || ny < 0 || nx >= w || ny >= h || !mask[ny * w + nx];
     });
-    if (edge) set(x, y, [230, 30, 30]);
+    if (edge) set(x, y, [130, 25, 25]); // this pair alone — dim; the fused outline is drawn over it
   }
   for (let x = x0; x <= x1; x++) { set(x, y0, [40, 90, 220]); set(x, y1, [40, 90, 220]); }
   for (let y = y0; y <= y1; y++) { set(x0, y, [40, 90, 220]); set(x1, y, [40, 90, 220]); }
@@ -375,9 +375,9 @@ for (let hole = 1; hole <= 21; hole++) {
   const clean = extracted.filter((e) => !e.cropped);
   const pool = clean.length ? clean : extracted;
   const final = pool.length ? pool.reduce((a, b) => (b.area > a.area ? b : a)) : null;
-  let fusedGrid = null, fusedFrom = 0;
+  let fusedGrid = null, fusedFrom = 0, fusedH = null;
   if (pool.length) {
-    const fusedH = Array.from({ length: GRID_N }, () => new Array(GRID_N).fill(null));
+    fusedH = Array.from({ length: GRID_N }, () => new Array(GRID_N).fill(null));
     for (let gy = 0; gy < GRID_N; gy++)
       for (let gx = 0; gx < GRID_N; gx++) {
         let sum = 0, wsum = 0;
@@ -487,7 +487,57 @@ for (let hole = 1; hole <= 21; hole++) {
     }
   }
   savePng(join(OUT, `${id}-mask.png`), r.dbg);
-  savePng(join(OUT, `${id}-height.png`), r.hv);
+
+  // Height view rendered from the FUSED grid, which is what actually ships.
+  // It used to render one pair's own height field, so it showed that pair's
+  // flag notch and read as a hole in the data when the fused grid had none.
+  {
+    const W = r.plain.width, H = r.plain.height;
+    const hv = { width: W, height: H, data: Buffer.alloc(W * H * 4, 255) };
+    for (let i = 0; i < W * H; i++) {
+      const j = i * 4;
+      hv.data[j] = 238; hv.data[j + 1] = 238; hv.data[j + 2] = 238; hv.data[j + 3] = 255;
+    }
+    const bx = r.bbox.x0, by = r.bbox.y0;
+    const cw = (r.bbox.x1 - r.bbox.x0) / GRID_N, chh = (r.bbox.y1 - r.bbox.y0) / GRID_N;
+    const put = (x, y, c) => {
+      x = Math.round(x); y = Math.round(y);
+      if (x < 0 || y < 0 || x >= W || y >= H) return;
+      const j = (y * W + x) * 4;
+      hv.data[j] = c[0]; hv.data[j + 1] = c[1]; hv.data[j + 2] = c[2];
+    };
+    const gridSrc = fusedGrid ?? r.grid, hSrc = fusedH ?? r.cellH;
+    for (let gy = 0; gy < GRID_N; gy++) for (let gx = 0; gx < GRID_N; gx++) {
+      const x0 = bx + gx * cw, y0 = by + gy * chh;
+      const hh = hSrc?.[gy]?.[gx];
+      for (let y = Math.round(y0); y < Math.round(y0 + chh); y++)
+        for (let x = Math.round(x0); x < Math.round(x0 + cw); x++) {
+          if (hh == null) {
+            // genuinely no data for this cell — hatched, so a real gap is
+            // never mistaken for one pair's flag shadow
+            if (((x + y) % 6) < 2) put(x, y, [235, 150, 150]);
+          } else {
+            const v = Math.round(60 + hh * 170);
+            put(x, y, [v, v, 70]);
+          }
+        }
+      const [vx, vy] = gridSrc[gy][gx];
+      if (!vx && !vy) continue;
+      const cx = x0 + cw / 2, cy = y0 + chh / 2, L = Math.min(cw, chh) * 0.8;
+      for (let t = 0; t <= 1; t += 0.05) put(cx + vx * L * t, cy + vy * L * t, [220, 30, 30]);
+      put(cx, cy, [0, 0, 255]);
+    }
+    if (poly) {
+      const bw = r.bbox.x1 - r.bbox.x0, bh = r.bbox.y1 - r.bbox.y0;
+      for (let i = 0; i < poly.length; i++) {
+        const a = poly[i], b = poly[(i + 1) % poly.length];
+        const ax = bx + a[0] * bw, ay = by + a[1] * bh, bx2 = bx + b[0] * bw, by2 = by + b[1] * bh;
+        const steps = Math.ceil(Math.hypot(bx2 - ax, by2 - ay));
+        for (let t = 0; t <= steps; t++) put(ax + (bx2 - ax) * t / steps, ay + (by2 - ay) * t / steps, [0, 190, 230]);
+      }
+    }
+    savePng(join(OUT, `${id}-height.png`), hv);
+  }
   writeFileSync(join(OUT, `${id}.json`), JSON.stringify({
     hole, sources: { plain: final.plainF, heightmap: final.hmapF },
     panelBbox: r.bbox, gridN: GRID_N, grid: fusedGrid ?? r.grid, fusedFrom,

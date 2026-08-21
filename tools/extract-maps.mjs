@@ -441,6 +441,9 @@ for (let hole = 1; hole <= 21; hole++) {
   // tell you why any given capture did or did not affect this hole's map
   results.push({ hole, frames: use.map((f) => f.file),
     pool: pool.map((f) => f.file),
+    // where each pooled frame's own flag stood: distinct positions are what
+    // let the stack source real art under a flag instead of inpainting it
+    poolFlags: overlays.map((o) => o.flag ? { x: Math.round(o.flag.x), y: Math.round(o.flag.y) } : null),
     teeCandidates: tees.map((f) => f.file),
     mapFramesSeen: allMaps.map((f) => f.file),
     w: stacked.width, h: stacked.height,

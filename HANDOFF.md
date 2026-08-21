@@ -6,6 +6,20 @@ standing: verify (babel parse App.jsx + `npm run build`) → commit → push
 (Netlify deploys main). The PC scheduled task "CaddieAutosync" runs the whole
 capture pipeline; after editing autosync.ps1 restart it (Stop/Start-ScheduledTask).
 
+## CAPTURE WORKLIST — run the tool, don't guess
+`node tools/capture-plan.mjs [--table]` reads what the pipeline actually
+derived and ranks what to shoot next. Re-run it after every upload batch; it
+is the source of truth for this section. Four independent needs:
+- AIM   tee frames whose aims DIFFER (the world under the panel only churns
+        when the camera turns, and that churn is the matte's whole signal)
+- FLAG  tee frames from a round with the pin somewhere new (only then can the
+        stack show real art under the flag instead of an inpaint)
+- PIN   green captures at a new pin position (the flag hides the surface it
+        stands on; only a different pin reveals it)
+- ZOOM  another green pair, plain + Terrain back to back, to fuse against
+As of 2026-08-21: H1 H9 H10 H14 H16 need nothing. Worst are H15 H19 H6 H13
+H12 H21 H5 H20 (all four needs). H11 needs AIM only; H8 needs PIN only.
+
 ## State (as of the wide-layout commit e616989 + this session)
 - Capture transport: edge function → blobs → autosync → classify (template
   OCR, 113/113 validated) → extract-maps/greens → assemble-shots →
@@ -16,8 +30,22 @@ capture pipeline; after editing autosync.ps1 restart it (Stop/Start-ScheduledTas
   (captures/derived/compass0/). Baked pin flags: now ONION-INPAINTED out
   wherever every pooled frame shares one pin (see below); real art replaces
   the inpaint automatically once a 2nd-pin session exists.
-- Greens: boundary + fused multi-session height field → 9×9 grid; pins
-  accumulate. Shots: address+popup pairs → importable Log rows w/ bearing.
+- Greens: EVERY plain/heightmap frame in a session pairs now (it used to take
+  s.find() of each kind and drop the rest — 11 dead frames on one H10
+  session). Zoom-mismatch guard rejects pairs whose diff blows up past 42% of
+  the panel. Outlines FUSE across pairs (a flag only ever subtracts green, so
+  union fills the notch it bit) and are traced to a ≤44-pt polygon shipped as
+  greenPoly; the app draws it instead of the old rectangle. Heights fuse by
+  cell weight. Pins cluster at 0.02 and average, so repeat sightings sharpen
+  a pin instead of duplicating it. Plain-only frames contribute via the
+  FRINGE detector (tools/lib/greensurface.mjs): the surface's grid checker
+  gives a regular local luma range while the fringe is flat, so the boundary
+  is a texture edge needing no heightmap — mean IoU 0.787 vs the diff masks,
+  gated on bbox-normalized shape agreement (NOT area: zoom varies).
+- Shots: address+popup pairs → importable Log rows w/ bearing (40 rows, 34
+  importable).
+- Frame accounting: `node tools/frame-audit.mjs` says which stage consumes
+  each capture, or that it is inert. Currently 47 inert of 369.
 - Solver UX: 1500px shell, 3-col solver on xl; tee-default draggable target,
   windDeg N-up canonical, draggable rec bars, trees hide toggle, ball dot
   r=1.5. Pins: only the SELECTED pin draws during play (the whole catalog
