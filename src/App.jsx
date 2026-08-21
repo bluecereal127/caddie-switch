@@ -381,6 +381,7 @@ function HoleMap({ holeNum, line, onLine, markers, onMarkers, markerMode, aimPre
   const src = HOLE_MAPS[holeNum];
 
   const dragMoved = useRef(false);
+  const [draggingT, setDraggingT] = useState(false);
   const fracOf = (e, el) => {
     const r = el.getBoundingClientRect();
     const pt = e.touches ? e.touches[0] : e;
@@ -394,6 +395,7 @@ function HoleMap({ holeNum, line, onLine, markers, onMarkers, markerMode, aimPre
     const f = fracOf(e, el);
     if (Math.hypot(f.x - line.target.x, f.y - line.target.y) >= 0.07) return;
     e.preventDefault();
+    setDraggingT(true);
     const ball = line.ball;
     const mv = (ev) => {
       if (ev.cancelable) ev.preventDefault();
@@ -402,6 +404,7 @@ function HoleMap({ holeNum, line, onLine, markers, onMarkers, markerMode, aimPre
     };
     const up = () => {
       window.removeEventListener("mousemove", mv); window.removeEventListener("touchmove", mv);
+      setDraggingT(false);
       setTimeout(() => { dragMoved.current = false; }, 0);
     };
     window.addEventListener("mousemove", mv);
@@ -438,14 +441,14 @@ function HoleMap({ holeNum, line, onLine, markers, onMarkers, markerMode, aimPre
 
   // aim preview point: rotate the aim offset (yd → map fraction handled by parent via aimPreview.fx/fy)
   return (
-    <div className="relative rounded-xl overflow-hidden select-none touch-none" style={{ border: `3px solid ${T.turfDeep}`, cursor: "crosshair" }}
+    <div className="relative rounded-xl overflow-hidden select-none touch-none" style={{ border: `3px solid ${T.turfDeep}`, cursor: draggingT ? "grabbing" : "crosshair" }}
       onClick={click} onMouseDown={onDown} onTouchStart={onDown}>
       <img ref={imgRef} src={src} alt={`Hole ${holeNum} map`} className="w-full block" draggable={false}
         onLoad={(e) => setDims({ w: e.target.naturalWidth, h: e.target.naturalHeight })} />
       <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 100 100" preserveAspectRatio="none">
         {b && t && <line x1={b.x} y1={b.y} x2={t.x} y2={t.y} stroke="#fff" strokeWidth="1" strokeDasharray="2.5 2" />}
         {t && (
-          <g transform={`translate(${t.x} ${t.y})`}>
+          <g transform={`translate(${t.x} ${t.y})`} style={{ pointerEvents: "auto", cursor: draggingT ? "grabbing" : "grab" }}>
             <circle r="3.1" fill="rgba(255,255,255,0.22)" stroke="#fff" strokeWidth="0.8" />
             <circle r="0.9" fill="#fff" />
           </g>
@@ -737,10 +740,11 @@ export default function App() {
     const dx = (pin.x - from.x) * MAP_W, dy = (pin.y - from.y) * MAP_H;
     return ((Math.atan2(dx, -dy) * 180) / Math.PI + 360) % 360;
   }, [line.ball, holesMeta, hole]);
+  // windDeg state is ALWAYS stored N-up absolute; "relative to shot" is just
+  // a different view of the same value, so dragging the target (which
+  // changes the bearing) correctly changes the effective wind either way.
   const shotBearing = geo?.bearing ?? defaultBearing;
-  const relWindDeg = windMode === "map"
-    ? (shotBearing != null ? ((windDeg - shotBearing) % 360 + 360) % 360 : windDeg)
-    : windDeg;
+  const relWindDeg = shotBearing != null ? ((windDeg - shotBearing) % 360 + 360) % 360 : windDeg;
 
   const activeWindRules = useMemo(
     () => (lie === "green" ? [] : matchWindRules(hole, stroke, windSpeed, relWindDeg)),
@@ -752,6 +756,27 @@ export default function App() {
     () => solve(clubs, { dist, windSpeed, relWindDeg, lie, hole, stroke }, blockedRules),
     [clubs, dist, windSpeed, relWindDeg, lie, hole, stroke, blockedRules]
   );
+  // drag a rec card's power bar -> power -> implied stop distance
+  const dragBar = (e, r) => {
+    e.stopPropagation(); e.preventDefault();
+    const el = e.currentTarget;
+    const wAlongNow = windSpeed * Math.cos((relWindDeg * Math.PI) / 180);
+    const denom = r.club.a * (1 + r.club.h * wAlongNow);
+    const apply = (ev) => {
+      const rect = el.getBoundingClientRect();
+      const pt = ev.touches ? ev.touches[0] : ev;
+      const frac = Math.min(1, Math.max(0.05, (pt.clientX - rect.left) / rect.width));
+      const d = Math.round(frac * r.cap * denom);
+      if (d > 0) setDist(d);
+    };
+    apply(e);
+    const mv = (ev) => { if (ev.cancelable) ev.preventDefault(); apply(ev); };
+    const up = () => { window.removeEventListener("mousemove", mv); window.removeEventListener("touchmove", mv); };
+    window.addEventListener("mousemove", mv);
+    window.addEventListener("touchmove", mv, { passive: false });
+    window.addEventListener("mouseup", up, { once: true });
+    window.addEventListener("touchend", up, { once: true });
+  };
   useEffect(() => { maxReachRef.current = maxReach; if (lie !== "green" && maxReach && dist > Math.floor(maxReach.yd)) setDist(Math.floor(maxReach.yd)); }, [maxReach, dist, lie]);
 
   // aim preview on map: rotate best rec's aim offset around the ball
@@ -977,12 +1002,12 @@ export default function App() {
                 </div>
               </div>
 
-              {/* --- the map --- */}
-              <div className="grid grid-cols-5 gap-3">
-                <div className="col-span-3">
+              {/* --- the map (full width for a bigger canvas) --- */}
+              <div className="space-y-2">
+                <div>
                   <HoleMap holeNum={hole} line={line} onLine={setLine}
                     markers={holesMeta[hole].markers} onMarkers={(m) => setMarkers(hole, m)}
-                    markerMode={false} aimPreview={aimPreview}
+                    markerMode={markerMode} aimPreview={aimPreview}
                     greenBox={holesMeta[hole].green?.box ?? null}
                     pins={holesMeta[hole].pins} curPinId={holesMeta[hole].curPin}
                     pinMode={false} onPins={(p) => setPins(hole, p)}
@@ -990,7 +1015,7 @@ export default function App() {
                     teePos={holesMeta[hole].tee ?? null}
                     stopMarker={stopPoint} />
                 </div>
-                <div className="col-span-2 space-y-2 text-xs">
+                <div className="grid grid-cols-2 gap-2 text-xs">
                   <div className="rounded-xl border-2 p-2" style={{ borderColor: T.line, background: "#fff" }}>
                     {!line.ball && <span className="font-semibold">Tap the map where your <b>ball</b> is.</span>}
                     {line.ball && !line.target && <span className="font-semibold">Tap your <b>target</b> on the map — or just type the distance to use the game's default line.</span>}
@@ -1037,6 +1062,9 @@ export default function App() {
                     <button onClick={() => setLine({ ball: holesMeta[hole].tee ? { ...holesMeta[hole].tee } : null, target: null })} className="flex-1 py-1.5 rounded-xl border-2 font-bold" style={chip(false)}>
                       Clear line
                     </button>
+                    <button onClick={() => setMarkerMode(!markerMode)} className="flex-1 py-1.5 rounded-xl border-2 font-bold" style={chip(markerMode)}>
+                      🌲 {markerMode ? "tap: add / remove" : "Edit trees"}
+                    </button>
                   </div>
                 </div>
               </div>
@@ -1061,17 +1089,22 @@ export default function App() {
                       if (geo && !scale && v > 0) {
                         const next = { ...holesMeta, [hole]: { ...holesMeta[hole], scale: v / geo.srcPx } };
                         setHolesMeta(next); persist({ holesMeta: next });
-                      } else if (line.target) {
-                        // typing a distance = "I'm on the game's default line,
-                        // not a drawn adjustment" — drop the drawn target
-                        setLine((l) => ({ ...l, target: null }));
+                      } else if (line.target && line.ball && scale && v > 0) {
+                        // a chosen target defines the line — typing a distance
+                        // slides the target along it (From tee resets)
+                        const dx = line.target.x - line.ball.x, dy = line.target.y - line.ball.y;
+                        const len = Math.hypot(dx * MAP_W, dy * MAP_H);
+                        if (len > 1) {
+                          const k = (v / scale) / len;
+                          setLine((l) => ({ ...l, target: { x: l.ball.x + dx * k, y: l.ball.y + dy * k } }));
+                        }
                       }
                       if (lie !== "green" && maxReach) v = Math.min(v, Math.floor(maxReach.yd));
                       setDist(v);
                     }} />
                   {lie !== "green" && (
                     <div className="text-[11px] mt-1 font-semibold" style={{ minHeight: "2.1em", color: maxReach && dist >= Math.floor(maxReach.yd) ? "#8a6d1a" : undefined, opacity: maxReach && dist >= Math.floor(maxReach.yd) ? 1 : 0.55 }}>
-                      {maxReach ? <>max reachable in this wind/lie: {Math.floor(maxReach.yd)} yd ({maxReach.club}){dist >= Math.floor(maxReach.yd) ? " — field capped; past this is a layup + extra shot" : ""}</> : "—"}
+                      {maxReach ? <>max reachable in this wind/lie: {Math.floor(maxReach.yd)} yd ({maxReach.club})</> : "—"}
                     </div>
                   )}
                 </div>
@@ -1113,8 +1146,10 @@ export default function App() {
                   </div>
                 </div>
                 <div className="flex items-center gap-4 mt-1">
-                  <WindDial deg={windDeg} setDeg={setWindDeg} speed={windSpeed}
-                    topLabel={windMode === "map" ? "N" : "PIN"} bottomLabel={windMode === "map" ? "S" : "YOU"}
+                  <WindDial deg={windMode === "map" ? windDeg : relWindDeg}
+                    setDeg={(d) => setWindDeg(windMode === "map" ? d : (((shotBearing ?? 0) + d) % 360 + 360) % 360)}
+                    speed={windSpeed}
+                    topLabel={windMode === "map" ? "N" : "AIM"} bottomLabel={windMode === "map" ? "S" : "YOU"}
                     snap={windMode === "map" ? 45 : 5} />
                   <div className="flex-1">
                     <input type="number" min="0" max="31" step="1" className={inputCls} style={inputStyle} value={windSpeed}
@@ -1200,25 +1235,21 @@ export default function App() {
                           <div className="text-[10px] uppercase tracking-wide opacity-60">{r.cap < r.club.maxPower ? `of ${r.cap}-bar cap` : "of full swing"}</div>
                         </div>
                       </div>
-                      <div className="mt-3 h-3 rounded-full relative" style={{ background: T.sky }}>
-                        <div className="h-3 rounded-full" style={{ width: `${Math.min(100, r.frac * 100)}%`, background: `linear-gradient(90deg, ${T.turfLight}, ${T.turf})` }} />
-                        <div className="absolute -top-1 h-5 w-0.5" style={{ left: `${Math.min(100, r.frac * 100)}%`, background: T.ink }} />
+                      <div className="mt-3 h-3 rounded-full relative" style={{ background: T.sky, cursor: "grab", touchAction: "none" }}
+                        onMouseDown={(e) => dragBar(e, r)} onTouchStart={(e) => dragBar(e, r)}
+                        onClick={(e) => e.stopPropagation()}
+                        title="drag to change the target distance">
+                        <div className="h-3 rounded-full pointer-events-none" style={{ width: `${Math.min(100, r.frac * 100)}%`, background: `linear-gradient(90deg, ${T.turfLight}, ${T.turf})` }} />
+                        {[25, 50, 75].map((q) => (
+                          <div key={q} className="absolute rounded-full pointer-events-none" style={{ left: `${q}%`, top: "50%", width: 5, height: 5, transform: "translate(-50%,-50%)", background: "#fff", boxShadow: "0 0 0 1px rgba(20,48,29,0.35)" }} />
+                        ))}
+                        <div className="absolute -top-1 h-5 w-0.5 pointer-events-none" style={{ left: `${Math.min(100, r.frac * 100)}%`, background: T.ink }} />
                       </div>
-                      {(lie === "rough" || lie === "bunker" || !r.club.spin) && (
-                        <div className="mt-2 space-y-0.5">
-                          {(lie === "rough" || lie === "bunker") && <div className="text-[10px] font-semibold" style={{ color: "#8a6d1a" }}>⚠ {lie} lie: shots skew off-line more{lie === "bunker" ? ` — bar capped at ${r.cap} of ${r.club.maxPower}` : " — bar capped at ¾"}</div>}
-                          {!r.club.spin && <div className="text-[10px] font-semibold" style={{ color: "#8a6d1a" }}>no backspin on {r.club.name} — plan for roll-out</div>}
-                        </div>
+                      {(lie === "rough" || lie === "bunker") && (
+                        <div className="mt-2 text-[10px] font-semibold" style={{ color: "#8a6d1a" }}>⚠ {lie} lie: shots skew off-line more{lie === "bunker" ? ` — bar capped at ${r.cap} of ${r.club.maxPower}` : " — bar capped at ¾"}</div>
                       )}
-                      <div className="mt-2 flex items-center justify-between">
-                        <div className="text-[11px] opacity-60">
-                          {r.calibrated > 0 ? `calibrated (${r.calibrated} shots)` : "default numbers — calibrate this club"}
-                        </div>
-                        {!r.blocked && (
-                          <button onClick={(e) => { e.stopPropagation(); markBlocked(r); }} className="text-[11px] font-bold px-2 py-1 rounded-lg border-2" style={{ borderColor: T.line }}>
-                            🌲 Mark blocked
-                          </button>
-                        )}
+                      <div className="mt-2 text-[11px] opacity-60">
+                        {r.calibrated > 0 ? `calibrated (${r.calibrated} shots)` : "default numbers — calibrate this club"}
                       </div>
                     </div>
                   );

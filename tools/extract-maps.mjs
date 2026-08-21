@@ -288,11 +288,18 @@ for (let hole = 1; hole <= 21; hole++) {
   const poolCrops = (pool.length >= 2 ? pool : use).map((f) => { const img = loadImage(INBOX + f.file); return cropRect(img, panelRect(img)); });
   const overlays = poolCrops.map(overlayMask);
   const image = darkenStack(poolCrops, { masks: overlays.map((o) => o.mask), flags: overlays.map((o) => o.flag) });
-  // composite the flag crisply from the detection stack (one flag, no ghosts)
-  if (flag) {
-    const fr = { x0: Math.max(0, Math.round(flag.x - 16)), y0: Math.max(0, Math.round(flag.y - 16)),
-                 x1: Math.min(image.width - 1, Math.round(flag.x + 16)), y1: Math.min(image.height - 1, Math.round((pin?.y ?? flag.maxY) + 6)) };
-    blitRect(image, stacked, fr);
+  // NO flag composite: the app draws pins itself. Where every pooled frame
+  // shares one pin the baked flag survives for now; a second-pin upload for
+  // that hole scrubs it automatically (user's chosen approach).
+  // dark backdrop: the panel's translucent teal backdrop -> near-black for
+  // contrast (backdrop is dark, desaturated, blue-leaning; the OB ring art
+  // is darker GREEN, so require b >= g)
+  for (let i = 0; i < image.width * image.height * 4; i += 4) {
+    const r = image.data[i], g = image.data[i + 1], b = image.data[i + 2];
+    const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+    if (mx < 100 && b >= g - 4 && mx - mn < 45) {
+      image.data[i] = 7; image.data[i + 1] = 10; image.data[i + 2] = 9;
+    }
   }
   // compass: locked 0-mph patch when available, else the detection stack's own
   const corner = findCompassCorner(stacked);
