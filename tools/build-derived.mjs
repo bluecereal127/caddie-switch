@@ -204,8 +204,11 @@ for (let hole = 1; hole <= 21; hole++) {
   // k down
   const kLo = meta.scaleYdPerPx ? Math.max(0.08, 0.25 / meta.scaleYdPerPx) : 0.1;
   const kHi = meta.scaleYdPerPx ? Math.min(0.55, 0.55 / meta.scaleYdPerPx) : 0.5;
+  // anchor on uncropped sessions only — a green cut off by the panel edge
+  // has an unreliable bbox and weaker correlation
+  const anchorPool = g.sessions.filter((s) => !s.cropped);
   let anchor = null;
-  for (const s of g.sessions) {
+  for (const s of (anchorPool.length ? anchorPool : g.sessions)) {
     const zimg = loadImage(join(INBOX, s.plain));
     const zoom = cropRect(zimg, panelRect(zimg));
     const pr = projectGreenBox(img, zoom, meta.pin, s.pinPx, s.bboxPx, kLo, kHi);
@@ -218,16 +221,18 @@ for (let hole = 1; hole <= 21; hole++) {
     const W = img.width, H = img.height;
     const proj = (zx, zy) => ({ x: meta.pin.x + ox + (zx - session.pinPx.x) * k,
                                 y: meta.pin.y + oy + (zy - session.pinPx.y) * k });
-    const zb = g.panelBbox; // latest session's bbox (grid space)
+    // project the ANCHOR session's own bbox (its k belongs to its zoom level;
+    // other sessions can sit at different zooms)
+    const zb = session.bboxPx;
     const c0 = proj(zb.x0, zb.y0), c1 = proj(zb.x1, zb.y1);
     box = { x0: Math.max(0, Math.round(c0.x)), y0: Math.max(0, Math.round(c0.y)),
       x1: Math.min(W - 1, Math.round(c1.x)), y1: Math.min(H - 1, Math.round(c1.y)) };
     greenBox = { x0: +(box.x0 / W).toFixed(4), y0: +(box.y0 / H).toFixed(4),
       x1: +(box.x1 / W).toFixed(4), y1: +(box.y1 / H).toFixed(4) };
-    pins = g.sessions.map((s) => {
-      const p = proj(s.pinPx.x, s.pinPx.y);
-      return { x: +(p.x / W).toFixed(4), y: +(p.y / H).toFixed(4) };
-    });
+    // pins via bbox-normalized coords — zoom-invariant across sessions
+    pins = g.pins.map((p) => ({
+      x: +((box.x0 + p.gx * (box.x1 - box.x0)) / W).toFixed(4),
+      y: +((box.y0 + p.gy * (box.y1 - box.y0)) / H).toFixed(4) }));
     // debug overlay
     const dbg = { width: W, height: H, data: Buffer.from(img.data) };
     const set = (x, y) => { if (x < 0 || y < 0 || x >= W || y >= H) return; const i = (y * W + x) * 4; dbg.data[i] = 30; dbg.data[i + 1] = 120; dbg.data[i + 2] = 255; };

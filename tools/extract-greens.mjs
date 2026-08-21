@@ -236,20 +236,29 @@ for (let hole = 1; hole <= 21; hole++) {
   if (!sess.length) { console.log(`H${hole}: no plain+heightmap pair`); continue; }
   const pins = [];
   const sessionDetails = [];
-  let final = null;
+  const extracted = [];
   for (const s of sess) {
     const plainF = s.find((f) => f.frameType === "greenPlain").file;
     const hmapF = s.find((f) => f.frameType === "greenHeightmap").file;
     const r = extractPair(hole, plainF, hmapF);
     if (r.error) { console.log(`H${hole} session: ${r.error}`); continue; }
+    // the zoom level grows as the player nears the green — a cropped green
+    // (mask at the panel border) must never supply the grid
+    const cw = r.plain.width, ch = r.plain.height;
+    const cropped = r.bbox.x0 <= 1 || r.bbox.y0 <= 1 || r.bbox.x1 >= cw - 2 || r.bbox.y1 >= ch - 2;
     if (r.pin) {
       pins.push(r.pin);
-      sessionDetails.push({ plain: plainF, hmap: hmapF, bboxPx: r.bbox,
+      sessionDetails.push({ plain: plainF, hmap: hmapF, bboxPx: r.bbox, cropped,
         pinPx: { x: +(r.bbox.x0 + r.pin.gx * (r.bbox.x1 - r.bbox.x0)).toFixed(1),
                  y: +(r.bbox.y0 + r.pin.gy * (r.bbox.y1 - r.bbox.y0)).toFixed(1) } });
     }
-    final = { r, plainF, hmapF };
+    extracted.push({ r, plainF, hmapF, cropped, area: r.maskSize });
   }
+  // grid source: the highest-resolution UNCROPPED green (largest mask area);
+  // grids are bbox-normalized so they transfer across zoom levels
+  const clean = extracted.filter((e) => !e.cropped);
+  const pool = clean.length ? clean : extracted;
+  const final = pool.length ? pool.reduce((a, b) => (b.area > a.area ? b : a)) : null;
   if (!final) continue;
   const { r } = final;
   const id = `h${String(hole).padStart(2, "0")}`;
