@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useMemo, useId } from "react";
 import { HOLE_MAPS } from "./maps.js";
+import { GREEN_VIEWS } from "./greens.js";
 import { MAP_XFORM_V5 } from "./mapxform.js";
 
 
@@ -374,6 +375,74 @@ function GreenCanvas({ mapSrc, green, mode, onGrid, ball, cup, onTap, path, aimP
   );
 }
 
+/* ---------------- zoomed green view ----------------
+   The putting surface at its own scale, fused from the zoomed green
+   captures and free of the flag, pole and cup. It needs no projection onto
+   the hole map: the image IS the green's bounding box, so green-local
+   (0,0)..(1,1) lands on derived.json's greenBox and on the 9x9 slope grid
+   directly. Pins are stored map-fractional, so they convert through the box.
+*/
+function GreenView({ holeNum, pins = [], curPinId = null, greenBox = null, grid = null, meta = null, onPick }) {
+  const src = GREEN_VIEWS[holeNum];
+  if (!src || !greenBox) return null;
+  const bw = greenBox.x1 - greenBox.x0, bh = greenBox.y1 - greenBox.y0;
+  if (!(bw > 0) || !(bh > 0)) return null;
+  const toLocal = (p) => ({ x: ((p.x - greenBox.x0) / bw) * 100, y: ((p.y - greenBox.y0) / bh) * 100 });
+  const cells = [];
+  if (grid) {
+    const N = grid.length;
+    for (let gy = 0; gy < N; gy++) for (let gx = 0; gx < N; gx++) {
+      const v = grid[gy]?.[gx];
+      if (!v || (!v[0] && !v[1])) continue;
+      const mag = Math.hypot(v[0], v[1]) || 1;
+      cells.push({ cx: ((gx + 0.5) / N) * 100, cy: ((gy + 0.5) / N) * 100,
+        ux: v[0] / mag, uy: v[1] / mag, mag });
+    }
+  }
+  return (
+    <div className="rounded-xl border-2 overflow-hidden" style={{ borderColor: T.line, background: "#fff" }}>
+      <div className="flex items-center justify-between px-2.5 pt-1.5 pb-1">
+        <span className="disp text-[11px] font-bold">Green · hole {holeNum}</span>
+        <span className="text-[10px] opacity-60">
+          {meta ? `${meta.sessions} capture${meta.sessions === 1 ? "" : "s"} · ${Math.round(meta.covered * 100)}% seen` : ""}
+        </span>
+      </div>
+      <div className="relative mx-auto mb-2" style={{ width: "88%", aspectRatio: String(meta?.aspect || 1) }}>
+        <img src={src} alt="" className="absolute inset-0 w-full h-full rounded-lg"
+          style={{ objectFit: "fill", imageRendering: "auto" }} />
+        <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="absolute inset-0 w-full h-full">
+          {/* downhill slope arrows, length by magnitude */}
+          {cells.map((c, i) => {
+            const L = 2.6 + c.mag * 1.9;
+            const x2 = c.cx + c.ux * L, y2 = c.cy + c.uy * L;
+            return (
+              <g key={i} opacity="0.85">
+                <line x1={c.cx} y1={c.cy} x2={x2} y2={y2} stroke="#12203A" strokeWidth="0.9" strokeLinecap="round" />
+                <circle cx={c.cx} cy={c.cy} r="0.8" fill="#12203A" />
+              </g>
+            );
+          })}
+          {pins.map((p, i) => {
+            const q = toLocal(p);
+            if (q.x < -8 || q.y < -8 || q.x > 108 || q.y > 108) return null;
+            const cur = p.id === curPinId;
+            return (
+              <g key={p.id} transform={`translate(${q.x} ${q.y})`}
+                onPointerDown={onPick ? (e) => { e.stopPropagation(); onPick(p.id); } : undefined}
+                style={{ cursor: onPick ? "pointer" : "default" }}>
+                <circle r={cur ? 3 : 2.2} fill={cur ? T.flag : "rgba(255,255,255,0.85)"}
+                  stroke={T.ink} strokeWidth="0.7" />
+                <text y="1.1" textAnchor="middle" fontSize="3.2" fontWeight="700"
+                  fill={cur ? "#fff" : T.ink}>{i + 1}</text>
+              </g>
+            );
+          })}
+        </svg>
+      </div>
+    </div>
+  );
+}
+
 /* ---------------- clickable hole map ---------------- */
 function HoleMap({ holeNum, line, onLine, markers, onMarkers, markerMode, aimPreview, cornerMode, onCorner, greenBox, greenPoly = null, pins = [], curPinId = null, pinMode = false, onPins, distLabel = null, windBadge = null, teePos = null, stopMarker = null, showTrees = true }) {
   const imgRef = useRef(null);
@@ -666,6 +735,9 @@ export default function App() {
               if (dh.tee && (fresh || !cur.tee)) cur.tee = dh.tee;
               if (dh.greenBox && (fresh || !cur.green.box)) cur.green.box = dh.greenBox;
               if (dh.greenPoly && (fresh || !cur.green.poly)) cur.green.poly = dh.greenPoly;
+              // aspect + provenance for the zoomed green view; always take the
+              // derived value, it describes the shipped image not user edits
+              if (dh.greenView) cur.green.view = dh.greenView;
               const gridEmpty = !(cur.green.grid ?? []).some((r) => r.some(([x, y]) => x || y));
               if (dh.grid && (fresh || gridEmpty)) cur.green.grid = dh.grid;
               const pins = [...(cur.pins ?? [])];
@@ -1095,6 +1167,12 @@ export default function App() {
               </div>
             </section>
             <section className="space-y-3">
+              <GreenView holeNum={hole}
+                pins={holesMeta[hole].pins} curPinId={holesMeta[hole].curPin}
+                greenBox={holesMeta[hole].green?.box ?? null}
+                grid={holesMeta[hole].green?.grid ?? null}
+                meta={holesMeta[hole].green?.view ?? null}
+                onPick={(id) => setCurPin(hole, id)} />
               <div className="rounded-xl border-2 px-3 py-2 text-xs" style={{ borderColor: T.sand, background: "#FFFDF4" }}>
                 <span className="disp font-bold">Hole {hole} · Par {holesMeta[hole].par}: </span>{holesMeta[hole].note}
               </div>

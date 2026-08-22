@@ -86,6 +86,21 @@ export function flagCupMask(img) {
       if (mx2 >= 0 && my2 >= 0 && mx2 < w && my2 < h) mask[my2 * w + mx2] = 1;
     }
   }
+  // the cloth is drawn with a black outline that isFlagPink cannot see, and
+  // it survived as a dark remnant at the top of the fused texture; sweep any
+  // near-black pixel in the flag's own neighbourhood
+  let mnx = w, mxx = -1, mny = h, mxy = -1;
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++)
+    if (mask[y * w + x]) { if (x < mnx) mnx = x; if (x > mxx) mxx = x; if (y < mny) mny = y; if (y > mxy) mxy = y; }
+  for (let y = Math.max(0, mny - 5); y <= Math.min(h - 1, mxy + 5); y++)
+    for (let x = Math.max(0, mnx - 5); x <= Math.min(w - 1, mxx + 5); x++) {
+      const p = px(img, x, y);
+      if (Math.max(p[0], p[1], p[2]) > 105) continue;
+      for (let gy = -2; gy <= 2; gy++) for (let gx = -2; gx <= 2; gx++) {
+        const nx = x + gx, ny = y + gy;
+        if (nx >= 0 && ny >= 0 && nx < w && ny < h) mask[ny * w + nx] = 1;
+      }
+    }
   return { mask, found: true };
 }
 
