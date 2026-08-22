@@ -219,7 +219,7 @@ for (let hole = 1; hole <= 21; hole++) {
     const pr = projectGreenBox(det, zoom, meta.pin, s.pinPx, s.bboxPx, kLo, kHi);
     if (!anchor || pr.r > anchor.r) anchor = { ...pr, session: s };
   }
-  let greenBox = null, greenPoly = null, pins = [];
+  let greenBox = null, greenPoly = null, pins = [], pinZones = null, greenPins = 0;
   let box = null;
   if (anchor && anchor.r > 0.22) {
     const { k, session, ox, oy } = anchor;
@@ -256,6 +256,45 @@ for (let hole = 1; hole <= 21; hole++) {
       if (c) { c.x += p.x; c.y += p.y; c.n++; } else clusters.push({ x: p.x, y: p.y, n: 1 });
     }
     pins = clusters.map((c) => ({ x: +(c.x / c.n).toFixed(4), y: +(c.y / c.n).toFixed(4), n: c.n }));
+
+    // PIN ZONES. Clustered in GREEN-LOCAL space (fraction of the green's own
+    // bbox), which is the frame the game presumably picks spots in and is
+    // comparable across holes and zoom levels. Cluster count is stable across
+    // a wide threshold range — H1 holds at 2 zones from 0.02 to 0.30, H14 and
+    // H16 at 3 — which is what discrete spawn vicinities look like rather than
+    // a uniform scatter. 0.12 sits inside that plateau for every hole so far.
+    const ZONE_T = 0.12;
+    const lab = new Array(g.pins.length).fill(-1);
+    let zn = 0;
+    for (let i = 0; i < g.pins.length; i++) {
+      if (lab[i] >= 0) continue;
+      lab[i] = zn;
+      const st = [i];
+      while (st.length) {
+        const a = st.pop();
+        for (let j = 0; j < g.pins.length; j++) {
+          if (lab[j] >= 0) continue;
+          if (Math.hypot(g.pins[a].gx - g.pins[j].gx, g.pins[a].gy - g.pins[j].gy) <= ZONE_T) { lab[j] = zn; st.push(j); }
+        }
+      }
+      zn++;
+    }
+    const bw = box.x1 - box.x0, bh = box.y1 - box.y0;
+    greenPins = g.pins.length;
+    pinZones = Array.from({ length: zn }, (_, z) => {
+      const mem = g.pins.filter((_, i) => lab[i] === z);
+      const gx = mem.reduce((s, p) => s + p.gx, 0) / mem.length;
+      const gy = mem.reduce((s, p) => s + p.gy, 0) / mem.length;
+      // radius in green-local units, and the same in map fractions so the app
+      // can draw it without knowing the green's bbox
+      const rg = Math.max(...mem.map((p) => Math.hypot(p.gx - gx, p.gy - gy)));
+      return {
+        x: +((box.x0 + gx * bw) / W).toFixed(4),
+        y: +((box.y0 + gy * bh) / H).toFixed(4),
+        r: +(Math.max(rg * bw / W, rg * bh / H)).toFixed(4),
+        rGreen: +rg.toFixed(3), n: mem.length,
+      };
+    }).sort((a, b) => b.n - a.n);
     // debug overlay
     const dbg = { width: W, height: H, data: Buffer.from(img.data) };
     const set = (x, y) => { if (x < 0 || y < 0 || x >= W || y >= H) return; const i = (y * W + x) * 4; dbg.data[i] = 30; dbg.data[i + 1] = 120; dbg.data[i + 2] = 255; };
@@ -268,7 +307,7 @@ for (let hole = 1; hole <= 21; hole++) {
   const zoomAspect = (g.panelBbox.x1 - g.panelBbox.x0) / (g.panelBbox.y1 - g.panelBbox.y0);
   const mapAspect = box ? (box.x1 - box.x0) / (box.y1 - box.y0) : null;
   derived.holes[hole] = { scale: meta.scaleYdPerPx, yards: meta.yards, greenBox, greenPoly,
-    grid: quantizeGrid(g.grid), pins,
+    grid: quantizeGrid(g.grid), pins, pinZones, pinObservations: greenPins,
     tee: meta.tee ? { x: +(meta.tee.x / img.width).toFixed(4), y: +(meta.tee.y / img.height).toFixed(4) } : null };
   console.log(`H${hole}: k=${anchor?.k?.toFixed(2)} r=${anchor?.r?.toFixed(2)} box=${box ? `${box.x0},${box.y0}..${box.x1},${box.y1}` : "MISS"} aspect map=${mapAspect?.toFixed(2) ?? "-"} zoom=${zoomAspect.toFixed(2)} pins=${pins.length}`);
 }

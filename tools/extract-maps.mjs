@@ -116,9 +116,20 @@ const overlayMask = (crop) => {
   // few px for the antialias halo. A fixed box was used here before; on
   // single-pin holes (where this becomes the inpaint hole) a box that wide
   // straddles green AND backdrop and the fill came out a gray smear.
+  // Skip both dial corners: at 20+ mph the wind arrow is PINK, the same pink
+  // as the flag, and this scan had no exclusion. On H16's 31 mph frames the
+  // "flag" centroid came out as a blend of the real flag (127 px at y~78) and
+  // the arrow (~190 px at y~250), landing at y=182 — empty grass. The cup
+  // flood then seeded there, the real cup was never masked, and it survived
+  // into the composite as the black blob that would not go away.
+  const inDial = (x, y) => {
+    const cy = CCY * h, rr = 0.16 * w;
+    return (x - 0.832 * w) ** 2 + (y - cy) ** 2 < rr * rr ||
+           (x - 0.168 * w) ** 2 + (y - cy) ** 2 < rr * rr;
+  };
   let sx = 0, sy = 0, c = 0, bx0 = w, bx1 = -1, by0 = h, by1 = -1;
   for (let y = 0; y < h; y++) for (let x = 0; x < w; x++)
-    if (isFlagPink(px(crop, x, y))) {
+    if (!inDial(x, y) && isFlagPink(px(crop, x, y))) {
       sx += x; sy += y; c++;
       if (x < bx0) bx0 = x; if (x > bx1) bx1 = x;
       if (y < by0) by0 = y; if (y > by1) by1 = y;
@@ -139,6 +150,33 @@ const overlayMask = (crop) => {
     const x0 = Math.max(0, Math.min(bx0, px0) - PAD), x1 = Math.min(w - 1, Math.max(bx1, px1) + PAD);
     const y0 = Math.max(0, by0 - PAD), y1 = Math.min(h - 1, poleBottom + PAD);
     for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) mask[y * w + x] = 1;
+
+    // THE CUP. This is why greens kept a black smear that got WORSE with
+    // every new pin position: darkenStack keeps the darkest pixel at each
+    // position, the cup is the blackest thing on the map, and the cup was
+    // never masked — so every pin position a hole has ever seen painted its
+    // own cup into the composite, and the blobs unioned. Flood the near-black
+    // blob at the pole base (bounded, so it cannot run off into trees or the
+    // panel edge) and dilate it past its antialiased rim.
+    // Every near-black pixel within reach of the pole base, by RADIUS rather
+    // than by connected flood: the cyan aim line runs straight through the
+    // cup and bisects it, so a flood seeded on one lobe cannot cross to the
+    // other (on H2 it reached 24 of 90 dark pixels and the rest survived as
+    // the black blob). Nothing else on a green is this dark, so a plain
+    // radius test is both simpler and complete.
+    const isCupDark = (p) => Math.max(p[0], p[1], p[2]) < 95;
+    const seedY = Math.min(h - 1, poleBottom), seedX = Math.round(flag.x);
+    const CUP_R = 17, GROW = 3;
+    for (let dy = -CUP_R; dy <= CUP_R; dy++) for (let dx = -CUP_R; dx <= CUP_R; dx++) {
+      if (dx * dx + dy * dy > CUP_R * CUP_R) continue;
+      const nx = seedX + dx, ny = seedY + dy;
+      if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+      if (!isCupDark(px(crop, nx, ny))) continue;
+      for (let gy = -GROW; gy <= GROW; gy++) for (let gx = -GROW; gx <= GROW; gx++) {
+        const mx = nx + gx, my = ny + gy;
+        if (mx >= 0 && my >= 0 && mx < w && my < h) mask[my * w + mx] = 1;
+      }
+    }
   }
   // compass (either corner)
   const r = CR * w, cy = CCY * h;
