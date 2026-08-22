@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, useId } from "react";
 import { HOLE_MAPS } from "./maps.js";
 import { MAP_XFORM_V5 } from "./mapxform.js";
 
@@ -378,6 +378,7 @@ function GreenCanvas({ mapSrc, green, mode, onGrid, ball, cup, onTap, path, aimP
 function HoleMap({ holeNum, line, onLine, markers, onMarkers, markerMode, aimPreview, cornerMode, onCorner, greenBox, greenPoly = null, pins = [], curPinId = null, pinMode = false, onPins, distLabel = null, windBadge = null, teePos = null, stopMarker = null, showTrees = true }) {
   const imgRef = useRef(null);
   const [dims, setDims] = useState({ w: 113, h: 140 });
+  const gridId = `greengrid${useId().replace(/:/g, "")}`; // ids must be unique per SVG on the page
   const src = HOLE_MAPS[holeNum];
 
   const dragMoved = useRef(false);
@@ -456,13 +457,27 @@ function HoleMap({ holeNum, line, onLine, markers, onMarkers, markerMode, aimPre
         {b && t && aimPreview && (
           <line x1={b.x} y1={b.y} x2={aimPreview.x * 100} y2={aimPreview.y * 100} stroke={T.sand} strokeWidth="1" strokeDasharray="1.5 1.5" />
         )}
-        {/* the traced green outline when we have one — greens are lobed, and
-            the fringe gives a real boundary; the box is the fallback */}
+        {/* The green: its traced outline (greens are lobed, and the fringe
+            gives a real boundary; the box is the fallback), filled with the
+            mown grid the game paints on a putting surface. Drawn here rather
+            than baked into the map image because the overview renders a green
+            only ~28px across — the real checker is below Nyquist at that size
+            and averages to flat green, and only the holes framed tightest
+            ever showed it. As SVG it stays crisp at whatever size the map is
+            displayed, and every hole gets it. */}
+        <defs>
+          <pattern id={gridId} patternUnits="userSpaceOnUse" width="2.4" height="2.4">
+            <rect width="1.2" height="1.2" fill="rgba(255,255,255,0.17)" />
+            <rect x="1.2" y="1.2" width="1.2" height="1.2" fill="rgba(255,255,255,0.17)" />
+            <rect x="1.2" width="1.2" height="1.2" fill="rgba(0,0,0,0.05)" />
+            <rect y="1.2" width="1.2" height="1.2" fill="rgba(0,0,0,0.05)" />
+          </pattern>
+        </defs>
         {greenPoly && greenPoly.length > 2
           ? <polygon points={greenPoly.map(([x, y]) => `${x * 100},${y * 100}`).join(" ")}
-              fill="rgba(234,217,164,0.15)" stroke={T.sand} strokeWidth="0.8" strokeDasharray="2 1.5" />
+              fill={`url(#${gridId})`} stroke="rgba(255,255,255,0.45)" strokeWidth="0.5" />
           : greenBox && <rect x={greenBox.x0 * 100} y={greenBox.y0 * 100} width={(greenBox.x1 - greenBox.x0) * 100} height={(greenBox.y1 - greenBox.y0) * 100}
-              fill="rgba(234,217,164,0.15)" stroke={T.sand} strokeWidth="0.8" strokeDasharray="2 1.5" />}
+              fill={`url(#${gridId})`} stroke="rgba(255,255,255,0.45)" strokeWidth="0.5" />}
         {teePos && (
           <g transform={`translate(${teePos.x * 100} ${teePos.y * 100})`}>
             <circle r="3.4" fill="rgba(20,48,29,0.55)" />
@@ -499,7 +514,6 @@ function HoleMap({ holeNum, line, onLine, markers, onMarkers, markerMode, aimPre
           if (!cur && !pinMode) return null;
           return (
             <g key={p.id} transform={`translate(${p.x * 100} ${p.y * 100})`}>
-              {cur && <circle r="4" fill="none" stroke="#fff" strokeWidth="0.9" />}
               <circle r="1.4" fill={cur ? T.flag : "#fff"} stroke={T.ink} strokeWidth="0.5" />
               <line x1="0" y1="0" x2="0" y2="-6" stroke={cur ? T.flag : "#fff"} strokeWidth="1" />
               <path d="M 0 -6 L 4.5 -4.5 L 0 -3 Z" fill={cur ? T.flag : "#EAD9A4"} stroke={T.ink} strokeWidth="0.3" />
@@ -513,7 +527,7 @@ function HoleMap({ holeNum, line, onLine, markers, onMarkers, markerMode, aimPre
             <text y="1.5" textAnchor="middle" fontSize={m.auto ? 3.8 : 4.5}>🌲</text>
           </g>
         ))}
-        {b && <circle cx={b.x} cy={b.y} r="1.5" fill="#fff" stroke={T.ink} strokeWidth="0.6" />}
+        {b && <circle cx={b.x} cy={b.y} r="1.2" fill="#fff" stroke={T.ink} strokeWidth="0.6" />}
         {t && <g transform={`translate(${t.x} ${t.y})`} style={{ pointerEvents: "auto", cursor: draggingT ? "grabbing" : "grab" }}>
           <circle r="2.8" fill="none" stroke={T.flag} strokeWidth="1.1" />
           <circle r="0.9" fill={T.flag} />
@@ -559,8 +573,8 @@ export default function App() {
   const [hole, setHole] = useState(1);
   const [stroke, setStroke] = useState(1);
   const [dist, setDist] = useState(180);
-  const [windSpeed, setWindSpeed] = useState(8);
-  const [windDeg, setWindDeg] = useState(90);
+  const [windSpeed, setWindSpeed] = useState(0);
+  const [windDeg, setWindDeg] = useState(0); // N-up canonical: 0 = due north
   const [windMode, setWindMode] = useState("map"); // 'map' (N-up, as minimap shows) | 'shot'
   const [lie, setLie] = useState("tee");
   const [line, setLine] = useState({ ball: null, target: null });
