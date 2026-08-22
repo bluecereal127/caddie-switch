@@ -1,4 +1,4 @@
-# HANDOFF — remaining work queue (2026-08-21)
+# HANDOFF — remaining work queue (2026-08-22)
 
 Read CLAUDE.md first (mechanics, conventions, pipeline map). This file is the
 work queue if a session/model handoff happens mid-stream. Auto-push policy is
@@ -50,19 +50,40 @@ is the source of truth for this section. Four independent needs:
 - PIN   green captures at a new pin position (the flag hides the surface it
         stands on; only a different pin reveals it)
 - ZOOM  another green pair, plain + Terrain back to back, to fuse against
-As of 2026-08-21: H1 H9 H10 H14 H16 need nothing. Worst are H15 H19 H6 H13
+As of 2026-08-22: H1 H9 H10 H11 H14 H15 H16 need nothing. Worst are H19 H6 H13
 H12 H21 H5 H20 (all four needs). H11 needs AIM only; H8 needs PIN only.
 
-## State (as of the wide-layout commit e616989 + this session)
+## State (2026-08-22, 491 frames in the manifest)
 - Capture transport: edge function → blobs → autosync → classify (template
-  OCR, 113/113 validated) → extract-maps/greens → assemble-shots →
-  build-derived → auto-commit+push. Zero manual steps.
-- Maps: darken-stack over ≤9 pooled tee frames, per-frame flag/compass
-  exclusion, NATIVE backdrop (black transform reverted — do not reintroduce).
-  Compass = game's own, locked per hole from first 0-mph tee frame
-  (captures/derived/compass0/). Baked pin flags: now ONION-INPAINTED out
-  wherever every pooled frame shares one pin (see below); real art replaces
-  the inpaint automatically once a 2nd-pin session exists.
+  OCR) → extract-maps/greens → assemble-shots → build-derived →
+  auto-commit+push. Zero manual steps.
+- Maps: darken-stack over ≤16 aim-diverse tee frames, per-frame flag / cup /
+  aim-line / dial exclusion, NATIVE backdrop (black transform reverted — do
+  not reintroduce). Compass = game's own, locked per hole from the first
+  0-mph tee frame (captures/derived/compass0/).
+- THE CUP was the "black blobs on greens", and it got worse with every new
+  pin: darkenStack keeps the darkest pixel, the cup is the blackest thing on
+  the map, and it was never masked, so every pin position a hole had seen
+  unioned its cup into the composite. Masked by RADIUS from the pole base —
+  a connected flood fails because the cyan aim line bisects the cup (24 of 90
+  px on H2). All 21 greens scan clean.
+- GREEN TRANSPLANT: the overview's green is rebuilt from the zoom captures
+  (which hold the same surface 3-8x larger) and painted back down, gated on
+  projection correlation ≥0.45 (H5/H6/H8 keep their own art). Average EVERY
+  texel under a map pixel — striding aliases the grid checker into moire —
+  and colour-match to the overview first or it reads as a patch with a seam.
+- GREEN VIEWS (src/greens.js, ~500KB): a 256×256 fused putting surface per
+  hole in the green's OWN frame, so (0,0)..(1,1) lands on greenBox and the
+  9×9 grid with no projection — which is why H5/H6/H8 still get one. Built by
+  PRIORITY not average: sharpest capture first, each texel takes the first
+  capture that saw it unobstructed. Averaging superimposes misaligned copies
+  of the checker and washes it out (H10's 12 captures fused to flat green).
+  11 holes fully seen, 10 with a soft inpainted patch where their single
+  capture's flag stood.
+- PIN ZONES: pins cluster in green-local space and ship as pinZones. Cluster
+  count is stable across a wide threshold range (H1 holds at 2 from 0.02 to
+  0.30, H14/H16 at 3), which looks like discrete spawn vicinities rather than
+  uniform scatter. Not yet separable from measurement noise within a zone.
 - Greens: EVERY plain/heightmap frame in a session pairs now (it used to take
   s.find() of each kind and drop the rest — 11 dead frames on one H10
   session). Zoom-mismatch guard rejects pairs whose diff blows up past 42% of
@@ -75,14 +96,22 @@ H12 H21 H5 H20 (all four needs). H11 needs AIM only; H8 needs PIN only.
   gives a regular local luma range while the fringe is flat, so the boundary
   is a texture edge needing no heightmap — mean IoU 0.787 vs the diff masks,
   gated on bbox-normalized shape agreement (NOT area: zoom varies).
-- Shots: address+popup pairs → importable Log rows w/ bearing (40 rows, 34
-  importable).
-- Frame accounting: `node tools/frame-audit.mjs` says which stage consumes
-  each capture, or that it is inert. Currently 47 inert of 369.
+- Shots: address+popup pairs → importable Log rows w/ bearing. 34 importable,
+  and they are LOPSIDED: every row is tee or fairway, none from rough, bunker
+  or green, and driver/5i/3i dominate. The lie caps in the solver are still
+  running on the WSR defaults, unvalidated by our own data.
+- Frame accounting: `node tools/frame-audit.mjs` — which stage consumes each
+  capture, or that it is inert. Currently 83 inert of 491 (mostly mid-round
+  map frames that no pop-up followed, plus unpaired green frames).
 - Solver UX: 1500px shell, 3-col solver on xl; tee-default draggable target,
   windDeg N-up canonical, draggable rec bars, trees hide toggle, ball dot
-  r=1.5. Pins: only the SELECTED pin draws during play (the whole catalog
-  shows only in pin-edit mode) — the show/hide-pins toggle is gone.
+  r=1.2, wind defaults to N at 0 mph. Only the SELECTED pin draws during play
+  (full catalog only in pin-edit mode). The green is drawn as its traced
+  polygon filled with an SVG grid pattern — it CANNOT come from the map
+  image, since at ~28px the real checker is below Nyquist and averages flat,
+  which is why only the tightest-framed holes ever showed one.
+- The zoomed green view sits above the hole note with slope arrows and the
+  pin catalog over it; tapping a pin selects it.
 
 ## NEW DIRECTION — map art pass (user-validated 2026-08-21)
 User A/B-tested externally on one map JPEG:
@@ -196,7 +225,19 @@ occluded in every frame, so that fill stays invented (inpaint + blur).
   unchanged — only image resolution doubles), add the app's own SVG compass
   to HoleMap, then retire compass0 farming.
 
-## QUEUE (after the art pass)
+## QUEUE — in priority order
+
+### 1. PHASE 2 IS THE REAL BOTTLENECK: the shot model
+Everything above serves the solver, and the solver is still guessing. 34 rows
+is thin, and they cover only tee and fairway. What is missing:
+- ROUGH and BUNKER rows. The lie caps (rough 3 bars; sand wedge 3 / irons 2 /
+  driver-spoon 1) are WSR lore, never checked against this game's data.
+- Partial-power rows. The one anomaly on file — driver at 1 bar going 110yd
+  where linear predicts 62 — says the power curve is NOT linear, and the
+  solver inverts it linearly (p = dist/denom).
+- Wind coefficients: fits currently lean on a handful of rows.
+Capture protocol is already written in CLAUDE.md (Shot Assist + restart for
+identical wind). This is the highest-value thing left.
 
 ### 2. Lie classification from the minimap + editable masks
 - New tools/extract-lies.mjs: classify each FINAL map image pixel →
