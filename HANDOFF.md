@@ -6,6 +6,39 @@ standing: verify (babel parse App.jsx + `npm run build`) → commit → push
 (Netlify deploys main). The PC scheduled task "CaddieAutosync" runs the whole
 capture pipeline; after editing autosync.ps1 restart it (Stop/Start-ScheduledTask).
 
+## Badge OCR is NOT trustworthy — never let one reading drive a hole
+Three failures found 2026-08-21 when five holes of new captures landed, all
+from the same root cause (a single OCR'd badge steering hole-level state):
+- A putt reading "33.3 ft to go" came through as "599 yd" on H18 (a 458yd
+  hole). That inflated maxYd, which raised the tee threshold to 527, which
+  admitted the putting CLOSE-UP into the map stack and rejected the four
+  genuine 458/459yd tee frames. H18's recorded length became 119yd and its
+  scale 0.546 instead of 2.103.
+- H17's "219 yd" read as "819 yd" — scale 4.345 instead of 1.163, wrong by
+  3.7x, and wrong since long before this batch.
+- H15's scale went 1.816 -> 5.097 the same way.
+Defences now in place, keep them:
+1. checkerFrac veto: when the player putts, the minimap zooms to the green
+   and the avatar is still on screen, so the classifier calls it "map". The
+   grid checker separates them — hole overviews ran 4.6-5.0% of the panel,
+   real green captures 9.5-10%, H18's putt 12.7%. The cut is RELATIVE per
+   hole (max(7%, 1.8x that hole's median)): a fixed 7% wiped out H6, H11 and
+   H19 entirely, because short holes are framed tighter and their green
+   legitimately fills more of the panel.
+2. Hole length: drop readings above 1.6x the median before taking the max,
+   then pick the candidate whose implied scale lands in 0.7-3.2 yd/px. The
+   panel frames every hole to roughly fill it, so that band is physical.
+3. Take the yardage from the DETECTION SESSION's own frames — pins move
+   between rounds, and scale = yards / (tee->pin px) needs both from the
+   same pin.
+4. findCluster excludes BOTH bottom corners now. The dial floats to whichever
+   corner avoids the hole and its arrow is yellow at 10-19 mph, the same
+   colour as the avatar pointer, so on left-dial holes the arrow was being
+   detected AS the avatar.
+An avatar-position tee test was tried and rejected: the pointer orbits the
+ball as aim turns, and the orbit is wider in px on short (zoomed-in) holes,
+so no single tolerance worked — H11's own Stroke-1 frames scattered 14.7px.
+
 ## CAPTURE WORKLIST — run the tool, don't guess
 `node tools/capture-plan.mjs [--table]` reads what the pipeline actually
 derived and ranks what to shoot next. Re-run it after every upload batch; it

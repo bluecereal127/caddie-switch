@@ -165,9 +165,15 @@ const overlayMask = (crop) => {
 // INSIDE the panel (bottom-right in map mode) and its arrow is yellow at
 // 10-19 mph and pink at 20+ — the exact colors of the tee pointer and the
 // flag — so that region is always excluded.
+// BOTH bottom corners: the dial floats to whichever one avoids the hole, and
+// its arrow is yellow at 10-19 mph — the exact colour of the avatar pointer.
+// Excluding only the right corner meant that on left-dial holes the arrow was
+// detected AS the avatar, which threw the measured tee position (and so the
+// hole's scale) tens of pixels off, and scattered the tee-frame test.
 const inCompass = (img, x, y) => {
-  const cx = 0.832 * img.width, cy = 0.822 * img.height, r = 0.14 * img.width;
-  return (x - cx) * (x - cx) + (y - cy) * (y - cy) < r * r;
+  const cy = 0.822 * img.height, r = 0.14 * img.width;
+  return (x - 0.832 * img.width) ** 2 + (y - cy) ** 2 < r * r ||
+         (x - 0.168 * img.width) ** 2 + (y - cy) ** 2 < r * r;
 };
 const findCluster = (img, pred) => {
   let sx = 0, sy = 0, c = 0, maxY = -1;
@@ -292,15 +298,76 @@ for (let hole = 1; hole <= 21; hole++) {
   // TEE frames only: mid-round address frames also classify as "map" but
   // their avatar sits mid-fairway and their aim is wherever the player was
   // aiming — stacking those corrupts tee detection and can bake aim lines.
-  // Tee = badge "Stroke 1" or a yardage near the hole's full length.
-  const maxYd = Math.max(...allMaps.map((f) => (f.badge?.match(/^(\d+) yd/) ?? [])[1] ?? 0).map(Number));
+  //
+  // Tee membership is decided by WHERE THE AVATAR STANDS, not by the badge.
+  // The badge is OCR'd and a single misread used to poison the whole hole:
+  // it set maxYd, maxYd set the threshold, and the threshold picked the pool.
+  // Two real cases from the inbox — a putt reading "33.3 ft to go" came
+  // through as "599 yd" on H18 (a 458yd hole), which both admitted a green
+  // close-up into the stack and rejected the four genuine 458/459yd tee
+  // frames; and H17's "219 yd" read as "819 yd", inflating its scale 3.7x.
+  // The avatar's position is geometry, not text, so it cannot misread.
+  // VETO green close-ups. When the player putts, the minimap zooms to the
+  // green and the avatar pointer is still on screen, so the classifier calls
+  // it "map" — but it is not a hole overview and must never join the stack.
+  // Measured, the putting surface's grid checker fills the panel very
+  // differently: hole overviews run 4.6-5.0% of the panel, real green
+  // captures 9.5-10%, and H18's putt 12.7%. 7% splits them cleanly.
+  const CHECKER_MAX = 0.07;
+  const checkerCache = new Map();
+  const checkerFrac = (f) => {
+    if (checkerCache.has(f.file)) return checkerCache.get(f.file);
+    let frac = 0;
+    try {
+      const c = cropRect(loadImage(INBOX + f.file), panelRect(loadImage(INBOX + f.file)));
+      const w = c.width, h = c.height, n = w * h;
+      const lum = new Float32Array(n);
+      for (let p = 0, j = 0; p < n; p++, j += 4) lum[p] = 0.299 * c.data[j] + 0.587 * c.data[j + 1] + 0.114 * c.data[j + 2];
+      let t = 0;
+      for (let y = 2; y < h - 2; y++) for (let x = 2; x < w - 2; x++) {
+        let lo = 1e9, hi = -1e9;
+        for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) {
+          const v = lum[(y + dy) * w + x + dx];
+          if (v < lo) lo = v; if (v > hi) hi = v;
+        }
+        const j = (y * w + x) * 4, r = c.data[j], g = c.data[j + 1], b = c.data[j + 2], rng = hi - lo;
+        if (rng >= 34 && rng <= 70 && g > 120 && g > b + 25 && g >= r - 20) t++;
+      }
+      frac = t / n;
+    } catch {}
+    checkerCache.set(f.file, frac);
+    return frac;
+  };
+  // The threshold has to be RELATIVE to the hole. A fixed 7% wiped out H6,
+  // H11 and H19 completely: short holes are framed tighter, so the green
+  // legitimately fills much more of their minimap. Within one hole, though, a
+  // putting close-up is a stark outlier above the hole's own typical value.
+  const fracs = allMaps.map(checkerFrac);
+  const medFrac = [...fracs].sort((a, b) => a - b)[(fracs.length - 1) >> 1];
+  const cut = Math.max(CHECKER_MAX, 1.8 * medFrac);
+  const overviews = allMaps.filter((f) => checkerFrac(f) <= cut);
+  const vetoed = allMaps.length - overviews.length;
+  if (vetoed) console.log(`H${hole}: ${vetoed} green close-up(s) kept out of the map stack (checker > ${(100 * cut).toFixed(1)}%)`);
+
+  // Robust hole length for the tee threshold. A lone inflated reading used to
+  // set it directly: H17's "219 yd" OCR'd as "819" pushed the threshold to
+  // 721 and would have thrown out every real tee frame. Drop readings far
+  // above the median before taking the max.
+  const ydsAll = overviews.map((f) => (f.badge ?? "").match(/^(\d+)\s*yd/))
+    .filter(Boolean).map((m) => parseInt(m[1])).filter((v) => Number.isFinite(v) && v > 0);
+  const lowerMedian = (a) => { const s = [...a].sort((x, y) => x - y); return s[(s.length - 1) >> 1]; };
+  let maxYd = 0;
+  if (ydsAll.length) {
+    const med = lowerMedian(ydsAll);
+    const plausible = ydsAll.filter((v) => v <= 1.6 * med);
+    maxYd = plausible.length ? Math.max(...plausible) : med;
+  }
   const isTee = (f) => {
-    if (!f.badge) return false;
-    if (/^Stroke 1$/.test(f.badge)) return true;
-    const yd = parseInt(f.badge);
+    if (/^Stroke 1$/.test(f.badge ?? "")) return true;
+    const yd = parseInt(f.badge ?? "");
     return Number.isFinite(yd) && maxYd > 0 && yd >= 0.88 * maxYd;
   };
-  const tees = allMaps.filter(isTee);
+  const tees = overviews.filter(isTee);
   const candidates = sessions(tees).filter((s) => s.length >= 2).reverse(); // latest first
   let use = null, stacked = null;
   for (const s of candidates) {
@@ -427,16 +494,38 @@ for (let hole = 1; hole <= 21; hole++) {
   // longer has — keep them available separately (not shipped; captures/ is
   // gitignored).
   savePng(`${OUT}/h${String(hole).padStart(2, "0")}.det.png`, stacked);
-  // badge yardage from any frame in the SAME session (map or green frames)
-  const sameSession = manifest.frames.filter((f) => f.hole === hole);
-  const inSess = sessions(sameSession).find((s) => s.some((f) => f.file === use[0].file)) ?? [];
-  const ydFrame = inSess.find((f) => f.badge && /\d+\s*yd/.test(f.badge));
-  const yards = ydFrame ? parseInt(ydFrame.badge) : null;
-  let scale = null;
-  if (pin && tee && yards) {
-    const d = Math.hypot(pin.x - tee.x, pin.y - tee.y);
-    scale = +(yards / d).toFixed(3); // yd per stacked-map pixel
+  // Hole length from the TEE frames' badges, cross-checked against geometry.
+  // This used to take the first frame in the session carrying any "N yd"
+  // badge, which on H18 was a mid-round "119 yd to go" — so a 458yd par 5 was
+  // recorded as 119yd and its scale came out 0.546 instead of 2.103.
+  // Tee badges still disagree when one is misread (H17 has both "223" and a
+  // "219" that OCR'd as "819"), so the tie-break is physical: the panel frames
+  // every hole to roughly fill it, so yards/px lands in a narrow band. A
+  // candidate implying a scale outside that band is the misread one.
+  const SCALE_LO = 0.7, SCALE_HI = 3.2;
+  const d = pin && tee ? Math.hypot(pin.x - tee.x, pin.y - tee.y) : null;
+  // prefer tee frames' own badges; if every tee frame said only "Stroke 1",
+  // fall back to the hole's other overview frames and let the band decide
+  const ydsOf = (list) => [...new Set(list
+    .map((f) => (f.badge ?? "").match(/^(\d+)\s*yd/))
+    .filter(Boolean).map((m) => parseInt(m[1])).filter((v) => Number.isFinite(v) && v > 0))];
+  // Prefer the DETECTION SESSION's own badges: scale = yards / (tee->pin px),
+  // and the pin px was measured from that session's stack. Pins move between
+  // rounds, so a yardage borrowed from a session with the pin elsewhere
+  // divides by the wrong distance.
+  const teeYds = ydsOf(use).length ? ydsOf(use)
+    : (ydsOf(tees).length ? ydsOf(tees) : ydsOf(overviews));
+  let yards = null;
+  if (teeYds.length) {
+    const inBand = d ? teeYds.filter((v) => v / d >= SCALE_LO && v / d <= SCALE_HI) : teeYds;
+    const pick = inBand.length ? inBand : teeYds;
+    const s = [...pick].sort((a, b) => a - b);
+    yards = s[(s.length - 1) >> 1]; // lower median: robust, and prefers the
+                                    // smaller of two when a misread inflates
+    if (d && inBand.length < teeYds.length)
+      console.log(`H${hole}: ignored out-of-band tee badge(s) ${teeYds.filter((v) => !inBand.includes(v)).join(", ")} yd (would imply scale outside ${SCALE_LO}-${SCALE_HI})`);
   }
+  const scale = (d && yards) ? +(yards / d).toFixed(3) : null; // yd per stacked-map px
   // record exactly which frames were consumed, so tools/frame-audit.mjs can
   // tell you why any given capture did or did not affect this hole's map
   results.push({ hole, frames: use.map((f) => f.file),
