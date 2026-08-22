@@ -45,6 +45,50 @@ export function findPin(img) {
   return base ?? { x: Math.round(fx), y: Math.min(h - 1, maxY + 8) };
 }
 
+// Everything the game paints ON the green rather than the green itself: the
+// pink cloth, the pole, and the cup. Masked per frame so a stack of captures
+// taken at different pin positions can cover each other's occlusions.
+export function flagCupMask(img) {
+  const w = img.width, h = img.height;
+  const mask = new Uint8Array(w * h);
+  let sx = 0, sy = 0, c = 0, by1 = -1;
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    if (inCompass(x, y, w, h)) continue;      // the dial's arrow is pink at 20+ mph
+    if (!isFlagPink(px(img, x, y))) continue;
+    sx += x; sy += y; c++;
+    if (y > by1) by1 = y;
+    for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++) {
+      const nx = x + dx, ny = y + dy;
+      if (nx >= 0 && ny >= 0 && nx < w && ny < h) mask[ny * w + nx] = 1;
+    }
+  }
+  if (!c) return { mask, found: false };
+  const fx = Math.round(sx / c);
+  // pole down to the cup, then every near-black pixel within reach of the
+  // base — by radius, not by flood: the aim line bisects the cup
+  let poleBottom = by1;
+  for (let y = by1; y < Math.min(h, by1 + Math.round(0.09 * h)); y++)
+    for (let x = Math.max(0, fx - 5); x <= Math.min(w - 1, fx + 6); x++) {
+      const p = px(img, x, y);
+      if (Math.max(p[0], p[1], p[2]) < 80 || Math.min(p[0], p[1], p[2]) > 170) { poleBottom = y; break; }
+    }
+  for (let y = by1; y <= Math.min(h - 1, poleBottom + 2); y++)
+    for (let x = Math.max(0, fx - 7); x <= Math.min(w - 1, fx + 8); x++) mask[y * w + x] = 1;
+  const R = Math.max(14, Math.round(0.075 * w)), GROW = 3;
+  for (let dy = -R; dy <= R; dy++) for (let dx = -R; dx <= R; dx++) {
+    if (dx * dx + dy * dy > R * R) continue;
+    const nx = fx + dx, ny = poleBottom + dy;
+    if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+    const p = px(img, nx, ny);
+    if (Math.max(p[0], p[1], p[2]) >= 95) continue;
+    for (let gy = -GROW; gy <= GROW; gy++) for (let gx = -GROW; gx <= GROW; gx++) {
+      const mx2 = nx + gx, my2 = ny + gy;
+      if (mx2 >= 0 && my2 >= 0 && mx2 < w && my2 < h) mask[my2 * w + mx2] = 1;
+    }
+  }
+  return { mask, found: true };
+}
+
 const morph = (m, w, h, r, op) => {
   if (r <= 0) return m;
   const out = new Uint8Array(m.length);
