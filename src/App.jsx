@@ -382,21 +382,37 @@ function GreenCanvas({ mapSrc, green, mode, onGrid, ball, cup, onTap, path, aimP
    (0,0)..(1,1) lands on derived.json's greenBox and on the 9x9 slope grid
    directly. Pins are stored map-fractional, so they convert through the box.
 */
-function GreenView({ holeNum, pins = [], curPinId = null, greenBox = null, grid = null, meta = null, onPick }) {
+function GreenView({ holeNum, pins = [], curPinId = null, greenBox = null, greenPoly = null, grid = null, meta = null, onPick }) {
   const src = GREEN_VIEWS[holeNum];
   if (!src || !greenBox) return null;
   const bw = greenBox.x1 - greenBox.x0, bh = greenBox.y1 - greenBox.y0;
   if (!(bw > 0) || !(bh > 0)) return null;
-  const toLocal = (p) => ({ x: ((p.x - greenBox.x0) / bw) * 100, y: ((p.y - greenBox.y0) / bh) * 100 });
+  // The image carries padding around the bbox so the whole green is in frame,
+  // so bbox-local 0..1 maps to (u + M) / (1 + 2M) of the image.
+  const M = meta?.margin ?? 0;
+  const place = (u) => ((u + M) / (1 + 2 * M)) * 100;
+  const toLocal = (p) => ({ x: place((p.x - greenBox.x0) / bw), y: place((p.y - greenBox.y0) / bh) });
+  // green outline in bbox-local units, used to keep slope arrows on the green
+  const localPoly = (greenPoly ?? []).map(([x, y]) => [(x - greenBox.x0) / bw, (y - greenBox.y0) / bh]);
+  const inGreen = (u, v) => {
+    if (localPoly.length < 3) return true;
+    let inside = false;
+    for (let i = 0, j = localPoly.length - 1; i < localPoly.length; j = i++) {
+      const [xi, yi] = localPoly[i], [xj, yj] = localPoly[j];
+      if ((yi > v) !== (yj > v) && u < ((xj - xi) * (v - yi)) / (yj - yi + 1e-12) + xi) inside = !inside;
+    }
+    return inside;
+  };
   const cells = [];
   if (grid) {
     const N = grid.length;
     for (let gy = 0; gy < N; gy++) for (let gx = 0; gx < N; gx++) {
       const v = grid[gy]?.[gx];
       if (!v || (!v[0] && !v[1])) continue;
+      const u = (gx + 0.5) / N, w = (gy + 0.5) / N;
+      if (!inGreen(u, w)) continue; // a cell straddling the edge has slope data but is not puttable
       const mag = Math.hypot(v[0], v[1]) || 1;
-      cells.push({ cx: ((gx + 0.5) / N) * 100, cy: ((gy + 0.5) / N) * 100,
-        ux: v[0] / mag, uy: v[1] / mag, mag });
+      cells.push({ cx: place(u), cy: place(w), ux: v[0] / mag, uy: v[1] / mag, mag });
     }
   }
   return (
@@ -542,11 +558,13 @@ function HoleMap({ holeNum, line, onLine, markers, onMarkers, markerMode, aimPre
             <rect y="1.2" width="1.2" height="1.2" fill="rgba(0,0,0,0.05)" />
           </pattern>
         </defs>
+        {/* fill only — no outline. The grid already reads as the green, and a
+            stroke around it is just a line the player does not need. */}
         {greenPoly && greenPoly.length > 2
           ? <polygon points={greenPoly.map(([x, y]) => `${x * 100},${y * 100}`).join(" ")}
-              fill={`url(#${gridId})`} stroke="rgba(255,255,255,0.45)" strokeWidth="0.5" />
+              fill={`url(#${gridId})`} stroke="none" />
           : greenBox && <rect x={greenBox.x0 * 100} y={greenBox.y0 * 100} width={(greenBox.x1 - greenBox.x0) * 100} height={(greenBox.y1 - greenBox.y0) * 100}
-              fill={`url(#${gridId})`} stroke="rgba(255,255,255,0.45)" strokeWidth="0.5" />}
+              fill={`url(#${gridId})`} stroke="none" />}
         {teePos && (
           <g transform={`translate(${teePos.x * 100} ${teePos.y * 100})`}>
             <circle r="3.4" fill="rgba(20,48,29,0.55)" />
@@ -1170,6 +1188,7 @@ export default function App() {
               <GreenView holeNum={hole}
                 pins={holesMeta[hole].pins} curPinId={holesMeta[hole].curPin}
                 greenBox={holesMeta[hole].green?.box ?? null}
+                greenPoly={holesMeta[hole].green?.poly ?? null}
                 grid={holesMeta[hole].green?.grid ?? null}
                 meta={holesMeta[hole].green?.view ?? null}
                 onPick={(id) => setCurPin(hole, id)} />

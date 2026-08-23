@@ -199,6 +199,11 @@ const greenMeta = {};
 // surface, another capture taken at a different pin supplies it. Only cells
 // no capture ever saw get inpainted.
 const GT = 256;
+// The texture covers the green's bbox PLUS this fraction of it on every side.
+// Sampling the bbox exactly puts the green hard against all four edges, so
+// its outermost lobes and the fringe around them get cut off; the margin
+// leaves the whole surface visible with a little context around it.
+const GT_MARGIN = 0.12;
 // dial + its "N mph" caption, in either bottom corner
 const inHud = (x, y, w, h) =>
   y > 0.66 * h && (Math.abs(x - 0.168 * w) < 0.23 * w || Math.abs(x - 0.832 * w) < 0.23 * w);
@@ -225,8 +230,11 @@ function greenTexture(g) {
     used++;
     for (let gy = 0; gy < GT; gy++) for (let gx = 0; gx < GT; gx++) {
       if (cnt[gy * GT + gx]) continue; // a sharper capture already saw this
-      const sx = Math.round(b.x0 + ((gx + 0.5) / GT) * bw);
-      const sy = Math.round(b.y0 + ((gy + 0.5) / GT) * bh);
+      // texture space runs from -MARGIN to 1+MARGIN in bbox units
+      const fu = ((gx + 0.5) / GT) * (1 + 2 * GT_MARGIN) - GT_MARGIN;
+      const fv = ((gy + 0.5) / GT) * (1 + 2 * GT_MARGIN) - GT_MARGIN;
+      const sx = Math.round(b.x0 + fu * bw);
+      const sy = Math.round(b.y0 + fv * bh);
       if (sx < 0 || sy < 0 || sx >= img.width || sy >= img.height) continue;
       if (mask[sy * img.width + sx]) continue;
       // The wind dial sits at the bottom of the zoom panel and overlaps the
@@ -491,6 +499,9 @@ for (let hole = 1; hole <= 21; hole++) {
     const pb = g.panelBbox;
     greenMeta[hole] = {
       aspect: +((pb.x1 - pb.x0) / Math.max(1, pb.y1 - pb.y0)).toFixed(4),
+      // how much bbox-relative padding the image carries on each side, so the
+      // app can place pins and slope arrows inside it
+      margin: GT_MARGIN,
       covered: +gtex.covered.toFixed(3), sessions: gtex.sessions,
     };
     // derived.holes[hole] was written just above, before the texture existed
