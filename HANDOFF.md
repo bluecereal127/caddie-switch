@@ -315,3 +315,28 @@ the bottom-most yellow cluster is the ball. It must anchor on the avatar and
 walk the aim line outward instead. Current spread within a single hole (H1
 3i: 1.19 and 1.27 on two shots) is as wide as the spread between holes, so
 nothing about elevation can be concluded from the 34 rows on file yet.
+
+### CORRECTION (2026-08-23): the gauge IS linear — measure dot SPACING
+An earlier pass in this session claimed the power curve was non-linear below
+3 bars. That was WRONG and must not be propagated. It came from measuring
+avatar-pointer → terminal-dot, which carries a fixed offset (the pointer sits
+off the ball), and a constant offset inflates SHORT readings proportionally —
+manufacturing a curve out of nothing.
+
+Measure the SPACING BETWEEN CONSECUTIVE DOTS instead. Spacing is independent
+of where the ball is and of any anchor error. On H10's driver at full power
+the four marks fall at gaps of 33.5, 33.6, 33.9 px — dead even. CLAUDE.md's
+"Gauge = 4 bars, linear (a = max/4)" stands confirmed.
+
+What the dots are actually good for: per-bar FLAT carry, straight, zero wind,
+read off a frame with no shot hit. H10 scale 1.67 yd/px gives driver 56.2 yd
+per bar (225 yd at 4 bars) and 9i 23.4 yd per bar (94 yd). The yellow dot is
+the mark for the currently selected power; the white dots are the other bar
+marks, and the left-hand power gauge mirrors them.
+
+For elevation: carry is now measurable exactly, and the pop-up gives stop, so
+    stop − carry = roll + wind + elevation
+Roll is club/lie dependent but hole-independent, and wind we already model,
+so cross-hole variation at matched club/power/wind isolates elevation. Each
+club lands at a different distance down the same corridor, so one club sweep
+from a tee samples the elevation profile between tee and green.
