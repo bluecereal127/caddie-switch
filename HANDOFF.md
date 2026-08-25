@@ -281,3 +281,37 @@ identical wind). This is the highest-value thing left.
 - After assembler changes: check cap anchors still read 3.01/2.01/0.99 and
   stroke-1 bearings ≈ tee→pin geometry.
 - classify.mjs --test N against captures/labels.json + manifest truth.
+
+## ELEVATION — what is and isn't available (investigated 2026-08-23)
+
+DEAD END: the Terrain toggle cannot give whole-hole height. Proven by
+H09-hmap-D565-W9-BPZE — taken from H9's TEE (565 yd to go) with Terrain ON,
+and the minimap has still zoomed to the green. Terrain always jumps to the
+green no matter where the player stands, which is also what generates the
+"plain/heightmap zoom mismatch" pair rejections: a tee-distance plain frame
+paired against a green-zoom heightmap.
+
+THE LEAD: the minimap's METER DOTS are the game's own carry prediction, and
+they are already in every address frame we capture. From one spot the dot
+chain scales with the selected club — measured off H10's tee, terminal dot
+at driver 227yd, 3i 180, 5i 152, 7i 123, 9i 96 (scale 1.67 yd/px). The
+terminal dot is yellow, the intermediate ones white.
+
+Dots are CARRY; the pop-up's distance chain gives STOP. Clean full-power
+rows show stop/dot ≈ 1.21-1.33, rising as club distance falls, which is the
+roll fraction. So:
+      stop − dot  =  roll  +  elevation effect
+Roll depends on club and lie but NOT on the hole; elevation depends on hole
+and landing distance. Hole-to-hole variation in (stop − dot) for the same
+club at the same power therefore isolates elevation — and because each club
+lands at a different distance down the same corridor, a club sweep from one
+tee samples elevation at 6-7 points between tee and green. That is the
+height profile for tee shots, from captures we already take.
+
+NOT YET USABLE — the reader needs building properly first. The throwaway
+detector used for this investigation locks onto the wrong yellow blob on
+maybe a third of frames (it reported a 327yd wedge on H1) because it assumes
+the bottom-most yellow cluster is the ball. It must anchor on the avatar and
+walk the aim line outward instead. Current spread within a single hole (H1
+3i: 1.19 and 1.27 on two shots) is as wide as the spread between holes, so
+nothing about elevation can be concluded from the 34 rows on file yet.
