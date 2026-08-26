@@ -340,3 +340,20 @@ Roll is club/lie dependent but hole-independent, and wind we already model,
 so cross-hole variation at matched club/power/wind isolates elevation. Each
 club lands at a different distance down the same corridor, so one club sweep
 from a tee samples the elevation profile between tee and green.
+
+### Elevation sampling is 2D, not per-hole (user's catch, 2026-08-23)
+"One sweep samples the corridor" was too loose: with Shot Assist the default
+aim follows the PIN, so when the pin moves between sessions the default line
+rotates and a sweep from the same tee runs down a DIFFERENT line across the
+terrain. Elevation varies laterally, so residuals from different pin days
+must never be pooled as one profile. Design consequences for the reader:
+- Key every elevation sample to a 2D MAP POSITION: ball pos + carry·(aim
+  unit vector). The aim vector comes free from the dot chain itself (the
+  dots ARE the aim line), which also beats the 45°-quantized wind-arrow
+  bearing we use for shot rows.
+- Group sweeps by session (restart trick holds pin AND wind constant within
+  one), and treat cross-session sweeps as separate transects.
+- The pin moving is a FEATURE here: different pin days lay transects down
+  different lines, so over time the samples cover the fairway laterally and
+  the result is a sparse 2D elevation-effect field per hole, not a 1D
+  profile.
