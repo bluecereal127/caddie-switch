@@ -79,3 +79,10 @@ glyph templates from real frames → frame classifier (address / popup / tee-map
 - All positions fractional (0–1) relative to the hole map image.
 - Never bump storage keys without migration; flags used so far: parFixV3, mapV4, treesV9, mapV5 (map swap + coordinate transform), derivedV1 (derived.json applied wholesale once). Additive optional keys (e.g. `captures`, the per-hole screenshot catalog) need no flag.
 - Validate App.jsx with @babel/parser (jsx plugin) before shipping any edit.
+- NEVER add a Netlify Form (`data-netlify`) to `index.html`. Netlify registers
+  forms by parsing deployed HTML and bills **per submission** — the original
+  one-submission-per-photo upload path cost $19 in the Jul–Aug 2026 cycle.
+  Capture uploads go through `netlify/edge-functions/upload.js`, which answers
+  every POST itself and never calls `context.next()` on one (falling through is
+  what would reach Forms). Edge invocations + Blobs are effectively free, so
+  upload batch size has no billing consequence.

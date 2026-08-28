@@ -1,14 +1,17 @@
-# Netlify Forms autosync — the PC half of the iPhone share-sheet upload path.
+# Caddie autosync — the PC half of the iPhone share-sheet upload path.
 #
 #   npm run autosync          # visible console loop, polls every 60s
 #   ... -Once                 # single poll (for testing)
-#   ... -KeepRemote           # don't delete submissions after download
+#   ... -KeepRemote           # don't delete after download
+#   ... -Forms                # ALSO drain the legacy Netlify Forms inbox
 #
-# Polls the "captures" form's submissions via the Netlify API, downloads each
-# new batch (zip or single images), expands zips, normalizes names, and drops
-# everything into captures\inbox. Remote submissions are deleted only after
-# every file is verified on disk (disable with -KeepRemote). Processed
-# submission ids are remembered in captures\.autosync-state.json.
+# Drains the "captures" BLOB STORE that netlify/edge-functions/upload.js
+# writes into: downloads each new upload (zip or single images), expands zips,
+# normalizes names, drops everything into captures\inbox, then deletes the
+# blob. Netlify Forms is NOT polled by default — that transport was metered
+# per submission and cost real money, index.html no longer declares the form,
+# and nothing new can arrive through it. -Forms re-enables the old drain for
+# stragglers only.
 #
 # One-time setup: copy tools\netlify.example.json to tools\netlify.json and
 # paste a Personal Access Token (app.netlify.com > User settings >
@@ -17,7 +20,8 @@
 param(
   [int]$IntervalSec = 60,
   [switch]$Once,
-  [switch]$KeepRemote
+  [switch]$KeepRemote,
+  [switch]$Forms
 )
 $ErrorActionPreference = "Stop"
 [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
@@ -250,51 +254,63 @@ function Sync-Blobs {
   return $copied
 }
 
+# LEGACY (opt-in with -Forms): drain the old Netlify Forms "captures" form.
+# Uploads have not used Forms since 2026-08-20 and index.html no longer
+# declares the form, so nothing new can ever arrive here — every submission
+# was metered and billed, which is exactly why the transport moved to the
+# edge function + blob store. Kept only to rescue stragglers that were
+# already sitting in the account when the switch happened.
+function Sync-Forms {
+  $copied = 0
+  $forms = @((Invoke-RestMethod "$api/sites/$($site.id)/forms" -Headers $H) | ForEach-Object { $_ })
+  $form = $forms | Where-Object { $_.name -eq "captures" } | Select-Object -First 1
+  if ($null -eq $form) {
+    Log "no 'captures' form registered - correct: uploads use the edge function now, nothing to drain"
+  } else {
+    $subs = @((Invoke-RestMethod "$api/forms/$($form.id)/submissions" -Headers $H) | ForEach-Object { $_ })
+    $new = @($subs | Where-Object { -not $state.ContainsKey($_.id) })
+    if ($new.Count -gt 0) {
+      Log "$($new.Count) new submission(s)"
+      foreach ($sub in $new) {
+        try {
+          $n = Process-Submission $sub
+          $copied += $n
+          Log "  submission $($sub.id): $n file(s) -> captures\inbox"
+          if (-not $KeepRemote) {
+            Invoke-RestMethod "$api/submissions/$($sub.id)" -Headers $H -Method Delete | Out-Null
+          }
+          $state[$sub.id] = $true; Save-State
+        } catch {
+          Log "  submission $($sub.id) failed: $($_.Exception.Message) (kept remote, will retry)" "Yellow"
+        }
+      }
+    }
+    # Akismet quarantines rapid scripted posts (it once ate 82 of them
+    # silently). Rescue anything in spam that looks like a capture upload:
+    # honeypot empty + at least one file field. Marking ham moves it to the
+    # verified list, which the NEXT poll ingests normally.
+    $spam = @((Invoke-RestMethod "$api/forms/$($form.id)/submissions?state=spam&per_page=100" -Headers $H) | ForEach-Object { $_ })
+    $rescued = 0
+    foreach ($s in $spam) {
+      $hasFile = $false
+      foreach ($p in $s.data.PSObject.Properties) {
+        if ($p.Value -is [System.Management.Automation.PSCustomObject] -and $p.Value.url) { $hasFile = $true }
+      }
+      if ($hasFile -and -not $s.data.'bot-field') {
+        try { Invoke-RestMethod "$api/submissions/$($s.id)/ham" -Headers $H -Method Put | Out-Null; $rescued++ }
+        catch { Log "  ham-rescue failed for $($s.id): $($_.Exception.Message)" "Yellow" }
+      }
+    }
+    if ($rescued -gt 0) { Log "rescued $rescued submission(s) from the spam folder" }
+  }
+  return $copied
+}
+
 while ($true) {
   $cycleCopied = 0
   try {
-    $forms = @((Invoke-RestMethod "$api/sites/$($site.id)/forms" -Headers $H) | ForEach-Object { $_ })
-    $form = $forms | Where-Object { $_.name -eq "captures" } | Select-Object -First 1
-    if ($null -eq $form) {
-      Log "form 'captures' not registered yet - deploy the site once with the hidden form in index.html"
-    } else {
-      $subs = @((Invoke-RestMethod "$api/forms/$($form.id)/submissions" -Headers $H) | ForEach-Object { $_ })
-      $new = @($subs | Where-Object { -not $state.ContainsKey($_.id) })
-      if ($new.Count -gt 0) {
-        Log "$($new.Count) new submission(s)"
-        foreach ($sub in $new) {
-          try {
-            $n = Process-Submission $sub
-            $cycleCopied += $n
-            Log "  submission $($sub.id): $n file(s) -> captures\inbox"
-            if (-not $KeepRemote) {
-              Invoke-RestMethod "$api/submissions/$($sub.id)" -Headers $H -Method Delete | Out-Null
-            }
-            $state[$sub.id] = $true; Save-State
-          } catch {
-            Log "  submission $($sub.id) failed: $($_.Exception.Message) (kept remote, will retry)" "Yellow"
-          }
-        }
-      }
-      # Akismet quarantines rapid scripted posts (it once ate 82 of them
-      # silently). Rescue anything in spam that looks like a capture upload:
-      # honeypot empty + at least one file field. Marking ham moves it to the
-      # verified list, which the NEXT poll ingests normally.
-      $spam = @((Invoke-RestMethod "$api/forms/$($form.id)/submissions?state=spam&per_page=100" -Headers $H) | ForEach-Object { $_ })
-      $rescued = 0
-      foreach ($s in $spam) {
-        $hasFile = $false
-        foreach ($p in $s.data.PSObject.Properties) {
-          if ($p.Value -is [System.Management.Automation.PSCustomObject] -and $p.Value.url) { $hasFile = $true }
-        }
-        if ($hasFile -and -not $s.data.'bot-field') {
-          try { Invoke-RestMethod "$api/submissions/$($s.id)/ham" -Headers $H -Method Put | Out-Null; $rescued++ }
-          catch { Log "  ham-rescue failed for $($s.id): $($_.Exception.Message)" "Yellow" }
-        }
-      }
-      if ($rescued -gt 0) { Log "rescued $rescued submission(s) from the spam folder" }
-    }
-    # primary upload path now: the edge function's blob store
+    if ($Forms) { $cycleCopied += Sync-Forms }
+    # the upload path: the edge function's blob store (never metered)
     $cycleCopied += Sync-Blobs
     if ($cycleCopied -gt 0) { Invoke-Pipeline }
     else { Write-Host "$(Get-Date -Format HH:mm:ss) nothing new" }  # console only

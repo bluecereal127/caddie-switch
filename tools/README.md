@@ -32,11 +32,12 @@ captures (original `16digits-` name, or exactly 1280×720) so personal photos
 are never touched. Files the phone renamed get a file-time prefix so
 chronological ordering survives.
 
-**Fully wireless — iPhone share sheet → Netlify Form → autosync (the
-pogolist/mccullough pattern).** One-time setup:
+**Fully wireless — iPhone share sheet → edge function → autosync.** One-time
+setup:
 
-1. index.html ships a hidden Netlify form named `captures` (deployed with the
-   site — nothing to do).
+1. Nothing to deploy by hand: `netlify/edge-functions/upload.js` ships with
+   the site and answers `POST /` (and `POST /api/upload`), writing every
+   uploaded file into the `captures` blob store.
 2. Netlify token: app.netlify.com → User settings → Applications → New access
    token. Copy `tools/netlify.example.json` → `tools/netlify.json` (gitignored)
    and paste it. Set `"site"` only if the token sees multiple sites.
@@ -49,20 +50,37 @@ pogolist/mccullough pattern).** One-time setup:
    - Action 1: **Make Archive** — input *Shortcut Input*, format *.zip*.
    - Action 2: **Get Contents of URL** —
      URL `https://caddie-switch.netlify.app/`, Method **POST**,
-     Request Body **Form**, with exactly two fields:
-     - `form-name` (Text) = `captures`
+     Request Body **Form**, with one field:
      - `batch` (**File** type) = tap the value → *Select Variable* → the
        **Archive** from action 1
+
+     A leftover `form-name` (Text) = `captures` field is harmless — the edge
+     function ignores non-file fields — so an existing Shortcut needs no edit.
    - Action 3 (optional): **Show Notification** — "captures uploaded".
 
-   TRANSPORT (2026-08-20): uploads no longer touch Netlify Forms. An edge
-   function (netlify/edge-functions/upload.js) intercepts POST / before
-   Forms sees it and stores every file field into the "captures" blob
-   store; autosync drains the store each poll. Nothing is metered at this
-   scale (edge invocations + Blobs are effectively free), so BOTH Shortcut
-   shapes are fine — per-image loop or zip batch, no quota concerns, no
-   Shortcut changes ever needed. The hidden form in index.html stays only
-   as a legacy fallback (autosync still polls it + rescues its spam).
+   ### NETLIFY FORMS IS GONE — DO NOT BRING IT BACK
+
+   Forms bills **per submission**. The original design posted one submission
+   per photo, which quietly ran up ~195 submissions and **$19** in the
+   Jul–Aug 2026 cycle. Two things now make that impossible:
+
+   - `index.html` declares **no form at all**. Netlify registers forms by
+     parsing deployed HTML, so there is nothing to meter. Adding any
+     `data-netlify` form back to `index.html` re-arms the meter silently.
+   - The edge function **always answers a POST itself** and never calls
+     `context.next()` on one. Falling through is what would have handed the
+     request to Forms, so every error path returns a Response instead.
+
+   Edge invocations and Blobs are effectively free at this scale, so batch
+   size no longer has any billing consequence — one share of 50 photos and
+   50 shares of one photo cost the same. (Keep batches under ~7 MB anyway:
+   that is a hard Netlify request limit, not a cost concern.)
+
+   Optional lockdown: the endpoint is public, so anyone who finds the URL can
+   write to the blob store. Set an `UPLOAD_TOKEN` env var on the Netlify site
+   and add a matching `token` (Text) field to the Shortcut; unset (the
+   default) leaves it open, exactly as it behaves today.
+
 4. PC side is automatic: `npm run autosync:install` registers the
    **CaddieAutosync** scheduled task — starts hidden at every logon, restarts
    itself if it dies, and logs to `captures\autosync.log`. (Already installed
@@ -73,12 +91,12 @@ pogolist/mccullough pattern).** One-time setup:
 Per session after that: Photos → select the screenshots → Share → **Caddie
 Upload** — that's the only manual step; within a minute the background task
 downloads the batch, unzips it into `captures/inbox/` (names normalized for
-chronological ingest order), and deletes the remote submission once every
-byte is verified locally (`-KeepRemote` disables deletion). Keep a batch
-under ~7 MB (~12 screenshots) — Netlify rejects requests over 8 MB; just
-share in two rounds if bigger. If a batch never arrives, check
-`captures\autosync.log`, then the form's **spam** folder in the Netlify UI —
-Akismet occasionally quarantines scripted submissions.
+chronological ingest order), and deletes the blob once every byte is verified
+locally. Keep a batch under ~7 MB (~12 screenshots) — Netlify rejects requests
+over 8 MB; just share in two rounds if bigger. If a batch never arrives, check
+`captures\autosync.log`. The autosync loop no longer polls Netlify Forms;
+`npm run autosync -- -Once -Forms` runs the legacy Forms drain once, kept only
+for stragglers that predate the switch.
 
 **Then:** `npm run ingest` reads `captures/inbox/` and writes
 `captures/rows.json` for the Log-tab importer (after setup below is done).
