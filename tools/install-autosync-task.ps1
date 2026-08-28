@@ -1,8 +1,8 @@
 # One-time install of the CaddieAutosync scheduled task, so the watcher runs
-# by itself: starts at every logon in a VISIBLE console (titled "Caddie
-# autosync") — deliberately not hidden, so it's never forgotten once the
-# project winds down — and restarts if it dies. Also logs to
-# captures\autosync.log.
+# by itself: starts at every LOGON (not at boot — the trigger needs an
+# interactive logon) in a VISIBLE console titled "Caddie autosync"
+# — deliberately not hidden, so it's never forgotten once the project winds
+# down — and restarts itself if it dies. Also logs to captures\autosync.log.
 #
 #   npm run autosync:install     (re-run any time; it updates in place)
 #
@@ -20,7 +20,7 @@ $settings = New-ScheduledTaskSettingsSet `
   -StartWhenAvailable -MultipleInstances IgnoreNew
 
 Register-ScheduledTask -TaskName "CaddieAutosync" -Action $action -Trigger $trigger `
-  -Settings $settings -Description "Caddie-Switch: pull screenshot uploads from the Netlify form into captures\inbox" `
+  -Settings $settings -Description "Caddie-Switch: drain capture uploads from the Netlify blob store into captures\inbox" `
   -Force | Out-Null
 Start-ScheduledTask -TaskName "CaddieAutosync"
 $t = Get-ScheduledTask -TaskName "CaddieAutosync"

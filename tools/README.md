@@ -82,11 +82,19 @@ setup:
    default) leaves it open, exactly as it behaves today.
 
 4. PC side is automatic: `npm run autosync:install` registers the
-   **CaddieAutosync** scheduled task — starts hidden at every logon, restarts
-   itself if it dies, and logs to `captures\autosync.log`. (Already installed
-   on this machine.) For a visible console instead: `npm run autosync` or
-   `tools\autosync.cmd`. Remove the task with
+   **CaddieAutosync** scheduled task — starts at every logon in a VISIBLE
+   console titled "Caddie autosync" (deliberate: an invisible poller is one
+   you forget is running once the project winds down), restarts itself if it
+   dies, and logs to `captures\autosync.log`. (Already installed on this
+   machine.) Don't close that window — it IS the watcher; closing it stops
+   uploads until the next logon. Restart it by hand with
+   `Start-ScheduledTask -TaskName CaddieAutosync`. Remove it with
    `Unregister-ScheduledTask -TaskName CaddieAutosync -Confirm:$false`.
+
+   It triggers on LOGON, not boot, and runs as your interactive user — so
+   after a reboot it is not watching until you actually sign in. Editing
+   `autosync.ps1` does NOT affect the running process; restart the task to
+   load changes (stop, then start).
 
 Per session after that: Photos → select the screenshots → Share → **Caddie
 Upload** — that's the only manual step; within a minute the background task
