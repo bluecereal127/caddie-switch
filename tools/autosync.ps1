@@ -98,7 +98,7 @@ if ($null -eq $site) {
   Log "Set `"site`" in tools\netlify.json to one of those names."
   exit 1
 }
-Log "Watching form 'captures' on $($site.default_domain) (every ${IntervalSec}s)" "Green"
+Log "Draining capture uploads from $($site.default_domain) blob store (every ${IntervalSec}s)" "Green"
 
 # processed-submission memory
 $state = @{}
