@@ -36,6 +36,8 @@ function json(body, status = 200) {
 }
 
 export default async (request, context) => {
+  // Unreachable while config.method is "POST"; kept so the function still
+  // behaves if that declaration is ever loosened.
   if (request.method !== "POST") return context.next();
 
   // Optional shared secret. Unset (the default) = open, exactly as before, so
@@ -93,4 +95,14 @@ export default async (request, context) => {
   return json({ ok: true, saved: saved.length, skipped });
 };
 
-export const config = { path: ["/", "/api/upload"] };
+// method:"POST" is load-bearing, not tidiness. Without it this function is
+// invoked on every GET to "/" too, so ANY crash in the upload path — a cold
+// start that fails to load @netlify/blobs, an oversized body that kills the
+// isolate — takes the whole SITE down and shows Netlify's "edge function has
+// crashed" page to someone who just wanted to look at a hole map. Scoped to
+// POST, a failure here can only ever affect an upload.
+//
+// onError is deliberately left at its default ("fail"). Uploads SHOULD fail
+// loudly: "bypass" would hand the Shortcut a 200 with the site's HTML and
+// silently drop the photos.
+export const config = { path: ["/", "/api/upload"], method: "POST" };
