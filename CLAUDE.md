@@ -86,3 +86,6 @@ glyph templates from real frames → frame classifier (address / popup / tee-map
   every POST itself and never calls `context.next()` on one (falling through is
   what would reach Forms). Edge invocations + Blobs are effectively free, so
   upload batch size has no billing consequence.
+  Its `config.method` MUST stay `"POST"`: without it the function is invoked
+  on every page load, so an upload-path crash serves Netlify's "edge function
+  has crashed" page to anyone browsing the site (this happened 2026-08-29).
