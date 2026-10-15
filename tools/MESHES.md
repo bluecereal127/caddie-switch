@@ -45,7 +45,11 @@ Front nine are the "fcJP" files (Famicom Golf JP-course holes), back nine the
 "fc" files (NES Golf US-course holes), specials fcJP2/19/14 — WSR built its
 course from the two NES Golf layouts. Confirmed three ways: tee→green distance
 vs yardage (table), the app's 36 catalogued pins all project inside the right
-mesh green, and visual matching of the previews against the 21 minimaps.
+mesh green, and visual matching of the previews against the 21 minimaps (one
+matcher plus two adversarial verifiers per mesh, zero refutations). The visual
+pass is what separates the two ~570 yd par 5s, which yardage cannot: H5 has
+the island green across a strait (fcJP7), H9 the inland lake below its green
+(fcJP3).
 
 | hole | mesh | tee→green centre | game yd | | hole | mesh | tee→green centre | game yd |
 |---|---|---|---|---|---|---|---|---|
@@ -53,11 +57,11 @@ mesh green, and visual matching of the previews against the 21 minimaps.
 | 2 | fcJP6 | 159 | 152 | | 13 | fc14 | 144 | 145 |
 | 3 | fcJP12 | 533 | 536 | | 14 | fc5 | 364 | 355 |
 | 4 | fcJP16 | 174 | 186 | | 15 | fc16 | 345 | 355 |
-| 5 | fcJP3 | 571 | 564 | | 16 | fc12 | 257 | 259 |
+| 5 | fcJP7 | 574 | 564 | | 16 | fc12 | 257 | 259 |
 | 6 | fcJP10 | 420 | 407 | | 17 | fc9 | 224 | 219 |
 | 7 | fcJP9 | 401 | 399 | | 18 | fc13 | 460 | 459 |
 | 8 | fcJP13 | 166 | 161 | | 19 | fcJP2 | 391 | 389 |
-| 9 | fcJP7 | 574 | 569 | | 20 | fcJP19 | 343 | 347 |
+| 9 | fcJP3 | 571 | 569 | | 20 | fcJP19 | 343 | 347 |
 | 10 | fc1 | 379 | 360 | | 21 | fcJP14 | 436 | 416 |
 | 11 | fc3 | 143 | 148 | | | | | |
 
