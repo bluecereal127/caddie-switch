@@ -3,6 +3,10 @@
 Turns Switch capture frames into Log-tab import JSON rows:
 `{club,power,lie,windSpeed,windDeg,ended,side?,hole?,stroke?}`.
 
+Course geometry from the Wii Sports Resort collision meshes (16-bit heightmaps,
+surface-class maps, mesh→hole mapping, unit scale) is a separate track: see
+[MESHES.md](MESHES.md) (`mesh-inspect.mjs`, `mesh-heightmap.mjs`, `mesh-holes.json`).
+
 Pure Node (pngjs + jpeg-js, no native deps). PNG and JPG both work — Switch
 album transfers arrive as JPG, capture cards usually give PNG.
 

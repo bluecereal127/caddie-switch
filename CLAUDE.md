@@ -18,6 +18,12 @@ v13 and now diverges (v14: capture catalog); the web repo is the source of truth
   Run it before concluding a frame is unused; `--list` names them, `--json`
   writes captures/derived/frame-audit.json.
 - `tools/` — screenshot ingestion pipeline (pure Node; see tools/README.md). Scaffolded + verified on synthetic frames; ROIs/gauge cal/digit templates await first real captures.
+- `tools/mesh-inspect.mjs`, `tools/mesh-heightmap.mjs`, `tools/lib/obj.mjs`,
+  `tools/mesh-holes.json` — WSR collision-mesh track (see tools/MESHES.md):
+  geometry reports, 16-bit RAW heightmaps + previews + per-pixel surface-class
+  maps, mesh→hole mapping. Inputs `captures/meshes/wsr-kcl-obj/*.obj` and
+  outputs `captures/meshes/heightmaps-res4/` are gitignored (user-supplied rips,
+  92 MB of rasters); regenerate with the command in MESHES.md.
 - Capture platform: user plays on a Switch 2, but NSS is a backward-compat Switch 1 title, so album captures are 1280×720 (Switch 2 games capture 1920×1080; no setting changes this — Nintendo support a_id 68408). All measured ROIs assume 720p frames; rects are fractional anyway.
 
 ## Model
@@ -52,6 +58,18 @@ grid per green (MU=1.35, SLOPE_G=1.1, capture radius 0.22 yd, max capture speed 
 - All in-game distance readouts ("NNN yd to go", distance-to-pin) are FLAT level-ground distances — elevation never enters them (player-confirmed). They live in the same plane as the minimap, so map-scale calibration (yards ÷ map pixels) is exact on every hole; elevation only shifts actual carry.
 - Each green's height field NEVER changes (player-confirmed) — every heightmap capture of a hole describes the same terrain, so frames fuse across sessions/zooms (kills noise, fills legend-occluded cells).
 - Wind indicators (player-confirmed): the minimap is always true-north-up, so its wind arrow is NORTH-relative; the top-right circle arrow is relative to the PLAYER'S AIM — i.e. it directly reads shot-relative wind direction (arrow up = tailwind).
+
+## Course geometry (WSR collision meshes — see tools/MESHES.md, do not re-derive)
+- 21 KCL→OBJ meshes, one per hole, Y-up, X/Z ground, -Z = minimap "up"
+  (green end), +X = right, same handedness as the minimap. **1 unit = 0.1 m
+  (9.144 units/yd)** — confirmed by tee-pad→green distances on all 21 holes and
+  by all 36 catalogued pins projecting inside the right mesh green.
+- Mesh→hole map is in `tools/mesh-holes.json`: front nine = fcJP files, back
+  nine = fc files, specials fcJP2/19/14 (WSR built its course from the two NES
+  Golf layouts).
+- KCL types: 1 fairway (+ the flat tee pad), 2 rough, 3 sand (bunkers, beaches,
+  river gravel), 4 outer ground, 5 floor plane (dead), 6 green (some with a
+  15×15 u cup gap), 7 water, 9 fringe ring, 0x0c walls/tree trunks.
 
 ## Data-entry protocol (why the Log tab looks like it does)
 Ended = distance-to-pin(before) − (after); valid at any power if straight, but
