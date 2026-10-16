@@ -1,0 +1,2196 @@
+{
+ "_note": "Similarity transform per hole between the app's 250x304 minimap frame (fractional coords) and the WSR collision mesh units (0.1 m). mapFracToMesh: [X,Z] = M * [fx, fy, 1]; meshToMapFrac: [fx, fy] = M * [X, Z, 1]. Fitted by mesh-register.mjs from colour-class overlap; seeded from derived.json green centre + yardage scale.",
+ "unitsPerYard": 9.144,
+ "holes": {
+  "1": {
+   "hole": 1,
+   "meshId": "fcJP11",
+   "map": {
+    "width": 250,
+    "height": 304
+   },
+   "seed": {
+    "scaleUnitsPerPx": 17.4833,
+    "fromAppScale": true
+   },
+   "transform": {
+    "unitsPerMapPx": 17.3081,
+    "rotationDeg": 0,
+    "pivotPx": [
+     134,
+     64.49
+    ],
+    "pivotMesh": [
+     261.1,
+     -1486.63
+    ]
+   },
+   "mapFracToMesh": [
+    [
+     4327.0155,
+     0,
+     -2058.17613
+    ],
+    [
+     0,
+     5261.65085,
+     -2602.89257
+    ]
+   ],
+   "meshToMapFrac": [
+    [
+     0.00023111,
+     0,
+     0.47565721
+    ],
+    [
+     0,
+     0.00019005,
+     0.49469124
+    ]
+   ],
+   "ydPerPx": 1.8928,
+   "appScaleYdPerPx": 1.912,
+   "score": 2.2216,
+   "iou": {
+    "grass": 0.908,
+    "green": 0.606,
+    "sand": 0.366,
+    "water": 0.222,
+    "rough": 0.809,
+    "outer": 0.563
+   },
+   "seedScore": 1.9783,
+   "seedIou": {
+    "grass": 0.829,
+    "green": 0.635,
+    "sand": 0.246,
+    "water": 0.224,
+    "rough": 0.713,
+    "outer": 0.548
+   },
+   "greenCentreMapFrac": [
+    0.5431,
+    0.2055
+   ],
+   "appGreenCentreFrac": [
+    0.536,
+    0.2122
+   ],
+   "teeMapFrac": [
+    0.3584,
+    0.8826
+   ],
+   "appTeeFrac": [
+    0.3604,
+    0.8701
+   ],
+   "teeResidualPx": 3.8,
+   "pins": [
+    {
+     "frac": [
+      0.5483,
+      0.1919
+     ],
+     "x": 314.3,
+     "z": -1593.2,
+     "insideGreen": true
+    },
+    {
+     "frac": [
+      0.5194,
+      0.1941
+     ],
+     "x": 189.3,
+     "z": -1581.6,
+     "insideGreen": true
+    }
+   ]
+  },
+  "2": {
+   "hole": 2,
+   "meshId": "fcJP6",
+   "map": {
+    "width": 250,
+    "height": 304
+   },
+   "seed": {
+    "scaleUnitsPerPx": 8.6777,
+    "fromAppScale": true
+   },
+   "transform": {
+    "unitsPerMapPx": 8.8523,
+    "rotationDeg": -0.25,
+    "pivotPx": [
+     123.5,
+     93.51
+    ],
+    "pivotMesh": [
+     193.62,
+     -813.94
+    ]
+   },
+   "mapFracToMesh": [
+    [
+     2213.05293,
+     11.74209,
+     -903.23767
+    ],
+    [
+     -9.65633,
+     2691.07237,
+     -1636.94246
+    ]
+   ],
+   "meshToMapFrac": [
+    [
+     0.00045186,
+     -0.00000197,
+     0.40490584
+    ],
+    [
+     0.00000162,
+     0.00037159,
+     0.60973922
+    ]
+   ],
+   "ydPerPx": 0.9681,
+   "appScaleYdPerPx": 0.949,
+   "score": 3.1817,
+   "iou": {
+    "grass": 0.823,
+    "green": 0.893,
+    "sand": 0.655,
+    "water": 0.787,
+    "rough": 0.887,
+    "outer": 0.833
+   },
+   "seedScore": 3.1104,
+   "seedIou": {
+    "grass": 0.785,
+    "green": 0.937,
+    "sand": 0.632,
+    "water": 0.789,
+    "rough": 0.85,
+    "outer": 0.817
+   },
+   "greenCentreMapFrac": [
+    0.4979,
+    0.3092
+   ],
+   "appGreenCentreFrac": [
+    0.494,
+    0.3076
+   ],
+   "teeMapFrac": [
+    0.6361,
+    0.8364
+   ],
+   "appTeeFrac": [
+    0.6316,
+    0.8171
+   ],
+   "teeResidualPx": 6,
+   "pins": [
+    {
+     "frac": [
+      0.5389,
+      0.3127
+     ],
+     "x": 293,
+     "z": -800.6,
+     "insideGreen": true
+    },
+    {
+     "frac": [
+      0.4757,
+      0.316
+     ],
+     "x": 153.2,
+     "z": -791.2,
+     "insideGreen": true
+    }
+   ]
+  },
+  "3": {
+   "hole": 3,
+   "meshId": "fcJP12",
+   "map": {
+    "width": 250,
+    "height": 304
+   },
+   "seed": {
+    "scaleUnitsPerPx": 22.476,
+    "fromAppScale": true
+   },
+   "transform": {
+    "unitsPerMapPx": 22.1953,
+    "rotationDeg": 0,
+    "pivotPx": [
+     150.5,
+     47.01
+    ],
+    "pivotMesh": [
+     697.72,
+     -2335.27
+    ]
+   },
+   "mapFracToMesh": [
+    [
+     5548.82159,
+     0,
+     -2642.66655
+    ],
+    [
+     0,
+     6747.36705,
+     -3378.7474
+    ]
+   ],
+   "meshToMapFrac": [
+    [
+     0.00018022,
+     0,
+     0.47625726
+    ],
+    [
+     0,
+     0.00014821,
+     0.5007505
+    ]
+   ],
+   "ydPerPx": 2.4273,
+   "appScaleYdPerPx": 2.458,
+   "score": 3.1108,
+   "iou": {
+    "grass": 0.874,
+    "green": 0.526,
+    "sand": 0.757,
+    "water": 0.658,
+    "rough": 0.888,
+    "outer": 0.823
+   },
+   "seedScore": 3.0057,
+   "seedIou": {
+    "grass": 0.821,
+    "green": 0.676,
+    "sand": 0.718,
+    "water": 0.648,
+    "rough": 0.819,
+    "outer": 0.798
+   },
+   "greenCentreMapFrac": [
+    0.6061,
+    0.1488
+   ],
+   "appGreenCentreFrac": [
+    0.602,
+    0.1547
+   ],
+   "teeMapFrac": [
+    0.591,
+    0.8711
+   ],
+   "appTeeFrac": [
+    0.5852,
+    0.8651
+   ],
+   "teeResidualPx": 2.3,
+   "pins": [
+    {
+     "frac": [
+      0.5943,
+      0.1474
+     ],
+     "x": 655,
+     "z": -2384.2,
+     "insideGreen": true
+    }
+   ]
+  },
+  "4": {
+   "hole": 4,
+   "meshId": "fcJP16",
+   "map": {
+    "width": 250,
+    "height": 304
+   },
+   "seed": {
+    "scaleUnitsPerPx": 10.1133,
+    "fromAppScale": true
+   },
+   "transform": {
+    "unitsPerMapPx": 9.7823,
+    "rotationDeg": 0.125,
+    "pivotPx": [
+     102.5,
+     103.01
+    ],
+    "pivotMesh": [
+     -111.88,
+     -508.01
+    ]
+   },
+   "mapFracToMesh": [
+    [
+     2445.56988,
+     -6.48786,
+     -1112.3605
+    ],
+    [
+     5.33541,
+     2973.81297,
+     -1517.87731
+    ]
+   ],
+   "meshToMapFrac": [
+    [
+     0.0004089,
+     8.9e-7,
+     0.45619906
+    ],
+    [
+     -7.3e-7,
+     0.00033627,
+     0.50959603
+    ]
+   ],
+   "ydPerPx": 1.0698,
+   "appScaleYdPerPx": 1.106,
+   "score": 3.395,
+   "iou": {
+    "grass": 0.823,
+    "green": 0.668,
+    "sand": 0.822,
+    "water": 0.853,
+    "rough": 0.921,
+    "outer": 0.898
+   },
+   "seedScore": 2.9654,
+   "seedIou": {
+    "grass": 0.718,
+    "green": 0.738,
+    "sand": 0.563,
+    "water": 0.835,
+    "rough": 0.818,
+    "outer": 0.855
+   },
+   "greenCentreMapFrac": [
+    0.3945,
+    0.3423
+   ],
+   "appGreenCentreFrac": [
+    0.41,
+    0.3388
+   ],
+   "teeMapFrac": [
+    0.6869,
+    0.8204
+   ],
+   "appTeeFrac": [
+    0.6912,
+    0.823
+   ],
+   "teeResidualPx": 1.3,
+   "pins": [
+    {
+     "frac": [
+      0.3795,
+      0.3379
+     ],
+     "x": -186.5,
+     "z": -511,
+     "insideGreen": true
+    },
+    {
+     "frac": [
+      0.4361,
+      0.3234
+     ],
+     "x": -47.9,
+     "z": -553.8,
+     "insideGreen": true
+    },
+    {
+     "frac": [
+      0.4006,
+      0.3115
+     ],
+     "x": -134.7,
+     "z": -589.4,
+     "insideGreen": true
+    }
+   ]
+  },
+  "5": {
+   "hole": 5,
+   "meshId": "fcJP7",
+   "map": {
+    "width": 250,
+    "height": 304
+   },
+   "seed": {
+    "scaleUnitsPerPx": 21.7079,
+    "fromAppScale": true
+   },
+   "transform": {
+    "unitsPerMapPx": 22.8372,
+    "rotationDeg": 0.25,
+    "pivotPx": [
+     144.5,
+     34.99
+    ],
+    "pivotMesh": [
+     415.33,
+     -2451.71
+    ]
+   },
+   "mapFracToMesh": [
+    [
+     5709.23931,
+     -30.29228,
+     -2881.12332
+    ],
+    [
+     24.91141,
+     6942.435,
+     -3265.18538
+    ]
+   ],
+   "meshToMapFrac": [
+    [
+     0.00017515,
+     7.6e-7,
+     0.50712804
+    ],
+    [
+     -6.3e-7,
+     0.00014404,
+     0.46850307
+    ]
+   ],
+   "ydPerPx": 2.4975,
+   "appScaleYdPerPx": 2.374,
+   "score": 2.8275,
+   "iou": {
+    "grass": 0.818,
+    "green": 0.295,
+    "sand": 0.873,
+    "water": 0.502,
+    "rough": 0.848,
+    "outer": 0.453
+   },
+   "seedScore": 1.8539,
+   "seedIou": {
+    "grass": 0.595,
+    "green": 0.367,
+    "sand": 0.224,
+    "water": 0.529,
+    "rough": 0.552,
+    "outer": 0.459
+   },
+   "greenCentreMapFrac": [
+    0.5876,
+    0.1299
+   ],
+   "appGreenCentreFrac": [
+    0.578,
+    0.1151
+   ],
+   "teeMapFrac": [
+    0.5057,
+    0.8825
+   ],
+   "appTeeFrac": [
+    0.508,
+    0.8852
+   ],
+   "teeResidualPx": 1,
+   "pins": [
+    {
+     "frac": [
+      0.6014,
+      0.1213
+     ],
+     "x": 548.7,
+     "z": -2408.1,
+     "insideGreen": true
+    },
+    {
+     "frac": [
+      0.5996,
+      0.0989
+     ],
+     "x": 539.1,
+     "z": -2563.6,
+     "insideGreen": false
+    }
+   ]
+  },
+  "6": {
+   "hole": 6,
+   "meshId": "fcJP10",
+   "map": {
+    "width": 250,
+    "height": 304
+   },
+   "seed": {
+    "scaleUnitsPerPx": 17.6845,
+    "fromAppScale": true
+   },
+   "transform": {
+    "unitsPerMapPx": 17.9065,
+    "rotationDeg": -0.25,
+    "pivotPx": [
+     151.5,
+     50.51
+    ],
+    "pivotMesh": [
+     403.44,
+     -1736.68
+    ]
+   },
+   "mapFracToMesh": [
+    [
+     4476.59461,
+     23.75207,
+     -2313.32049
+    ],
+    [
+     -19.53295,
+     5443.53904,
+     -2629.29154
+    ]
+   ],
+   "meshToMapFrac": [
+    [
+     0.00022338,
+     -9.7e-7,
+     0.51418642
+    ],
+    [
+     8e-7,
+     0.0001837,
+     0.48485647
+    ]
+   ],
+   "ydPerPx": 1.9583,
+   "appScaleYdPerPx": 1.934,
+   "score": 2.4495,
+   "iou": {
+    "grass": 0.807,
+    "green": 0.846,
+    "sand": 0.829,
+    "water": 0,
+    "rough": 0.76,
+    "outer": 0.742
+   },
+   "seedScore": 2.3524,
+   "seedIou": {
+    "grass": 0.804,
+    "green": 0.969,
+    "sand": 0.711,
+    "water": 0,
+    "rough": 0.745,
+    "outer": 0.742
+   },
+   "greenCentreMapFrac": [
+    0.604,
+    0.1694
+   ],
+   "appGreenCentreFrac": [
+    0.606,
+    0.1661
+   ],
+   "teeMapFrac": [
+    0.5012,
+    0.8696
+   ],
+   "appTeeFrac": [
+    0.5008,
+    0.8569
+   ],
+   "teeResidualPx": 3.9,
+   "pins": [
+    {
+     "frac": [
+      0.6001,
+      0.1769
+     ],
+     "x": 377.3,
+     "z": -1678.1,
+     "insideGreen": true
+    }
+   ]
+  },
+  "7": {
+   "hole": 7,
+   "meshId": "fcJP9",
+   "map": {
+    "width": 250,
+    "height": 304
+   },
+   "seed": {
+    "scaleUnitsPerPx": 19.7968,
+    "fromAppScale": true
+   },
+   "transform": {
+    "unitsPerMapPx": 19.5466,
+    "rotationDeg": 1,
+    "pivotPx": [
+     124,
+     78.49
+    ],
+    "pivotMesh": [
+     -259.63,
+     -2209.81
+    ]
+   },
+   "mapFracToMesh": [
+    [
+     4885.89911,
+     -103.70496,
+     -2656.26012
+    ],
+    [
+     85.28369,
+     5941.25332,
+     -3786.1469
+    ]
+   ],
+   "meshToMapFrac": [
+    [
+     0.00020461,
+     0.00000357,
+     0.55701485
+    ],
+    [
+     -0.00000294,
+     0.00016826,
+     0.62926834
+    ]
+   ],
+   "ydPerPx": 2.1376,
+   "appScaleYdPerPx": 2.165,
+   "score": 2.7813,
+   "iou": {
+    "grass": 0.719,
+    "green": 0.069,
+    "sand": 0.904,
+    "water": 0.576,
+    "rough": 0.733,
+    "outer": 0.661
+   },
+   "seedScore": 1.5333,
+   "seedIou": {
+    "grass": 0.422,
+    "green": 0.563,
+    "sand": 0.052,
+    "water": 0.562,
+    "rough": 0.392,
+    "outer": 0.536
+   },
+   "greenCentreMapFrac": [
+    0.4572,
+    0.2438
+   ],
+   "appGreenCentreFrac": [
+    0.496,
+    0.2582
+   ],
+   "teeMapFrac": [
+    0.3778,
+    0.8577
+   ],
+   "appTeeFrac": [
+    0.372,
+    0.8447
+   ],
+   "teeResidualPx": 4.2,
+   "pins": [
+    {
+     "frac": [
+      0.5054,
+      0.2565
+     ],
+     "x": -213.5,
+     "z": -2219.1,
+     "insideGreen": false
+    }
+   ]
+  },
+  "8": {
+   "hole": 8,
+   "meshId": "fcJP13",
+   "map": {
+    "width": 250,
+    "height": 304
+   },
+   "seed": {
+    "scaleUnitsPerPx": 17.1999,
+    "fromAppScale": true
+   },
+   "transform": {
+    "unitsPerMapPx": 15.6519,
+    "rotationDeg": 0.125,
+    "pivotPx": [
+     148,
+     126.49
+    ],
+    "pivotMesh": [
+     154,
+     -277.8
+    ]
+   },
+   "mapFracToMesh": [
+    [
+     3912.95975,
+     -10.38071,
+     -2158.15497
+    ],
+    [
+     8.53677,
+     4758.15905,
+     -2262.72524
+    ]
+   ],
+   "meshToMapFrac": [
+    [
+     0.00025556,
+     5.6e-7,
+     0.55279924
+    ],
+    [
+     -4.6e-7,
+     0.00021016,
+     0.47455457
+    ]
+   ],
+   "ydPerPx": 1.7117,
+   "appScaleYdPerPx": 1.881,
+   "score": 1.9772,
+   "iou": {
+    "grass": 0.685,
+    "green": 0,
+    "sand": 0,
+    "water": 0.673,
+    "rough": 0.871,
+    "outer": 0.613
+   },
+   "seedScore": 0.9007,
+   "seedIou": {
+    "grass": 0.09,
+    "green": 0.737,
+    "sand": 0,
+    "water": 0.432,
+    "rough": 0.17,
+    "outer": 0.363
+   },
+   "greenCentreMapFrac": [
+    0.5205,
+    0.3765
+   ],
+   "appGreenCentreFrac": [
+    0.592,
+    0.4161
+   ],
+   "teeMapFrac": [
+    0.5788,
+    0.6924
+   ],
+   "appTeeFrac": [
+    0.5708,
+    0.6961
+   ],
+   "teeResidualPx": 2.3,
+   "pins": [
+    {
+     "frac": [
+      0.5844,
+      0.4062
+     ],
+     "x": 124.4,
+     "z": -325,
+     "insideGreen": false
+    },
+    {
+     "frac": [
+      0.5806,
+      0.4267
+     ],
+     "x": 109.3,
+     "z": -227.5,
+     "insideGreen": false
+    },
+    {
+     "frac": [
+      0.6061,
+      0.4254
+     ],
+     "x": 209.1,
+     "z": -233.4,
+     "insideGreen": false
+    }
+   ]
+  },
+  "9": {
+   "hole": 9,
+   "meshId": "fcJP3",
+   "map": {
+    "width": 250,
+    "height": 304
+   },
+   "seed": {
+    "scaleUnitsPerPx": 22.8691,
+    "fromAppScale": true
+   },
+   "transform": {
+    "unitsPerMapPx": 22.9204,
+    "rotationDeg": 0,
+    "pivotPx": [
+     138.5,
+     42.5
+    ],
+    "pivotMesh": [
+     273.94,
+     -2237.38
+    ]
+   },
+   "mapFracToMesh": [
+    [
+     5730.0877,
+     0,
+     -2900.52658
+    ],
+    [
+     0,
+     6967.78665,
+     -3211.47557
+    ]
+   ],
+   "meshToMapFrac": [
+    [
+     0.00017452,
+     0,
+     0.50619235
+    ],
+    [
+     0,
+     0.00014352,
+     0.46090326
+    ]
+   ],
+   "ydPerPx": 2.5066,
+   "appScaleYdPerPx": 2.501,
+   "score": 2.9292,
+   "iou": {
+    "grass": 0.718,
+    "green": 0.376,
+    "sand": 0.671,
+    "water": 0.845,
+    "rough": 0.849,
+    "outer": 0.588
+   },
+   "seedScore": 2.1382,
+   "seedIou": {
+    "grass": 0.518,
+    "green": 0.565,
+    "sand": 0.159,
+    "water": 0.816,
+    "rough": 0.677,
+    "outer": 0.551
+   },
+   "greenCentreMapFrac": [
+    0.54,
+    0.1341
+   ],
+   "appGreenCentreFrac": [
+    0.554,
+    0.1398
+   ],
+   "teeMapFrac": [
+    0.4151,
+    0.8767
+   ],
+   "appTeeFrac": [
+    0.4264,
+    0.8632
+   ],
+   "teeResidualPx": 5,
+   "pins": [
+    {
+     "frac": [
+      0.555,
+      0.139
+     ],
+     "x": 279.7,
+     "z": -2243,
+     "insideGreen": true
+    }
+   ]
+  },
+  "10": {
+   "hole": 10,
+   "meshId": "fc1",
+   "map": {
+    "width": 250,
+    "height": 304
+   },
+   "seed": {
+    "scaleUnitsPerPx": 15.2705,
+    "fromAppScale": true
+   },
+   "transform": {
+    "unitsPerMapPx": 16.3894,
+    "rotationDeg": 0.375,
+    "pivotPx": [
+     127,
+     54.01
+    ],
+    "pivotMesh": [
+     95.63,
+     -1438.42
+    ]
+   },
+   "mapFracToMesh": [
+    [
+     4097.27407,
+     -32.60945,
+     -1979.98738
+    ],
+    [
+     26.81698,
+     4982.28527,
+     -2337.1498
+    ]
+   ],
+   "meshToMapFrac": [
+    [
+     0.00024405,
+     0.0000016,
+     0.4869576
+    ],
+    [
+     -0.00000131,
+     0.0002007,
+     0.4664709
+    ]
+   ],
+   "ydPerPx": 1.7924,
+   "appScaleYdPerPx": 1.67,
+   "score": 2.5159,
+   "iou": {
+    "grass": 0.926,
+    "green": 0.505,
+    "sand": 0.85,
+    "water": 0,
+    "rough": 0.859,
+    "outer": 0.616
+   },
+   "seedScore": 1.5108,
+   "seedIou": {
+    "grass": 0.672,
+    "green": 0.619,
+    "sand": 0.19,
+    "water": 0,
+    "rough": 0.608,
+    "outer": 0.635
+   },
+   "greenCentreMapFrac": [
+    0.4902,
+    0.1701
+   ],
+   "appGreenCentreFrac": [
+    0.508,
+    0.1777
+   ],
+   "teeMapFrac": [
+    0.4933,
+    0.8651
+   ],
+   "appTeeFrac": [
+    0.4936,
+    0.8605
+   ],
+   "teeResidualPx": 1.4,
+   "pins": [
+    {
+     "frac": [
+      0.538,
+      0.1636
+     ],
+     "x": 219,
+     "z": -1507.6,
+     "insideGreen": false
+    },
+    {
+     "frac": [
+      0.4905,
+      0.1768
+     ],
+     "x": 24,
+     "z": -1443.1,
+     "insideGreen": true
+    },
+    {
+     "frac": [
+      0.5479,
+      0.1843
+     ],
+     "x": 258.9,
+     "z": -1404.2,
+     "insideGreen": false
+    },
+    {
+     "frac": [
+      0.5139,
+      0.1525
+     ],
+     "x": 120.6,
+     "z": -1563.6,
+     "insideGreen": true
+    }
+   ]
+  },
+  "11": {
+   "hole": 11,
+   "meshId": "fc3",
+   "map": {
+    "width": 250,
+    "height": 304
+   },
+   "seed": {
+    "scaleUnitsPerPx": 7.5366,
+    "fromAppScale": false
+   },
+   "transform": {
+    "unitsPerMapPx": 8.1701,
+    "rotationDeg": -0.25,
+    "pivotPx": [
+     132,
+     101
+    ],
+    "pivotMesh": [
+     160.6,
+     -407.99
+    ]
+   },
+   "mapFracToMesh": [
+    [
+     2042.50615,
+     10.8372,
+     -921.43955
+    ],
+    [
+     -8.91217,
+     2483.68748,
+     -1228.48677
+    ]
+   ],
+   "meshToMapFrac": [
+    [
+     0.00048959,
+     -0.00000214,
+     0.44849891
+    ],
+    [
+     0.00000176,
+     0.00040262,
+     0.49623146
+    ]
+   ],
+   "ydPerPx": 0.8935,
+   "appScaleYdPerPx": null,
+   "score": 2.4246,
+   "iou": {
+    "grass": 0.611,
+    "green": 0.841,
+    "sand": 0.259,
+    "water": 0.669,
+    "rough": 0.783,
+    "outer": 0.943
+   },
+   "seedScore": 1.5302,
+   "seedIou": {
+    "grass": 0.347,
+    "green": 0.429,
+    "sand": 0.061,
+    "water": 0.557,
+    "rough": 0.458,
+    "outer": 0.761
+   },
+   "greenCentreMapFrac": [
+    0.5344,
+    0.333
+   ],
+   "appGreenCentreFrac": [
+    0.528,
+    0.3322
+   ],
+   "teeMapFrac": [
+    0.3041,
+    0.824
+   ],
+   "appTeeFrac": null,
+   "teeResidualPx": null,
+   "pins": [
+    {
+     "frac": [
+      0.5273,
+      0.3497
+     ],
+     "x": 159.4,
+     "z": -364.6,
+     "insideGreen": true
+    },
+    {
+     "frac": [
+      0.4967,
+      0.3415
+     ],
+     "x": 96.8,
+     "z": -384.7,
+     "insideGreen": true
+    },
+    {
+     "frac": [
+      0.5506,
+      0.2978
+     ],
+     "x": 206.4,
+     "z": -493.8,
+     "insideGreen": true
+    },
+    {
+     "frac": [
+      0.5574,
+      0.3184
+     ],
+     "x": 220.5,
+     "z": -442.6,
+     "insideGreen": true
+    },
+    {
+     "frac": [
+      0.5222,
+      0.3152
+     ],
+     "x": 148.6,
+     "z": -450.3,
+     "insideGreen": true
+    }
+   ]
+  },
+  "12": {
+   "hole": 12,
+   "meshId": "fc8",
+   "map": {
+    "width": 250,
+    "height": 304
+   },
+   "seed": {
+    "scaleUnitsPerPx": 19.9614,
+    "fromAppScale": true
+   },
+   "transform": {
+    "unitsPerMapPx": 19.5621,
+    "rotationDeg": 0.125,
+    "pivotPx": [
+     100.5,
+     49.49
+    ],
+    "pivotMesh": [
+     -554.41,
+     -2057.84
+    ]
+   },
+   "mapFracToMesh": [
+    [
+     4890.5196,
+     -12.97408,
+     -2518.28346
+    ],
+    [
+     10.66948,
+     5946.87184,
+     -3030.27851
+    ]
+   ],
+   "meshToMapFrac": [
+    [
+     0.00020448,
+     4.5e-7,
+     0.51628103
+    ],
+    [
+     -3.7e-7,
+     0.00016815,
+     0.50863213
+    ]
+   ],
+   "ydPerPx": 2.1393,
+   "appScaleYdPerPx": 2.183,
+   "score": 1.6688,
+   "iou": {
+    "grass": 0.707,
+    "green": 0.255,
+    "sand": 0.365,
+    "water": 0,
+    "rough": 0.666,
+    "outer": 0.666
+   },
+   "seedScore": 1.105,
+   "seedIou": {
+    "grass": 0.464,
+    "green": 0.598,
+    "sand": 0.126,
+    "water": 0,
+    "rough": 0.372,
+    "outer": 0.598
+   },
+   "greenCentreMapFrac": [
+    0.4224,
+    0.1594
+   ],
+   "appGreenCentreFrac": [
+    0.402,
+    0.1628
+   ],
+   "teeMapFrac": [
+    0.359,
+    0.8735
+   ],
+   "appTeeFrac": [
+    0.3608,
+    0.8678
+   ],
+   "teeResidualPx": 1.8,
+   "pins": [
+    {
+     "frac": [
+      0.4075,
+      0.1675
+     ],
+     "x": -527.6,
+     "z": -2029.8,
+     "insideGreen": true
+    }
+   ]
+  },
+  "13": {
+   "hole": 13,
+   "meshId": "fc14",
+   "map": {
+    "width": 250,
+    "height": 304
+   },
+   "seed": {
+    "scaleUnitsPerPx": 8.321,
+    "fromAppScale": true
+   },
+   "transform": {
+    "unitsPerMapPx": 8.2748,
+    "rotationDeg": 0,
+    "pivotPx": [
+     112.5,
+     91
+    ],
+    "pivotMesh": [
+     -139.52,
+     -708.52
+    ]
+   },
+   "mapFracToMesh": [
+    [
+     2068.70308,
+     0,
+     -1070.43743
+    ],
+    [
+     0,
+     2515.54295,
+     -1461.54882
+    ]
+   ],
+   "meshToMapFrac": [
+    [
+     0.00048339,
+     0,
+     0.51744372
+    ],
+    [
+     0,
+     0.00039753,
+     0.5810073
+    ]
+   ],
+   "ydPerPx": 0.9049,
+   "appScaleYdPerPx": 0.91,
+   "score": 2.1761,
+   "iou": {
+    "grass": 0.645,
+    "green": 0.842,
+    "sand": 0.719,
+    "water": 0,
+    "rough": 0.691,
+    "outer": 0.856
+   },
+   "seedScore": 2.0628,
+   "seedIou": {
+    "grass": 0.614,
+    "green": 0.834,
+    "sand": 0.662,
+    "water": 0,
+    "rough": 0.655,
+    "outer": 0.836
+   },
+   "greenCentreMapFrac": [
+    0.454,
+    0.3027
+   ],
+   "appGreenCentreFrac": [
+    0.45,
+    0.2994
+   ],
+   "teeMapFrac": [
+    0.5507,
+    0.8187
+   ],
+   "appTeeFrac": [
+    0.55,
+    0.8066
+   ],
+   "teeResidualPx": 3.7,
+   "pins": [
+    {
+     "frac": [
+      0.4364,
+      0.2754
+     ],
+     "x": -167.7,
+     "z": -768.8,
+     "insideGreen": true
+    }
+   ]
+  },
+  "14": {
+   "hole": 14,
+   "meshId": "fc5",
+   "map": {
+    "width": 250,
+    "height": 304
+   },
+   "seed": {
+    "scaleUnitsPerPx": 13.7357,
+    "fromAppScale": false
+   },
+   "transform": {
+    "unitsPerMapPx": 14.7481,
+    "rotationDeg": 0,
+    "pivotPx": [
+     164.5,
+     51
+    ],
+    "pivotMesh": [
+     373.87,
+     -1857.46
+    ]
+   },
+   "mapFracToMesh": [
+    [
+     3687.01653,
+     0,
+     -2052.18734
+    ],
+    [
+     0,
+     4483.4121,
+     -2609.55397
+    ]
+   ],
+   "meshToMapFrac": [
+    [
+     0.00027122,
+     0,
+     0.55659836
+    ],
+    [
+     0,
+     0.00022304,
+     0.58204642
+    ]
+   ],
+   "ydPerPx": 1.6129,
+   "appScaleYdPerPx": null,
+   "score": 3.1403,
+   "iou": {
+    "grass": 0.892,
+    "green": 0.089,
+    "sand": 0.862,
+    "water": 0.67,
+    "rough": 0.86,
+    "outer": 0.88
+   },
+   "seedScore": 0.8144,
+   "seedIou": {
+    "grass": 0.13,
+    "green": 0,
+    "sand": 0,
+    "water": 0.501,
+    "rough": 0.123,
+    "outer": 0.406
+   },
+   "greenCentreMapFrac": [
+    0.6489,
+    0.1429
+   ],
+   "appGreenCentreFrac": [
+    0.658,
+    0.1678
+   ],
+   "teeMapFrac": [
+    0.7182,
+    0.8824
+   ],
+   "appTeeFrac": null,
+   "teeResidualPx": null,
+   "pins": [
+    {
+     "frac": [
+      0.6614,
+      0.1672
+     ],
+     "x": 386.4,
+     "z": -1859.9,
+     "insideGreen": true
+    }
+   ]
+  },
+  "15": {
+   "hole": 15,
+   "meshId": "fc16",
+   "map": {
+    "width": 250,
+    "height": 304
+   },
+   "seed": {
+    "scaleUnitsPerPx": 16.5689,
+    "fromAppScale": true
+   },
+   "transform": {
+    "unitsPerMapPx": 16.3627,
+    "rotationDeg": 0.125,
+    "pivotPx": [
+     139.5,
+     64.49
+    ],
+    "pivotMesh": [
+     235.72,
+     -1744.07
+    ]
+   },
+   "mapFracToMesh": [
+    [
+     4090.67691,
+     -10.85218,
+     -2044.57989
+    ],
+    [
+     8.92449,
+     4974.26313,
+     -2804.34309
+    ]
+   ],
+   "meshToMapFrac": [
+    [
+     0.00024446,
+     5.3e-7,
+     0.50130781
+    ],
+    [
+     -4.4e-7,
+     0.00020103,
+     0.56287114
+    ]
+   ],
+   "ydPerPx": 1.7895,
+   "appScaleYdPerPx": 1.812,
+   "score": 3.4531,
+   "iou": {
+    "grass": 0.876,
+    "green": 0.848,
+    "sand": 0.915,
+    "water": 0.764,
+    "rough": 0.825,
+    "outer": 0.912
+   },
+   "seedScore": 3.3492,
+   "seedIou": {
+    "grass": 0.841,
+    "green": 0.894,
+    "sand": 0.856,
+    "water": 0.769,
+    "rough": 0.779,
+    "outer": 0.899
+   },
+   "greenCentreMapFrac": [
+    0.56,
+    0.2096
+   ],
+   "appGreenCentreFrac": [
+    0.558,
+    0.2122
+   ],
+   "teeMapFrac": [
+    0.6016,
+    0.8429
+   ],
+   "appTeeFrac": [
+    0.5924,
+    0.8484
+   ],
+   "teeResidualPx": 2.8,
+   "pins": [
+    {
+     "frac": [
+      0.5653,
+      0.2231
+     ],
+     "x": 265.5,
+     "z": -1689.5,
+     "insideGreen": true
+    },
+    {
+     "frac": [
+      0.5634,
+      0.1958
+     ],
+     "x": 258,
+     "z": -1825.4,
+     "insideGreen": true
+    }
+   ]
+  },
+  "16": {
+   "hole": 16,
+   "meshId": "fc12",
+   "map": {
+    "width": 250,
+    "height": 304
+   },
+   "seed": {
+    "scaleUnitsPerPx": 13.3045,
+    "fromAppScale": true
+   },
+   "transform": {
+    "unitsPerMapPx": 13.6694,
+    "rotationDeg": 0.125,
+    "pivotPx": [
+     177,
+     99.51
+    ],
+    "pivotMesh": [
+     452.7,
+     -350.6
+    ]
+   },
+   "mapFracToMesh": [
+    [
+     3417.34098,
+     -9.06588,
+     -1963.8097
+    ],
+    [
+     7.45549,
+     4155.48663,
+     -1716.18156
+    ]
+   ],
+   "meshToMapFrac": [
+    [
+     0.00029262,
+     6.4e-7,
+     0.57575304
+    ],
+    [
+     -5.3e-7,
+     0.00024064,
+     0.41195874
+    ]
+   ],
+   "ydPerPx": 1.4949,
+   "appScaleYdPerPx": 1.455,
+   "score": 2.6995,
+   "iou": {
+    "grass": 0.877,
+    "green": 0.81,
+    "sand": 0.933,
+    "water": 0,
+    "rough": 0.873,
+    "outer": 0.836
+   },
+   "seedScore": 2.2802,
+   "seedIou": {
+    "grass": 0.76,
+    "green": 0.845,
+    "sand": 0.677,
+    "water": 0,
+    "rough": 0.76,
+    "outer": 0.84
+   },
+   "greenCentreMapFrac": [
+    0.708,
+    0.3306
+   ],
+   "appGreenCentreFrac": [
+    0.708,
+    0.3273
+   ],
+   "teeMapFrac": [
+    0.4449,
+    0.852
+   ],
+   "appTeeFrac": [
+    0.434,
+    0.8539
+   ],
+   "teeResidualPx": 2.8,
+   "pins": [
+    {
+     "frac": [
+      0.7291,
+      0.3198
+     ],
+     "x": 524.9,
+     "z": -381.8,
+     "insideGreen": true
+    },
+    {
+     "frac": [
+      0.7075,
+      0.3241
+     ],
+     "x": 451,
+     "z": -364.1,
+     "insideGreen": true
+    },
+    {
+     "frac": [
+      0.7268,
+      0.3454
+     ],
+     "x": 516.8,
+     "z": -275.5,
+     "insideGreen": true
+    }
+   ]
+  },
+  "17": {
+   "hole": 17,
+   "meshId": "fc9",
+   "map": {
+    "width": 250,
+    "height": 304
+   },
+   "seed": {
+    "scaleUnitsPerPx": 10.6345,
+    "fromAppScale": true
+   },
+   "transform": {
+    "unitsPerMapPx": 10.3894,
+    "rotationDeg": -0.125,
+    "pivotPx": [
+     137,
+     79.01
+    ],
+    "pivotMesh": [
+     334.87,
+     -749.06
+    ]
+   },
+   "mapFracToMesh": [
+    [
+     2597.35601,
+     6.89054,
+     -1090.27642
+    ],
+    [
+     -5.66656,
+     3158.38491,
+     -1566.82107
+    ]
+   ],
+   "meshToMapFrac": [
+    [
+     0.00038501,
+     -8.4e-7,
+     0.4184459
+    ],
+    [
+     6.9e-7,
+     0.00031662,
+     0.49683375
+    ]
+   ],
+   "ydPerPx": 1.1362,
+   "appScaleYdPerPx": 1.163,
+   "score": 2.9243,
+   "iou": {
+    "grass": 0.833,
+    "green": 0.649,
+    "sand": 0.666,
+    "water": 0.631,
+    "rough": 0.791,
+    "outer": 0.787
+   },
+   "seedScore": 2.426,
+   "seedIou": {
+    "grass": 0.703,
+    "green": 0.703,
+    "sand": 0.375,
+    "water": 0.626,
+    "rough": 0.665,
+    "outer": 0.715
+   },
+   "greenCentreMapFrac": [
+    0.5521,
+    0.2464
+   ],
+   "appGreenCentreFrac": [
+    0.548,
+    0.2599
+   ],
+   "teeMapFrac": [
+    0.3873,
+    0.8812
+   ],
+   "appTeeFrac": [
+    0.3964,
+    0.8549
+   ],
+   "teeResidualPx": 8.3,
+   "pins": [
+    {
+     "frac": [
+      0.5499,
+      0.2408
+     ],
+     "x": 339.7,
+     "z": -809.4,
+     "insideGreen": true
+    },
+    {
+     "frac": [
+      0.5162,
+      0.2683
+     ],
+     "x": 252.3,
+     "z": -722.4,
+     "insideGreen": true
+    }
+   ]
+  },
+  "18": {
+   "hole": 18,
+   "meshId": "fc13",
+   "map": {
+    "width": 250,
+    "height": 304
+   },
+   "seed": {
+    "scaleUnitsPerPx": 19.2298,
+    "fromAppScale": true
+   },
+   "transform": {
+    "unitsPerMapPx": 19.3743,
+    "rotationDeg": 0.625,
+    "pivotPx": [
+     126,
+     47.01
+    ],
+    "pivotMesh": [
+     -33.22,
+     -1491.62
+    ]
+   },
+   "mapFracToMesh": [
+    [
+     4843.28586,
+     -64.24632,
+     -2464.29698
+    ],
+    [
+     52.83415,
+     5889.43561,
+     -2429.052
+    ]
+   ],
+   "meshToMapFrac": [
+    [
+     0.00020645,
+     0.00000225,
+     0.51421671
+    ],
+    [
+     -0.00000185,
+     0.00016978,
+     0.4078292
+    ]
+   ],
+   "ydPerPx": 2.1188,
+   "appScaleYdPerPx": 2.103,
+   "score": 2.8962,
+   "iou": {
+    "grass": 0.842,
+    "green": 0.041,
+    "sand": 0.763,
+    "water": 0.636,
+    "rough": 0.795,
+    "outer": 0.826
+   },
+   "seedScore": 1.6454,
+   "seedIou": {
+    "grass": 0.456,
+    "green": 0.712,
+    "sand": 0.002,
+    "water": 0.621,
+    "rough": 0.4,
+    "outer": 0.628
+   },
+   "greenCentreMapFrac": [
+    0.4663,
+    0.1574
+   ],
+   "appGreenCentreFrac": [
+    0.504,
+    0.1547
+   ],
+   "teeMapFrac": [
+    0.3299,
+    0.8624
+   ],
+   "appTeeFrac": [
+    0.3252,
+    0.8572
+   ],
+   "teeResidualPx": 2,
+   "pins": [
+    {
+     "frac": [
+      0.5055,
+      0.1547
+     ],
+     "x": -26,
+     "z": -1491.2,
+     "insideGreen": false
+    }
+   ]
+  },
+  "19": {
+   "hole": 19,
+   "meshId": "fcJP2",
+   "map": {
+    "width": 250,
+    "height": 304
+   },
+   "seed": {
+    "scaleUnitsPerPx": 14.9413,
+    "fromAppScale": true
+   },
+   "transform": {
+    "unitsPerMapPx": 14.6351,
+    "rotationDeg": 0,
+    "pivotPx": [
+     92.5,
+     40.49
+    ],
+    "pivotMesh": [
+     -227.79,
+     -1466.47
+    ]
+   },
+   "mapFracToMesh": [
+    [
+     3658.77227,
+     0,
+     -1581.5338
+    ],
+    [
+     0,
+     4449.06708,
+     -2059.08638
+    ]
+   ],
+   "meshToMapFrac": [
+    [
+     0.00027332,
+     0,
+     0.43225806
+    ],
+    [
+     0,
+     0.00022477,
+     0.46281307
+    ]
+   ],
+   "ydPerPx": 1.6005,
+   "appScaleYdPerPx": 1.634,
+   "score": 2.6884,
+   "iou": {
+    "grass": 0.92,
+    "green": 0.665,
+    "sand": 0.49,
+    "water": 0.415,
+    "rough": 0.868,
+    "outer": 0.879
+   },
+   "seedScore": 2.4172,
+   "seedIou": {
+    "grass": 0.854,
+    "green": 0.669,
+    "sand": 0.338,
+    "water": 0.415,
+    "rough": 0.778,
+    "outer": 0.846
+   },
+   "greenCentreMapFrac": [
+    0.3639,
+    0.1349
+   ],
+   "appGreenCentreFrac": [
+    0.37,
+    0.1332
+   ],
+   "teeMapFrac": [
+    0.6387,
+    0.9063
+   ],
+   "appTeeFrac": [
+    0.6404,
+    0.9076
+   ],
+   "teeResidualPx": 0.6,
+   "pins": [
+    {
+     "frac": [
+      0.3965,
+      0.1066
+     ],
+     "x": -130.8,
+     "z": -1584.8,
+     "insideGreen": true
+    },
+    {
+     "frac": [
+      0.3731,
+      0.1422
+     ],
+     "x": -216.4,
+     "z": -1426.4,
+     "insideGreen": true
+    }
+   ]
+  },
+  "20": {
+   "hole": 20,
+   "meshId": "fcJP19",
+   "map": {
+    "width": 250,
+    "height": 304
+   },
+   "seed": {
+    "scaleUnitsPerPx": 13.46,
+    "fromAppScale": true
+   },
+   "transform": {
+    "unitsPerMapPx": 13.6565,
+    "rotationDeg": 0,
+    "pivotPx": [
+     157,
+     51.01
+    ],
+    "pivotMesh": [
+     747.47,
+     -1433.5
+    ]
+   },
+   "mapFracToMesh": [
+    [
+     3414.12593,
+     0,
+     -1396.60107
+    ],
+    [
+     0,
+     4151.57713,
+     -2130.13464
+    ]
+   ],
+   "meshToMapFrac": [
+    [
+     0.0002929,
+     0,
+     0.40906548
+    ],
+    [
+     0,
+     0.00024087,
+     0.51309047
+    ]
+   ],
+   "ydPerPx": 1.4935,
+   "appScaleYdPerPx": 1.472,
+   "score": 2.151,
+   "iou": {
+    "grass": 0.838,
+    "green": 0.881,
+    "sand": 0.728,
+    "water": 0,
+    "rough": 0.73,
+    "outer": 0
+   },
+   "seedScore": 1.9511,
+   "seedIou": {
+    "grass": 0.764,
+    "green": 0.915,
+    "sand": 0.639,
+    "water": 0,
+    "rough": 0.638,
+    "outer": 0
+   },
+   "greenCentreMapFrac": [
+    0.63,
+    0.1678
+   ],
+   "appGreenCentreFrac": [
+    0.628,
+    0.1678
+   ],
+   "teeMapFrac": [
+    0.5893,
+    0.9231
+   ],
+   "appTeeFrac": [
+    0.5892,
+    0.9266
+   ],
+   "teeResidualPx": 1.1,
+   "pins": [
+    {
+     "frac": [
+      0.6406,
+      0.1855
+     ],
+     "x": 790.5,
+     "z": -1360,
+     "insideGreen": true
+    },
+    {
+     "frac": [
+      0.6593,
+      0.1674
+     ],
+     "x": 854.3,
+     "z": -1435.2,
+     "insideGreen": true
+    }
+   ]
+  },
+  "21": {
+   "hole": 21,
+   "meshId": "fcJP14",
+   "map": {
+    "width": 250,
+    "height": 304
+   },
+   "seed": {
+    "scaleUnitsPerPx": 18.2423,
+    "fromAppScale": true
+   },
+   "transform": {
+    "unitsPerMapPx": 17.7379,
+    "rotationDeg": -0.125,
+    "pivotPx": [
+     112,
+     49
+    ],
+    "pivotMesh": [
+     -177.02,
+     -793.58
+    ]
+   },
+   "mapFracToMesh": [
+    [
+     4434.46801,
+     11.76422,
+     -2165.55635
+    ],
+    [
+     -9.67452,
+     5392.3131,
+     -1658.48839
+    ]
+   ],
+   "meshToMapFrac": [
+    [
+     0.00022551,
+     -4.9e-7,
+     0.48752811
+    ],
+    [
+     4e-7,
+     0.00018545,
+     0.30843999
+    ]
+   ],
+   "ydPerPx": 1.9398,
+   "appScaleYdPerPx": 1.995,
+   "score": 2.6138,
+   "iou": {
+    "grass": 0.676,
+    "green": 0.591,
+    "sand": 0.747,
+    "water": 0.511,
+    "rough": 0.746,
+    "outer": 0.528
+   },
+   "seedScore": 2.1602,
+   "seedIou": {
+    "grass": 0.575,
+    "green": 0.613,
+    "sand": 0.468,
+    "water": 0.488,
+    "rough": 0.653,
+    "outer": 0.499
+   },
+   "greenCentreMapFrac": [
+    0.4449,
+    0.1637
+   ],
+   "appGreenCentreFrac": [
+    0.448,
+    0.1612
+   ],
+   "teeMapFrac": [
+    0.5811,
+    0.8938
+   ],
+   "appTeeFrac": [
+    0.5756,
+    0.8763
+   ],
+   "teeResidualPx": 5.5,
+   "pins": [
+    {
+     "frac": [
+      0.457,
+      0.1845
+     ],
+     "x": -136.8,
+     "z": -668,
+     "insideGreen": true
+    }
+   ]
+  }
+ }
+}

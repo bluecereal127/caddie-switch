@@ -18,12 +18,15 @@ v13 and now diverges (v14: capture catalog); the web repo is the source of truth
   Run it before concluding a frame is unused; `--list` names them, `--json`
   writes captures/derived/frame-audit.json.
 - `tools/` — screenshot ingestion pipeline (pure Node; see tools/README.md). Scaffolded + verified on synthetic frames; ROIs/gauge cal/digit templates await first real captures.
-- `tools/mesh-inspect.mjs`, `tools/mesh-heightmap.mjs`, `tools/lib/obj.mjs`,
-  `tools/mesh-holes.json` — WSR collision-mesh track (see tools/MESHES.md):
-  geometry reports, 16-bit RAW heightmaps + previews + per-pixel surface-class
-  maps, mesh→hole mapping. Inputs `captures/meshes/wsr-kcl-obj/*.obj` and
-  outputs `captures/meshes/heightmaps-res4/` are gitignored (user-supplied rips,
-  92 MB of rasters); regenerate with the command in MESHES.md.
+- `tools/mesh-inspect.mjs`, `tools/mesh-heightmap.mjs`, `tools/mesh-register.mjs`,
+  `tools/lib/obj.mjs`, `tools/mesh-holes.json`, `tools/mesh-registration.json` —
+  WSR collision-mesh track (see tools/MESHES.md): geometry reports, 16-bit RAW
+  heightmaps + previews + per-pixel surface-class maps, mesh→hole mapping, and
+  the per-hole similarity transform between mesh units and the app's 250×304
+  map frame (`mapFracToMesh` / `meshToMapFrac`). Inputs
+  `captures/meshes/wsr-kcl-obj/*.obj` and outputs `captures/meshes/heightmaps-res4/`,
+  `captures/meshes/registration/` are gitignored (user-supplied rips, ~100 MB of
+  rasters); regenerate with the commands in MESHES.md.
 - Capture platform: user plays on a Switch 2, but NSS is a backward-compat Switch 1 title, so album captures are 1280×720 (Switch 2 games capture 1920×1080; no setting changes this — Nintendo support a_id 68408). All measured ROIs assume 720p frames; rects are fractional anyway.
 
 ## Model

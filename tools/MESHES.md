@@ -106,6 +106,34 @@ nodata-heavy ones because their meshes stop just outside the rough. The default
 crop (`--crop core`) is the bounding box of fairway + rough + sand + green +
 fringe plus `--pad 600` units; `--crop all` keeps every non-giant surface.
 
+## Registration to the app's map frame (`tools/mesh-registration.json`)
+
+    node tools/mesh-register.mjs --heightmaps captures/meshes/heightmaps-res4 --out captures/meshes/registration \
+         --json tools/mesh-registration.json [--holes 3,11] [--classify-only]
+
+Fits, per hole, a similarity transform (scale, rotation, translation) between
+the 250x304 minimap panel in `src/maps.js` (fractional coords, the frame every
+app position lives in) and mesh units. The minimap is classified by
+hue/saturation/value into fairway (+ the hex-patterned green, same colour),
+rough, outer ground, sand, water (deep and pale lake), with the wind dial
+masked out and the app's `greenPoly` painted in as the green class; the mesh
+side is the `_classes.png` raster from mesh-heightmap.mjs. The score is a
+weighted sum of per-class IoUs (grass 1, sand 1, water 1, rough 0.5, outer 0.3,
+app-green 0.25), seeded from the app's green centre and yardage scale (or the
+grass-extent ratio on holes 11/14 that have no scale), coarse grid at half
+resolution then pattern search at full resolution (~20 s per hole).
+
+The JSON holds `mapFracToMesh` / `meshToMapFrac` 2x3 matrices per hole, the
+fitted yd/px, per-class IoUs, and diagnostics (tee residual, app pins inside
+the mesh green). Results: rotation within ±1° on every hole, fitted yd/px
+within 3% of the app's own on 15 of 19 holes with a scale, tee residual 0.6–8
+px, grass IoU 0.61–0.93. Where the two disagree the mesh wins: the app's
+scale on holes 8 and 10 (and probably 5) is off by 5–9%, and the app's
+capture-derived green polygon is misplaced by ~10 px on holes 7 and 18 and
+~22 px on hole 8 (the mesh green sits on the minimap's visible putting
+surface in all three). Per-hole `_compare.png` images (minimap | mesh classes
+warped into the map frame | edge overlay) land in `captures/meshes/registration/`.
+
 ## Quirks worth knowing
 
 - fcJP12 (H3) and fcJP6 (H2) carry extra type-6 quads sitting on the floor plane
@@ -119,10 +147,10 @@ fringe plus `--pad 600` units; `--crop all` keeps every non-giant surface.
 
 ## Where to take it next
 
-1. Proper registration mesh → minimap (fit the fairway outline, not just the
-   green centre + yardage scale) so the heightmap lands in the app's fractional
-   coordinates; then publish a low-res height + class PNG per hole under
-   `public/` for the app to fetch like `derived.json`.
+1. (done: `mesh-register.mjs`) Registration mesh → minimap. Next: publish a
+   low-res height + class raster per hole in the map frame under `public/`
+   for the app to fetch like `derived.json`, and let the mesh correct the
+   app's scale on holes 8/10 and its green polygons on holes 7/8/18.
 2. Green slopes for the putt solver straight from the mesh (sample the green at
    1 u/px) instead of the hand-painted 9×9 grid.
 3. Per-hole elevation offsets for the shot model (holes 8/12/17 first) from the
