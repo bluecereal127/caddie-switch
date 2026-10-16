@@ -56,9 +56,8 @@ function hsv(r, g, b) {
   return [h, s, v];
 }
 // The putting surface's hex pattern is the same bright green as the fairway, so
-// colour cannot separate them: both land in "fairway" here and the green class is
-// painted in afterwards from derived.json's greenPoly (the app's own notion of
-// the green, which is what the mesh must line up with).
+// colour cannot separate them: both land in "fairway" here, and the "grass" term
+// merges fairway and green on the mesh side to match.
 export function classifyMinimapPixel(r, g, b) {
   const [h, s, v] = hsv(r, g, b);
   if (h >= 170 && h <= 230 && s >= 0.25 && v < 0.55) return MC.water;             // deep sea / river
@@ -68,14 +67,6 @@ export function classifyMinimapPixel(r, g, b) {
   if (h >= 80 && h <= 130 && s >= 0.35 && v >= 0.38 && v < 0.6) return MC.rough;  // mid green
   if (h >= 80 && h <= 160 && v < 0.38) return MC.outer;                            // dark dotted ground
   return MC.other;
-}
-function pointInPoly(x, y, poly) {
-  let inside = false;
-  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
-    const [xi, yi] = poly[i], [xj, yj] = poly[j];
-    if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
-  }
-  return inside;
 }
 const MAP_CLASS_COLORS = { 1: [128, 205, 70], 2: [78, 156, 58], 3: [236, 216, 150], 4: [44, 96, 46], 6: [160, 235, 150], 7: [96, 165, 232], 0: [120, 120, 120], 255: [20, 20, 20] };
 
@@ -98,7 +89,7 @@ function detectDial(W, H, data, pad = 4) {
   return { side, x0: Math.max(0, b.x0 - pad), y0: Math.max(0, b.y0 - pad), x1: Math.min(W - 1, b.x1 + pad), y1: Math.min(H - 1, b.y1 + pad), whitePx: b.n };
 }
 
-function decodeMinimap(hole, greenPoly = null) {
+function decodeMinimap(hole) {
   const b64 = HOLE_MAPS[hole].split(",")[1];
   const img = jpeg.decode(Buffer.from(b64, "base64"), { useTArray: true, formatAsRGBA: true });
   const { width: W, height: H, data } = img;
@@ -107,11 +98,9 @@ function decodeMinimap(hole, greenPoly = null) {
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
     const i = (y * W + x) * 4;
     const masked = y < 3 /* panel's top border line */ || (dial && x >= dial.x0 && x <= dial.x1 && y >= dial.y0 && y <= dial.y1);
-    let c = masked ? MC.excluded : classifyMinimapPixel(data[i], data[i + 1], data[i + 2]);
-    if (greenPoly && c !== MC.excluded && pointInPoly((x + 0.5) / W, (y + 0.5) / H, greenPoly)) c = MC.green;
-    cls[y * W + x] = c;
+    cls[y * W + x] = masked ? MC.excluded : classifyMinimapPixel(data[i], data[i + 1], data[i + 2]);
   }
-  return { W, H, rgba: data, cls, hasGreen: !!greenPoly, dial };
+  return { W, H, rgba: data, cls, dial };
 }
 
 // ---- mesh class raster (from mesh-heightmap.mjs output) ----
@@ -137,9 +126,12 @@ function makeXform(p, pivot) {
 }
 // Overlap terms: map classes vs mesh classes (weighted IoU). "grass" merges fairway
 // and green on both sides because the minimap colours cannot tell them apart.
+// The app's greenPoly is NOT a term: it is capture-derived and misplaced on six
+// holes (5/7/8/10/14/18), and src/maps.js has a green texture transplanted at that
+// same derived box, so neither may steer the fit. Its offset from the mesh green
+// is reported as a diagnostic instead.
 const TERMS = [
   { id: "grass", w: 1.0, m: new Set([1, 6]), k: new Set([1, 6]) },
-  { id: "green", w: 0.25, m: new Set([6]), k: new Set([6]), needsGreen: true }, // app greenPoly is itself derived data and wrong on some holes (H8): diagnostic weight only
   { id: "sand", w: 1.0, m: new Set([3]), k: new Set([3]) },
   { id: "water", w: 1.0, m: new Set([7]), k: new Set([7]) },
   { id: "rough", w: 0.5, m: new Set([2]), k: new Set([2]) },
@@ -147,7 +139,7 @@ const TERMS = [
 ];
 function score(map, mesh, p, pivot, step) {
   const xf = makeXform(p, pivot);
-  const terms = TERMS.filter((t) => !t.needsGreen || map.hasGreen);
+  const terms = TERMS;
   const inter = new Float64Array(terms.length), uni = new Float64Array(terms.length);
   for (let v = 0; v < map.H; v += step) for (let u = 0; u < map.W; u += step) {
     const m = map.cls[v * map.W + u];
@@ -174,7 +166,7 @@ function score(map, mesh, p, pivot, step) {
 function registerHole(hole) {
   const meshId = holeToMesh[hole];
   const dh = derived.holes[String(hole)] || {};
-  const map = decodeMinimap(hole, dh.greenPoly || null);
+  const map = decodeMinimap(hole); // no greenPoly painting: see TERMS
   const mesh = loadMeshRaster(hole);
   const gm = mesh.meta.green;
   if (!gm) throw new Error(`hole ${hole}: no green in mesh sidecar`);
@@ -249,6 +241,7 @@ function registerHole(hole) {
     score: +best.total.toFixed(4), iou: Object.fromEntries(Object.entries(best.iou).map(([k, v]) => [k, +v.toFixed(3)])),
     seedScore: +init.total.toFixed(4), seedIou: Object.fromEntries(Object.entries(init.iou).map(([k, v]) => [k, +v.toFixed(3)])),
     greenCentreMapFrac: [+greenMap[0].toFixed(4), +greenMap[1].toFixed(4)], appGreenCentreFrac: gb ? [+((gb.x0 + gb.x1) / 2).toFixed(4), +((gb.y0 + gb.y1) / 2).toFixed(4)] : null,
+    appGreenOffsetPx: gb ? +Math.hypot(((gb.x0 + gb.x1) / 2 - greenMap[0]) * map.W, ((gb.y0 + gb.y1) / 2 - greenMap[1]) * map.H).toFixed(1) : null,
     teeMapFrac: teeMap ? [+teeMap[0].toFixed(4), +teeMap[1].toFixed(4)] : null, appTeeFrac: dh.tee ? [dh.tee.x, dh.tee.y] : null, teeResidualPx: teeResidualPx == null ? null : +teeResidualPx.toFixed(1),
     pins,
   };
@@ -301,7 +294,7 @@ function registerHole(hole) {
 }
 
 function writeMapClass(hole) {
-  const map = decodeMinimap(hole, (derived.holes[String(hole)] || {}).greenPoly || null);
+  const map = decodeMinimap(hole);
   const rgb = Buffer.alloc(map.W * map.H * 3);
   for (let p = 0; p < map.W * map.H; p++) { const c = MAP_CLASS_COLORS[map.cls[p]]; rgb[p * 3] = c[0]; rgb[p * 3 + 1] = c[1]; rgb[p * 3 + 2] = c[2]; }
   writePngRGB(join(opt.out, `hole-${String(hole).padStart(2, "0")}_mapclass.png`), rgb, map.W, map.H);
@@ -315,7 +308,7 @@ for (const hole of holes) {
   const t0 = Date.now();
   const r = registerHole(hole);
   results[hole] = r;
-  console.log(`hole ${String(hole).padStart(2)} ${r.meshId.padEnd(7)} s ${r.transform.unitsPerMapPx.toFixed(2)} u/px (${r.ydPerPx.toFixed(3)} yd/px, app ${r.appScaleYdPerPx ?? "-"}) rot ${r.transform.rotationDeg.toFixed(2)}deg  score ${r.seedScore.toFixed(3)} -> ${r.score.toFixed(3)}  iou grass ${r.iou.grass} green ${r.iou.green ?? "-"} sand ${r.iou.sand} water ${r.iou.water} rough ${r.iou.rough}  tee resid ${r.teeResidualPx ?? "-"} px  pins in ${r.pins.filter((q) => q.insideGreen).length}/${r.pins.length}  ${((Date.now() - t0) / 1000).toFixed(1)}s`);
+  console.log(`hole ${String(hole).padStart(2)} ${r.meshId.padEnd(7)} s ${r.transform.unitsPerMapPx.toFixed(2)} u/px (${r.ydPerPx.toFixed(3)} yd/px, app ${r.appScaleYdPerPx ?? "-"}) rot ${r.transform.rotationDeg.toFixed(2)}deg  score ${r.seedScore.toFixed(3)} -> ${r.score.toFixed(3)}  iou grass ${r.iou.grass} sand ${r.iou.sand} water ${r.iou.water} rough ${r.iou.rough}  tee resid ${r.teeResidualPx ?? "-"} px  pins in ${r.pins.filter((q) => q.insideGreen).length}/${r.pins.length}  ${((Date.now() - t0) / 1000).toFixed(1)}s`);
 }
 if (opt.json && !opt.classifyOnly) {
   writeFileSync(opt.json, JSON.stringify({ _note: "Similarity transform per hole between the app's 250x304 minimap frame (fractional coords) and the WSR collision mesh units (0.1 m). mapFracToMesh: [X,Z] = M * [fx, fy, 1]; meshToMapFrac: [fx, fy] = M * [X, Z, 1]. Fitted by mesh-register.mjs from colour-class overlap; seeded from derived.json green centre + yardage scale.", unitsPerYard: UPY, holes: results }, null, 1));

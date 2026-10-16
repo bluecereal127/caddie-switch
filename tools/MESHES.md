@@ -115,9 +115,11 @@ Fits, per hole, a similarity transform (scale, rotation, translation) between
 the 250x304 minimap panel in `src/maps.js` (fractional coords, the frame every
 app position lives in) and mesh units. The minimap is classified by
 hue/saturation/value into fairway (+ the hex-patterned green, same colour),
-rough, outer ground, sand, water (deep and pale lake), with the app's
-`greenPoly` painted in as the green class; the mesh side is the
-`_classes.png` raster from mesh-heightmap.mjs. Masked out: the wind dial,
+rough, outer ground, sand, water (deep and pale lake); the mesh side is the
+`_classes.png` raster from mesh-heightmap.mjs. Nothing from the app's derived
+green (box, polygon, pins) steers the fit, because it is misplaced on six
+holes and src/maps.js has a green texture transplanted at that same box (see
+below); its offset from the mesh green is only reported. Masked out: the wind dial,
 found per hole as the bbox of near-white pixels (its ring and "NN mph" text)
 in whichever bottom corner has them, since the dial floats to the left
 corner on 11 holes and the right on 10, and the panel's top border line.
@@ -125,7 +127,7 @@ Pixels the classifier cannot name (brown cliff and bank bands, tee mats, UI
 glyphs) are don't-care, because the mesh puts water under cliff faces (walls
 have no footprint) and penalising them would bias the fit. The score is a
 weighted sum of per-class IoUs (grass 1, sand 1, water 1, rough 0.5, outer
-0.3, app-green 0.25), seeded from the app's green centre and yardage scale
+0.3), seeded from the app's green centre and yardage scale
 (or the grass-extent ratio on holes 11/14 that have no scale), coarse grid at
 half resolution, then a pattern search at full resolution over the full
 3^4−1 stencil of joint moves: rotation about the green pivot has to be paired
@@ -134,12 +136,13 @@ cannot do (~25 s per hole).
 
 The JSON holds `mapFracToMesh` / `meshToMapFrac` 2x3 matrices per hole, the
 fitted yd/px, per-class IoUs, the masked dial box, and diagnostics (tee
-residual against the app's marker, app pins inside the mesh green). Results:
-rotation within ±0.13° on every hole (the minimaps are axis-aligned renders of
-the course), fitted yd/px within 3% of the app's own on 15 of the 19 holes
-that have one, tee residual 1.2–7.6 px (median 2.4; the large ones on holes 2
-and 17 are the app's marker sitting at the top edge of the drawn tee box),
-grass IoU 0.61–0.94. Per-hole `_compare.png` images (minimap | mesh classes
+residual against the app's marker, `appGreenOffsetPx` between the centres of
+the app's green box and the mesh green, app pins inside the mesh green).
+Results: rotation within 0.25° on every hole (the minimaps are axis-aligned
+renders of the course), fitted yd/px within 3% of the app's own on 15 of the
+19 holes that have one, tee residual 0.7–7.6 px (median 2.6; the large ones
+on holes 2 and 17 are the app's marker sitting at the top edge of the drawn
+tee box), grass IoU 0.61–0.94. Per-hole `_compare.png` images (minimap | mesh classes
 warped into the map frame | edge overlay) land in `captures/meshes/registration/`.
 `--other penalize|water|ignore` picks the scoring rule for unclassifiable map
 pixels; `water` (default) and `penalize` score the same against the
@@ -149,42 +152,52 @@ verification below, while `ignore` lets the mesh grow into cliff bands (hole
 **Verification (2026-10-15).** 21 independent judges, one per hole, each
 measuring the compare images with their own scripts, rated every hole
 aligned with residuals under 1 px. Adversarial checks with two lenses per hole
-(water/sand, fairway/rough/green) found no transform error: every gap over
-3 px was a drawn cliff or bank band, a tree canopy, or one of the content
-differences below, and each refuter that flagged a gap reported that no
-shift, scale or rotation could close it. Of the 42 checks, 32 had finished
-when this was written: 27 found nothing over 3 px and 5 flagged a gap that is
-one of the content differences below. The fit
-committed here was then re-scored against the judges' measurements: same mean
-error as the first fit (0.64 px), with the worst hole down from 1.7 to 1.05 px
-(it removes hole 7's 0.75° rotation, hole 18's green-island offset and hole
-21's 1% scale error, the defects the judges had measured).
+(water/sand, fairway/rough/green) found no transform error. 37 of the 42
+found nothing over 3 px beyond drawn cliff or bank bands and tree canopies;
+the 5 that flagged a gap (holes 8, 10, 13, 15, 17) each reported that no
+shift, scale or rotation could close it, and the recheck below traces four of
+them to the edited minimaps. Those checks measured the first fit; the fit
+committed here was re-scored against the judges' measurements and has the
+same mean error (0.64 px) with the worst hole down from 1.73 to 1.03 px (it
+removes hole 7's 0.75° rotation, hole 18's green-island offset and hole 21's
+1% scale error, the defects the judges had measured). It differs from the
+first fit by at most 4 px anywhere in the frame (hole 7) and under 2 px on
+most holes.
 
-**Where the Wii mesh and the Switch course differ.** The mesh is WSR's
-collision data and NSS changed a few features. No transform can fix these, so
-the class map predicts the Wii lie there:
-- Hole 10: the green sits ~5 px (~9.5 yd) further west in the mesh than the
-  drawn NSS green (a circle fitted to the drawn rim confirms it), while the
-  bunkers and fairway beside it match within 1 px. Two of the app's four pin
-  spots fall outside the mesh green. Do not use mesh green slopes on hole 10
-  without checking them against captures.
-- Hole 13: the NE greenside bunker's west lobe is ~6 px wider on the NSS
-  minimap; the mesh has flat fairway there.
-- Hole 17: the right greenside bunker has a different shape (sand IoU 0.59
-  against 0.91 for the left one), and the mesh has a sand strip on the right
-  landmass's NE hilltop that NSS draws as plain ground.
-- Hole 15: the mesh fairway apron NE of the green runs ~6.5 px further than
-  the NSS fairway, which paints that band as rough.
-- Hole 1: the greenside bunker's east lobe is ~6 px longer in the mesh.
-- Holes 8, 15 and 17 have small holes in the collision ground (water or
-  nodata showing through) that no NSS capture shows.
+**The minimaps in src/maps.js are edited, so check disagreements near greens
+against the unedited stacks.** extract-maps.mjs paints the flag out of every
+stacked map (onion inpainting), and build-derived.mjs then transplants a green
+texture fused from the zoom captures at the app's derived green box
+(`transplantGreen`). `captures/derived/maps/hNN.png` is the stack before the
+transplant, `hNN.det.png` a single-session stack with the flag still drawn,
+`hNN.final.png` what ships. Five apparent mesh/minimap differences, all at or
+beside greens, were rechecked this way:
+- Not course differences: hole 10's green (the shipped map shows the
+  transplanted disc ~5 px east, at the app's own misplaced green box; the
+  unedited stack's putting surface and the real cup in the flag stack sit
+  inside the mesh green), hole 1's greenside bunker (the flag painted out its
+  east lobe; raw frames match the mesh within 0.3 px), and the greenside
+  bunkers on holes 13 and 17 (the disputed spots are under the flag cloth in
+  every capture, 80–100% covered, so the minimap there is paint-out fill).
+- Real, in unedited game art away from the flag: hole 15's fairway apron NE
+  of the green runs ~6.5 px further in the mesh than the Switch fairway, which
+  paints that band as rough. Hole 17's mesh also has a sand strip on the right
+  landmass's NE hilltop that the Switch minimap draws as plain ground.
+- Holes 8, 15 and 17 have small holes in the collision ground (water or nodata
+  showing through) that no capture shows; hole 8's was checked against all 20
+  raw tee frames.
 
 **Errors in the app's own data that the mesh exposes** (not corrected yet):
 - The map scale (yd/px) from a single yardage reading is off by ~5% on hole 5,
   9% on hole 8 and 7% on hole 10; two judges confirmed the fitted scale
   independently, one against the in-game yardage badge on hole 18.
-- The capture-derived green polygon and pins are misplaced on holes 5, 7, 8,
-  14 and 18, by up to ~22 px on hole 8. Hole 18's root cause: `pinBase()` in
+- The capture-derived green box, polygon and pins are misplaced on holes 5, 7,
+  8, 10, 14 and 18, by ~5 px on hole 10 and up to ~22 px on hole 8; the
+  transplanted green in src/maps.js follows the box, so the shipped minimap
+  draws those greens in the wrong place too. `appGreenOffsetPx` measures box
+  centres, so a few px can come from size alone: hole 12's 5 px is the app's
+  box covering only the west part of the mesh green, with its pin on the real
+  cup. Hole 18's root cause: `pinBase()` in
   tools/extract-maps.mjs searches for the flag pole only from 4 px left to
   6 px right of the pink cloth's centroid and keeps the last dark pixel, but
   on that hole the flag flies 7–10 px downwind of its pole, so the search

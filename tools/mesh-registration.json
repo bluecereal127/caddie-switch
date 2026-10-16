@@ -21,86 +21,85 @@
     "fromAppScale": true
    },
    "transform": {
-    "unitsPerMapPx": 17.3518,
-    "rotationDeg": 0.125,
+    "unitsPerMapPx": 17.3085,
+    "rotationDeg": 0,
     "pivotPx": [
      134,
      64.49
     ],
     "pivotMesh": [
-     265.48,
+     261.1,
      -1482.26
     ]
    },
    "mapFracToMesh": [
     [
-     4337.93117,
-     -11.50812,
-     -2057.21465
+     4327.12368,
+     0,
+     -2058.23412
     ],
     [
-     9.46391,
-     5274.9243,
-     -2606.41036
+     0,
+     5261.78239,
+     -2598.54965
     ]
    ],
    "meshToMapFrac": [
     [
-     0.00023052,
-     5e-7,
-     0.47554723
+     0.0002311,
+     0,
+     0.47565872
     ],
     [
-     -4.1e-7,
-     0.00018958,
-     0.49326013
+     0,
+     0.00019005,
+     0.4938535
     ]
    ],
-   "ydPerPx": 1.8976,
+   "ydPerPx": 1.8929,
    "appScaleYdPerPx": 1.912,
-   "score": 2.2406,
+   "score": 2.0916,
    "iou": {
-    "grass": 0.912,
-    "green": 0.603,
-    "sand": 0.365,
-    "water": 0.236,
-    "rough": 0.811,
-    "outer": 0.572
+    "grass": 0.913,
+    "sand": 0.364,
+    "water": 0.238,
+    "rough": 0.812,
+    "outer": 0.573
    },
-   "seedScore": 1.9951,
+   "seedScore": 1.8364,
    "seedIou": {
     "grass": 0.829,
-    "green": 0.635,
     "sand": 0.246,
     "water": 0.238,
     "rough": 0.713,
     "outer": 0.557
    },
    "greenCentreMapFrac": [
-    0.542,
+    0.5431,
     0.2047
    ],
    "appGreenCentreFrac": [
     0.536,
     0.2122
    ],
+   "appGreenOffsetPx": 2.9,
    "teeMapFrac": [
-    0.3596,
-    0.8804
+    0.3584,
+    0.8818
    ],
    "appTeeFrac": [
     0.3604,
     0.8701
    ],
-   "teeResidualPx": 3.2,
+   "teeResidualPx": 3.6,
    "pins": [
     {
      "frac": [
       0.5483,
       0.1919
      ],
-     "x": 319.1,
-     "z": -1589,
+     "x": 314.3,
+     "z": -1588.8,
      "insideGreen": true
     },
     {
@@ -108,8 +107,8 @@
       0.5194,
       0.1941
      ],
-     "x": 193.7,
-     "z": -1577.6,
+     "x": 189.3,
+     "z": -1577.2,
      "insideGreen": true
     }
    ]
@@ -170,22 +169,20 @@
    ],
    "ydPerPx": 0.9656,
    "appScaleYdPerPx": 0.949,
-   "score": 3.3223,
+   "score": 3.0955,
    "iou": {
-    "grass": 0.824,
-    "green": 0.899,
+    "grass": 0.823,
     "sand": 0.649,
     "water": 0.932,
-    "rough": 0.883,
+    "rough": 0.881,
     "outer": 0.838
    },
-   "seedScore": 3.2392,
+   "seedScore": 3.0005,
    "seedIou": {
-    "grass": 0.777,
-    "green": 0.937,
+    "grass": 0.774,
     "sand": 0.632,
     "water": 0.93,
-    "rough": 0.841,
+    "rough": 0.839,
     "outer": 0.818
    },
    "greenCentreMapFrac": [
@@ -196,6 +193,7 @@
     0.494,
     0.3076
    ],
+   "appGreenOffsetPx": 0.9,
    "teeMapFrac": [
     0.6369,
     0.8376
@@ -245,86 +243,85 @@
     "fromAppScale": true
    },
    "transform": {
-    "unitsPerMapPx": 22.1908,
-    "rotationDeg": 0,
+    "unitsPerMapPx": 22.1355,
+    "rotationDeg": -0.125,
     "pivotPx": [
      150.5,
      47.01
     ],
     "pivotMesh": [
-     697.72,
-     -2335.27
+     686.49,
+     -2329.65
     ]
    },
    "mapFracToMesh": [
     [
-     5547.70062,
-     0,
-     -2641.99172
+     5533.85278,
+     14.68078,
+     -2647.16369
     ],
     [
-     0,
-     6746.00395,
-     -3378.53659
+     -12.07301,
+     6729.16498,
+     -3363.04551
     ]
    ],
    "meshToMapFrac": [
     [
-     0.00018025,
-     0,
-     0.47623185
+     0.00018071,
+     -3.9e-7,
+     0.47703005
     ],
     [
-     0,
-     0.00014824,
-     0.50082043
+     3.2e-7,
+     0.00014861,
+     0.50062745
     ]
    ],
-   "ydPerPx": 2.4268,
+   "ydPerPx": 2.4208,
    "appScaleYdPerPx": 2.458,
-   "score": 3.1342,
+   "score": 3.017,
    "iou": {
-    "grass": 0.874,
-    "green": 0.526,
-    "sand": 0.757,
-    "water": 0.682,
-    "rough": 0.886,
-    "outer": 0.822
+    "grass": 0.883,
+    "sand": 0.759,
+    "water": 0.68,
+    "rough": 0.894,
+    "outer": 0.828
    },
-   "seedScore": 3.0283,
+   "seedScore": 2.8577,
    "seedIou": {
-    "grass": 0.821,
-    "green": 0.676,
+    "grass": 0.82,
     "sand": 0.718,
     "water": 0.674,
     "rough": 0.815,
     "outer": 0.795
    },
    "greenCentreMapFrac": [
-    0.6061,
-    0.1488
+    0.6081,
+    0.148
    ],
    "appGreenCentreFrac": [
     0.602,
     0.1547
    ],
+   "appGreenOffsetPx": 2.5,
    "teeMapFrac": [
-    0.591,
-    0.8712
+    0.5911,
+    0.8722
    ],
    "appTeeFrac": [
     0.5852,
     0.8651
    ],
-   "teeResidualPx": 2.4,
+   "teeResidualPx": 2.6,
    "pins": [
     {
      "frac": [
       0.5943,
       0.1474
      ],
-     "x": 655,
-     "z": -2384.2,
+     "x": 643.8,
+     "z": -2378.3,
      "insideGreen": true
     }
    ]
@@ -355,7 +352,7 @@
      103.01
     ],
     "pivotMesh": [
-     -114.4,
+     -111.88,
      -502.96
     ]
    },
@@ -363,7 +360,7 @@
     [
      2446.29888,
      6.4898,
-     -1119.58518
+     -1117.05687
     ],
     [
      -5.337,
@@ -375,58 +372,57 @@
     [
      0.00040878,
      -8.9e-7,
-     0.45631722
+     0.45528369
     ],
     [
      7.3e-7,
      0.00033617,
-     0.50801123
+     0.50800938
     ]
    ],
    "ydPerPx": 1.0701,
    "appScaleYdPerPx": 1.106,
-   "score": 3.4869,
+   "score": 3.3168,
    "iou": {
-    "grass": 0.833,
-    "green": 0.679,
+    "grass": 0.832,
     "sand": 0.819,
-    "water": 0.971,
-    "rough": 0.873,
+    "water": 0.974,
+    "rough": 0.871,
     "outer": 0.857
    },
-   "seedScore": 3.003,
+   "seedScore": 2.8196,
    "seedIou": {
-    "grass": 0.703,
-    "green": 0.738,
+    "grass": 0.705,
     "sand": 0.563,
     "water": 0.925,
-    "rough": 0.767,
+    "rough": 0.766,
     "outer": 0.813
    },
    "greenCentreMapFrac": [
-    0.3955,
+    0.3945,
     0.3405
    ],
    "appGreenCentreFrac": [
     0.41,
     0.3388
    ],
+   "appGreenOffsetPx": 3.9,
    "teeMapFrac": [
-    0.6853,
+    0.6843,
     0.8196
    ],
    "appTeeFrac": [
     0.6912,
     0.823
    ],
-   "teeResidualPx": 1.8,
+   "teeResidualPx": 2,
    "pins": [
     {
      "frac": [
       0.3795,
       0.3379
      ],
-     "x": -189,
+     "x": -186.5,
      "z": -505.6,
      "insideGreen": true
     },
@@ -435,7 +431,7 @@
       0.4361,
       0.3234
      ],
-     "x": -50.7,
+     "x": -48.1,
      "z": -549.1,
      "insideGreen": true
     },
@@ -444,7 +440,7 @@
       0.4006,
       0.3115
      ],
-     "x": -137.6,
+     "x": -135,
      "z": -584.3,
      "insideGreen": true
     }
@@ -506,23 +502,21 @@
    ],
    "ydPerPx": 2.4975,
    "appScaleYdPerPx": 2.374,
-   "score": 2.8876,
+   "score": 2.8679,
    "iou": {
-    "grass": 0.824,
-    "green": 0.287,
-    "sand": 0.89,
+    "grass": 0.849,
+    "sand": 0.912,
     "water": 0.531,
-    "rough": 0.865,
+    "rough": 0.876,
     "outer": 0.461
    },
-   "seedScore": 1.8684,
+   "seedScore": 1.7545,
    "seedIou": {
-    "grass": 0.596,
-    "green": 0.367,
-    "sand": 0.224,
+    "grass": 0.579,
+    "sand": 0.221,
     "water": 0.544,
-    "rough": 0.557,
-    "outer": 0.451
+    "rough": 0.552,
+    "outer": 0.45
    },
    "greenCentreMapFrac": [
     0.5894,
@@ -532,6 +526,7 @@
     0.578,
     0.1151
    ],
+   "appGreenOffsetPx": 5.3,
    "teeMapFrac": [
     0.5036,
     0.8822
@@ -581,7 +576,7 @@
     "fromAppScale": true
    },
    "transform": {
-    "unitsPerMapPx": 17.9058,
+    "unitsPerMapPx": 17.992,
     "rotationDeg": 0,
     "pivotPx": [
      151.5,
@@ -589,78 +584,77 @@
     ],
     "pivotMesh": [
      412.28,
-     -1736.68
+     -1745.53
     ]
    },
    "mapFracToMesh": [
     [
-     4476.44276,
+     4497.9902,
      0,
-     -2300.43982
+     -2313.49757
     ],
     [
      0,
-     5443.3544,
-     -2641.09783
+     5469.55609,
+     -2654.29349
     ]
    ],
    "meshToMapFrac": [
     [
-     0.00022339,
+     0.00022232,
      0,
-     0.51389908
+     0.51434029
     ],
     [
      0,
-     0.00018371,
-     0.48519674
+     0.00018283,
+     0.48528499
     ]
    ],
-   "ydPerPx": 1.9582,
+   "ydPerPx": 1.9676,
    "appScaleYdPerPx": 1.934,
-   "score": 2.5152,
+   "score": 2.2782,
    "iou": {
-    "grass": 0.807,
-    "green": 0.827,
-    "sand": 0.843,
+    "grass": 0.772,
+    "sand": 0.858,
     "water": 0,
-    "rough": 0.838,
-    "outer": 0.796
+    "rough": 0.825,
+    "outer": 0.788
    },
-   "seedScore": 2.4062,
+   "seedScore": 2.1115,
    "seedIou": {
-    "grass": 0.803,
-    "green": 0.969,
-    "sand": 0.711,
+    "grass": 0.765,
+    "sand": 0.699,
     "water": 0,
-    "rough": 0.82,
+    "rough": 0.814,
     "outer": 0.801
    },
    "greenCentreMapFrac": [
-    0.602,
-    0.1694
+    0.6021,
+    0.171
    ],
    "appGreenCentreFrac": [
     0.606,
     0.1661
    ],
+   "appGreenOffsetPx": 1.8,
    "teeMapFrac": [
-    0.5029,
-    0.87
+    0.5034,
+    0.8683
    ],
    "appTeeFrac": [
     0.5008,
     0.8569
    ],
-   "teeResidualPx": 4,
+   "teeResidualPx": 3.5,
    "pins": [
     {
      "frac": [
       0.6001,
       0.1769
      ],
-     "x": 385.9,
-     "z": -1678.2,
+     "x": 385.7,
+     "z": -1686.7,
      "insideGreen": true
     }
    ]
@@ -684,7 +678,7 @@
     "fromAppScale": true
    },
    "transform": {
-    "unitsPerMapPx": 19.5948,
+    "unitsPerMapPx": 19.5953,
     "rotationDeg": -0.125,
     "pivotPx": [
      124,
@@ -697,43 +691,41 @@
    },
    "mapFracToMesh": [
     [
-     4898.6966,
-     12.99578,
-     -2722.43494
+     4898.81786,
+     12.9961,
+     -2722.49517
     ],
     [
-     -10.68732,
-     5956.81507,
-     -3742.56332
+     -10.68758,
+     5956.96252,
+     -3742.60126
     ]
    ],
    "meshToMapFrac": [
     [
      0.00020413,
      -4.5e-7,
-     0.55407739
+     0.55407595
     ],
     [
      3.7e-7,
      0.00016787,
-     0.6292767
+     0.62926751
     ]
    ],
-   "ydPerPx": 2.1429,
+   "ydPerPx": 2.143,
    "appScaleYdPerPx": 2.165,
-   "score": 3.0328,
+   "score": 3.0039,
    "iou": {
     "grass": 0.799,
-    "green": 0.115,
     "sand": 0.926,
     "water": 0.675,
     "rough": 0.798,
     "outer": 0.681
    },
-   "seedScore": 1.671,
+   "seedScore": 1.5303,
    "seedIou": {
     "grass": 0.447,
-    "green": 0.563,
     "sand": 0.053,
     "water": 0.677,
     "rough": 0.379,
@@ -747,6 +739,7 @@
     0.496,
     0.2582
    ],
+   "appGreenOffsetPx": 9.3,
    "teeMapFrac": [
     0.3699,
     0.8542
@@ -824,23 +817,21 @@
    ],
    "ydPerPx": 1.7117,
    "appScaleYdPerPx": 1.881,
-   "score": 2.1164,
+   "score": 2.1427,
    "iou": {
-    "grass": 0.681,
-    "green": 0,
+    "grass": 0.706,
     "sand": 0,
-    "water": 0.81,
-    "rough": 0.871,
-    "outer": 0.635
+    "water": 0.811,
+    "rough": 0.872,
+    "outer": 0.634
    },
-   "seedScore": 0.9599,
+   "seedScore": 0.7509,
    "seedIou": {
-    "grass": 0.09,
-    "green": 0.737,
+    "grass": 0.065,
     "sand": 0,
     "water": 0.488,
     "rough": 0.175,
-    "outer": 0.368
+    "outer": 0.367
    },
    "greenCentreMapFrac": [
     0.5205,
@@ -850,6 +841,7 @@
     0.592,
     0.4161
    ],
+   "appGreenOffsetPx": 21.6,
    "teeMapFrac": [
     0.5788,
     0.6924
@@ -945,19 +937,17 @@
    ],
    "ydPerPx": 2.5073,
    "appScaleYdPerPx": 2.501,
-   "score": 3.0659,
+   "score": 2.9714,
    "iou": {
-    "grass": 0.719,
-    "green": 0.376,
+    "grass": 0.718,
     "sand": 0.672,
     "water": 0.979,
     "rough": 0.848,
     "outer": 0.592
    },
-   "seedScore": 2.2254,
+   "seedScore": 2.0836,
    "seedIou": {
     "grass": 0.518,
-    "green": 0.565,
     "sand": 0.159,
     "water": 0.902,
     "rough": 0.677,
@@ -971,6 +961,7 @@
     0.554,
     0.1398
    ],
+   "appGreenOffsetPx": 3.9,
    "teeMapFrac": [
     0.4152,
     0.8765
@@ -1048,19 +1039,17 @@
    ],
    "ydPerPx": 1.7834,
    "appScaleYdPerPx": 1.67,
-   "score": 2.5434,
+   "score": 2.4149,
    "iou": {
     "grass": 0.938,
-    "green": 0.516,
     "sand": 0.86,
     "water": 0,
     "rough": 0.86,
     "outer": 0.624
    },
-   "seedScore": 1.5019,
+   "seedScore": 1.3468,
    "seedIou": {
-    "grass": 0.671,
-    "green": 0.619,
+    "grass": 0.67,
     "sand": 0.19,
     "water": 0,
     "rough": 0.596,
@@ -1074,6 +1063,7 @@
     0.508,
     0.1777
    ],
+   "appGreenOffsetPx": 4.7,
    "teeMapFrac": [
     0.4905,
     0.8669
@@ -1141,72 +1131,71 @@
     "fromAppScale": false
    },
    "transform": {
-    "unitsPerMapPx": 8.1326,
-    "rotationDeg": 0,
+    "unitsPerMapPx": 8.1529,
+    "rotationDeg": -0.125,
     "pivotPx": [
      132,
      101
     ],
     "pivotMesh": [
-     162.49,
-     -406.1
+     160.6,
+     -407.99
     ]
    },
    "mapFracToMesh": [
     [
-     2033.13899,
-     0,
-     -911.00889
+     2038.22972,
+     5.40723,
+     -917.37749
     ],
     [
-     0,
-     2472.29701,
-     -1227.52378
+     -4.44673,
+     2478.48734,
+     -1229.11678
     ]
    ],
    "meshToMapFrac": [
     [
-     0.00049185,
-     0,
-     0.44807999
+     0.00049062,
+     -0.00000107,
+     0.44876768
     ],
     [
-     0,
-     0.00040448,
-     0.49651145
+     8.8e-7,
+     0.00040347,
+     0.49671923
     ]
    ],
-   "ydPerPx": 0.8894,
+   "ydPerPx": 0.8916,
    "appScaleYdPerPx": null,
-   "score": 2.5697,
+   "score": 2.3507,
    "iou": {
-    "grass": 0.61,
-    "green": 0.861,
+    "grass": 0.606,
     "sand": 0.265,
-    "water": 0.801,
-    "rough": 0.786,
-    "outer": 0.951
+    "water": 0.804,
+    "rough": 0.782,
+    "outer": 0.95
    },
-   "seedScore": 1.6166,
+   "seedScore": 1.5114,
    "seedIou": {
-    "grass": 0.347,
-    "green": 0.429,
+    "grass": 0.349,
     "sand": 0.062,
     "water": 0.643,
-    "rough": 0.458,
+    "rough": 0.459,
     "outer": 0.761
    },
    "greenCentreMapFrac": [
-    0.5335,
-    0.3322
+    0.5344,
+    0.3329
    ],
    "appGreenCentreFrac": [
     0.528,
     0.3322
    ],
+   "appGreenOffsetPx": 1.6,
    "teeMapFrac": [
-    0.3048,
-    0.8263
+    0.3049,
+    0.8254
    ],
    "appTeeFrac": null,
    "teeResidualPx": null,
@@ -1216,8 +1205,8 @@
       0.5273,
       0.3497
      ],
-     "x": 161.1,
-     "z": -363,
+     "x": 159.3,
+     "z": -364.7,
      "insideGreen": true
     },
     {
@@ -1225,8 +1214,8 @@
       0.4967,
       0.3415
      ],
-     "x": 98.9,
-     "z": -383.2,
+     "x": 96.9,
+     "z": -384.9,
      "insideGreen": true
     },
     {
@@ -1234,8 +1223,8 @@
       0.5506,
       0.2978
      ],
-     "x": 208.4,
-     "z": -491.3,
+     "x": 206.5,
+     "z": -493.5,
      "insideGreen": true
     },
     {
@@ -1243,8 +1232,8 @@
       0.5574,
       0.3184
      ],
-     "x": 222.3,
-     "z": -440.3,
+     "x": 220.5,
+     "z": -442.4,
      "insideGreen": true
     },
     {
@@ -1252,8 +1241,8 @@
       0.5222,
       0.3152
      ],
-     "x": 150.7,
-     "z": -448.3,
+     "x": 148.7,
+     "z": -450.2,
      "insideGreen": true
     }
    ]
@@ -1314,19 +1303,17 @@
    ],
    "ydPerPx": 2.1393,
    "appScaleYdPerPx": 2.183,
-   "score": 1.6028,
+   "score": 1.539,
    "iou": {
     "grass": 0.7,
-    "green": 0.255,
     "sand": 0.308,
     "water": 0,
     "rough": 0.661,
     "outer": 0.669
    },
-   "seedScore": 1.082,
+   "seedScore": 0.9325,
    "seedIou": {
     "grass": 0.46,
-    "green": 0.598,
     "sand": 0.109,
     "water": 0,
     "rough": 0.368,
@@ -1340,6 +1327,7 @@
     0.402,
     0.1628
    ],
+   "appGreenOffsetPx": 5.2,
    "teeMapFrac": [
     0.359,
     0.8735
@@ -1380,86 +1368,85 @@
     "fromAppScale": true
    },
    "transform": {
-    "unitsPerMapPx": 8.1923,
-    "rotationDeg": 0,
+    "unitsPerMapPx": 8.1924,
+    "rotationDeg": -0.125,
     "pivotPx": [
      112.5,
      91
     ],
     "pivotMesh": [
-     -137.44,
+     -139.52,
      -706.44
     ]
    },
    "mapFracToMesh": [
     [
-     2048.08051,
-     0,
-     -1059.07701
+     2048.08863,
+     5.43338,
+     -1062.78741
     ],
     [
-     0,
-     2490.4659,
-     -1451.96175
+     -4.46824,
+     2490.47577,
+     -1449.95399
     ]
    ],
    "meshToMapFrac": [
     [
      0.00048826,
-     0,
-     0.51710712
+     -0.00000107,
+     0.51736972
     ],
     [
-     0,
+     8.8e-7,
      0.00040153,
-     0.58300808
+     0.58312783
     ]
    ],
    "ydPerPx": 0.8959,
    "appScaleYdPerPx": 0.91,
-   "score": 2.1878,
+   "score": 1.974,
    "iou": {
-    "grass": 0.648,
-    "green": 0.858,
-    "sand": 0.713,
+    "grass": 0.651,
+    "sand": 0.71,
     "water": 0,
-    "rough": 0.704,
+    "rough": 0.707,
     "outer": 0.865
    },
-   "seedScore": 2.0534,
+   "seedScore": 1.8449,
    "seedIou": {
     "grass": 0.606,
-    "green": 0.834,
     "sand": 0.662,
     "water": 0,
     "rough": 0.654,
     "outer": 0.833
    },
    "greenCentreMapFrac": [
-    0.453,
+    0.4541,
     0.3019
    ],
    "appGreenCentreFrac": [
     0.45,
     0.2994
    ],
+   "appGreenOffsetPx": 1.3,
    "teeMapFrac": [
-    0.5507,
-    0.8231
+    0.5503,
+    0.8233
    ],
    "appTeeFrac": [
     0.55,
     0.8066
    ],
-   "teeResidualPx": 5,
+   "teeResidualPx": 5.1,
    "pins": [
     {
      "frac": [
       0.4364,
       0.2754
      ],
-     "x": -165.3,
-     "z": -766.1,
+     "x": -167.5,
+     "z": -766,
      "insideGreen": true
     }
    ]
@@ -1483,72 +1470,71 @@
     "fromAppScale": false
    },
    "transform": {
-    "unitsPerMapPx": 14.6599,
-    "rotationDeg": 0,
+    "unitsPerMapPx": 14.6233,
+    "rotationDeg": 0.125,
     "pivotPx": [
      164.5,
      51
     ],
     "pivotMesh": [
-     362.95,
-     -1847.91
+     366.09,
+     -1841.62
     ]
    },
    "mapFracToMesh": [
     [
-     3664.98379,
-     0,
-     -2048.61086
+     3655.81263,
+     -9.69852,
+     -2037.80352
     ],
     [
-     0,
-     4456.62029,
-     -2595.51222
+     7.97576,
+     4445.46816,
+     -2592.59792
     ]
    ],
    "meshToMapFrac": [
     [
-     0.00027285,
-     0,
-     0.5589686
+     0.00027354,
+     6e-7,
+     0.55895917
     ],
     [
-     0,
-     0.00022439,
-     0.58239474
+     -4.9e-7,
+     0.00022495,
+     0.58219735
     ]
    ],
-   "ydPerPx": 1.6032,
+   "ydPerPx": 1.5992,
    "appScaleYdPerPx": null,
-   "score": 3.2633,
+   "score": 3.2445,
    "iou": {
-    "grass": 0.922,
-    "green": 0.084,
-    "sand": 0.866,
-    "water": 0.716,
+    "grass": 0.927,
+    "sand": 0.862,
+    "water": 0.718,
     "rough": 0.908,
-    "outer": 0.951
+    "outer": 0.949
    },
    "seedScore": 1.2888,
    "seedIou": {
     "grass": 0.362,
-    "green": 0,
     "sand": 0,
     "water": 0.637,
     "rough": 0.28,
     "outer": 0.498
    },
    "greenCentreMapFrac": [
-    0.6519,
-    0.1406
+    0.6509,
+    0.1391
    ],
    "appGreenCentreFrac": [
     0.658,
     0.1678
    ],
+   "appGreenOffsetPx": 8.9,
    "teeMapFrac": [
-    0.7216,
-    0.8846
+    0.7228,
+    0.8848
    ],
    "appTeeFrac": null,
    "teeResidualPx": null,
@@ -1558,9 +1544,9 @@
       0.6614,
       0.1672
      ],
-     "x": 375.4,
-     "z": -1850.4,
-     "insideGreen": true
+     "x": 378.5,
+     "z": -1844,
+     "insideGreen": false
     }
    ]
   },
@@ -1583,7 +1569,7 @@
     "fromAppScale": true
    },
    "transform": {
-    "unitsPerMapPx": 16.3201,
+    "unitsPerMapPx": 16.3205,
     "rotationDeg": -0.125,
     "pivotPx": [
      139.5,
@@ -1596,43 +1582,41 @@
    },
    "mapFracToMesh": [
     [
-     4080.01451,
-     10.82389,
-     -2047.37108
+     4080.11625,
+     10.82416,
+     -2047.42791
     ],
     [
-     -8.90122,
-     4961.29764,
-     -2791.64571
+     -8.90145,
+     4961.42137,
+     -2791.67184
     ]
    ],
    "meshToMapFrac": [
     [
-     0.0002451,
+     0.00024509,
      -5.3e-7,
-     0.50030972
+     0.50031116
     ],
     [
      4.4e-7,
-     0.00020156,
-     0.56358221
+     0.00020155,
+     0.56357345
     ]
    ],
    "ydPerPx": 1.7848,
    "appScaleYdPerPx": 1.812,
-   "score": 3.6582,
+   "score": 3.4528,
    "iou": {
     "grass": 0.882,
-    "green": 0.821,
     "sand": 0.936,
-    "water": 0.928,
+    "water": 0.927,
     "rough": 0.844,
     "outer": 0.952
    },
-   "seedScore": 3.5329,
+   "seedScore": 3.3093,
    "seedIou": {
     "grass": 0.843,
-    "green": 0.894,
     "sand": 0.867,
     "water": 0.923,
     "rough": 0.791,
@@ -1646,6 +1630,7 @@
     0.558,
     0.2122
    ],
+   "appGreenOffsetPx": 1.1,
    "teeMapFrac": [
     0.5994,
     0.8447
@@ -1732,19 +1717,17 @@
    ],
    "ydPerPx": 1.4949,
    "appScaleYdPerPx": 1.455,
-   "score": 2.702,
+   "score": 2.4996,
    "iou": {
     "grass": 0.877,
-    "green": 0.81,
     "sand": 0.933,
     "water": 0,
     "rough": 0.873,
     "outer": 0.845
    },
-   "seedScore": 2.2827,
+   "seedScore": 2.0713,
    "seedIou": {
     "grass": 0.76,
-    "green": 0.845,
     "sand": 0.677,
     "water": 0,
     "rough": 0.76,
@@ -1758,6 +1741,7 @@
     0.708,
     0.3273
    ],
+   "appGreenOffsetPx": 1,
    "teeMapFrac": [
     0.4449,
     0.852
@@ -1816,8 +1800,8 @@
     "fromAppScale": true
    },
    "transform": {
-    "unitsPerMapPx": 10.4165,
-    "rotationDeg": 0.125,
+    "unitsPerMapPx": 10.4186,
+    "rotationDeg": 0,
     "pivotPx": [
      137,
      79.01
@@ -1829,59 +1813,58 @@
    },
    "mapFracToMesh": [
     [
-     2604.12609,
-     -6.9085,
-     -1087.74143
+     2604.64805,
+     0,
+     -1089.82299
     ],
     [
-     5.68133,
-     3166.61732,
-     -1572.5207
+     0,
+     3167.25203,
+     -1569.5723
     ]
    ],
    "meshToMapFrac": [
     [
-     0.000384,
-     8.4e-7,
-     0.41901464
+     0.00038393,
+     0,
+     0.41841468
     ],
     [
-     -6.9e-7,
-     0.00031579,
-     0.49584146
+     0,
+     0.00031573,
+     0.4955628
     ]
    ],
-   "ydPerPx": 1.1392,
+   "ydPerPx": 1.1394,
    "appScaleYdPerPx": 1.163,
-   "score": 3.2448,
+   "score": 3.0885,
    "iou": {
-    "grass": 0.838,
-    "green": 0.636,
-    "sand": 0.67,
-    "water": 0.947,
-    "rough": 0.79,
-    "outer": 0.784
+    "grass": 0.836,
+    "sand": 0.678,
+    "water": 0.946,
+    "rough": 0.789,
+    "outer": 0.781
    },
-   "seedScore": 2.7097,
+   "seedScore": 2.534,
    "seedIou": {
     "grass": 0.703,
-    "green": 0.703,
     "sand": 0.375,
     "water": 0.91,
     "rough": 0.665,
     "outer": 0.715
    },
    "greenCentreMapFrac": [
-    0.551,
+    0.5511,
     0.2456
    ],
    "appGreenCentreFrac": [
     0.548,
     0.2599
    ],
+   "appGreenOffsetPx": 4.4,
    "teeMapFrac": [
-    0.39,
-    0.8793
+    0.3884,
+    0.8789
    ],
    "appTeeFrac": [
     0.3964,
@@ -1894,7 +1877,7 @@
       0.5499,
       0.2408
      ],
-     "x": 342.6,
+     "x": 342.5,
      "z": -806.9,
      "insideGreen": true
     },
@@ -1904,7 +1887,7 @@
       0.2683
      ],
      "x": 254.7,
-     "z": -720,
+     "z": -719.8,
      "insideGreen": true
     }
    ]
@@ -1929,84 +1912,83 @@
    },
    "transform": {
     "unitsPerMapPx": 19.5651,
-    "rotationDeg": 0.125,
+    "rotationDeg": 0.25,
     "pivotPx": [
      126,
      47.01
     ],
     "pivotMesh": [
-     -62.06,
+     -57.25,
      -1510.85
     ]
    },
    "mapFracToMesh": [
     [
-     4891.27521,
-     -12.97609,
-     -2525.2573
+     4891.24029,
+     -25.95211,
+     -2518.4255
     ],
     [
-     10.67112,
-     5947.79065,
-     -2436.05628
+     21.3422,
+     5947.74819,
+     -2441.42793
     ]
    ],
    "meshToMapFrac": [
     [
      0.00020444,
-     4.5e-7,
-     0.517362
+     8.9e-7,
+     0.51705294
     ],
     [
-     -3.7e-7,
+     -7.3e-7,
      0.00016813,
-     0.40864509
+     0.40862404
     ]
    ],
    "ydPerPx": 2.1397,
    "appScaleYdPerPx": 2.103,
-   "score": 3.1174,
+   "score": 3.0874,
    "iou": {
-    "grass": 0.884,
-    "green": 0.094,
-    "sand": 0.826,
-    "water": 0.71,
-    "rough": 0.849,
-    "outer": 0.833
+    "grass": 0.88,
+    "sand": 0.828,
+    "water": 0.709,
+    "rough": 0.842,
+    "outer": 0.83
    },
-   "seedScore": 1.6998,
+   "seedScore": 1.5214,
    "seedIou": {
-    "grass": 0.456,
-    "green": 0.712,
+    "grass": 0.455,
     "sand": 0.002,
     "water": 0.677,
     "rough": 0.398,
     "outer": 0.626
    },
    "greenCentreMapFrac": [
-    0.4726,
+    0.4716,
     0.1604
    ],
    "appGreenCentreFrac": [
     0.504,
     0.1547
    ],
+   "appGreenOffsetPx": 8.3,
    "teeMapFrac": [
-    0.3301,
-    0.8574
+    0.3309,
+    0.8577
    ],
    "appTeeFrac": [
     0.3252,
     0.8572
    ],
-   "teeResidualPx": 1.2,
+   "teeResidualPx": 1.4,
    "pins": [
     {
      "frac": [
       0.5055,
       0.1547
      ],
-     "x": -54.7,
+     "x": -49.9,
      "z": -1510.5,
      "insideGreen": false
     }
@@ -2031,78 +2013,77 @@
     "fromAppScale": true
    },
    "transform": {
-    "unitsPerMapPx": 14.6735,
-    "rotationDeg": -0.125,
+    "unitsPerMapPx": 14.6414,
+    "rotationDeg": 0,
     "pivotPx": [
      92.5,
      40.49
     ],
     "pivotMesh": [
      -227.79,
-     -1470.21
+     -1466.47
     ]
    },
    "mapFracToMesh": [
     [
-     3668.3627,
-     9.73182,
-     -1586.37853
+     3660.34389,
+     0,
+     -1582.11529
     ],
     [
-     -8.00314,
-     4460.72905,
-     -2061.41392
+     0,
+     4450.97817,
+     -2059.34094
     ]
    ],
    "meshToMapFrac": [
     [
-     0.0002726,
-     -5.9e-7,
-     0.43122063
+     0.0002732,
+     0,
+     0.43223133
     ],
     [
-     4.9e-7,
-     0.00022418,
-     0.46289856
+     0,
+     0.00022467,
+     0.46267154
     ]
    ],
-   "ydPerPx": 1.6047,
+   "ydPerPx": 1.6012,
    "appScaleYdPerPx": 1.634,
-   "score": 3.5849,
+   "score": 3.4271,
    "iou": {
-    "grass": 0.916,
-    "green": 0.661,
-    "sand": 0.912,
-    "water": 0.881,
-    "rough": 0.876,
-    "outer": 0.91
+    "grass": 0.924,
+    "sand": 0.91,
+    "water": 0.877,
+    "rough": 0.885,
+    "outer": 0.911
    },
-   "seedScore": 3.1874,
+   "seedScore": 3.0267,
    "seedIou": {
-    "grass": 0.849,
-    "green": 0.669,
+    "grass": 0.855,
     "sand": 0.67,
     "water": 0.84,
-    "rough": 0.796,
+    "rough": 0.797,
     "outer": 0.88
    },
    "greenCentreMapFrac": [
     0.3639,
-    0.1357
+    0.1349
    ],
    "appGreenCentreFrac": [
     0.37,
     0.1332
    ],
+   "appGreenOffsetPx": 1.6,
    "teeMapFrac": [
-    0.636,
-    0.9056
+    0.6386,
+    0.906
    ],
    "appTeeFrac": [
     0.6404,
     0.9076
    ],
-   "teeResidualPx": 1.3,
+   "teeResidualPx": 0.7,
    "pins": [
     {
      "frac": [
@@ -2110,7 +2091,7 @@
       0.1066
      ],
      "x": -130.8,
-     "z": -1589.1,
+     "z": -1584.9,
      "insideGreen": true
     },
     {
@@ -2118,8 +2099,8 @@
       0.3731,
       0.1422
      ],
-     "x": -216.3,
-     "z": -1430.1,
+     "x": -216.4,
+     "z": -1426.4,
      "insideGreen": true
     }
    ]
@@ -2143,86 +2124,85 @@
     "fromAppScale": true
    },
    "transform": {
-    "unitsPerMapPx": 13.7248,
-    "rotationDeg": 0.125,
+    "unitsPerMapPx": 13.6905,
+    "rotationDeg": -0.125,
     "pivotPx": [
      157,
      51.01
     ],
     "pivotMesh": [
-     750.84,
-     -1440.23
+     744.11,
+     -1436.86
     ]
    },
    "mapFracToMesh": [
     [
-     3431.18839,
-     -9.10262,
-     -1402.42388
+     3422.61042,
+     9.07986,
+     -1406.81792
     ],
     [
-     7.4857,
-     4172.32509,
-     -2145.04716
+     -7.46699,
+     4161.89428,
+     -2130.54158
     ]
    ],
    "meshToMapFrac": [
     [
-     0.00029144,
-     6.4e-7,
-     0.41009027
+     0.00029217,
+     -6.4e-7,
+     0.40967652
     ],
     [
-     -5.2e-7,
-     0.00023967,
-     0.51337738
+     5.2e-7,
+     0.00024027,
+     0.51265133
     ]
    ],
-   "ydPerPx": 1.501,
+   "ydPerPx": 1.4972,
    "appScaleYdPerPx": 1.472,
-   "score": 2.1491,
+   "score": 1.9248,
    "iou": {
-    "grass": 0.834,
-    "green": 0.898,
-    "sand": 0.735,
+    "grass": 0.835,
+    "sand": 0.732,
     "water": 0,
-    "rough": 0.712,
+    "rough": 0.717,
     "outer": 0
    },
-   "seedScore": 1.945,
+   "seedScore": 1.7158,
    "seedIou": {
     "grass": 0.76,
-    "green": 0.915,
     "sand": 0.64,
     "water": 0,
     "rough": 0.632,
     "outer": 0
    },
    "greenCentreMapFrac": [
-    0.629,
-    0.1694
+    0.6309,
+    0.1686
    ],
    "appGreenCentreFrac": [
     0.628,
     0.1678
    ],
+   "appGreenOffsetPx": 0.8,
    "teeMapFrac": [
-    0.5905,
-    0.9211
+    0.5883,
+    0.922
    ],
    "appTeeFrac": [
     0.5892,
     0.9266
    ],
-   "teeResidualPx": 1.7,
+   "teeResidualPx": 1.4,
    "pins": [
     {
      "frac": [
       0.6406,
       0.1855
      ],
-     "x": 793.9,
-     "z": -1366.3,
+     "x": 787.4,
+     "z": -1363.3,
      "insideGreen": true
     },
     {
@@ -2230,8 +2210,8 @@
       0.6593,
       0.1674
      ],
-     "x": 858.2,
-     "z": -1441.7,
+     "x": 851.2,
+     "z": -1438.8,
      "insideGreen": true
     }
    ]
@@ -2292,19 +2272,17 @@
    ],
    "ydPerPx": 1.9639,
    "appScaleYdPerPx": 1.995,
-   "score": 2.8863,
+   "score": 2.7526,
    "iou": {
     "grass": 0.793,
-    "green": 0.53,
     "sand": 0.788,
     "water": 0.6,
     "rough": 0.834,
     "outer": 0.518
    },
-   "seedScore": 2.3676,
+   "seedScore": 2.2135,
    "seedIou": {
     "grass": 0.659,
-    "green": 0.613,
     "sand": 0.468,
     "water": 0.584,
     "rough": 0.708,
@@ -2318,6 +2296,7 @@
     0.448,
     0.1612
    ],
+   "appGreenOffsetPx": 1.8,
    "teeMapFrac": [
     0.5803,
     0.8871
