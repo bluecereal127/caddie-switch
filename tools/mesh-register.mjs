@@ -24,10 +24,11 @@ import jpeg from "jpeg-js";
 import { writePngRGB } from "./lib/obj.mjs";
 
 const args = process.argv.slice(2);
-const opt = { heightmaps: "captures/meshes/heightmaps-res4", out: "captures/meshes/registration", json: null, holes: null, classifyOnly: false, maps: "src/maps.js", derived: "public/derived.json", names: "tools/mesh-holes.json" };
+const opt = { heightmaps: "captures/meshes/heightmaps-res4", out: "captures/meshes/registration", json: null, holes: null, classifyOnly: false, maps: "src/maps.js", derived: "public/derived.json", names: "tools/mesh-holes.json", other: "water" };
 for (let i = 0; i < args.length; i++) {
   const a = args[i];
-  if (a === "--heightmaps") opt.heightmaps = args[++i];
+  if (a === "--other") opt.other = args[++i]; // penalize | water | ignore (see score())
+  else if (a === "--heightmaps") opt.heightmaps = args[++i];
   else if (a === "--out") opt.out = args[++i];
   else if (a === "--json") opt.json = args[++i];
   else if (a === "--holes") opt.holes = args[++i].split(",").map(Number);
@@ -78,18 +79,39 @@ function pointInPoly(x, y, poly) {
 }
 const MAP_CLASS_COLORS = { 1: [128, 205, 70], 2: [78, 156, 58], 3: [236, 216, 150], 4: [44, 96, 46], 6: [160, 235, 150], 7: [96, 165, 232], 0: [120, 120, 120], 255: [20, 20, 20] };
 
+// The wind dial sits in the bottom-LEFT corner on some holes and bottom-RIGHT on
+// others. Its white ring + "NN mph" text are the only near-white pixels down
+// there, so the corner with more of them holds the dial; mask their bbox + pad.
+function detectDial(W, H, data, pad = 4) {
+  const box = { left: { n: 0, x0: W, y0: H, x1: -1, y1: -1 }, right: { n: 0, x0: W, y0: H, x1: -1, y1: -1 } };
+  for (let y = Math.floor(H * 0.72); y < H; y++) for (let x = 0; x < W; x++) {
+    const i = (y * W + x) * 4;
+    const [, s, v] = hsv(data[i], data[i + 1], data[i + 2]);
+    if (v <= 0.85 || s >= 0.15) continue;
+    const b = x < W * 0.36 ? box.left : x > W * 0.64 ? box.right : null;
+    if (!b) continue;
+    b.n++; b.x0 = Math.min(b.x0, x); b.x1 = Math.max(b.x1, x); b.y0 = Math.min(b.y0, y); b.y1 = Math.max(b.y1, y);
+  }
+  const side = box.right.n >= box.left.n ? "right" : "left";
+  const b = box[side];
+  if (b.n < 50) return null;
+  return { side, x0: Math.max(0, b.x0 - pad), y0: Math.max(0, b.y0 - pad), x1: Math.min(W - 1, b.x1 + pad), y1: Math.min(H - 1, b.y1 + pad), whitePx: b.n };
+}
+
 function decodeMinimap(hole, greenPoly = null) {
   const b64 = HOLE_MAPS[hole].split(",")[1];
   const img = jpeg.decode(Buffer.from(b64, "base64"), { useTArray: true, formatAsRGBA: true });
   const { width: W, height: H, data } = img;
+  const dial = detectDial(W, H, data);
   const cls = new Uint8Array(W * H);
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
     const i = (y * W + x) * 4;
-    let c = x > W * 0.64 && y > H * 0.72 ? MC.excluded : classifyMinimapPixel(data[i], data[i + 1], data[i + 2]);
+    const masked = y < 3 /* panel's top border line */ || (dial && x >= dial.x0 && x <= dial.x1 && y >= dial.y0 && y <= dial.y1);
+    let c = masked ? MC.excluded : classifyMinimapPixel(data[i], data[i + 1], data[i + 2]);
     if (greenPoly && c !== MC.excluded && pointInPoly((x + 0.5) / W, (y + 0.5) / H, greenPoly)) c = MC.green;
     cls[y * W + x] = c;
   }
-  return { W, H, rgba: data, cls, hasGreen: !!greenPoly };
+  return { W, H, rgba: data, cls, hasGreen: !!greenPoly, dial };
 }
 
 // ---- mesh class raster (from mesh-heightmap.mjs output) ----
@@ -133,7 +155,11 @@ function score(map, mesh, p, pivot, step) {
     const [X, Z] = xf(u + 0.5, v + 0.5);
     const i = Math.floor((X - mesh.originX) / mesh.upp), j = Math.floor((Z - mesh.originZ) / mesh.upp);
     const k = i >= 0 && j >= 0 && i < mesh.w && j < mesh.h ? mesh.cls[j * mesh.w + i] : 0;
-    if (k === 0 && m === MC.other) continue;
+    // map pixels the classifier cannot name (brown cliff/bank bands, tee mats, UI
+    // glyphs): "penalize" skips them only over mesh nodata; "water" also skips them
+    // over mesh water (the mesh puts water under cliff faces, walls have no
+    // footprint); "ignore" skips them always (lets the mesh grow into cliff bands)
+    if (m === MC.other && (k === 0 || opt.other === "ignore" || (opt.other === "water" && k === 7))) continue;
     for (let t = 0; t < terms.length; t++) {
       const a = terms[t].m.has(m), b = k !== 0 && terms[t].k.has(k);
       if (a && b) inter[t]++;
@@ -184,23 +210,22 @@ function registerHole(hole) {
       }
     }
   }
-  // pattern search at full resolution
+  // pattern search at full resolution over the full 3^4-1 stencil: rotation about
+  // the green pivot has to be paired with a shift to move the far (tee) end, which
+  // a one-parameter-at-a-time search cannot do (it left hole 7 stuck at exactly 1 deg)
   let steps = { s: 0.02, theta: (1 * Math.PI) / 180, X0: 2 * s0, Z0: 2 * s0 };
   best = { p: best.p, ...score(map, mesh, best.p, pivot, 1) };
-  for (let round = 0; round < 40; round++) {
-    let improved = false;
-    for (const key of ["s", "theta", "X0", "Z0"]) {
-      for (const dir of [-1, 1]) {
-        const p = { ...best.p };
-        if (key === "s") p.s = best.p.s * (1 + dir * steps.s); else p[key] = best.p[key] + dir * steps[key];
-        const r = score(map, mesh, p, pivot, 1);
-        if (r.total > best.total + 1e-6) { best = { p, ...r }; improved = true; }
-      }
+  for (let round = 0; round < 80; round++) {
+    let cand = null;
+    for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) for (let c = -1; c <= 1; c++) for (let d = -1; d <= 1; d++) {
+      if (!a && !b && !c && !d) continue;
+      const p = { s: best.p.s * (1 + a * steps.s), theta: best.p.theta + b * steps.theta, X0: best.p.X0 + c * steps.X0, Z0: best.p.Z0 + d * steps.Z0 };
+      const r = score(map, mesh, p, pivot, 1);
+      if (r.total > (cand ? cand.total : best.total) + 1e-6) cand = { p, ...r };
     }
-    if (!improved) {
-      steps = { s: steps.s / 2, theta: steps.theta / 2, X0: steps.X0 / 2, Z0: steps.Z0 / 2 };
-      if (steps.s < 0.0015) break;
-    }
+    if (cand) { best = cand; continue; }
+    steps = { s: steps.s / 2, theta: steps.theta / 2, X0: steps.X0 / 2, Z0: steps.Z0 / 2 };
+    if (steps.s < 0.0015) break;
   }
   const p = best.p;
   const xf = makeXform(p, pivot);
@@ -216,7 +241,7 @@ function registerHole(hole) {
   const pins = (dh.pins || []).map((q) => { const [X, Z] = xf(q.x * map.W, q.y * map.H); return { frac: [q.x, q.y], x: +X.toFixed(1), z: +Z.toFixed(1), insideGreen: Math.abs(X - gm.centerX) < gm.width / 2 && Math.abs(Z - gm.centerZ) < gm.depth / 2 }; });
   const greenMap = inv(gm.centerX, gm.centerZ);
   const result = {
-    hole, meshId, map: { width: map.W, height: map.H },
+    hole, meshId, map: { width: map.W, height: map.H, windDialMasked: map.dial ? [map.dial.side, map.dial.x0, map.dial.y0, map.dial.x1, map.dial.y1] : null },
     seed: { scaleUnitsPerPx: +s0.toFixed(4), fromAppScale: seeded },
     transform: { unitsPerMapPx: +p.s.toFixed(4), rotationDeg: +((p.theta * 180) / Math.PI).toFixed(3), pivotPx: [+pivot.u0.toFixed(2), +pivot.v0.toFixed(2)], pivotMesh: [+p.X0.toFixed(2), +p.Z0.toFixed(2)] },
     mapFracToMesh: A.map((r) => r.map((v) => +v.toFixed(5))), meshToMapFrac: B.map((r) => r.map((v) => +v.toFixed(8))),

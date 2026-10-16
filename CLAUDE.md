@@ -73,6 +73,11 @@ grid per green (MU=1.35, SLOPE_G=1.1, capture radius 0.22 yd, max capture speed 
 - KCL types: 1 fairway (+ the flat tee pad), 2 rough, 3 sand (bunkers, beaches,
   river gravel), 4 outer ground, 5 floor plane (dead), 6 green (some with a
   15×15 u cup gap), 7 water, 9 fringe ring, 0x0c walls/tree trunks.
+- The meshes are the Wii course; the Switch version changed a few features
+  (hole 10's green sits ~9.5 yd east of the mesh green; bunker/apron shapes on
+  holes 1/13/15/17). tools/MESHES.md lists them — check there before trusting
+  mesh lies or green slopes on those holes. Registration to the app frame
+  (`tools/mesh-registration.json`) is verified to ~1 px on all 21 holes.
 
 ## Data-entry protocol (why the Log tab looks like it does)
 Ended = distance-to-pin(before) − (after); valid at any power if straight, but
