@@ -248,6 +248,39 @@ equals the hole's `wsrRev` (a hash of its WSR geometry, so a corrected truth
 re-applies while unchanged holes keep manual edits), and pipeline pins mirror derived.json on every load while
 the player's own pins stay untouched.
 
+## Pin positions (research 2026-10-17)
+
+The meshes hold no pins. WSR stores them in each course archive's PMP ("Pack
+MaP") placement file, next to the KCL: the archive (Yaz0-compressed U8, e.g.
+`WS2_glf_course_fc1.carc`) holds `WS2_glf_course_<id>.kcl` and
+`WS2_glf_course_<id>.pmp`. Pins are PMP objects group 0x0002 / id 0x0001;
+0x0000 is the player start, 0x000A the tee marker, and group 0x000B holds
+Frisbee Golf's start/goal (not pins). Sources: Resort2OG
+(github.com/kiwi515/Resort2OG), wiki.tockdom.com/wiki/PMP_(File_Format),
+Caddie (github.com/PackProject/Caddie), the original Wii Sports notes
+(github.com/kiwi515/ogws_info), whose course order fc1, fc3, fc8, fc14, fc5,
+fc16, fc12, fc9, fc13 matches our holes 10-18.
+
+    node tools/wsr-pins.mjs <course archives / .pmp files / extracted folders> [--out tools/wsr-pins.json]
+
+decodes every pin, start and tee marker, maps them through the registration
+and checks each pin against the WSR green (tested on a synthetic archive; it
+has not seen real files yet). Get the archives from the disc image with Dolphin
+(right-click the game -> Properties -> Filesystem -> extract the partition) or
+`DolphinTool extract`; WSR golf scenes live under `GlfScene/`.
+
+How WSR picks the pin (speedrun.com/wsr/forums/0t4mu by tendog; Caddie's code
+for the index layout; choosePin is `Sp2::Glf::GlfConfig::choosePin` at
+0x804066e0 in the US main.dol, which could confirm the rules directly):
+- Holes 2-17 have 6 pins: indices 0-2 the easier "B" set, 3-5 the harder "A"
+  set. Your score going into the hole picks the set, a random draw the pin.
+  18-hole and Resort 9 thresholds for A: H2-3 <=-2, H4-5 <=-3, H6-7 <=-4,
+  H8-9 <=-5, H10-11 <=-6, H12-13 <=-7, H14-15 <=-8, H16-17 <=-9. Classic 9:
+  H10 always B, H11-12 <=-2, H13-14 <=-3, H15-16 <=-4, H17 <=-5. 3-hole courses
+  always use B.
+- Hole 1 has 3 pins, hole 18 one, the three specials 6 each at random.
+- Whether Switch Sports keeps these rules is not documented anywhere public.
+
 ## Quirks worth knowing
 
 - fcJP12 (H3) and fcJP6 (H2) carry extra type-6 quads sitting on the floor plane
