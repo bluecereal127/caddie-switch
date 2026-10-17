@@ -31,7 +31,7 @@ turns them into 16-bit RAW heightmaps + PNG previews + per-pixel surface maps.
 | `offroad_03_F0103` (3) | **sand** | bunkers, but also beaches (H3) and river gravel (H15) |
 | `offroad_04_F0104` (4) | **outer ground** | the hole's wider terrain: deep rough / OB hills |
 | `offroad_05_F0805` (5) | **floor plane** | flat dead plane under water and OB (y = −10…−800); never visible, dropped from heightmaps |
-| `fast_06_F0106` (6) | **green** | dense mesh, 230–370 u across; some greens contain a 15×15 u square gap = the **cup** |
+| `fast_06_F0106` (6) | **green** | dense grid of ~15 u cells, 230–370 u across; no cup or pin data (pins live in the course PMP file) |
 | `fast_07_F0107` (7) | **water surface** | ponds, rivers, the ocean |
 | `item_09_F0109` (9) | **fringe** | ring ~12 u wide around the green (matches the player-confirmed fringe) |
 | `wall_0c_F010c` (12) | **walls** | tree trunks (cylinders over 60–80 u square holes in the ground), cliffs, fences |
@@ -70,7 +70,7 @@ the island green across a strait (fcJP7), H9 the inland lake below its green
     node tools/mesh-inspect.mjs captures/meshes/wsr-kcl-obj/*.obj --out <dir> [--px 800] [--json report.json] [--raw] [--loop-types 1,3,6,7]
 
 Per mesh: group table (type, triangles, plan area, height range, flatness),
-boundary loops of selected groups (cups and tree holes show up as tiny loops)
+boundary loops of selected groups (tree holes show up as tiny loops)
 and a hillshaded semantic-colour preview (`--raw` colours by raw KCL type).
 
     node tools/mesh-heightmap.mjs captures/meshes/wsr-kcl-obj/*.obj --out captures/meshes/heightmaps-res4 \
@@ -91,7 +91,7 @@ Per hole it writes (`--names` turns mesh ids into `hole-NN`):
 - `hole-NN.json` — georeferencing (`originX/originZ`, `unitsPerPixel`, pixel-centre
   formula), the height encoding (`y = encodeMinY + value/65535 * (encodeMaxY − encodeMinY)`,
   per hole unless `--yrange MIN MAX` fixes one scale for all), nodata/fill
-  counts, per-group stats, the green (centre, size, height range, cup squares),
+  counts, per-group stats, the green (centre, size, height range),
   the tee pad (centre, size, height, distance to green in units and yards) and —
   with `--derived` — a first-cut registration of the app's minimap frame
   (`fracToMesh`, the app's pins in mesh units, tee residual).
@@ -187,7 +187,8 @@ beside greens, were rechecked this way:
   showing through) that no capture shows; hole 8's was checked against all 20
   raw tee frames.
 
-**Errors in the app's own data that the mesh exposes** (not corrected yet):
+**Errors in the app's own data that the mesh exposes** (corrected 2026-10-16,
+see the next section):
 - The map scale (yd/px) from a single yardage reading is off by ~5% on hole 5,
   9% on hole 8 and 7% on hole 10; two judges confirmed the fitted scale
   independently, one against the in-game yardage badge on hole 18.
@@ -203,6 +204,50 @@ beside greens, were rechecked this way:
   on that hole the flag flies 7–10 px downwind of its pole, so the search
   lands on the cup's rim.
 
+## The WSR truth applied to the app's data (2026-10-16)
+
+The user's rule: when in doubt, the WSR data is the truth and derived data
+adjusts to it. `node tools/wsr-truth.mjs` writes `tools/wsr-truth.json`
+(committed; needs the meshes only when they or the registration change) and
+`tools/build-derived.mjs` uses it for every hole:
+
+- **Scale**: the registration's yd/px. Fixes holes 5/8/10 and fills 11/14,
+  which never had one.
+- **Green box and outline**: the mesh green (type 6) outline mapped into the
+  map frame. The zoom captures' green outlines match it in normalized shape
+  (IoU 0.86–0.98 on 20 holes, aspect within 3%), so the capture data that
+  lives in the green's own frame (pins, pin zones, zoomed green texture)
+  carries over through the WSR box.
+- **Pins**: the zoom sightings projected through the WSR box, clustered in
+  green-local space at 0.085 of the green. Checked against the real cup in each
+  hole's flag stack (`hNN.det.png`, no projection involved): mean distance
+  3.69 px before, 1.61 px after, with holes 7/8/10/14/18 down from 5–14 px to
+  ~1 px. The old 0.02 map-fraction clustering merged distinct spots 3–6 px
+  apart on holes 3/5/14/18. Readings from cropped (zoom-mismatched) pairings
+  are dropped: on hole 10 they shipped as two phantom spots. These are still
+  capture readings; the WSR pins themselves are in the course PMP files (see
+  "Pin positions" below).
+- **Slope grid**: built from the mesh green's heights with the capture
+  convention (downhill, normalized to the green's own steepest cell, levels
+  1–3) but true physical spacing; `gridPct` keeps absolute percent slopes for
+  calibrating the putt model later. Direction agreement with the capture grids
+  is 0.85–0.97 on 9 holes, weaker on the flattest greens (holes 1/10/12, where
+  relative shading is noise), and opposite on holes 2 and 14.
+- **Transplanted green** in src/maps.js: painted at the WSR box on all 21 holes
+  (holes 5, 6 and 8 never had a confident enough projection before).
+- **Tee**: the WSR pad says where the teeing ground is, not where the ball
+  sits on it. All 19 detected markers lie on their WSR pads and match the
+  in-game yardage better than the pad centre (mean error 3.7 vs 5.6 yd; the
+  ball sits a median 3.8 yd toward the green), so the marker is kept while it
+  is on the pad and snapped onto it otherwise. Holes 11 and 14 have no marker
+  and get the pad centre moved forward by that median.
+
+The app picks this up through `src/derivedMerge.js`: WSR-sourced scale, green box,
+outline and grid overwrite the stored values until the hole's marker `green.src`
+equals the hole's `wsrRev` (a hash of its WSR geometry, so a corrected truth
+re-applies while unchanged holes keep manual edits), and pipeline pins mirror derived.json on every load while
+the player's own pins stay untouched.
+
 ## Quirks worth knowing
 
 - fcJP12 (H3) and fcJP6 (H2) carry extra type-6 quads sitting on the floor plane
@@ -211,16 +256,21 @@ beside greens, were rechecked this way:
   `> 1e5 u²` rule drops them, which is why nodata appears beyond the island on H8.
 - Tree trunks are not solid in the ground mesh: each leaves a 60–80 u square gap
   in fairway/rough, so the surface under a trunk comes from the outer ground.
-- Only some greens have the cup gap (H4 ×2, H5, H8, H12, H13); for the others
-  the pin spots come from the app's own capture catalogue.
+- There are no cups in the meshes. The "15×15 cup gaps" once reported on six
+  greens were artefacts: the OBJ export stores shared corners with ~0.001 u of
+  noise (e.g. -46.876 / -46.875), and rounding vertices to a 0.05 grid split
+  such pairs into fake holes. tools/lib/obj.mjs now welds vertices within
+  0.01 u. What remains are one fringe-type cell inside hole 4's green and one
+  water-type cell inside hole 8's.
 
 ## Where to take it next
 
-1. (done: `mesh-register.mjs`) Registration mesh → minimap. Next: publish a
-   low-res height + class raster per hole in the map frame under `public/`
-   for the app to fetch like `derived.json`, and let the mesh correct the
-   app's scale on holes 8/10 and its green polygons on holes 7/8/18.
-2. Green slopes for the putt solver straight from the mesh (sample the green at
-   1 u/px) instead of the hand-painted 9×9 grid.
+1. (done) Registration mesh → minimap, and the WSR truth applied to scale,
+   greens, pins, slope grids and tees. Next: publish a low-res height + class
+   raster per hole in the map frame under `public/` for the app to fetch like
+   `derived.json`, so the solver can read elevation and lies.
+2. Calibrate the putt model to absolute slopes (`gridPct`): the 9×9 levels are
+   still per-green relative, so a level-3 cell means "this green's steepest",
+   not a fixed gradient.
 3. Per-hole elevation offsets for the shot model (holes 8/12/17 first) from the
    tee/landing-zone heights in the sidecars.

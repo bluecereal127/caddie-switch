@@ -10,7 +10,9 @@ v13 and now diverges (v14: capture catalog); the web repo is the source of truth
 - `src/main.jsx` — mount point + client-side password gate (SHA-256 vs PASS_HASH; casual deterrence only — change via `node tools/hash-password.mjs <pw>`; deliberately kept out of App.jsx).
 - `src/maps.js` — AUTO-GENERATED (tools/build-derived.mjs): 21 hole minimaps as base64 JPEG, 250×304, median-stacked from the user's captures (mapV5; replaced the 219×270 rufusmccoot/chart set). Fractional coordinates everywhere.
 - `src/mapxform.js` — AUTO-GENERATED per-hole old→new fractional transforms used once by the mapV5 migration.
-- `public/derived.json` — AUTO-GENERATED capture-pipeline output (per-hole scale, green box, quantized 9×9 slope grid, pins, tee). App fetches it on load: first application is wholesale (derivedV1 flag), afterwards fill-empty + append-new-pins so manual edits survive. Regenerate: extract-maps → extract-greens → build-derived.
+- `public/derived.json` — AUTO-GENERATED pipeline output (per-hole scale, green box + outline, quantized 9×9 slope grid, pins, tee). Since 2026-10-16 every hole is built with the WSR truth (`source: "wsr"`): scale, green box/outline and slope grid come from `tools/wsr-truth.json`, pins and the transplanted green are placed through the WSR green box, the tee is the detected marker kept on the WSR pad. App fetches it on load and merges via `src/derivedMerge.js`: first application wholesale (derivedV1), WSR holes overwrite until the hole's marker `green.src` equals derived.json's `wsrRev` (a hash of that hole's WSR geometry, so corrected truth re-applies; kept in the hole's own saved state, so a racing save just re-migrates next load), otherwise fill-empty so manual edits survive; pipeline pins (string ids `d…`) mirror derived.json every load, the player's own pins (numeric ids) are never touched. Regenerate: extract-maps → extract-greens → (wsr-truth, only if the meshes or registration change) → build-derived.
+- `src/derivedMerge.js` — the per-hole merge rules above, pure so they can be tested outside the app.
+- `tools/wsr-truth.mjs` → `tools/wsr-truth.json` — per-hole WSR truth in the app's map frame (scale, green box/outline, tee pad hull, slope grid) from the meshes + registration; committed so build-derived runs without the meshes.
 - `src/storage.js` — window.storage shim (async get/set/delete/list over localStorage, key prefix `caddie:`; app data lives under `caddie:sss-golf-solver-v2`).
 - `tools/frame-audit.mjs` — read-only: joins every stage's record of what it
   consumed and reports, per capture, which roles it holds (mapPool, mapDetect,
@@ -40,7 +42,7 @@ grid per green (MU=1.35, SLOPE_G=1.1, capture radius 0.22 yd, max capture speed 
 - Lies cap the usable BAR; distance per bar is unchanged below the cap. Rough = 3 bars (all clubs). Sand: wedge 3, irons 2, spoon/driver 1 (player-confirmed, hardcoded in BUNKER_CAPS). Putter uncapped, dead roll in sand.
 - Driver & spoon can NEVER backspin. Spin strength scales with swing power (official) → capped lies also cap spin.
 - Wind: exactly 8 directions (N/NE/E/SE/S/SW/W/NW), integer mph, observed 0–31 (odd values exist in NSS; WSR was even-only 0–30). Arrow color: blue <10, yellow 10–19, pink 20+. At 0 mph direction is still readable from the pin flag.
-- Pins: finite fixed spots per hole. WSR data: most holes have score-gated sets (harder "A pins" on good score, easier "B" on bad); H1=3 pins, H18=1, Specials 6. NSS has MORE spots than WSR's A/B model (player reports well over 2 per hole); the pipeline accumulates every distinct pin seen in uploaded green captures, uncapped (dedupe radius 0.02 map-fraction).
+- Pins: finite fixed spots per hole. WSR (research 2026-10-17, see tools/MESHES.md): pins live in each course archive's PMP placement file, not the KCL; holes 2-17 have 6 (a "B" set of 3 used when your score is not good enough, an "A" set of 3 when it is; score thresholds per hole in the speedrun guide), H1=3, H18=1, specials 6 picked at random. The player's "well over 2 per hole" in NSS fits it reusing these six. the pipeline accumulates every distinct pin seen in uploaded green captures, uncapped, clustering sightings in green-local space at 0.085 of the green's bbox (repeat sightings agree within 0.07; the old 0.02 map-fraction radius merged distinct spots on small greens).
 - Over-swinging a capped bar = red bar + wobble/curve; solver treats caps as hard.
 - Minimap meter dots = flat-terrain carry; elevation shifts real distance (notably holes 8, 12, 17).
 - Community wind-route rules encoded in WIND_RULES (H7/10/12/14/15/16/18/21).
@@ -62,6 +64,11 @@ grid per green (MU=1.35, SLOPE_G=1.1, capture radius 0.22 yd, max capture speed 
 - Each green's height field NEVER changes (player-confirmed) — every heightmap capture of a hole describes the same terrain, so frames fuse across sessions/zooms (kills noise, fills legend-occluded cells).
 - Wind indicators (player-confirmed): the minimap is always true-north-up, so its wind arrow is NORTH-relative; the top-right circle arrow is relative to the PLAYER'S AIM — i.e. it directly reads shot-relative wind direction (arrow up = tailwind).
 
+## Truth source (user's rule, 2026-10-15)
+When in doubt, the data extracted from the WSR collision meshes is the truth.
+Derived/calculated data (scale, green box/outline, pins, tee, slopes, anything
+built from captures) is adjusted to match it, never the other way round.
+
 ## Course geometry (WSR collision meshes — see tools/MESHES.md, do not re-derive)
 - 21 KCL→OBJ meshes, one per hole, Y-up, X/Z ground, -Z = minimap "up"
   (green end), +X = right, same handedness as the minimap. **1 unit = 0.1 m
@@ -71,8 +78,8 @@ grid per green (MU=1.35, SLOPE_G=1.1, capture radius 0.22 yd, max capture speed 
   nine = fc files, specials fcJP2/19/14 (WSR built its course from the two NES
   Golf layouts).
 - KCL types: 1 fairway (+ the flat tee pad), 2 rough, 3 sand (bunkers, beaches,
-  river gravel), 4 outer ground, 5 floor plane (dead), 6 green (some with a
-  15×15 u cup gap), 7 water, 9 fringe ring, 0x0c walls/tree trunks.
+  river gravel), 4 outer ground, 5 floor plane (dead), 6 green (a grid of ~15-unit cells;
+  the meshes carry no cup or pin data), 7 water, 9 fringe ring, 0x0c walls/tree trunks.
 - The meshes are the Wii course and match the Switch art almost everywhere
   (hole 15's apron NE of the green and a hilltop sand strip on 17 differ;
   tools/MESHES.md lists them). src/maps.js is NOT raw game art near greens:
@@ -106,7 +113,7 @@ glyph templates from real frames → frame classifier (address / popup / tee-map
 
 ## Conventions
 - All positions fractional (0–1) relative to the hole map image.
-- Never bump storage keys without migration; flags used so far: parFixV3, mapV4, treesV9, mapV5 (map swap + coordinate transform), derivedV1 (derived.json applied wholesale once). Additive optional keys (e.g. `captures`, the per-hole screenshot catalog) need no flag.
+- Never bump storage keys without migration; flags used so far: parFixV3, mapV4, treesV9, mapV5 (map swap + coordinate transform), derivedV1 (derived.json applied wholesale once). WSR-sourced holes use a per-hole marker instead of a flag (`green.src` = the hole's `wsrRev`, see derivedMerge.js). Additive optional keys (e.g. `captures`, the per-hole screenshot catalog) need no flag.
 - Validate App.jsx with @babel/parser (jsx plugin) before shipping any edit.
 - NEVER add a Netlify Form (`data-netlify`) to `index.html`. Netlify registers
   forms by parsing deployed HTML and bills **per submission** — the original

@@ -1,0 +1,68 @@
+// Merge one hole of public/derived.json into the stored hole state. Pure (no
+// React, no storage) so it can be exercised outside the app.
+//
+//   cur        the stored hole, with `green` already defaulted
+//   n          hole number
+//   dh         derived.json's entry for the hole
+//   fresh      first load ever (no derivedV1 flag): derived values apply wholesale
+//
+// Rules:
+// - Holes built from the WSR collision meshes carry source "wsr". That data is
+//   the truth (CLAUDE.md, "Truth source"), so their scale, green box, outline and
+//   slope grid overwrite whatever is stored until the hole's marker green.src
+//   equals derived.json's wsrRev (a hash of that hole's WSR geometry, so a later
+//   correction of the truth applies again). The marker lives in the hole's own saved state, so a save
+//   that raced the merge (old values written back) simply gets migrated again on
+//   the next load; once it is stored, later manual edits survive (every edit
+//   spreads the existing green object, keeping the marker).
+// - Everything else keeps the original fill-empty behaviour. Tee is not
+//   persisted, so it always follows derived.json.
+// - Pins the pipeline produced (string ids "d…") mirror derived.json on every
+//   load, so corrections reach the app and stale spots drop out. The player's
+//   own pins (numeric ids) are never touched. If the current pin was a pipeline
+//   pin it moves to the pipeline pin at the same spot on the green: its position
+//   is carried from the stored green box's frame into the new one, then the
+//   nearest current pipeline pin is chosen.
+export const isPipelinePin = (p) => typeof p?.id === "string" && p.id.startsWith("d");
+
+export function applyDerivedHole(cur, n, dh, { fresh }) {
+  const out = { ...cur, green: { ...cur.green } };
+  const storedBox = out.green.box ?? null;
+  if (dh.source === "wsr") {
+    const rev = dh.wsrRev ?? "wsr";
+    if (fresh || out.green.src !== rev) {
+      if (dh.scale != null) out.scale = dh.scale;
+      if (dh.greenBox) out.green.box = dh.greenBox;
+      if (dh.greenPoly) out.green.poly = dh.greenPoly;
+      if (dh.grid) out.green.grid = dh.grid;
+    }
+    out.green.src = rev;
+  }
+  if (dh.scale != null && (fresh || out.scale == null)) out.scale = dh.scale;
+  if (dh.tee && (fresh || !out.tee)) out.tee = dh.tee;
+  if (dh.greenBox && (fresh || !out.green.box)) out.green.box = dh.greenBox;
+  if (dh.greenPoly && (fresh || !out.green.poly)) out.green.poly = dh.greenPoly;
+  // aspect + provenance for the zoomed green view; always take the derived
+  // value, it describes the shipped image not user edits
+  if (dh.greenView) out.green.view = dh.greenView;
+  const gridEmpty = !(out.green.grid ?? []).some((r) => r.some(([x, y]) => x || y));
+  if (dh.grid && (fresh || gridEmpty)) out.green.grid = dh.grid;
+
+  const stored = out.pins ?? [];
+  const oldCur = stored.find((p) => p.id === out.curPin) ?? null;
+  const pipeline = (dh.pins ?? []).map((p, k) => ({ id: `d${n}-w${k}`, x: p.x, y: p.y }));
+  out.pins = [...stored.filter((p) => !isPipelinePin(p)), ...pipeline];
+  if (oldCur && isPipelinePin(oldCur)) {
+    const sb = storedBox, nb = out.green.box;
+    const ok = (b) => b && b.x1 > b.x0 && b.y1 > b.y0;
+    const at = ok(sb) && ok(nb)
+      ? { x: nb.x0 + ((oldCur.x - sb.x0) / (sb.x1 - sb.x0)) * (nb.x1 - nb.x0),
+          y: nb.y0 + ((oldCur.y - sb.y0) / (sb.y1 - sb.y0)) * (nb.y1 - nb.y0) }
+      : oldCur;
+    let best = null;
+    for (const p of pipeline) { const d = Math.hypot(p.x - at.x, p.y - at.y); if (!best || d < best.d) best = { id: p.id, d }; }
+    out.curPin = best ? best.id : null;
+  }
+  if (out.curPin == null || !out.pins.some((p) => p.id === out.curPin)) out.curPin = out.pins.length ? out.pins[out.pins.length - 1].id : null;
+  return out;
+}

@@ -19,6 +19,16 @@ const INBOX = join(ROOT, "captures", "inbox");
 const D = join(ROOT, "captures", "derived");
 const mapsMeta = JSON.parse(readFileSync(join(D, "maps.json"), "utf8")).holes;
 const register = JSON.parse(readFileSync(join(D, "register.json"), "utf8"));
+// WSR collision-mesh truth (tools/wsr-truth.json, written by tools/wsr-truth.mjs).
+// The user's rule: when in doubt the WSR data is the truth and derived data
+// adjusts to it. Where a hole has it, the WSR green box replaces the capture
+// projection (so outline, pins, pin zones and the transplanted green all follow
+// it), the WSR scale and slope grid replace the capture ones, and the detected
+// tee is kept only while it sits on the WSR tee pad. Without the file, or for a
+// hole it lacks, the capture projection is used as before (pin clustering and
+// the green transplant changed for every hole, see their comments).
+let WSR = null;
+try { WSR = JSON.parse(readFileSync(join(ROOT, "tools", "wsr-truth.json"), "utf8")).holes; } catch {}
 
 const isFlagPink = (p) => p[0] > 190 && p[2] > 120 && p[1] < 110 && p[0] - p[1] > 100;
 const colorDist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
@@ -285,59 +295,128 @@ function greenTexture(g) {
   return { tex, sessions: used, covered };
 }
 
-function transplantGreen(hole, img, g, box, t) {
-  if (!box || !t) return;
-  const W = img.width, H = img.height;
+// Paint the fused zoom texture into the overview over box (map px, may be
+// float). The texture covers the green's bbox PLUS GT_MARGIN of it on every
+// side, so box fraction c lives at texture coordinate (c + M) / (1 + 2M);
+// mapping the box onto the whole texture (as this did until 2026-10) painted
+// every green at 81% of its size with fringe texels inside the outline.
+// poly is the green outline in box-normalized coords (the WSR outline when
+// known). The texture must also look like the overview there: below
+// MIN_TRANSPLANT_R normalized correlation the overview keeps its own art. The
+// check runs over the texture's whole footprint (box plus margin), where the
+// fringe edge and bunkers give it structure; the putting surface alone is too
+// uniform at overview scale to correlate.
+const MIN_TRANSPLANT_R = 0.45;
+function transplantGreen(hole, img, box, poly, t) {
+  if (!box || !t) return { done: false, r: null };
+  const W = img.width, H = img.height, M = GT_MARGIN;
   const bw = box.x1 - box.x0, bh = box.y1 - box.y0;
-  if (bw < 4 || bh < 4) return;
-
-  // Colour-match the texture to the overview's own green before painting.
-  // The zoom captures are lit slightly differently from the overview, and
-  // without this the transplant reads as a patch with a visible seam around
-  // it. Compare means over the SAME pixels the transplant will cover, then
-  // shift the texture by the difference.
-  let mr = 0, mg = 0, mb = 0, tr = 0, tg = 0, tb = 0, mn = 0;
-  for (let y = box.y0; y <= box.y1; y++) for (let x = box.x0; x <= box.x1; x++) {
-    if (x < 0 || y < 0 || x >= W || y >= H) continue;
-    const fu = (x - box.x0) / bw, fv = (y - box.y0) / bh;
-    if (g.poly && !pointInPoly(fu, fv, g.poly)) continue;
-    const di = (y * W + x) * 4;
-    mr += img.data[di]; mg += img.data[di + 1]; mb += img.data[di + 2];
-    const tu = Math.min(GT - 1, Math.floor(fu * GT)), tv = Math.min(GT - 1, Math.floor(fv * GT));
-    const ti = (tv * GT + tu) * 4;
-    tr += t.tex.data[ti]; tg += t.tex.data[ti + 1]; tb += t.tex.data[ti + 2];
-    mn++;
-  }
-  const dR = mn ? (mr - tr) / mn : 0, dG = mn ? (mg - tg) / mn : 0, dB = mn ? (mb - tb) / mn : 0;
+  if (bw < 4 || bh < 4) return { done: false, r: null };
+  const tc = (c) => ((c + M) / (1 + 2 * M)) * GT; // box fraction -> texel coordinate
+  const xa = Math.max(0, Math.floor(box.x0 - M * bw)), xb = Math.min(W - 1, Math.ceil(box.x1 + M * bw) - 1);
+  const ya = Math.max(0, Math.floor(box.y0 - M * bh)), yb = Math.min(H - 1, Math.ceil(box.y1 + M * bh) - 1);
   // Average EVERY texel under each map pixel. Striding through the footprint
-  // instead (an early version stepped by GT/bw) point-samples a periodic
-  // pattern and aliases it: the green's grid checker beat against the stride
-  // and came through as visible moire at a scale where the game itself shows
-  // a smooth surface.
-  for (let y = box.y0; y <= box.y1; y++) for (let x = box.x0; x <= box.x1; x++) {
-    if (x < 0 || y < 0 || x >= W || y >= H) continue;
-    const u0 = ((x - box.x0) / (bw + 1)) * GT, v0 = ((y - box.y0) / (bh + 1)) * GT;
-    const u1 = ((x + 1 - box.x0) / (bw + 1)) * GT, v1 = ((y + 1 - box.y0) / (bh + 1)) * GT;
+  // instead point-samples the green's grid checker and aliases it into moire.
+  const cells = [];
+  for (let y = ya; y <= yb; y++) for (let x = xa; x <= xb; x++) {
+    const fu = (x + 0.5 - box.x0) / bw, fv = (y + 0.5 - box.y0) / bh;
+    const paint = fu >= 0 && fu <= 1 && fv >= 0 && fv <= 1 && (!poly || pointInPoly(fu, fv, poly));
+    const u0 = tc((x - box.x0) / bw), u1 = tc((x + 1 - box.x0) / bw);
+    const v0 = tc((y - box.y0) / bh), v1 = tc((y + 1 - box.y0) / bh);
     let r = 0, gg = 0, b = 0, n = 0;
-    for (let v = Math.floor(v0); v < Math.min(GT, Math.ceil(v1)); v++)
-      for (let u = Math.floor(u0); u < Math.min(GT, Math.ceil(u1)); u++) {
+    for (let v = Math.max(0, Math.floor(v0)); v < Math.min(GT, Math.ceil(v1)); v++)
+      for (let u = Math.max(0, Math.floor(u0)); u < Math.min(GT, Math.ceil(u1)); u++) {
         const ti = (v * GT + u) * 4;
         r += t.tex.data[ti]; gg += t.tex.data[ti + 1]; b += t.tex.data[ti + 2]; n++;
       }
     if (!n) continue;
-    // inside the green-local polygon only, so bunkers and fringe outside the
-    // bbox corners keep the overview's own art
-    const fu = (x - box.x0) / bw, fv = (y - box.y0) / bh;
-    if (g.poly && !pointInPoly(fu, fv, g.poly)) continue;
-    const edge = Math.min(x - box.x0, box.x1 - x, y - box.y0, box.y1 - y);
-    const a = edge <= 0 ? 0.5 : 1;
-    const di = (y * W + x) * 4;
-    const cl = (v) => v < 0 ? 0 : v > 255 ? 255 : Math.round(v);
-    img.data[di] = cl(a * (r / n + dR) + (1 - a) * img.data[di]);
-    img.data[di + 1] = cl(a * (gg / n + dG) + (1 - a) * img.data[di + 1]);
-    img.data[di + 2] = cl(a * (b / n + dB) + (1 - a) * img.data[di + 2]);
+    const edge = Math.min(x + 0.5 - box.x0, box.x1 - x - 0.5, y + 0.5 - box.y0, box.y1 - y - 0.5);
+    cells.push({ di: (y * W + x) * 4, r: r / n, g: gg / n, b: b / n, a: edge < 0.5 ? 0.5 : 1, paint });
   }
-  console.log(`H${hole}: green transplanted from ${t.sessions} zoom capture(s), ${(100 * t.covered).toFixed(0)}% of the surface seen unobstructed`);
+  if (cells.length < 9) return { done: false, r: null };
+  // agreement check (luma NCC) and colour match over the same pixels: the zoom
+  // captures are lit slightly differently, so shift the texture by the mean
+  // difference or the transplant reads as a patch with a seam
+  const lum = (r, g, b) => 0.299 * r + 0.587 * g + 0.114 * b;
+  let sm = 0, st = 0, dR = 0, dG = 0, dB = 0, np = 0;
+  for (const c of cells) {
+    const d = img.data; sm += lum(d[c.di], d[c.di + 1], d[c.di + 2]); st += lum(c.r, c.g, c.b);
+    if (c.paint) { dR += d[c.di] - c.r; dG += d[c.di + 1] - c.g; dB += d[c.di + 2] - c.b; np++; }
+  }
+  const n = cells.length; sm /= n; st /= n;
+  if (np < 9) return { done: false, r: null };
+  dR /= np; dG /= np; dB /= np; // colour match over the painted pixels only
+  let num = 0, vm = 0, vt = 0;
+  for (const c of cells) { const d = img.data; const a = lum(d[c.di], d[c.di + 1], d[c.di + 2]) - sm, q = lum(c.r, c.g, c.b) - st; num += a * q; vm += a * a; vt += q * q; }
+  const ncc = vm > 0 && vt > 0 ? num / Math.sqrt(vm * vt) : 0;
+  if (ncc < MIN_TRANSPLANT_R) {
+    console.log(`H${hole}: green NOT transplanted — the zoom texture correlates only ${ncc.toFixed(2)} with the overview at the box (the overview keeps its own art; the zoomed green view is unaffected)`);
+    return { done: false, r: ncc };
+  }
+  const cl = (v) => (v < 0 ? 0 : v > 255 ? 255 : Math.round(v));
+  for (const c of cells) {
+    if (!c.paint) continue;
+    const d = img.data;
+    d[c.di] = cl(c.a * (c.r + dR) + (1 - c.a) * d[c.di]);
+    d[c.di + 1] = cl(c.a * (c.g + dG) + (1 - c.a) * d[c.di + 1]);
+    d[c.di + 2] = cl(c.a * (c.b + dB) + (1 - c.a) * d[c.di + 2]);
+  }
+  console.log(`H${hole}: green transplanted from ${t.sessions} zoom capture(s), ${(100 * t.covered).toFixed(0)}% of the surface seen unobstructed, texture/overview r=${ncc.toFixed(2)}`);
+  return { done: true, r: ncc };
+}
+
+// Content revision of a hole's WSR geometry (FNV-1a over scale, box, outline,
+// grid). The app re-applies WSR values whenever it changes, so a corrected
+// truth reaches stored state while unchanged holes keep manual edits.
+function wsrRev(wt) {
+  const s = JSON.stringify([wt.scale, wt.greenBox, wt.greenPoly, wt.grid]);
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
+  return "wsr-" + h.toString(16).padStart(8, "0");
+}
+
+// nearest point of a polygon (map px) to (x, y); returns (x, y) if inside
+function snapIntoPoly(x, y, poly) {
+  let inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const [xi, yi] = poly[i], [xj, yj] = poly[j];
+    if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
+  }
+  if (inside) return [x, y, false];
+  let best = null;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const [ax, ay] = poly[j], [bx, by] = poly[i];
+    const L2 = (bx - ax) ** 2 + (by - ay) ** 2 || 1e-9;
+    const t = Math.max(0, Math.min(1, ((x - ax) * (bx - ax) + (y - ay) * (by - ay)) / L2));
+    const qx = ax + t * (bx - ax), qy = ay + t * (by - ay), d = Math.hypot(x - qx, y - qy);
+    if (!best || d < best.d) best = { d, qx, qy };
+  }
+  return [best.qx, best.qy, true];
+}
+
+// Where the ball sits on the WSR tee pad: the detected markers all lie on their
+// pads and match the in-game yardage better than the pad centre does, sitting
+// a few yards toward the green. The median of that offset places the ball on
+// holes with no detected marker.
+const MAP_W = 250, MAP_H = 304;
+const teeAxis = (wt) => {
+  const ux = (wt.greenCentre[0] - wt.tee.x) * MAP_W, uy = (wt.greenCentre[1] - wt.tee.y) * MAP_H;
+  const L = Math.hypot(ux, uy) || 1;
+  return [ux / L, uy / L];
+};
+let TEE_FORWARD_YD = 0;
+if (WSR) {
+  const offs = [];
+  for (let hole = 1; hole <= 21; hole++) {
+    const wt = WSR[hole], meta = mapsMeta.find((m) => m.hole === hole);
+    if (!wt?.tee || !meta?.tee) continue;
+    const [ex, ey] = teeAxis(wt);
+    const dx = meta.tee.x - wt.tee.x * MAP_W, dy = meta.tee.y - wt.tee.y * MAP_H;
+    offs.push((dx * ex + dy * ey) * wt.scale);
+  }
+  offs.sort((a, b) => a - b);
+  if (offs.length) TEE_FORWARD_YD = offs[Math.floor(offs.length / 2)];
+  console.log(`WSR truth: ${Object.keys(WSR).length} holes; detected tee sits a median ${TEE_FORWARD_YD.toFixed(2)} yd toward the green from the pad centre (${offs.length} holes)`);
 }
 
 const pointInPoly = (x, y, poly) => {
@@ -391,42 +470,66 @@ for (let hole = 1; hole <= 21; hole++) {
     if (!anchor || pr.r > anchor.r) anchor = { ...pr, session: s };
   }
   let greenBox = null, greenPoly = null, pins = [], pinZones = null, greenPins = 0;
-  let box = null;
+  let box = null, captureBox = null;
+  const W = img.width, H = img.height;
   if (anchor && anchor.r > 0.22) {
     const { k, session, ox, oy } = anchor;
-    const W = img.width, H = img.height;
     const proj = (zx, zy) => ({ x: meta.pin.x + ox + (zx - session.pinPx.x) * k,
                                 y: meta.pin.y + oy + (zy - session.pinPx.y) * k });
     // project the ANCHOR session's own bbox (its k belongs to its zoom level;
     // other sessions can sit at different zooms)
     const zb = session.bboxPx;
     const c0 = proj(zb.x0, zb.y0), c1 = proj(zb.x1, zb.y1);
-    box = { x0: Math.max(0, Math.round(c0.x)), y0: Math.max(0, Math.round(c0.y)),
+    captureBox = { x0: Math.max(0, Math.round(c0.x)), y0: Math.max(0, Math.round(c0.y)),
       x1: Math.min(W - 1, Math.round(c1.x)), y1: Math.min(H - 1, Math.round(c1.y)) };
-    greenBox = { x0: +(box.x0 / W).toFixed(4), y0: +(box.y0 / H).toFixed(4),
-      x1: +(box.x1 / W).toFixed(4), y1: +(box.y1 / H).toFixed(4) };
+  }
+  const wt = WSR?.[hole] ?? null;
+  // projection box in map px: the WSR green's bbox (float) when known, else the
+  // capture projection. The zoom captures' green outlines match the WSR
+  // outlines in normalized shape (IoU 0.86-0.98, aspect within 3%), so
+  // bbox-normalized pins and outline carry over through either box.
+  const pb = wt ? { x0: wt.greenBox.x0 * W, y0: wt.greenBox.y0 * H, x1: wt.greenBox.x1 * W, y1: wt.greenBox.y1 * H } : captureBox;
+  if (pb) {
+    // integer box for the pixel loops (transplant, debug overlay)
+    box = wt ? { x0: Math.max(0, Math.round(pb.x0)), y0: Math.max(0, Math.round(pb.y0)),
+      x1: Math.min(W - 1, Math.round(pb.x1)), y1: Math.min(H - 1, Math.round(pb.y1)) } : captureBox;
+    greenBox = wt ? wt.greenBox : { x0: +(pb.x0 / W).toFixed(4), y0: +(pb.y0 / H).toFixed(4),
+      x1: +(pb.x1 / W).toFixed(4), y1: +(pb.y1 / H).toFixed(4) };
     // pins via bbox-normalized coords — zoom-invariant across sessions —
-    // then CLUSTERED at the app's own 0.02 radius. Every pair that sees the
-    // same flag reports it, so one spot captured six times used to ship as
-    // six pins; the app deduped on merge but derived.json lied and the debug
+    // then CLUSTERED (radius below). Every pair that sees the same flag
+    // reports it, so one spot captured six times used to ship as six pins; the app deduped on merge but derived.json lied and the debug
     // overlay was unreadable. Averaging each cluster also sharpens the
     // estimate: more observations of a spot now means a better fix on it,
     // not more clutter.
     // the fused green outline, projected the same way (bbox-normalized ->
     // map fraction). A polygon, not a rectangle: greens are lobed, and the
     // fringe that wraps every green is a real boundary.
-    if (g.poly) greenPoly = g.poly.map(([nx, ny]) => [
-      +((box.x0 + nx * (box.x1 - box.x0)) / W).toFixed(4),
-      +((box.y0 + ny * (box.y1 - box.y0)) / H).toFixed(4)]);
-    const raw = g.pins.map((p) => ({
-      x: (box.x0 + p.gx * (box.x1 - box.x0)) / W,
-      y: (box.y0 + p.gy * (box.y1 - box.y0)) / H }));
+    if (wt) greenPoly = wt.greenPoly;
+    else if (g.poly) greenPoly = g.poly.map(([nx, ny]) => [
+      +((pb.x0 + nx * (pb.x1 - pb.x0)) / W).toFixed(4),
+      +((pb.y0 + ny * (pb.y1 - pb.y0)) / H).toFixed(4)]);
+    // Cluster in GREEN-LOCAL space at 0.085 of the green's bbox. Repeat
+    // sightings of one spot agree within 0.07 there (all holes so far), the
+    // next-closest pairs sit 0.10+ apart, and distinct spots on the small
+    // greens 0.25+. The old radius (0.02 of the MAP, ~5 px) merged pairs 3-6 px
+    // apart on holes 3, 5, 14 and 18 into one averaged position that matched
+    // neither; each flag-stack cup sits on one of the raw sightings instead.
+    const PIN_T = 0.085;
     const clusters = [];
-    for (const p of raw) {
-      const c = clusters.find((q) => Math.hypot(q.x / q.n - p.x, q.y / q.n - p.y) < 0.02);
-      if (c) { c.x += p.x; c.y += p.y; c.n++; } else clusters.push({ x: p.x, y: p.y, n: 1 });
+    // pins[i] belongs to sessions[i] (extract-greens.mjs). A cropped session's
+    // bbox is cut off by the panel edge, so its bbox-normalized pin is wrong:
+    // on H10 two cropped re-pairings of frames already read uncropped landed
+    // 0.11-0.12 away and shipped as phantom spots. The anchor and texture paths
+    // already skip cropped sessions; keep cropped readings only for a hole that
+    // has nothing else.
+    const okPins = g.pins.filter((_, i) => !g.sessions?.[i]?.cropped);
+    for (const p of (okPins.length ? okPins : g.pins)) {
+      const c = clusters.find((q) => Math.hypot(q.gx / q.n - p.gx, q.gy / q.n - p.gy) < PIN_T);
+      if (c) { c.gx += p.gx; c.gy += p.gy; c.n++; } else clusters.push({ gx: p.gx, gy: p.gy, n: 1 });
     }
-    pins = clusters.map((c) => ({ x: +(c.x / c.n).toFixed(4), y: +(c.y / c.n).toFixed(4), n: c.n }));
+    pins = clusters.map((c) => ({
+      x: +((pb.x0 + (c.gx / c.n) * (pb.x1 - pb.x0)) / W).toFixed(4),
+      y: +((pb.y0 + (c.gy / c.n) * (pb.y1 - pb.y0)) / H).toFixed(4), n: c.n }));
 
     // PIN ZONES. Clustered in GREEN-LOCAL space (fraction of the green's own
     // bbox), which is the frame the game presumably picks spots in and is
@@ -450,7 +553,7 @@ for (let hole = 1; hole <= 21; hole++) {
       }
       zn++;
     }
-    const bw = box.x1 - box.x0, bh = box.y1 - box.y0;
+    const bw = pb.x1 - pb.x0, bh = pb.y1 - pb.y0;
     greenPins = g.pins.length;
     pinZones = Array.from({ length: zn }, (_, z) => {
       const mem = g.pins.filter((_, i) => lab[i] === z);
@@ -460,8 +563,8 @@ for (let hole = 1; hole <= 21; hole++) {
       // can draw it without knowing the green's bbox
       const rg = Math.max(...mem.map((p) => Math.hypot(p.gx - gx, p.gy - gy)));
       return {
-        x: +((box.x0 + gx * bw) / W).toFixed(4),
-        y: +((box.y0 + gy * bh) / H).toFixed(4),
+        x: +((pb.x0 + gx * bw) / W).toFixed(4),
+        y: +((pb.y0 + gy * bh) / H).toFixed(4),
         r: +(Math.max(rg * bw / W, rg * bh / H)).toFixed(4),
         rGreen: +rg.toFixed(3), n: mem.length,
       };
@@ -477,11 +580,25 @@ for (let hole = 1; hole <= 21; hole++) {
   }
   const zoomAspect = (g.panelBbox.x1 - g.panelBbox.x0) / (g.panelBbox.y1 - g.panelBbox.y0);
   const mapAspect = box ? (box.x1 - box.x0) / (box.y1 - box.y0) : null;
-  derived.holes[hole] = { scale: meta.scaleYdPerPx, yards: meta.yards, greenBox, greenPoly,
-    grid: quantizeGrid(g.grid), pins, pinZones, pinObservations: greenPins,
-    greenView: greenMeta[hole] ?? null,
-    tee: meta.tee ? { x: +(meta.tee.x / img.width).toFixed(4), y: +(meta.tee.y / img.height).toFixed(4) } : null };
-  console.log(`H${hole}: k=${anchor?.k?.toFixed(2)} r=${anchor?.r?.toFixed(2)} box=${box ? `${box.x0},${box.y0}..${box.x1},${box.y1}` : "MISS"} aspect map=${mapAspect?.toFixed(2) ?? "-"} zoom=${zoomAspect.toFixed(2)} pins=${pins.length}`);
+  // tee (see TEE_FORWARD_YD): the detected marker while it is on the WSR pad,
+  // snapped onto the pad if it is not; no marker -> pad centre moved forward
+  let tee = meta.tee ? { x: +(meta.tee.x / W).toFixed(4), y: +(meta.tee.y / H).toFixed(4) } : null, teeNote = "";
+  if (wt?.tee) {
+    if (meta.tee) {
+      const [sx, sy, moved] = snapIntoPoly(meta.tee.x, meta.tee.y, wt.teePad.map(([x, y]) => [x * W, y * H]));
+      if (moved) { tee = { x: +(sx / W).toFixed(4), y: +(sy / H).toFixed(4) }; teeNote = " tee snapped onto WSR pad"; }
+    } else {
+      const [ex, ey] = teeAxis(wt), d = TEE_FORWARD_YD / wt.scale;
+      tee = { x: +((wt.tee.x * W + ex * d) / W).toFixed(4), y: +((wt.tee.y * H + ey * d) / H).toFixed(4) };
+      teeNote = " tee from WSR pad";
+    }
+  }
+  derived.holes[hole] = { scale: wt ? wt.scale : meta.scaleYdPerPx, yards: meta.yards, greenBox, greenPoly,
+    grid: quantizeGrid(wt ? wt.grid : g.grid), pins, pinZones, pinObservations: greenPins,
+    greenView: greenMeta[hole] ?? null, tee,
+    ...(wt ? { source: "wsr", wsrRev: wsrRev(wt), captureGreenBox: captureBox ? { x0: +(captureBox.x0 / W).toFixed(4), y0: +(captureBox.y0 / H).toFixed(4),
+      x1: +(captureBox.x1 / W).toFixed(4), y1: +(captureBox.y1 / H).toFixed(4) } : null } : {}) };
+  console.log(`H${hole}: k=${anchor?.k?.toFixed(2)} r=${anchor?.r?.toFixed(2)} box=${box ? `${box.x0},${box.y0}..${box.x1},${box.y1}` : "MISS"}${wt ? ` (WSR; capture box ${captureBox ? `${captureBox.x0},${captureBox.y0}..${captureBox.x1},${captureBox.y1}` : "MISS"})` : ""} aspect map=${mapAspect?.toFixed(2) ?? "-"} zoom=${zoomAspect.toFixed(2)} pins=${pins.length}${teeNote}`);
 
   // Rebuild the overview's green from the zoom captures, then encode. The
   // overview draws the green ~28px across; the zoom captures hold the same
@@ -511,7 +628,14 @@ for (let hole = 1; hole <= 21; hole++) {
   // means the box may be a few pixels off, and painting a whole green into
   // the wrong place is far worse than leaving the overview's own art (which
   // is already cup-free).
-  if (box && (anchor?.r ?? 0) >= 0.45) transplantGreen(hole, img, g, box, gtex);
+  // With the WSR box the placement is known, not estimated; the capture box
+  // still needs a confident projection. Either way transplantGreen checks the
+  // texture against the overview before painting. The outline mask is the WSR
+  // outline (box-normalized) when known, else the fused capture outline.
+  if (pb && (wt || (anchor?.r ?? 0) >= 0.45)) {
+    const mask = wt ? wt.greenPoly.map(([x, y]) => [(x * W - pb.x0) / (pb.x1 - pb.x0), (y * H - pb.y0) / (pb.y1 - pb.y0)]) : g.poly ?? null;
+    transplantGreen(hole, img, pb, mask, gtex);
+  }
   else if (box) console.log(`H${hole}: green NOT transplanted into the overview — projection correlation only ${anchor?.r?.toFixed(2)} (the zoomed green view is unaffected)`);
   const enc = jpeg.encode({ data: img.data, width: img.width, height: img.height }, 82);
   mapsJs.push(`  ${hole}: "data:image/jpeg;base64,${enc.data.toString("base64")}",`);

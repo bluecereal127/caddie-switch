@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useMemo, useId } from "react";
 import { HOLE_MAPS } from "./maps.js";
 import { GREEN_VIEWS } from "./greens.js";
 import { MAP_XFORM_V5 } from "./mapxform.js";
+import { applyDerivedHole } from "./derivedMerge.js";
 
 
 /* ============================================================
@@ -299,6 +300,13 @@ function WindDial({ deg, setDeg, speed, topLabel = "PIN", bottomLabel = "YOU", s
 }
 
 /* ---------------- green canvas (grid painter + putt view) ---------------- */
+// Slope grids hold PHYSICAL downhill vectors (yards: tools/wsr-truth.mjs, and
+// simPutt integrates them in yards). Views that stretch the green's box to a
+// different shape must convert directions, or arrows skew on non-square greens.
+// boxAspect = the green box's true width/height (map px are isotropic).
+const MAP_PX_W = 250, MAP_PX_H = 304;
+const boxAspect = (b) => (b && b.y1 > b.y0 ? ((b.x1 - b.x0) * MAP_PX_W) / ((b.y1 - b.y0) * MAP_PX_H) : 1);
+
 function GreenCanvas({ mapSrc, green, mode, onGrid, ball, cup, onTap, path, aimPt }) {
   const [phase, setPhase] = useState(0);
   const dragRef = useRef(null);
@@ -327,12 +335,14 @@ function GreenCanvas({ mapSrc, green, mode, onGrid, ball, cup, onTap, path, aimP
     const i = Math.min(GRID_N - 1, Math.max(0, Math.floor(s.x * GRID_N)));
     const j = Math.min(GRID_N - 1, Math.max(0, Math.floor(s.y * GRID_N)));
     const dx = (end.x - s.x) * 100, dy = (end.y - s.y) * 100;
-    const len = Math.hypot(dx, dy);
+    const len = Math.hypot(dx, dy); // drag length on screen sets the strength
+    // the canvas shows the box as a square; store the physical direction
+    const asp = boxAspect(green.box), px = dx * asp, py = dy, plen = Math.hypot(px, py) || 1;
     const g = green.grid.map((row) => row.map((v) => [...v]));
     if (len < 3) g[j][i] = [0, 0];
     else {
       const m = len < 8 ? 1 : len < 15 ? 2 : 3;
-      g[j][i] = [(dx / len) * m, (dy / len) * m];
+      g[j][i] = [(px / plen) * m, (py / plen) * m];
     }
     onGrid && onGrid(g);
   };
@@ -351,7 +361,8 @@ function GreenCanvas({ mapSrc, green, mode, onGrid, ball, cup, onTap, path, aimP
         {green.grid.map((row, j) => row.map(([sx, sy], i) => {
           const m = Math.hypot(sx, sy);
           if (m < 0.5) return null;
-          const ux = sx / m, uy = sy / m;
+          const asp = boxAspect(green.box), qx = sx / asp, qm = Math.hypot(qx, sy) || 1;
+          const ux = qx / qm, uy = sy / qm; // physical direction drawn on the square canvas
           const cx = (i + 0.5) * cell, cy = (j + 0.5) * cell;
           return [0, 1].map((k) => {
             const t = ((phase * (0.35 + m * 0.3) + k * 5) % 10) / 10 - 0.5;
@@ -412,7 +423,10 @@ function GreenView({ holeNum, pins = [], curPinId = null, greenBox = null, green
       const u = (gx + 0.5) / N, w = (gy + 0.5) / N;
       if (!inGreen(u, w)) continue; // a cell straddling the edge has slope data but is not puttable
       const mag = Math.hypot(v[0], v[1]) || 1;
-      cells.push({ cx: place(u), cy: place(w), ux: v[0] / mag, uy: v[1] / mag, mag });
+      // the 0..100 viewBox is stretched to the green's aspect, so a physical
+      // direction (dx, dy) is drawn as (dx / aspect, dy) to look right on screen
+      const asp = meta?.aspect || boxAspect(greenBox);
+      cells.push({ cx: place(u), cy: place(w), ux: v[0] / mag / asp, uy: v[1] / mag, mag });
     }
   }
   return (
@@ -734,10 +748,13 @@ export default function App() {
           return m;
         });
       }
-      // derived.json: capture-pipeline output shipped with the deploy
-      // (scales, green boxes, slope grids, pins). First time it applies
-      // wholesale (derivedV1); afterwards it only fills empty slots and
-      // appends unseen pins, so newer manual edits survive.
+      // derived.json: pipeline output shipped with the deploy (scales, green
+      // boxes, slope grids, pins, tees). First time it applies wholesale
+      // (derivedV1); afterwards it only fills empty slots, so newer manual
+      // edits survive. Holes built from the WSR collision meshes (the truth
+      // source) overwrite once more on the first load after that switch
+      // (per-hole marker green.src). Pipeline pins mirror derived.json on every load. The rules
+      // live in derivedMerge.js.
       try {
         const res = await fetch("/derived.json");
         if (res.ok) {
@@ -749,23 +766,7 @@ export default function App() {
               const n = +nStr;
               if (!m[n]) continue;
               const cur = { ...m[n], green: { ...(m[n].green ?? emptyGreen()) } };
-              if (dh.scale != null && (fresh || cur.scale == null)) cur.scale = dh.scale;
-              if (dh.tee && (fresh || !cur.tee)) cur.tee = dh.tee;
-              if (dh.greenBox && (fresh || !cur.green.box)) cur.green.box = dh.greenBox;
-              if (dh.greenPoly && (fresh || !cur.green.poly)) cur.green.poly = dh.greenPoly;
-              // aspect + provenance for the zoomed green view; always take the
-              // derived value, it describes the shipped image not user edits
-              if (dh.greenView) cur.green.view = dh.greenView;
-              const gridEmpty = !(cur.green.grid ?? []).some((r) => r.some(([x, y]) => x || y));
-              if (dh.grid && (fresh || gridEmpty)) cur.green.grid = dh.grid;
-              const pins = [...(cur.pins ?? [])];
-              for (const p of dh.pins ?? []) {
-                if (!pins.some((q) => Math.hypot(q.x - p.x, q.y - p.y) < 0.02))
-                  pins.push({ id: `d${n}-${pins.length}`, x: p.x, y: p.y });
-              }
-              cur.pins = pins;
-              if (!cur.curPin && pins.length) cur.curPin = pins[pins.length - 1].id;
-              m[n] = cur;
+              m[n] = applyDerivedHole(cur, n, dh, { fresh });
             }
             return m;
           });

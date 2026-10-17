@@ -139,15 +139,31 @@ export function groupStats(mesh) {
 // Boundary loops of one group's triangle set: edges used by exactly one of the
 // group's triangles, linked into closed loops. Vertices are merged by rounding
 // (the exporter emits near-duplicate vertices). Interior loops = holes (cups).
-export function groupBoundaryLoops(mesh, gi, quant = 0.05) {
-  const key = (i) => Math.round(mesh.verts[i * 3] / quant) + "," + Math.round(mesh.verts[i * 3 + 1] / quant) + "," + Math.round(mesh.verts[i * 3 + 2] / quant);
-  const vid = new Map(); const vpos = [];
-  const id = (i) => {
-    const k = key(i);
-    let v = vid.get(k);
-    if (v === undefined) { v = vpos.length; vid.set(k, v); vpos.push([mesh.verts[i * 3], mesh.verts[i * 3 + 1], mesh.verts[i * 3 + 2]]); }
-    return v;
-  };
+// Weld vertex copies that sit within eps of each other (spatial hash with a
+// neighbour search). The wszst OBJ export stores one corner as e.g. -46.876 and
+// -46.875; rounding to a grid splits such pairs whenever they straddle a grid
+// boundary (81 times in fc8 alone), which invents seams: fake holes in greens
+// (the 15x15-unit "cup gaps") and tee pads broken into fragments.
+export function weldVertices(mesh, eps = 0.01) {
+  const n = mesh.verts.length / 3, id = new Int32Array(n), pos = [], cells = new Map();
+  const cell = (v) => Math.floor(v / eps);
+  for (let i = 0; i < n; i++) {
+    const x = mesh.verts[i * 3], y = mesh.verts[i * 3 + 1], z = mesh.verts[i * 3 + 2];
+    const cx = cell(x), cy = cell(y), cz = cell(z);
+    let hit = -1;
+    for (let dx = -1; dx <= 1 && hit < 0; dx++) for (let dy = -1; dy <= 1 && hit < 0; dy++) for (let dz = -1; dz <= 1 && hit < 0; dz++) {
+      const list = cells.get((cx + dx) + ',' + (cy + dy) + ',' + (cz + dz));
+      if (list) for (const j of list) { const p = pos[j]; if (Math.abs(p[0] - x) <= eps && Math.abs(p[1] - y) <= eps && Math.abs(p[2] - z) <= eps) { hit = j; break; } }
+    }
+    if (hit < 0) { hit = pos.length; pos.push([x, y, z]); const k = cx + ',' + cy + ',' + cz; (cells.get(k) || cells.set(k, []).get(k)).push(hit); }
+    id[i] = hit;
+  }
+  return { id, pos };
+}
+
+export function groupBoundaryLoops(mesh, gi, eps = 0.01) {
+  const W = weldVertices(mesh, eps), vpos = W.pos;
+  const id = (i) => W.id[i];
   const edges = new Map(); // "a,b" (a<b) -> count
   const nt = mesh.tris.length / 3;
   for (let t = 0; t < nt; t++) {
@@ -166,17 +182,26 @@ export function groupBoundaryLoops(mesh, gi, quant = 0.05) {
     if (!adj.has(p)) adj.set(p, []); if (!adj.has(q)) adj.set(q, []);
     adj.get(p).push(q); adj.get(q).push(p);
   }
-  const used = new Set();
+  // Walk boundary EDGES, not vertices (Hierholzer with splicing). A vertex-
+  // based walk stops at a pinch vertex (an outline touching itself, degree 4)
+  // and leaves the rest as a fake small loop: on hole 9 that cut a spur off
+  // the green and reported it as a "cup". Every boundary vertex has even
+  // degree, so each connected boundary closes into one circuit.
+  const usedE = new Set();
+  const ek = (p, q) => (p < q ? p + "," + q : q + "," + p);
   const loops = [];
   for (const start of adj.keys()) {
-    if (used.has(start)) continue;
-    const loop = [start]; used.add(start);
-    let prev = -1, cur = start;
-    for (;;) {
-      const nb = adj.get(cur).filter((v) => v !== prev && !used.has(v));
-      if (!nb.length) break;
-      prev = cur; cur = nb[0]; used.add(cur); loop.push(cur);
+    if (!adj.get(start).some((w) => !usedE.has(ek(start, w)))) continue;
+    const stack = [start], circuit = [];
+    while (stack.length) {
+      const v = stack[stack.length - 1];
+      const w = adj.get(v).find((u) => !usedE.has(ek(v, u)));
+      if (w === undefined) circuit.push(stack.pop());
+      else { usedE.add(ek(v, w)); stack.push(w); }
     }
+    circuit.pop(); // the walk ends where it began
+    const loop = circuit;
+    if (loop.length < 2) continue;
     let x0 = Infinity, z0 = Infinity, x1 = -Infinity, z1 = -Infinity, y0 = Infinity, y1 = -Infinity, perim = 0;
     for (let i = 0; i < loop.length; i++) {
       const p = vpos[loop[i]], q = vpos[loop[(i + 1) % loop.length]];
@@ -184,7 +209,7 @@ export function groupBoundaryLoops(mesh, gi, quant = 0.05) {
       y0 = Math.min(y0, p[1]); y1 = Math.max(y1, p[1]);
       perim += Math.hypot(q[0] - p[0], q[2] - p[2]);
     }
-    loops.push({ n: loop.length, x0, z0, x1, z1, y0, y1, cx: (x0 + x1) / 2, cz: (z0 + z1) / 2, w: x1 - x0, d: z1 - z0, perim });
+    loops.push({ n: loop.length, x0, z0, x1, z1, y0, y1, cx: (x0 + x1) / 2, cz: (z0 + z1) / 2, w: x1 - x0, d: z1 - z0, perim, pts: loop.map((v) => vpos[v]) });
   }
   loops.sort((a, b) => b.perim - a.perim);
   return loops;
@@ -194,8 +219,9 @@ export function groupBoundaryLoops(mesh, gi, quant = 0.05) {
 // vertex position are connected). Returns per component: triangle count, bbox,
 // XZ-area-weighted centroid and height range. The tee pad shows up as a small,
 // perfectly flat fairway-class component ringed by rough.
-export function groupComponents(mesh, gi, quant = 0.05) {
-  const key = (i) => Math.round(mesh.verts[i * 3] / quant) + "," + Math.round(mesh.verts[i * 3 + 1] / quant) + "," + Math.round(mesh.verts[i * 3 + 2] / quant);
+export function groupComponents(mesh, gi, eps = 0.01) {
+  const Wd = weldVertices(mesh, eps);
+  const key = (i) => Wd.id[i];
   const nt = mesh.tris.length / 3;
   const tris = [];
   for (let t = 0; t < nt; t++) if (mesh.triGroup[t] === gi) tris.push(t);
