@@ -34,7 +34,7 @@ turns them into 16-bit RAW heightmaps + PNG previews + per-pixel surface maps.
 | `fast_06_F0106` (6) | **green** | dense grid of ~15 u cells, 230–370 u across; no cup or pin data (pins live in the course PMP file) |
 | `fast_07_F0107` (7) | **water surface** | ponds, rivers, the ocean |
 | `item_09_F0109` (9) | **fringe** | ring ~12 u wide around the green (matches the player-confirmed fringe) |
-| `wall_0c_F010c` (12) | **walls** | tree trunks (cylinders over 60–80 u square holes in the ground), cliffs, fences |
+| `wall_0c_F010c` (12) | **walls** | banks, cliffs and retaining walls, mostly along the water: on 14 of the 18 holes that have them 76–100% of the wall triangles stand within 32 u of a water surface (the lattice along the lake and the playable landmass's coasts in `hole-07_preview.png`), and H3's split between its coast and the outer-ground boundary. On the other three they follow the edge of the terrain instead: H12's the drop at its outer-ground boundary (2% near its pond), H13's the cliff faces around its island, 8–9 m down from the rim, whose mesh has no water surface at all (the floor plane stands in for the sea), and H20's ring the whole course as rock walls rising 24–45 m above it. H6, H10 and H16 have none. No tree trunks: the meshes hold no trees at all, which are PMP objects (see "Trees") |
 | `wall_0d_F080d` (13) | invisible wall | H13 only, 12 triangles spanning the hole |
 | `item_0e_F010e` (14) | special zone | H1 only: the 6-triangle pale hexagon near the tee that the minimap also shows |
 | `fall_10_F0110` (16) | fall boundary | H14 only |
@@ -70,7 +70,8 @@ the island green across a strait (fcJP7), H9 the inland lake below its green
     node tools/mesh-inspect.mjs captures/meshes/wsr-kcl-obj/*.obj --out <dir> [--px 800] [--json report.json] [--raw] [--loop-types 1,3,6,7]
 
 Per mesh: group table (type, triangles, plan area, height range, flatness),
-boundary loops of selected groups (tree holes show up as tiny loops)
+boundary loops of selected groups (small gaps in the ground show up as tiny
+loops; they are not under the trees, see "Quirks")
 and a hillshaded semantic-colour preview (`--raw` colours by raw KCL type).
 
     node tools/mesh-heightmap.mjs captures/meshes/wsr-kcl-obj/*.obj --out captures/meshes/heightmaps-res4 \
@@ -85,7 +86,7 @@ Per hole it writes (`--names` turns mesh ids into `hole-NN`):
   insists on 2ⁿ+1).
 - `hole-NN_height16.png` — the same values as a lossless 16-bit greyscale PNG.
 - `hole-NN_preview.png` — 8-bit hillshaded preview in semantic colours (fairway,
-  rough, sand, outer ground, green, fringe, water, trunks drawn as rings).
+  rough, sand, outer ground, green, fringe, water, walls drawn as edges).
 - `hole-NN_classes.png` — 8-bit map whose pixel value is the KCL type of the
   topmost surface (legend above; 0 = nodata). This is the per-pixel lie map.
 - `hole-NN.json` — georeferencing (`originX/originZ`, `unitsPerPixel`, pixel-centre
@@ -245,9 +246,9 @@ adjusts to it. `node tools/wsr-truth.mjs` writes `tools/wsr-truth.json`
   and get the pad centre moved forward by that median. Superseded 2026-10-17:
   the tee is now the WSR player start from the PMP file, which is where local
   play tees off. The markers that sat 6-10 yd off it came from stacks of
-  online Survival Golf frames, whose tee platform ships as `teeOnline`
-  (tools/PINS.md). The pad rule above remains only as the fallback without
-  `tools/wsr-pins.json`.
+  online Survival Golf frames: the upper tier of the two-tiered online tee
+  platform, which ships as `teeOnline` with both tiers (tools/PINS.md). The
+  pad rule above remains only as the fallback without `tools/wsr-pins.json`.
 
 The app picks this up through `src/derivedMerge.js`: WSR-sourced scale, green box,
 outline and grid overwrite the stored values until the hole's marker `green.src`
@@ -280,10 +281,86 @@ floor(start-to-pin yards). The output `tools/wsr-pins.json` is committed.
 How WSR picks the pin is now read from `main.dol` itself (choosePin, the set
 chooser and the slot table), and agrees with the speedrun community's
 thresholds. That, the per-hole spot table, and what Switch Sports does
-differently are in tools/PINS.md: both sets seen, a few extra spots, and an
-online Survival Golf tee platform 5-12 yd from the start on 10 of the 12
-holes with online captures (holes 1, 2, 3, 6, 7, 12, 13, 17 and 21 have none
-yet).
+differently are in tools/PINS.md: both sets seen, a few extra spots, and the
+online Survival Golf tee platform, two tiers 4 yd apart with the lower one on
+the start or up to 8 yd behind it, shipped on all 12 holes with online
+captures (holes 1, 2, 3, 6, 7, 12, 13, 17 and 21 have none yet).
+
+## Trees (decoded 2026-10-18)
+
+The meshes hold no trees either: their type-12 walls are banks, cliffs and
+retaining walls, along the water on most holes and at the edge of the terrain
+on H12, H13 and H20 (the type table above). The trees are objects in the same
+PMP placement files as the pins, group 0x0002 with ids 2, 3 and 6 (960 + 409
++ 171 over the 21 holes; H16 has 101 id-2 objects and nothing else, H17 and
+H18 only id 2). `tools/wsr-pins.mjs` writes them as `trees` (x, y in the map
+frame, `kind` = the id, `size` = the object's x scale) and
+`tools/build-derived.mjs` ships the ones on the map, with a canopy radius, as
+derived.json `trees`; the app mirrors them into its tree markers on every
+load (`src/derivedMerge.js`), replacing the v13 hand-placed seeds, of which
+only 24 of 130 were within 6 px of a real tree. Holes 1, 2, 9, 11 and 12 also
+carry 166 objects of ids 4, 5 and 7 (48, 33, 42, 24 and 19), each 0–26 u from
+a tree of ids 2, 3 or 6 — 0 u on H11 and H12, under 13 u (0.6 px) on H1 and
+H9, up to 26 u (3.0 px at 8.8 u/px) on H2 — with exactly that tree's scale on
+164 of the 166 (two on H1 differ by 0.1–0.3): companions of those trees, not
+trees of their own, and not read.
+
+Overlaid on the minimaps the positions sit at the centres of the drawn
+canopies (checked on H7, H16 and H19 by drawing them over the hole maps). The three
+ids are three sprites: id 2 is the round broadleaf canopy with a light
+highlight at the centre and a darker rim (the common tree), id 3 a dark dense
+crown with no highlight (conifer-like), id 6 a palm whose fronds draw as a
+thin star with no solid canopy. Their scale is uniform in x and z on 1533 of
+the 1540 (y equals x on 1174 and is within ±12% of it on 1477; the extremes
+are −33% and +52%), so `size` is the footprint scale, and the drawn
+canopy scales with it in world units, not screen px: the sprite edge
+(strongest colour gradient along 36 rays from the centre, median over rays,
+trees with no neighbour in reach and a ray spread under 1.5 px) sits at
+
+- **kind 2: r = 81 × size KCL units** — 42 trees on 18 holes, sizes 0.7–2.5;
+  r = 84.8·size − 6.8 u, R² 0.98, rms 6.5 u; through the origin 81.0 (rms
+  0.37 px); the same fit in px has a −0.2 px intercept, so no constant term.
+  Per hole that is 3.96 px per unit of scale on H7 (19.6 u/px) but 5.25–5.44
+  on H16/H19 (13.7–14.6 u/px), which is what rules out a fixed-size sprite.
+- **kind 3: r = 48 × size** — 48 trees on 11 holes, sizes 0.85–3.0; R² 0.94,
+  rms 0.48 px (median r/size 47.9, IQR 45.2–49.7).
+- **kind 6: r = 45 × size, by eye** — the fronds give no edge to fit (the
+  detector caught two palms at 61); 9–11 px across at size 2.4–2.5 on H7's
+  19.6 u/px map.
+
+In map px that is K·size / (scale·9.144) with the hole's yd/px; derived.json
+carries r as a fraction of the map width. 1,272 of the 1,540 trees ship
+(20–100 per hole, a 0.02 margin outside the frame), many of them in the
+outer ground where the minimap draws no canopy at all.
+
+**The ground under each tree (`lie`, 2026-10-18).** `tools/wsr-pins.mjs`
+samples the class raster (`hole-NN_classes.png`, 4 u/px; trees and rasters
+share the mesh frame, so no registration is involved) at every trunk and
+writes it as `lie`: fairway, rough, sand, green, fringe, outer (type-4
+ground, the type-5 floor plane, and anything beyond the raster's crop, which
+already reaches 600 u past the last course surface), water, other (zone,
+fall). A nodata pixel would take the surface most of the 1–2 px ring around
+it shows, and nothing within reach is outer; neither case occurs. Over the
+1,540: rough 454, fairway 6, outer 1,080 (896 on the rasters, 184 beyond
+their crops); no tree stands on sand, green, fringe or water. Per kind: 2
+outer 631 / rough 329; 3 outer 333 / rough 73 / fairway 3; 6 outer 116 /
+rough 52 / fairway 3. Per hole, outer / rough (/ fairway): H1 46/11, H2
+48/14, H3 79/22, H4 25/15, H5 57/20/4, H6 51/32, H7 38/30/1, H8 46/19, H9
+36/31/1, H10 75/33, H11 72/22, H12 77/9, H13 49/17, H14 48/38, H15 68/27, H16
+68/33, H17 53/15, H18 41/19, H19 66/18, H20 0/21, H21 37/8. The rasters are
+gitignored, so a run of wsr-pins.mjs without them keeps each tree's lie from
+the committed file (the tree at the same x, y, kind and size) and says so.
+
+`build-derived` ships `off: true` on a tree whose lie is outer or water: the
+course does not reach there, the minimap draws no canopy and a ball is out
+of bounds already, so the app draws it as a faint disc with no glyph (drawn
+like the course trees they buried the map on H16, H1 and H7), and the Guide's
+Trees step counts on-course trees only. The lie itself stays out of
+derived.json. Of the 1,272 shipped trees 458 are on the course and 814 off;
+per hole on/off: H1 11/37, H2 14/22, H3 22/64, H4 15/13, H5 24/56, H6
+32/47, H7 31/36, H8 19/12, H9 32/34, H10 33/64, H11 22/39, H12 9/64, H13
+17/27, H14 38/46, H15 27/47, H16 33/67, H17 14/24, H18 19/41, H19 18/40, H20
+20/0, H21 8/34.
 
 ## Quirks worth knowing
 
@@ -291,8 +368,13 @@ yet).
   under water; the green finder ignores them by taking the loop with most vertices.
 - fcJP13/14/7/9 have huge type-1 wedge planes far outside the hole; the
   `> 1e5 u²` rule drops them, which is why nodata appears beyond the island on H8.
-- Tree trunks are not solid in the ground mesh: each leaves a 60–80 u square gap
-  in fairway/rough, so the surface under a trunk comes from the outer ground.
+- The ground mesh has small (60–80 u) square gaps in fairway/rough, once read
+  as trunk footprints. They are not: sampling the class rasters at the PMP
+  tree positions (4 u/px) finds fairway or rough under 459 of the 460 trees
+  that fairway/rough surrounds (the one exception, on H18, has outer ground
+  under it), and the type-12 walls run along the water edges and the edge of
+  the terrain (the type table), not around trunks. The meshes carry no tree
+  collision at all.
 - There are no cups in the meshes. The "15×15 cup gaps" once reported on six
   greens were artefacts: the OBJ export stores shared corners with ~0.001 u of
   noise (e.g. -46.876 / -46.875), and rounding vertices to a 0.05 grid split
@@ -310,4 +392,7 @@ yet).
    still per-green relative, so a level-3 cell means "this green's steepest",
    not a fixed gradient.
 3. Per-hole elevation offsets for the shot model (holes 8/12/17 first) from the
-   tee/landing-zone heights in the sidecars.
+   tee/landing-zone heights in the sidecars (tee to green centre: up to 51 m
+   down on H21, 20 m up on H17). Online rounds add the tee platform's tier:
+   the upper tier is a few feet above the lower one, about 1-2 yd of carry
+   from the drop, small next to the terrain.

@@ -17,9 +17,10 @@
 //   spreads the existing green object, keeping the marker).
 // - Everything else keeps the original fill-empty behaviour, except the tees:
 //   tee (the WSR player start, where local play tees off) and teeOnline (the
-//   Survival Golf platform, on holes where it sits apart from the start) always
-//   follow derived.json. Nothing in the app edits a tee, and the loader drops
-//   both from saved state anyway.
+//   two-tiered Survival Golf platform: its lower and upper tier, or only the
+//   observed median x, y while none of a hole's online rounds has a judged
+//   tier) always follow derived.json, whole. Nothing in the app edits a tee,
+//   and the loader drops both from saved state anyway.
 // - Pins the pipeline produced (string ids "d…") mirror derived.json on every
 //   load, so corrections reach the app and stale spots drop out; they keep the
 //   derived fields (label, set, src, yd, seen) and their id is "d<hole>-<derived
@@ -28,6 +29,15 @@
 //   it moves to the pipeline pin at the same spot on the green: its position is
 //   carried from the stored green box's frame into the new one, then the nearest
 //   current pipeline pin is chosen.
+// - Tree markers the pipeline placed carry `auto: true` (today WSR's own trees
+//   from the course placement files, id "t<hole>-<k>", with the drawn canopy's
+//   radius r as a fraction of the map width, and `off: true` on a tree the
+//   course does not reach — outer ground or water under its trunk — which the
+//   app draws faint; before that the v13 hand-placed seeds, also auto). They
+//   mirror derived.json's `trees` on every load; the player's own markers (no
+//   `auto`) are never touched. A derived.json with no `trees` for the hole
+//   leaves the markers as they are, so an old install keeps its seeds until
+//   the pipeline ships trees.
 export const isPipelinePin = (p) => typeof p?.id === "string" && p.id.startsWith("d");
 // the app's hole-map frame (map px), so "nearest" means nearest on the map
 const MAP_W = 250, MAP_H = 304;
@@ -76,6 +86,10 @@ export function applyDerivedHole(cur, n, dh, { fresh }) {
   if (out.curPin == null || !out.pins.some((p) => p.id === out.curPin)) {
     const pick = pipeline.reduce((b, p) => ((p.seen ?? 0) > (b ? b.seen ?? 0 : -1) ? p : b), null);
     out.curPin = pick ? pick.id : out.pins.length ? out.pins[out.pins.length - 1].id : null;
+  }
+  if (Array.isArray(dh.trees)) {
+    out.markers = [...(out.markers ?? []).filter((m) => !m.auto),
+      ...dh.trees.map((t, k) => ({ id: `t${n}-${k}`, x: t.x, y: t.y, r: t.r, auto: true, ...(t.off ? { off: true } : {}) }))];
   }
   return out;
 }

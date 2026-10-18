@@ -1,0 +1,20 @@
+{
+ "_note": "Which tier of the online Survival Golf tee platform the player stood on in each online round, read from the captures by eye (two independent judges agreed on all 13; five were re-checked by hand). A round is a hole at one wind. Player-confirmed game facts: every hole has the same two-tiered platform, four slots on the lower tier and four on the upper, the upper directly behind the lower and raised a few feet, so a slot's upper and lower positions differ by one constant offset on every hole. Upper-tier frames show other players' heads cut off by the deck edge in front; lower-tier frames show the glass-faced upper deck with its stairs rising behind or beside the player.",
+ "tierOffsetYd": 4.0,
+ "tierOffsetFrom": "H11, the one hole captured from both tiers: the W6 round's median avatar stands 4.02 yd further from the green than the W0 round's, measured along the tee -> green-centre axis (from the WSR tee-pad centre, which is within 0.2 deg of the start -> green direction on H11; the avatar marker wanders ~1.5 px = 1.3 yd on H11 with the aim, so take it as 4 +- 1 yd)",
+ "rounds": [
+  { "hole": 4, "wind": 29, "tier": "upper", "evidence": "three heads past the front rim with bodies hidden (ERYD); stairs down at the deck's end" },
+  { "hole": 5, "wind": 0, "tier": "upper", "evidence": "afro and straw-hat heads past the front rim, bodies hidden (W69G, YEXD); steps down at the right (W69G)" },
+  { "hole": 8, "wind": 24, "tier": "upper", "evidence": "three heads just above the front rim, bodies hidden (9Q7S, ZR7Z); steps down at the deck's end (FNKE)" },
+  { "hole": 9, "wind": 20, "tier": "lower", "evidence": "glass-faced upper deck with four players on it rising beside the player (SA3N), stairs up (R67X, DSA9); flat curbs at the player's level" },
+  { "hole": 10, "wind": 4, "tier": "lower", "evidence": "glass riser with stairs and three players on top behind the player (TC5Y, D9V1, E9VD); flat curbs" },
+  { "hole": 11, "wind": 0, "tier": "lower", "evidence": "glass riser with stairs and players on top (TQJY, X3GA, FV5M, PZP2); flat curbs (0RNW)" },
+  { "hole": 11, "wind": 6, "tier": "upper", "evidence": "heads past the front rim with bodies hidden (Q7TD, 9ZTJ, B4A6, Y55H); the deck's edge drops to a lower strip (23PJ)" },
+  { "hole": 14, "wind": 15, "tier": "lower", "evidence": "glass riser with three players on top beside the player (KWAY); flat curbs, nothing below the front rim" },
+  { "hole": 15, "wind": 29, "tier": "upper", "evidence": "no players below, but the deck's glass sides drop away under its coping with stairs down at a corner (4X5K, TK9W, B24E); no riser above the player in any direction" },
+  { "hole": 16, "wind": 31, "tier": "upper", "evidence": "a camo-cap player past the front rim cut off at the shoulders (ZG9S, VR6R); glass faces and steps down (KHQA, PMFG)" },
+  { "hole": 18, "wind": 24, "tier": "upper", "evidence": "two heads above the front rim with bodies hidden (YV7V); a lower rimmed strip beyond the right edge (69GK)" },
+  { "hole": 19, "wind": 24, "tier": "upper", "evidence": "no players below, but the deck's glass face drops to a lower rimmed strip with stair notches (ZBVA, Q5RD); no riser behind (XJ73)" },
+  { "hole": 20, "wind": 11, "tier": "upper", "evidence": "no players below, but glass faces drop away under the coping on both sides (R608, Z16B, D6GC); lower strips alongside; no riser behind (3MW0)" }
+ ]
+}

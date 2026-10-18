@@ -73,8 +73,12 @@ const NOTES = {
 };
 
 const LIES = { tee: 1.0, fairway: 1.0, rough: 0.85, bunker: 0.7 };
-// Tree positions hand-annotated from the overview maps (fractional x,y).
-// Seeded once as editable hazard markers — delete any that look wrong.
+// v13's hand-placed tree positions (fractional x,y; an audit found 24 of the
+// 130 within 6 map px of a real tree). They only seed a fresh install's
+// markers (auto: true) until derived.json loads: its trees are WSR's own,
+// from the course placement files, with each canopy's radius, and they
+// replace every auto marker on every load (derivedMerge.js). The player's
+// own markers (no auto) are never touched.
 const TREE_SEEDS = {
   1:[[.36,.10],[.62,.12],[.28,.30],[.70,.30],[.27,.48],[.71,.50],[.33,.68],[.63,.70]],
   2:[[.18,.12],[.30,.08],[.70,.30],[.66,.48],[.75,.50],[.22,.55],[.18,.68],[.68,.65]],
@@ -498,6 +502,15 @@ function GreenView({ holeNum, pins = [], curPinId = null, greenBox = null, green
   );
 }
 
+// The ball is on a spot (the tee star, an online tier) only when it was put
+// there exactly: the ⛳ chips copy the spot's own coordinates, so an exact
+// match is what they make, and 1e-6 of the map is far under a map px. One
+// test for the chips and for HoleMap's ring, so they cannot disagree. The
+// old 0.01 reach (2.5 x 3 map px) lit both Online chips at once on 10 of the
+// 12 holes with tiers (the tiers are 4 yd apart, 0.0052-0.0152 of the map;
+// only H4 and H11 clear 0.01) and From tee as well on H10/H11/H15/H16/H18.
+const ballOn = (ball, spot) => !!(ball && spot && Math.hypot(ball.x - spot.x, ball.y - spot.y) < 1e-6);
+
 /* ---------------- clickable hole map ---------------- */
 function HoleMap({ holeNum, line, onLine, markers, onMarkers, markerMode, aimPreview, cornerMode, onCorner, greenBox, greenPoly = null, pins = [], curPinId = null, pinMode = false, onPins, distLabel = null, windBadge = null, teePos = null, teeOnlinePos = null, stopMarker = null, showTrees = true }) {
   const imgRef = useRef(null);
@@ -573,9 +586,23 @@ function HoleMap({ holeNum, line, onLine, markers, onMarkers, markerMode, aimPre
       return;
     }
     if (markerMode) {
-      const near = markers.find((m) => Math.hypot(m.x - fx, m.y - fy) < 0.06);
-      if (near) onMarkers(markers.filter((m) => m.id !== near.id));
-      else onMarkers([...markers, { id: Date.now(), x: fx, y: fy }]);
+      // The nearest of your own markers within 0.06 (a finger's reach) goes.
+      // Failing that, a tap inside the drawn canopy of a course tree (auto,
+      // on the course, and shown) is swallowed: the tree already marks that
+      // hazard, and a marker on it would only cover it. Any other tap adds
+      // your marker. The 0.06 reach (15 x 18 map px) once applied to every
+      // pipeline tree as well, 20-100 per hole with canopies of 2.6-18 px,
+      // the faint off-course ones (where a ball is out of bounds anyway) and
+      // hidden ones included: 20-68% of the map and 34-84% of the playable
+      // ground (H9) refused a marker, with no sign why. The shown canopies
+      // alone are 1-13% of the map (5-36% of the playable ground).
+      const own = markers.filter((m) => !m.auto)
+        .map((m) => ({ m, d: Math.hypot(m.x - fx, m.y - fy) })).filter((o) => o.d < 0.06).sort((a, b) => a.d - b.d)[0];
+      if (own) { onMarkers(markers.filter((m) => m.id !== own.m.id)); return; }
+      const r = mapRect(e.currentTarget); // a canopy is drawn as a circle of m.r * the map's width
+      const canopy = showTrees && markers.some((m) => m.auto && !m.off && m.r > 0
+        && Math.hypot((m.x - fx) * r.width, (m.y - fy) * r.height) < m.r * r.width);
+      if (!canopy) onMarkers([...markers, { id: Date.now(), x: fx, y: fy }]);
       return;
     }
     if (!line.ball || (line.ball && line.target)) onLine({ ball: { x: fx, y: fy }, target: null });
@@ -585,8 +612,10 @@ function HoleMap({ holeNum, line, onLine, markers, onMarkers, markerMode, aimPre
   const px = (p) => ({ x: p.x * 100, y: p.y * 100 });
   const b = line.ball ? px(line.ball) : null;
   const t = line.target ? px(line.target) : null;
-  // the ball is on the online tee: the same test as the ⛳ Online tee chip
-  const onlineTee = !!(b && teeOnlinePos && Math.hypot(line.ball.x - teeOnlinePos.x, line.ball.y - teeOnlinePos.y) < 0.01);
+  // the ball is on the online platform: on either tier's spot, or on the one
+  // spot of a hole whose tiers are unjudged; ballOn, the same test as the ⛳ chips
+  const onlineSpots = teeOnlinePos ? (teeOnlinePos.lower && teeOnlinePos.upper ? [teeOnlinePos.lower, teeOnlinePos.upper] : [teeOnlinePos]) : [];
+  const onlineTee = onlineSpots.some((p) => ballOn(line.ball, p));
 
   // aim preview point: rotate the aim offset (yd → map fraction handled by parent via aimPreview.fx/fy)
   return (
@@ -634,11 +663,14 @@ function HoleMap({ holeNum, line, onLine, markers, onMarkers, markerMode, aimPre
             <path d="M0,-2.4 L0.72,-0.74 2.5,-0.74 1.06,0.36 1.6,2.1 0,1.05 -1.6,2.1 -1.06,0.36 -2.5,-0.74 -0.72,-0.74 Z" fill="#FFD447" stroke="#8a6d1a" strokeWidth="0.25" />
           </g>
         )}
-        {/* the online (Survival Golf) tee sits only 0.9-2.2 viewBox units
-            from the tee star on 9 of the 10 holes that have one (3.9 on H4),
-            inside the star's 2.5-unit arms, so a marker of its own covered
-            the star. It shows only while the ball is on it (the ⛳ Online
-            tee chip is active): a thin white ring around the ball. */}
+        {/* the online (Survival Golf) platform's tiers sit 0.4-2.7 (lower)
+            and 0.8-3.9 (upper) viewBox units from the tee star on the 12
+            holes that have them, mostly inside the star's 2.5-unit arms (the
+            lower tier is within 2 yd of the star on H10 and H11, and level
+            with it along the hole but 4.6 yd beside it on H14), so markers
+            of their own covered the star. A thin white ring around the ball
+            shows only while the ball is on a tier (a ⛳ tier chip is
+            active). */}
         {onlineTee && (
           <circle cx={b.x} cy={b.y} r="2.2" fill="none" stroke="#fff" strokeWidth="0.5" />
         )}
@@ -694,11 +726,31 @@ function HoleMap({ holeNum, line, onLine, markers, onMarkers, markerMode, aimPre
             </g>
           );
         })}
+        {/* Trees. A pipeline marker (auto: WSR's own tree from the course
+            placement files) carries the drawn canopy's radius r as a
+            fraction of the map width and is drawn as that disc, so a canopy
+            reads as the area it covers. One marked off stands where the
+            course does not reach (outer ground or water under the trunk:
+            two thirds of H16's trees), where the minimap draws no canopy and
+            a ball is out of bounds already, so it is a faint disc with a
+            hairline and no glyph; drawn like the course trees they buried
+            the map. The 100x100 viewBox is stretched over the 250x304 map,
+            so a circle on screen is an ellipse here: rx = r*100,
+            ry = rx * width/height. Your own markers stay as they were, and
+            so does an old seed with no radius. */}
         {showTrees && markers.map((m) => (
-          <g key={m.id} transform={`translate(${m.x * 100} ${m.y * 100})`} opacity={m.auto ? 0.85 : 1}>
-            <circle r={m.auto ? 2.6 : 3.2} fill="#0B3D1E" stroke="#fff" strokeWidth={m.auto ? 0.4 : 0.7} />
-            <text y="1.5" textAnchor="middle" fontSize={m.auto ? 3.8 : 4.5}>🌲</text>
-          </g>
+          m.auto && m.r > 0 ? (
+            <g key={m.id} transform={`translate(${m.x * 100} ${m.y * 100})`}>
+              <ellipse rx={m.r * 100} ry={m.r * 100 * dims.w / dims.h} fill={m.off ? "rgba(11,61,30,0.15)" : "rgba(11,61,30,0.45)"}
+                stroke={m.off ? "rgba(255,255,255,0.3)" : "rgba(255,255,255,0.7)"} strokeWidth={m.off ? 0.1 : 0.3} />
+              {!m.off && <text y="1.3" textAnchor="middle" fontSize={Math.max(2.2, Math.min(3.8, m.r * 110))}>🌲</text>}
+            </g>
+          ) : (
+            <g key={m.id} transform={`translate(${m.x * 100} ${m.y * 100})`} opacity={m.auto ? 0.85 : 1}>
+              <circle r={m.auto ? 2.6 : 3.2} fill="#0B3D1E" stroke="#fff" strokeWidth={m.auto ? 0.4 : 0.7} />
+              <text y="1.5" textAnchor="middle" fontSize={m.auto ? 3.8 : 4.5}>🌲</text>
+            </g>
+          )
         ))}
         {b && <circle cx={b.x} cy={b.y} r="1.2" fill="#fff" stroke={T.ink} strokeWidth="0.6" />}
         {t && <g transform={`translate(${t.x} ${t.y})`} style={{ pointerEvents: "auto", cursor: draggingT ? "grabbing" : "grab" }}>
@@ -1245,7 +1297,7 @@ export default function App() {
                   <div className="flex gap-2">
                     {holesMeta[hole].tee && (
                       <button onClick={() => setLine({ ball: { ...holesMeta[hole].tee }, target: null })}
-                        className="flex-1 py-1.5 rounded-xl border-2 font-bold" style={chip(line.ball && holesMeta[hole].tee && Math.hypot(line.ball.x - holesMeta[hole].tee.x, line.ball.y - holesMeta[hole].tee.y) < 0.01)}>
+                        className="flex-1 py-1.5 rounded-xl border-2 font-bold" style={chip(ballOn(line.ball, holesMeta[hole].tee))}>
                         ⛳ From tee
                       </button>
                     )}
@@ -1256,16 +1308,31 @@ export default function App() {
                       🌲 {markerMode ? "tap: add / remove" : "Edit trees"}
                     </button>
                   </div>
-                  <div className="flex gap-2 mt-1.5">
-                    {holesMeta[hole].teeOnline && (
-                      <button onClick={() => setLine({ ball: { x: holesMeta[hole].teeOnline.x, y: holesMeta[hole].teeOnline.y }, target: null })}
-                        title="Online Survival Golf tees off from a platform away from the normal tee; your spot on it can vary by a few yards, so trust the 'yd to go' badge"
-                        className="flex-1 py-1 rounded-xl border-2 text-[11px] font-bold"
-                        style={chip(line.ball && Math.hypot(line.ball.x - holesMeta[hole].teeOnline.x, line.ball.y - holesMeta[hole].teeOnline.y) < 0.01)}>
-                        ⛳ Online tee
-                      </button>
-                    )}
-                    <button onClick={() => setShowTrees(!showTrees)} className="flex-1 py-1 rounded-xl border-2 text-[11px] font-bold" style={chip(showTrees)}>
+                  <div className="flex flex-wrap gap-2 mt-1.5">
+                    {/* the online platform's two tiers; a single chip while none
+                        of the hole's online rounds has a judged tier (x, y only).
+                        Two chips to a line (basis = half the row less half the
+                        gap), each label kept on one line, a chip that does not
+                        fit beside another taking a line of its own: three
+                        abreast had 46 px each in the 155-px cell of a 360-px
+                        phone and broke every label into three lines. Measured
+                        in Chrome (Trebuchet MS bold): "⛳ Lower tier" is 76 px
+                        at 11 px and 70 at 10 px, and the half row is 73.5 px at
+                        360 (77 at 375), so 10 px pairs the tiers on a 360-px
+                        phone; the trees chip (75-78 px) takes the next line. */}
+                    {holesMeta[hole].teeOnline && (() => {
+                      const to = holesMeta[hole].teeOnline;
+                      const tiers = to.lower && to.upper ? [["⛳ Lower tier", to.lower], ["⛳ Upper tier", to.upper]] : [["⛳ Online tee", to]];
+                      return tiers.map(([label, p]) => (
+                        <button key={label} onClick={() => setLine({ ball: { x: p.x, y: p.y }, target: null })}
+                          title="Online Survival Golf tees off from a two-tier platform on every hole: four slots on the lower tier, four on the upper, 4 yd behind and a few feet up. Your slot can shift you up to ~5 yd sideways, so trust the 'yd to go' badge"
+                          className="grow basis-[calc(50%-0.25rem)] py-1 rounded-xl border-2 text-[10px] font-bold whitespace-nowrap"
+                          style={chip(ballOn(line.ball, p))}>
+                          {label}
+                        </button>
+                      ));
+                    })()}
+                    <button onClick={() => setShowTrees(!showTrees)} className="grow basis-[calc(50%-0.25rem)] py-1 rounded-xl border-2 text-[10px] font-bold whitespace-nowrap" style={chip(showTrees)}>
                       🌲 trees {showTrees ? "shown" : "hidden"}
                     </button>
                   </div>
@@ -1807,10 +1874,10 @@ export default function App() {
         {/* ================= GUIDE ================= */}
         {tab === "guide" && (() => {
           const steps = [
-            ["Green box + slopes", (n) => !!holesMeta[n].green?.box && (holesMeta[n].green?.grid ?? []).some((r) => r.some(([x, y]) => x || y)), "AUTO (pipeline): boundary + slope grid extracted from your zoomed green captures. Manual paint in Holes → ⚙ stays available as an override."],
+            ["Green box + slopes", (n) => !!holesMeta[n].green?.box && (holesMeta[n].green?.grid ?? []).some((r) => r.some(([x, y]) => x || y)), "AUTO: boundary + slope grid come from Wii Sports Resort's collision meshes (the game files); your zoomed green captures only confirm them. Manual paint in Holes → ⚙ stays available as an override."],
             ["Pins", (n) => (holesMeta[n].pins?.length ?? 0) > 0, "AUTO: WSR's own spots are built in (from the game files). A spot that isn't one of them gets added as S1, S2… once two independent readings agree on it: two rounds, or a zoomed green plus a tee frame (which can be one round)."],
-            ["Map scale", (n) => !!holesMeta[n].scale, "AUTO (pipeline): tee 'yd to go' ÷ tee→pin distance on the map. (Manual fallback: Solver → tap ball, tap target, type the in-game distance → Set.)"],
-            ["Trees", (n) => true, "AUTO (pipeline): re-seeded from the upgraded maps. Spot-check in Holes → ⚙ only if a solver line looks wrong."],
+            ["Map scale", (n) => !!holesMeta[n].scale, "AUTO: yards per map pixel from the registration of the WSR meshes to the hole maps; the tee 'yd to go' badges confirm it. (Manual fallback: Solver → tap ball, tap target, type the in-game distance → Set.)"],
+            ["Trees", (n) => (holesMeta[n].markers ?? []).some((m) => m.auto && m.r > 0 && !m.off), "AUTO: every tree is WSR's own, from the game files (the course placement data), with its size; each is drawn as the canopy it covers, faint where it stands beyond the course (outer ground or water under it, where a ball is out of bounds anyway). Add your own markers in Holes → ⚙ for anything else that blocks a line."],
             ["Log shots", (n) => holeStats[n].shots > 0, "Phase 2: two captures per shot (address + result pop-up) — the pipeline turns them into Log rows."],
             ["Play & score", (n) => holeStats[n].times > 0, "Rounds → Start a round → enter strokes as you play. Mark blocked lines from the Solver when a rec hits trees."],
           ];
@@ -1829,7 +1896,7 @@ export default function App() {
                     </div>
                   ))}
                 </div>
-                <h3 className="disp text-sm font-bold mb-1">Progress (auto-tracked; Trees has no tracker)</h3>
+                <h3 className="disp text-sm font-bold mb-1">Progress (auto-tracked)</h3>
                 <div className="overflow-x-auto rounded-2xl border-2" style={{ borderColor: T.line, background: "#fff" }}>
                   <table className="w-full text-[11px]">
                     <thead><tr className="disp text-left" style={{ background: T.sky }}>
@@ -1841,8 +1908,7 @@ export default function App() {
                           <td className="px-2 py-1 font-bold">H{n}</td>
                           {steps.map(([nm, done], i) => (
                             <td key={i} className="px-1 py-1 text-center">
-                              {i === 3 ? <span className="opacity-40">—</span>
-                                : done(n) ? <span style={{ color: T.turf }}>●</span> : <span className="opacity-25">○</span>}
+                              {done(n) ? <span style={{ color: T.turf }}>●</span> : <span className="opacity-25">○</span>}
                             </td>
                           ))}
                         </tr>
@@ -1908,7 +1974,7 @@ export default function App() {
                   <div>10. You can physically swing past a capped bar — it goes red and the shot wobbles/curves unpredictably. The solver never plans on it.</div>
                   <div>11. Putter roll depends on surface: green rolls best, fairway noticeably slower, sand slowest. No source in 20 years reports any per-bar flight penalty from rough/sand — caps are the whole mechanic until your logs say otherwise.</div>
                   <div>12. Backspin strength scales with swing power ("the harder you swing, the stronger the backspin" — official). Capped lies therefore also cap max spin; that alone explains weaker spin from rough/sand.</div>
-                  <div>13. Pins are fixed spots, read straight from Wii Sports Resort's course files: H1 has 3, H2–H17 have 6 (B = the easier three, A = the harder three), H18 has 1, the Specials 6 each. In WSR your score picks the set — A once you're more than k/2 under par going into the round's k-th hole (−3 or better before the 4th), never in 3-hole rounds — and a random draw picks the spot within it. Switch Sports reuses these spots (your captures show both sets) and adds a few of its own, labelled S1, S2… Local play tees off from WSR's own tee spot unless you move it (Shot Position). Online Survival Golf tees off from a platform: on 10 of the 12 holes with online captures it sits 5–12 yd from that spot (⛳ Online tee), on holes 10 and 11 within 3 yd; holes 1, 2, 3, 6, 7, 12, 13, 17 and 21 have no online captures yet, so only the local tee is offered there. Your place on the platform varies a few yards within a round, so trust the "yd to go" badge.</div>
+                  <div>13. Pins are fixed spots, read straight from Wii Sports Resort's course files: H1 has 3, H2–H17 have 6 (B = the easier three, A = the harder three), H18 has 1, the Specials 6 each. In WSR your score picks the set — A once you're more than k/2 under par going into the round's k-th hole (−3 or better before the 4th), never in 3-hole rounds — and a random draw picks the spot within it. Switch Sports reuses these spots (your captures show both sets) and adds a few of its own, labelled S1, S2… Local play tees off from WSR's own tee spot unless you move it (Shot Position). Online Survival Golf tees off from the same two-tier platform on every hole: four slots on the lower tier, four on the upper, which is 4 yd further back and a few feet up. The lower tier is the local tee spot on some holes and up to 8 yd behind it on others (the ⛳ Lower tier / Upper tier chips put the ball on either), and your slot can put you up to ~5 yd to either side. Online captures exist on 12 holes; holes 1, 2, 3, 6, 7, 12, 13, 17 and 21 have none yet, so only the local tee is offered there. The "yd to go" badge is the authority.</div>
                   <div>14. At 0 mph the wind still HAS a direction — read it off the flag cloth on the pin.</div>
                 </div>
               </section>

@@ -4,7 +4,7 @@
 //                     migration of stored positions) + new map px size
 //   public/derived.json  per-hole scale, green box, quantized 9x9 slope
 //                     grid (app convention: unit direction x magnitude
-//                     1|2|3), pins in map-fractional coords
+//                     1|2|3), pins, tees and trees in map-fractional coords
 //   node tools/build-derived.mjs
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -426,12 +426,42 @@ if (WSR) {
 // course PMP files by tools/wsr-pins.mjs) are the truth for where pins and the
 // tee are (tools/PINS.md). NSS reuses WSR's spots, both sets, and adds a few of
 // its own. Local play tees off from the WSR start; online Survival Golf from a
-// platform that sits up to ~12 yd from it. derived.json gets every WSR spot
-// with the number of rounds it was seen in, the Switch-only spots that two
-// independent readings agree on, tee = the WSR start and teeOnline = the
-// median avatar of the online tee frames.
+// two-tiered platform whose lower tier stands 0-8 yd behind it (the Tees
+// block below). derived.json gets every WSR spot with the number of rounds it
+// was seen in, the Switch-only spots that two independent readings agree on,
+// tee = the WSR start and teeOnline = the platform's two tiers, placed from
+// the online tee frames.
 let WSRP = null;
 try { WSRP = JSON.parse(readFileSync(join(ROOT, "tools", "wsr-pins.json"), "utf8")).holes; } catch {}
+// Trees are WSR's own too (wsr-pins.json `trees`: the PMP tree objects, kind =
+// the PMP id, size = the object's x scale), replacing the v13 hand-placed
+// seeds (24 of 130 within 6 px of a real tree). The minimap draws each as a
+// sprite whose radius scales with `size` in world units, not screen px: the
+// sprite edge measured on the hole maps (the strongest colour gradient along
+// 36 rays, median over rays) sits at 81 KCL units per unit of scale for kind
+// 2, the round canopy (42 isolated trees on 18 holes, sizes 0.7-2.5, r =
+// 84.8*size - 6.8 units, R^2 0.98; through the origin 81.0, rms 0.37 px, and
+// the fit in px has a -0.2 px intercept, so no constant term), and 48 for
+// kind 3, the dark dense crown (48 trees on 11 holes, sizes 0.85-3.0, R^2
+// 0.94, rms 0.48 px). The same sprite on a long hole's map is drawn smaller
+// in px (3.96 px per unit of scale on H7 at 19.6 units/px, 5.25-5.44 on
+// H16/H19 at 13.7-14.6), which is what tells world-unit scaling from a fixed
+// sprite. Kind 6 is a palm whose fronds draw as a thin star with no edge to
+// fit (two detector hits at 61); 45 is the frond span by eye on three H7
+// palms (9-11 px across at size 2.4-2.5 on a 19.6 units/px map). In map px
+// that is K * size / (scale * 9.144), with scale the hole's yd/px.
+const TREE_CANOPY_UNITS = { 2: 81, 3: 48, 6: 45 };
+const UNITS_PER_YD = 9.144;
+// a tree this far outside the frame (fraction) still ships: its canopy reaches in
+const TREE_MARGIN = 0.02;
+// A tree on one of these lies (wsr-pins.json `lie`: the KCL surface under the
+// trunk, read off the mesh class rasters) ships with off: true. The course
+// does not reach there, the minimap draws no canopy and a ball is out of
+// bounds already, so the app draws it faint; drawn like the course trees
+// they buried the map (H16: 68 of its 101 trees stand on the outer ground,
+// H1 46 of 57). The lie itself stays out of derived.json: the app only needs
+// on or off, and it would add 1,272 strings to the file.
+const TREE_OFF_LIES = new Set(["outer", "water"]);
 // Capture time and wind of every classified frame, and from them the rounds
 // played on each hole. The time is the EXIF DateTime the console writes into
 // each capture (tools/lib/exif.mjs). The ULID in the original file name is
@@ -539,12 +569,28 @@ const TEE_ONLY_MIN_YD = 7, TEE_ONLY_MIN_PX = 3;
 // case in point: 6 px off any spot, while its own session's tee frame shows
 // WSR pin 2.
 const SWITCH_SPOT_MIN_READINGS = 2;
-// The online tee: the median avatar of >= 2 online tee frames, shipped when
-// it is at least this far from the WSR start. On holes 10 and 11 the online
-// avatars stand a median 1.9 and 2.8 yd from it (0.8-6.0 yd per frame), which
-// the WSR start already covers; the shipped ones stand 4.6 (H14), 5.5 (H18)
-// and 6.3-11.9 yd (H4/5/8/9/15/16/19/20) from it.
-const ONLINE_TEE_MIN_YD = 4, TEE_REACH_YD = 25;
+// The online tee platform. tools/online-rounds.json says which tier of it
+// the player stood on in each online round (a hole at one wind), judged from
+// the frames by eye, and holds the offset between the tiers; without the
+// file the observed median still ships, with no tiers (the Tees block below
+// has the model). An online frame's avatar is the yellow blob nearest the
+// WSR start, if within TEE_REACH_YD of it: the observed round medians stand
+// 0-12 yd from the start (H10 0.3 yd toward the green, H4 11.8 yd behind).
+let ONLINE_ROUNDS = null;
+try { ONLINE_ROUNDS = JSON.parse(readFileSync(join(ROOT, "tools", "online-rounds.json"), "utf8")); } catch {}
+const TIER_OFFSET_YD = ONLINE_ROUNDS?.tierOffsetYd ?? 4;
+// The file keys a round by hole + wind only (no date) and the first entry
+// wins: two entries for one hole + wind, or a second online round at a wind
+// the file judges once (another day, perhaps from the other tier), would hand
+// the same tier to both rounds, 4 yd wrong for one of them. Both cases warn
+// (the per-hole one in the Tees block) rather than pass silently.
+const tierEntries = (hole, wind) => ONLINE_ROUNDS?.rounds?.filter((r) => r.hole === hole && String(r.wind) === String(wind)) ?? [];
+const tierOf = (hole, wind) => tierEntries(hole, wind)[0]?.tier ?? null;
+for (const r of ONLINE_ROUNDS?.rounds ?? []) {
+  const same = tierEntries(r.hole, r.wind);
+  if (same.length > 1 && same[0] === r) console.warn(`tools/online-rounds.json: ${same.length} entries for hole ${r.hole} at wind ${r.wind} (${same.map((q) => q.tier).join(", ")}); the first one is used`);
+}
+const TEE_REACH_YD = 25;
 const median = (a) => { const s = [...a].sort((p, q) => p - q), m = s.length >> 1; return s.length & 1 ? s[m] : (s[m - 1] + s[m]) / 2; };
 const teeFramesUsed = {}; // file -> roles, for tools/frame-audit.mjs
 const pinObservations = {}; // hole -> every pin observation and what it was credited to
@@ -877,26 +923,70 @@ for (let hole = 1; hole <= 21; hole++) {
       badges: [...new Set(gr.obs.flatMap((o) => o.tee.map((r) => r.badge)))] }));
 
     // Tees. Local play tees off from the WSR start. Online Survival Golf
-    // starts from a platform of its own: teeOnline is the median avatar of
-    // the online tee frames (each frame's avatar nearest the start, as above),
-    // shipped when it stands ONLINE_TEE_MIN_YD or more from the start. The
-    // badge does not correct it: it is the distance to the pin, and NSS keeps
-    // some spots 2-4 yd from WSR's position, so sliding the avatar to the
-    // badge distance from the WSR spot moved the tee by the spot's offset
-    // (H9's online avatars stand a median 8.6 yd from the start; slid, 3.5 yd,
-    // and the tee was withheld).
+    // tees off from a two-tiered platform, the same object on every hole
+    // (player-confirmed): four slots on the lower tier, four on the upper,
+    // which is directly behind the lower one and raised a few feet, so a
+    // slot's upper position is its lower one moved back by one constant.
+    // The tier of each online round is judged from its frames by eye
+    // (tools/online-rounds.json: on the upper tier other players' heads show
+    // cut off by the deck edge in front; on the lower one the glass-faced
+    // upper deck and its stairs rise behind or beside the player). The
+    // offset between the tiers comes from H11, the one hole captured from
+    // both: its W6 (upper) round's median avatar stands 4.02 yd further from
+    // the green than its W0 (lower) round's, so tierOffsetYd = 4.0, +-1 yd
+    // (the avatar marker wanders ~1.5 px with the aim, 1.3 yd on H11). The
+    // offset runs along the tee -> green-centre axis (teeAxis: from the WSR
+    // tee-pad centre, where the start sits, to the green centre; the two
+    // directions differ by at most 0.64 deg, on H4, which moves the 4 yd
+    // offset by under 0.05 yd), away from the green. On a dogleg the platform faces the fairway, not
+    // the green centre, so that axis can be some degrees off: 20 deg moves
+    // the 4 yd offset by about 1.4 yd sideways, within the slot scatter.
+    // Per round, the median avatar (each frame's avatar nearest the start, as
+    // above) is where the player's tier stood; the lower tier is that point
+    // moved TIER_OFFSET_YD toward the green when the round was upper, else
+    // the point itself; the hole's lower tier is the mean over its judged
+    // rounds (H11 has two, which agree by construction of the offset) and
+    // its upper tier sits TIER_OFFSET_YD behind that. x, y stay the observed
+    // median over all the hole's online frames. The badge corrects none of
+    // it: it is the distance to the pin, and NSS keeps some spots 2-4 yd from
+    // WSR's position, so sliding the avatar to the badge distance from the
+    // WSR spot moved the tee by the spot's offset (H9's online avatars stand
+    // a median 8.6 yd from the start; slid, 3.5 yd, and the tee was
+    // withheld). Every hole with 2+ online frames ships: the lower tier sits
+    // within 2 yd of the start on H10 and H11 (and 4.6 yd beside it on H14)
+    // while the upper tier is 4 yd behind it, so no distance-from-the-start
+    // rule applies.
     tee = { x: +start.x.toFixed(4), y: +start.y.toFixed(4) };
     teeNote = " tee = WSR start";
     const online = (meta.teeFrames ?? []).filter((f) => f.online).map((f) => ({ f, p: avatarOf(f) })).filter((q) => q.p);
     let onlineNote = online.length >= 2 ? "" : online.length ? ", 1 online frame only" : ", no online frames";
     if (online.length >= 2) {
       const at = { x: median(online.map(({ p }) => p.x)), y: median(online.map(({ p }) => p.y)) };
-      const nSess = roundsOf(hole, online.map(({ f }) => f.file));
-      onlineNote = `, online tee ${yd(at, start).toFixed(1)} yd from it (${online.length} frames, ${nSess} round(s))`;
-      if (yd(at, start) >= ONLINE_TEE_MIN_YD) {
-        teeOnline = { x: +at.x.toFixed(4), y: +at.y.toFixed(4), n: online.length, sessions: nSess };
-        for (const { f } of online) (teeFramesUsed[f.file] ??= []).push("online tee");
-      } else onlineNote += " -> not shipped, the WSR start covers it";
+      const [ex, ey] = teeAxis(wt); // unit vector toward the green, in map px
+      // yd behind the start (+ = away from the green) and across the axis (+ = left, seen from the tee)
+      const along = (p) => -(((p.x - start.x) * W) * ex + ((p.y - start.y) * H) * ey) * sc;
+      const lateral = (p) => (((p.x - start.x) * W) * ey - ((p.y - start.y) * H) * ex) * sc;
+      const back = (p, d) => ({ x: p.x - (ex * d / sc) / W, y: p.y - (ey * d / sc) / H }); // p moved d yd away from the green
+      const byRound = new Map();
+      for (const q of online) { const r = roundOf(hole, q.f.file); byRound.set(r, [...(byRound.get(r) ?? []), q]); }
+      const rounds = [...byRound.values()].map((qs) => {
+        const m = { x: median(qs.map(({ p }) => p.x)), y: median(qs.map(({ p }) => p.y)) }, wind = windOf(qs[0].f.file), tier = tierOf(hole, wind);
+        return { wind, tier, n: qs.length, m, lower: tier === "upper" ? back(m, -TIER_OFFSET_YD) : tier === "lower" ? m : null };
+      });
+      for (const wind of new Set(rounds.map((q) => String(q.wind)))) {
+        const n = rounds.filter((q) => String(q.wind) === wind).length, judged = tierEntries(hole, wind).length;
+        if (judged && n > judged) console.warn(`H${hole}: ${n} online rounds at wind ${wind} mph but tools/online-rounds.json judges ${judged}; all ${n} take its tier (${tierOf(hole, wind)}) - judge the new round, it may be the other tier`);
+      }
+      const judged = rounds.filter((q) => q.lower);
+      const mean = (a) => a.reduce((t, v) => t + v, 0) / a.length;
+      const lower = judged.length ? { x: mean(judged.map((q) => q.lower.x)), y: mean(judged.map((q) => q.lower.y)) } : null;
+      const upper = lower && back(lower, TIER_OFFSET_YD);
+      const frac = (p) => ({ x: +p.x.toFixed(4), y: +p.y.toFixed(4) });
+      teeOnline = { ...frac(at), n: online.length, rounds: roundsOf(hole, online.map(({ f }) => f.file)),
+        seen: [...new Set(judged.map((q) => q.tier))].sort(), ...(lower ? { lower: frac(lower), upper: frac(upper) } : {}) };
+      for (const { f } of online) (teeFramesUsed[f.file] ??= []).push("online tee");
+      onlineNote = `, online platform: ${rounds.map((q) => `W${q.wind} ${q.tier ?? "tier?"} ${q.n} fr at ${along(q.m).toFixed(1)} along / ${lateral(q.m).toFixed(1)} lateral`).join("; ")}` +
+        (lower ? ` -> lower ${along(lower).toFixed(1)}, upper ${along(upper).toFixed(1)} yd behind the start` : " -> no judged tier, tiers not shipped");
     }
     if (process.env.PIN_DEBUG === String(hole)) for (const o of obs)
       console.log(`  round ${o.round} @ ${(o.x * W).toFixed(1)},${(o.y * H).toFixed(1)}: ${[...o.zoom, ...o.tee].map((r) => `${r.kind} ${r.file}${r.badge ? ` ${r.badge}yd` : ""}${r.online ? " online" : ""}`).join(" | ")}`);
@@ -904,9 +994,20 @@ for (let hole = 1; hole <= 21; hole++) {
     const fmt = (list) => list.map((gr) => `${(gr.x * W).toFixed(1)},${(gr.y * H).toFixed(1)} ${sessionsOf(gr)} round(s)`).join("; ");
     console.log(`H${hole}: pins = ${spots.length} WSR spot(s) (rounds on Switch: ${seenWsr || "none"})${kept.length ? ` + ${kept.length} Switch-only (${fmt(kept)})` : ""}${doubt.length ? `; one reading only, left out: ${fmt(doubt)}` : ""}${pinAmbiguous.length ? `; ambiguous: ${pinAmbiguous.map((a) => a.spots.join("/")).join(", ")}` : ""}; tee = WSR start${onlineNote}`);
   }
+  // ---- trees from WSR's placement file: the ones on the map, with the drawn
+  // canopy's radius as a fraction of the map WIDTH (the app draws it as a disc) ----
+  let trees = null;
+  if (Array.isArray(wp?.trees) && wt?.scale) {
+    const unitsPerPx = wt.scale * UNITS_PER_YD;
+    trees = wp.trees.filter((t) => t.x >= -TREE_MARGIN && t.x <= 1 + TREE_MARGIN && t.y >= -TREE_MARGIN && t.y <= 1 + TREE_MARGIN)
+      .map((t) => ({ x: +t.x.toFixed(4), y: +t.y.toFixed(4), r: +(((TREE_CANOPY_UNITS[t.kind] ?? TREE_CANOPY_UNITS[2]) * t.size) / unitsPerPx / W).toFixed(4), kind: t.kind,
+        ...(TREE_OFF_LIES.has(t.lie) ? { off: true } : {}) }));
+    const off = trees.filter((t) => t.off).length;
+    console.log(`H${hole}: trees = ${trees.length} on the map of ${wp.trees.length} in the PMP (${[2, 3, 6].map((k) => `${trees.filter((t) => t.kind === k).length} of kind ${k}`).join(", ")}), ${trees.length - off} on the course, ${off} off (outer ground or water under the trunk), canopy r ${Math.min(...trees.map((t) => t.r * W)).toFixed(1)}-${Math.max(...trees.map((t) => t.r * W)).toFixed(1)} px`);
+  }
   derived.holes[hole] = { scale: wt ? wt.scale : meta.scaleYdPerPx, yards: meta.yards, greenBox, greenPoly,
     grid: quantizeGrid(wt ? wt.grid : g.grid), pins, pinCandidates, pinAmbiguous, pinZones, pinObservations: greenPins,
-    greenView: greenMeta[hole] ?? null, tee, teeOnline,
+    greenView: greenMeta[hole] ?? null, tee, teeOnline, trees,
     ...(wt ? { source: "wsr", wsrRev: wsrRev(wt), captureGreenBox: captureBox ? { x0: +(captureBox.x0 / W).toFixed(4), y0: +(captureBox.y0 / H).toFixed(4),
       x1: +(captureBox.x1 / W).toFixed(4), y1: +(captureBox.y1 / H).toFixed(4) } : null } : {}) };
   console.log(`H${hole}: k=${anchor?.k?.toFixed(2)} r=${anchor?.r?.toFixed(2)} box=${box ? `${box.x0},${box.y0}..${box.x1},${box.y1}` : "MISS"}${wt ? ` (WSR; capture box ${captureBox ? `${captureBox.x0},${captureBox.y0}..${captureBox.x1},${captureBox.y1}` : "MISS"})` : ""} aspect map=${mapAspect?.toFixed(2) ?? "-"} zoom=${zoomAspect.toFixed(2)} pins=${pins.length}${teeNote}`);

@@ -369,8 +369,9 @@ export function writeRaw16(path, u16, littleEndian = true) {
 }
 
 // Draw the projected edges of every triangle in the selected groups into an
-// RGB buffer (Bresenham). Vertical wall triangles (tree trunks, cliffs) have no
-// footprint area, so this is how they become visible in a top-down preview.
+// RGB buffer (Bresenham). Vertical wall triangles (banks, cliffs and retaining
+// walls along the water edges and the edge of the terrain) have no footprint
+// area, so this is how they become visible in a top-down preview.
 export function drawEdges(mesh, { x0, z0, x1, z1, w, h, include, flipZ = false }, rgb, color) {
   const sx = (x1 - x0) / w, sz = (z1 - z0) / h;
   const put = (i, j) => { if (i >= 0 && j >= 0 && i < w && j < h) { const p = (j * w + i) * 3; rgb[p] = color[0]; rgb[p + 1] = color[1]; rgb[p + 2] = color[2]; } };
@@ -414,9 +415,12 @@ export function hillshade(height, w, h, sx, sz, az = 315, alt = 45) {
 // fc1 / fc13 / fcJP12 previews against the in-game minimaps (see mesh-inspect):
 //   1 fairway, 2 rough, 3 bunker, 4 outer ground (deep rough / OB terrain),
 //   5 floor plane under water & OB (F0805, never visible), 6 green,
-//   7 water surface, 9 fringe ring around the green, 0x0c/0x0d walls
-//   (tree trunks, cliffs, invisible fences), 0x0e special zone (hole 1 only),
-//   0x10 fall boundary (hole-5 mesh only).
+//   7 water surface, 9 fringe ring around the green, 0x0c walls (banks,
+//   cliffs and retaining walls: along the water on most holes, at the edge of
+//   the terrain on H12, H13 and H20, which have little or no water; none on
+//   H6, H10 and H16; no tree trunks: the trees are objects in the course PMP
+//   file, see tools/wsr-pins.mjs), 0x0d invisible fences, 0x0e special zone
+//   (hole 1 only), 0x10 fall boundary (hole-5 mesh only).
 export const KCL_GOLF = {
   1: "fairway", 2: "rough", 3: "bunker", 4: "ground", 5: "floor", 6: "green", 7: "water", 9: "fringe",
   12: "wall", 13: "wall", 14: "zone", 16: "fall",

@@ -2,7 +2,8 @@
 //   node tools/mesh-inspect.mjs <files.obj...> [--out <dir>] [--px 800] [--json <file>] [--flip-z]
 // Prints per-group stats (collision type, triangle count, footprint area,
 // height range, flatness), traces boundary loops of the small per-hole groups
-// (cups / tee pads show up as tiny interior loops) and writes a hillshaded
+// (tee pads and the small gaps in the ground show up as tiny interior loops;
+// there are no cups in the meshes, see tools/MESHES.md) and writes a hillshaded
 // type-map preview per mesh so the surfaces can be eyeballed against the
 // in-game minimaps.
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -89,7 +90,8 @@ for (const file of files) {
       const s = g < 0 ? 1 : 0.55 + 0.6 * shade[p];
       rgb[p * 3] = Math.min(255, c[0] * s); rgb[p * 3 + 1] = Math.min(255, c[1] * s); rgb[p * 3 + 2] = Math.min(255, c[2] * s);
     }
-    // walls (tree trunks, cliffs, fences) have no footprint: draw their edges
+    // walls (banks, cliffs and retaining walls along the water and the edge of
+    // the terrain; no tree trunks) have no footprint: draw their edges
     const walls = new Uint8Array(mesh.groups.length);
     mesh.groups.forEach((g, i) => { walls[i] = g.type === 12 ? 1 : 0; }); // real walls only; invisible fences (0x0d) span the map
     drawEdges(mesh, { x0, z0, x1, z1, w, h, include: walls, flipZ: opt.flipZ }, rgb, SEMANTIC_COLORS.wall);

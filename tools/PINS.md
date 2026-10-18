@@ -14,7 +14,8 @@ group 0x0002:
 
 - id 0x0000 is the player start;
 - id 0x0001 is a pin; its params are an s16 slot followed by an s16 set;
-- id 0x000A is the tee marker.
+- id 0x000A is the tee marker;
+- ids 0x0002, 0x0003 and 0x0006 are the trees (see "Trees" below).
 
 `tools/wsr-pins.mjs` decodes them, names the hole through
 `tools/mesh-holes.json`, maps them into the map frame through
@@ -219,57 +220,144 @@ counts the rounds in which the player's captures show the spot.
   yardages within the shifts above. Local frames also offer "Shot Position"
   (ZR) and "Reset Stance", so the ball can be moved before the shot; the badge
   is the authority.
-- **Online Survival Golf tees off from a platform.** Several players stand on
-  a white-railed platform under the shot timer. The platform sits 4.6–11.9 yd
-  from the WSR start on 10 of the 12 holes with online captures:
+- **Online Survival Golf tees off from a two-tiered platform** (player-
+  confirmed), the same one on every hole: up to four players stand on the
+  lower tier and four on the upper. The upper tier is directly behind the
+  lower one and raised at least a few feet (from it you see little more than
+  the tops of the lower-tier players' heads). The platform is one rigid
+  object, so a slot's upper-tier position is its lower-tier position moved
+  back by the same constant on every hole.
+- **Which tier each round was played from** is read from the frames by eye
+  and kept in `tools/online-rounds.json` (two independent judges agreed on
+  all 13 online rounds; five were re-checked by hand). Upper-tier frames show
+  other players' heads cut off by the deck edge in front of the player;
+  lower-tier frames show the glass-faced upper deck with its stairs rising
+  behind or beside the player. Nine rounds are upper, four lower.
+- **The tier offset is 4.0 yd.** H11 is the one hole captured from both
+  tiers: the W6 (upper) round's median avatar stands 4.02 yd further from the
+  green than the W0 (lower) round's, measured along the tee → green-centre
+  axis (below). Take it as 4 ± 1 yd: the avatar marker wanders
+  about 1.5 px with the aim, 1.3 yd on H11.
+- **Where the platform stands.** Per round, the median avatar as yards along
+  the tee → green-centre axis (+ = away from the green; build-derived's
+  `teeAxis` takes the direction from the WSR tee-pad centre to the green
+  centre, which is within 0.64° of the start's own direction on every hole,
+  so the 4 yd offset moves by under 0.05 yd whichever is used) and across it
+  (+ = left, seen from the tee), and the lower tier that follows (the
+  observed point moved 4.0 yd toward the green when the round was upper):
 
-| Hole | WSR start (px) | Online tee (px) | Apart | Plays | Frames / rounds |
+| Round | Tier | Frames | Along | Lateral | Lower tier along |
 |---|---|---|---|---|---|
-| 4 | 169.4,242.0 | 175.8,251.1 | 11.9 yd | +11.8 yd | 3 / 1 |
-| 5 | 126.1,265.1 | 127.5,269.6 | 11.7 yd | +10.9 yd | 8 / 1 |
-| 8 | 144.6,206.4 | 143.5,211.8 | 9.4 yd | +8.8 yd | 7 / 1 |
-| 9 | 104.8,263.4 | 105.5,266.8 | 8.6 yd | +8.1 yd | 7 / 1 |
-| 14 | 179.0,267.2 | 181.9,267.0 | 4.6 yd | 0.0 yd | 5 / 1 |
-| 15 | 149.7,254.9 | 148.5,258.2 | 6.3 yd | +5.8 yd | 9 / 1 |
-| 16 | 111.3,255.9 | 109.0,260.1 | 7.1 yd | +7.1 yd | 11 / 1 |
-| 18 | 83.2,259.6 | 81.5,261.5 | 5.5 yd | +4.7 yd | 6 / 1 |
-| 19 | 158.3,271.4 | 160.9,276.6 | 9.4 yd | +9.3 yd | 8 / 1 |
-| 20 | 146.0,276.2 | 147.9,282.5 | 9.9 yd | +9.3 yd | 11 / 1 |
+| H4 W29 | upper | 3 | 11.8 | −1.7 | 7.8 |
+| H5 W0 | upper | 8 | 10.9 | −4.4 | 6.9 |
+| H8 W24 | upper | 7 | 8.8 | 3.2 | 4.8 |
+| H9 W20 | lower | 7 | 8.1 | −3.0 | 8.1 |
+| H10 W4 | lower | 7 | −0.3 | −1.9 | −0.3 |
+| H11 W0 | lower | 11 | 0.6 | −2.8 | 0.6 |
+| H11 W6 | upper | 11 | 4.6 | 0.5 | 0.6 |
+| H14 W15 | lower | 5 | 0.0 | −4.6 | 0.0 |
+| H15 W29 | upper | 9 | 5.8 | 2.4 | 1.8 |
+| H16 W31 | upper | 11 | 7.1 | 0.8 | 3.1 |
+| H18 W24 | upper | 6 | 4.6 | 3.0 | 0.6 |
+| H19 W24 | upper | 8 | 9.3 | −1.7 | 5.3 |
+| H20 W11 | upper | 11 | 9.3 | −3.3 | 5.3 |
 
-"Plays" is how much longer it is to the green's centre. The online tee is the
-raw median of the frames' avatars; no badge corrects it. H14's platform sits
-beside the start, not behind it.
+  So NSS puts the platform's lower tier on the local tee (the WSR start) on
+  holes 10, 11, 14, 18 and 15 (within 2 yd) and 3–8 yd behind it on the
+  others, and the upper tier is 4 yd further back everywhere. The lateral
+  values are the slot the player was given (four per tier) plus wherever the
+  platform's centre sits; they run ±5 yd. The offset is applied along that
+  tee → green-centre axis; on a dogleg the platform faces the fairway
+  rather than the green centre, and a 20° difference would move the 4 yd
+  offset by about 1.4 yd sideways, within the slot scatter.
+- **What ships** (`teeOnline`, map px, with yards behind the WSR start along
+  the axis). The lower tier is the mean of the rounds' lower-tier estimates
+  and the upper tier is 4.0 yd behind it; no badge corrects either:
 
-- **Where the online tee isn't shipped.** On holes 10 and 11 the online
-  avatars stand a median 1.9 and 2.8 yd from the WSR start (0.8–6.0 yd per
-  frame), which the WSR start already covers. On holes 1, 2, 3, 6, 7, 12, 13,
-  17 and 21 there are no online captures yet, so the app offers only the local
-  tee there.
-- **Each row is one round.** A player's place on the platform varies within a
-  round by about 4–6 yd (per frame, H5's avatars stand 7.1–12.9 yd from the
-  start, H8's 6.7–11.4, H9's 5.0–10.5), so each shipped position is a median
-  over frames. H11 is the only hole with two online rounds: their avatars
-  stand a median 3.1 and 5.0 yd from the start. So the badge is the
-  authority.
+| Hole | WSR start | Lower tier | Upper tier | Tiers seen | Frames / rounds |
+|---|---|---|---|---|---|
+| 4 | 169.4,242.0 | 174.1,247.8 (7.8 yd) | 175.8,251.1 (11.8 yd) | upper | 3 / 1 |
+| 5 | 126.1,265.1 | 127.6,268.1 (6.9 yd) | 127.5,269.6 (10.9 yd) | upper | 8 / 1 |
+| 8 | 144.6,206.4 | 143.2,209.5 (4.8 yd) | 143.5,211.8 (8.8 yd) | upper | 7 / 1 |
+| 9 | 104.8,263.4 | 105.5,266.8 (8.1 yd) | 105.3,268.4 (12.1 yd) | lower | 7 / 1 |
+| 10 | 122.6,262.4 | 123.7,262.3 (−0.3 yd) | 123.7,264.5 (3.7 yd) | lower | 7 / 1 |
+| 11 | 77.0,247.5 | 78.0,248.6 (0.6 yd) | 76.4,252.8 (4.6 yd) | both | 22 / 2 |
+| 14 | 179.0,267.2 | 181.9,267.0 (0.0 yd) | 182.1,269.5 (3.9 yd) | lower | 5 / 1 |
+| 15 | 149.7,254.9 | 148.4,256.0 (1.8 yd) | 148.5,258.2 (5.8 yd) | upper | 9 / 1 |
+| 16 | 111.3,255.9 | 110.0,257.6 (3.1 yd) | 109.0,260.1 (7.1 yd) | upper | 11 / 1 |
+| 18 | 83.2,259.6 | 81.8,259.6 (0.6 yd) | 81.5,261.5 (4.6 yd) | upper | 6 / 1 |
+| 19 | 158.3,271.4 | 160.2,274.2 (5.3 yd) | 160.9,276.6 (9.3 yd) | upper | 8 / 1 |
+| 20 | 146.0,276.2 | 148.0,279.8 (5.3 yd) | 147.9,282.5 (9.3 yd) | upper | 11 / 1 |
+
+  On holes 1, 2, 3, 6, 7, 12, 13, 17 and 21 there are no online captures yet,
+  so the app offers only the local tee there.
+- **What the platform model reconciled.**
+  - H11's two online rounds, whose avatars stand a median 3.1 and 5.0 yd from
+    the start and looked like the platform moving between rounds: they are
+    the two tiers, 0.6 and 4.6 yd behind the start, and their lower-tier
+    estimates agree.
+  - H14's tee "beside the start": the lower tier is on the start (0.0 yd
+    along) and the player had a side slot, 4.6 yd across.
+  - The 0–12 yd spread of the observed medians: placement (the lower tier
+    0–8 yd behind the start) plus tier (4 yd).
+  - The ±5 yd lateral scatter: the slots.
+  - The spread within a round: a round's frames sit within 0.9–2.2 px of its
+    median avatar, the marker's wander with the aim. That is 1 yd on H11
+    (0.9 yd/px) but 4–5 yd on H5 and H9 (2.5 yd/px), the "4–6 yd within a
+    round" of before (per frame, H5's avatars stand 7.1–12.9 yd from the
+    start, H8's 6.7–11.4, H9's 5.0–10.5).
+- **What it did not.** H9's W20 round (lower tier, 8.1 yd behind the start)
+  measures 3.7 yd further from the cup than its badge reads (avatar-to-cup
+  572.7 yd against 569; +1.7 to +4.3 per frame). The elevated tier does not
+  shift the minimap marker: the upper-tier rounds agree with their badges
+  within 2 yd, seven of the nine within 1.2 (H4 −0.1, H5 +1.2, H11 W6 −0.1,
+  H15 −1.2, H16 −0.2, H19 −0.2, H20 −0.9; H18 +1.7, H8 +2.0), and H9's round
+  was on the lower tier anyway.
+- **The upper tier's height** is a few feet, worth 1–2 yd of carry from the
+  drop, small next to the terrain itself (the mesh heightmaps put the tee
+  51 m above the green on H21 and 20 m below it on H17); the shot model's
+  per-hole elevation work (tools/MESHES.md) is where it belongs.
 - **H10's frames 6–8 yd ahead of the tee are not a tee.** They are local
   frames taken after a short first shot, reading 365–367 yd with the address
   frames showing various clubs, between 374 yd tee frames of the same
   sitting.
 - **The earlier "moved tees" reading.** On holes 4, 5, 8, 15, 16, 19 and 20 the
   Switch seemed to have moved the tee. That came from map stacks built from
-  online frames.
+  online frames: the platform's upper tier, 6–12 yd behind the start there.
 
 ### Still unknown
 
 - **NSS's pin rule**, and whether online and local rounds differ in it.
-- **H9:** the online avatars stand 5–10 yd behind the start (median 8.6 yd,
-  the shipped tee, which plays 8 yd longer to the green), but the badge, 569,
-  is only 3 yd longer than WSR's start-to-AR yardage of 566.
+- **H9:** the online round's avatars (lower tier, 8.1 yd behind the start)
+  stand 3.7 yd further from the cup than the badge, 569, reads; WSR's
+  start-to-AR yardage is 566. Neither the tier nor its height explains it
+  (above).
+- **The platform's heading on doglegs**, and the tier offset to better than
+  ±1 yd: a second hole captured from both tiers would pin both.
+- **Which slot a player gets**, and whether the platform's centre sits on the
+  start → green line.
 - **H3:** two rounds (W2 on 08-20 and W4 on 08-21) read 536 yd with the cup at
   the same place (1 px apart), 4.0 and 5.8 yd from AL. The W2 round's zoom
   sighting is AL by position, so both are credited to AL; but the badge is
   4 yd longer than AL's 532, so either NSS's AL is shifted or this is a spot
   of its own.
+
+## Trees
+
+The same PMP files place every tree: group 0x0002, ids 2 (the round canopy,
+960 over the 21 holes), 3 (a dark dense crown, 409) and 6 (a palm, 171), with
+the object's x scale setting the drawn canopy's size; holes 1, 2, 9, 11 and
+12 pair 166 of theirs with a companion object of id 4, 5 or 7 at the same
+spot, which is not read. `tools/wsr-pins.mjs` writes them as `trees` (in and
+out of the frame), each with `lie`, the KCL surface under its trunk read off
+the mesh class rasters (rough 454, fairway 6, outer ground 1,080 of the
+1,540; none on sand, green, fringe or water), and `tools/build-derived.mjs`
+ships the ones on the map with a canopy radius and `off: true` on the outer
+or water ones, which the app draws faint; they replace the app's hand-placed
+v13 seeds through `src/derivedMerge.js`. The radius fit, the lie and on/off
+counts and what the KCL walls are instead (banks, cliffs and retaining walls
+along the water and the edge of the terrain, not trunks) are in
+tools/MESHES.md, "Trees".
 
 ## How the pipeline uses this
 
@@ -332,12 +420,20 @@ beside the start, not behind it.
     `pinCandidates`. S-numbers follow first sighting, so a spot keeps its
     number when later rounds change which one is seen most.
   - **`seen`** is the number of rounds.
-  - **`tee`** is the WSR start. **`teeOnline`** is the median avatar of the
-    online tee frames (at least 2), shipped when at least 4 yd from the
-    start, with `n` frames and `sessions` rounds. The badge does not correct
-    it: NSS keeps some spots a few yards from WSR's, so sliding the avatar to
-    the badge distance from a WSR spot moved the tee by the spot's offset
-    (H9: 8.6 yd raw, 3.5 yd slid, and the tee was withheld).
+  - **`tee`** is the WSR start. **`teeOnline`** is the online platform's two
+    tiers. Per round, the median avatar of the online tee frames is moved
+    4.0 yd toward the green (along the tee → green-centre axis above) when
+    `tools/online-rounds.json` says the round was upper; `lower` is the mean
+    over the judged rounds, `upper` 4.0 yd behind it, `seen` the tiers the
+    rounds were judged to be, `x`, `y` the observed median over all the
+    hole's online frames, with `n` frames and `rounds` rounds. Every hole
+    with at least 2 online frames ships (the lower tier can be the start
+    itself, as on holes 10, 11 and 14); a hole none of whose rounds has a
+    judged tier ships `x`, `y` only, and so does every hole when the file
+    is missing. The badge does not correct any of it: NSS keeps some spots a
+    few yards from WSR's, so sliding the avatar to the badge distance from a
+    WSR spot moved the tee by the spot's offset (H9: 8.6 yd raw, 3.5 yd
+    slid, and the tee was withheld).
   - **Diagnostics.** `captures/derived/pin-observations.json` lists every
     observation with its round (numbered over all the hole's rounds, so the
     numbers skip where a round produced no reading), wind, whether the round
@@ -351,7 +447,10 @@ beside the start, not behind it.
     cloth, Switch-only spots are dashed, and the player's own pins are P1,
     P2…. A tooltip (with a pointer) gives the set, the yardage and the rounds
     seen, on the hole map, the zoomed green and the pin chips.
-  - "⛳ Online tee" puts the ball on the online tee, and a thin white ring
-    around the ball shows while it is there.
+  - "⛳ Lower tier" and "⛳ Upper tier" put the ball on the platform's tiers
+    ("⛳ Online tee" on a hole none of whose online rounds has a judged tier),
+    and a thin white ring around the ball shows while it is on one. Your own
+    hazard markers go anywhere except inside a shown on-course canopy, which
+    is a hazard already; a tap there does nothing.
   - Pipeline pins keep the player's current pin on the nearest new spot when
     they change (`src/derivedMerge.js`).

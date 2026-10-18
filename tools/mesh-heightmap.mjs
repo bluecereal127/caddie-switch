@@ -16,8 +16,9 @@
 // horizontal and vertical units are the same, so slopes are true after decoding.
 //
 // What goes in: every surface group (fairway, rough, sand, outer ground, green, fringe,
-// water surface, special zones). Walls (tree trunks, cliffs, fences) are skipped: they have no
-// footprint. Giant filler triangles (> 1e5 u² in plan, i.e. ocean / sky-box planes) are skipped
+// water surface, special zones). Walls (banks, cliffs and retaining walls along the water and the
+// edge of the terrain, plus the invisible fences; the meshes hold no tree trunks) are
+// skipped: they have no footprint. Giant filler triangles (> 1e5 u² in plan, i.e. ocean / sky-box planes) are skipped
 // unless they are water or the floor plane, because those define the water level. Floor-plane
 // pixels (the dead plane under water and OB) are treated as nodata and filled from the nearest
 // real surface unless --keep-floor is given. Where several surfaces overlap, the topmost wins.
