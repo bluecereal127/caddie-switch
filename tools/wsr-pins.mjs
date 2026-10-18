@@ -3,10 +3,14 @@
 //   node tools/wsr-pins.mjs <archives-or-folders...> [--out tools/wsr-pins.json]
 //
 // Inputs: WSR golf course archives (.carc/.szs/.arc: Yaz0-compressed U8, e.g.
-// WS2_glf_course_fc1.carc from the extracted disc), loose .pmp files, or folders
-// holding either (searched recursively). Get them from the disc image with
-// Dolphin (right-click the game -> Properties -> Filesystem -> extract) or
-// `DolphinTool extract -i <game.rvz> -o <dir>`.
+// glf_course_fc1.carc under DATA/files/Stage/Shared2/ of the extracted disc,
+// which holds WS2_glf_course_fc1.kcl and WS2_glf_course_fc1.pmp), loose .pmp
+// files, or folders holding either (searched recursively). Get them from the
+// disc image with Dolphin (right-click the game -> Properties -> Filesystem ->
+// extract) or `DolphinTool extract -i <game.rvz> -o <dir>`. It also reads
+// tools/mesh-holes.json (mesh id -> hole), tools/mesh-registration.json (mesh
+// units -> map frame) and tools/wsr-truth.json (the WSR green outline, for
+// each pin's onGreen check).
 //
 // Pins are NOT in the KCL collision: each course archive carries a PMP ("Pack
 // MaP") object-placement file next to its KCL, holding the player start, every
@@ -20,13 +24,35 @@
 // (start/goal), which must not be read as pins.
 //
 // Positions are in KCL units (the mesh frame), so tools/mesh-registration.json
-// maps them into the app's 250x304 map frame. WSR's pin index (Caddie,
-// github.com/PackProject/Caddie): 0-2 the "B" set, 3-5 the "A" set on holes
-// 2-17, 0-2 on hole 1, 0 only on hole 18, 0-5 on the specials. This tool reports
-// file order as the index; check it against a known pin before relying on A/B.
+// maps them into the app's 250x304 map frame.
+//
+// A pin's params hold s16 slot then s16 set. Read from the US Rev 1 main.dol:
+// while loading the PMP, RPGlfFieldManager's walker (0x80402834, reached via
+// 0x80402b70 from the field manager's load 0x80403f44) calls 0x80406b44 for
+// each pin, which we call GlfConfig::addPinSlot(slot, pinOrdinal, set): it
+// fills a 16-slot table (GlfConfig+0x40 ordinal, +0x80 set; -1 = empty).
+// (Caddie's own GlfConfig::setPin(u32) is a different thing: it writes the
+// chosen slot at +0x38, as choosePin does.) At each hole start,
+// after the hole's wind is unpacked, GlfConfig::choosePin(set) (0x804066e0)
+// counts the slots whose set matches (set 0 matches every slot) and draws
+// floor(count * ((Sp2::Rand() >> 16) & 0xffff) / 65536): uniform within the
+// set. The set comes from RPGlfPlayerManager (0x803fa3f4), with k the hole's
+// 1-based position in the round and s each player's score to par over the
+// round's earlier holes:
+//   - set 1 on the round's first hole, and always in rounds of 3 holes or
+//     fewer (Resort/Classic A-C, Special);
+//   - otherwise set 1 if the best player's s >= -k/2, set 2 if the worst
+//     player's s < -k/2, else set 0, which means any of the hole's pins.
+// Single player: set 2 ("A", the harder pins) once s <= -(floor(k/2) + 1).
+// Set 1 is "B", the easier set. Holes 2-17 put slots 0-2 in set 1 and 3-5 in
+// set 2; hole 1 has three set-1 pins, hole 18 one spot listed under both sets,
+// the specials six set-1 pins.
 import { readFileSync, writeFileSync, readdirSync, statSync } from "node:fs";
 import { join, basename } from "node:path";
 import { pathToFileURL } from "node:url";
+
+// KCL units per yard (1 unit = 0.1 m); WSR shows floor(flat distance) in yards
+const UNITS_PER_YD = 9.144;
 
 const args = process.argv.slice(2);
 const opt = { out: "tools/wsr-pins.json", names: "tools/mesh-holes.json", registration: "tools/mesh-registration.json", truth: "tools/wsr-truth.json" };
@@ -106,16 +132,49 @@ export function pmpObjects(buf) {
   return { base, objs };
 }
 
+// ---- pin params -> slot / set / label ----
+// params bytes 0-1 = s16 slot, 2-3 = s16 set (see the header)
+export const pinSlot = (o) => Buffer.from(o.params, "hex").readInt16BE(0);
+export const pinSet = (o) => Buffer.from(o.params, "hex").readInt16BE(2);
+
+// One entry per distinct spot (hole 18 lists its only spot under both sets).
+// Labels: set letter (B = set 1, A = set 2) plus L/M/R west to east on the
+// minimap within the set, which reproduces the community's names on 95 of 99
+// pins of holes 1-17. The two misses are ties: hole 3's B pins in slots 0
+// and 1 sit 0.1 px apart in x, so the sort can't separate them; on hole 9 the
+// community names were matched to slots by yardage, and the A pins in slots 4
+// and 5 both read 571 yd, so that match was a guess. Hole 1 has one set, so no
+// letter. Hole 18's single spot and the specials' six are numbered by slot.
+export function pinSpots(pins) {
+  const spots = [];
+  for (const p of pins) {
+    const s = spots.find((q) => Math.hypot(q.mesh[0] - p.mesh[0], q.mesh[2] - p.mesh[2]) < 0.5);
+    if (s) { s.slots.push(p.slot); if (!s.sets.includes(p.set)) s.sets.push(p.set); }
+    else spots.push({ ...p, slots: [p.slot], sets: [p.set] });
+  }
+  const setsUsed = [...new Set(spots.flatMap((s) => s.sets))];
+  const lettered = setsUsed.length > 1 && spots.every((s) => s.sets.length === 1);
+  for (const set of setsUsed) {
+    const g = spots.filter((s) => s.sets.length === 1 && s.sets[0] === set).sort((a, b) => a.x - b.x);
+    const names = g.length === 3 ? ["L", "M", "R"] : null;
+    g.forEach((s, i) => { s.label = names ? (lettered ? (set === 2 ? "A" : "B") : "") + names[i] : String(s.slots[0] + 1); });
+  }
+  for (const s of spots) if (!s.label) s.label = String(s.slots[0] + 1);
+  // A/B only means something on a hole that has both sets
+  return spots.map(({ pin, index, params, slot, set, ...s }) => ({ ...s, set: lettered ? (s.sets[0] === 2 ? "A" : "B") : null }));
+}
+
 // ---- gather PMPs from inputs ----
 function collect(p, acc) {
   const st = statSync(p);
   if (st.isDirectory()) { for (const e of readdirSync(p)) collect(join(p, e), acc); return; }
   const raw = readFileSync(p);
-  if (raw.toString("ascii", 0, 4) === "PMPF") { acc.push({ from: p, name: basename(p), data: raw }); return; }
+  if (raw.toString("ascii", 0, 4) === "PMPF") { acc.push({ from: basename(p), name: basename(p), data: raw }); return; }
   if (!/\.(carc|szs|arc|u8)$/i.test(p) && raw.toString("ascii", 0, 4) !== "Yaz0") return;
   const files = u8Files(yaz0Decode(raw));
   if (!files) return;
-  for (const f of files) if (/\.pmp$/i.test(f.path) || f.data.toString("ascii", 0, 4) === "PMPF") acc.push({ from: `${p}:${f.path}`, name: basename(f.path), data: f.data });
+  // record names only: the output is committed, absolute paths are personal
+  for (const f of files) if (/\.pmp$/i.test(f.path) || f.data.toString("ascii", 0, 4) === "PMPF") acc.push({ from: `${basename(p)}:${f.path}`, name: basename(f.path), data: f.data });
 }
 
 if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) {
@@ -124,11 +183,14 @@ if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) 
   const truth = JSON.parse(readFileSync(opt.truth, "utf8")).holes;
   const pmps = [];
   for (const p of inputs) collect(p, pmps);
-  const out = { _note: "WSR golf pins, player starts and tee markers decoded from the course PMP files by tools/wsr-pins.mjs; x/y are fractions of the app's 250x304 map, mesh = KCL units.", holes: {} };
+  const out = { _note: "WSR golf pins, player starts and tee markers decoded from the course PMP files by tools/wsr-pins.mjs; x/y are fractions of the app's 250x304 map, mesh = KCL units, yd = floor of the flat distance from the player start (what WSR shows). spots = distinct pin positions with labels; set B = 1 (easier), A = 2.", holes: {} };
   for (const f of pmps) {
     const m = /glf_course_(fc(?:JP)?\d+)\.pmp$/i.exec(f.name);
     const meshId = m ? m[1].replace(/^fcjp/i, "fcJP") : null;
     const hole = meshId ? names[meshId] : null;
+    // an extracted disc tree holds each PMP twice (inside the archive and as
+    // wszst's loose copy); the first one read wins
+    if (hole && out.holes[hole]) continue;
     const { base, objs } = pmpObjects(f.data);
     const tally = {}; for (const o of objs) { const k = `${o.group.toString(16)}:${o.id.toString(16)}`; tally[k] = (tally[k] || 0) + 1; }
     console.log(`${f.from}: ${objs.length} objects (table at 0x${base.toString(16)}) ${JSON.stringify(tally)}${hole ? ` -> hole ${hole}` : " (no hole match)"}`);
@@ -138,14 +200,17 @@ if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) 
     const poly = truth[hole]?.greenPoly ?? [];
     const inPoly = (x, y, P) => { let c = false; for (let i = 0, j = P.length - 1; i < P.length; j = i++) { const [xi, yi] = P[i], [xj, yj] = P[j]; if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) c = !c; } return c; };
     const conv = (o) => { const [x, y] = toFrac(o.pos[0], o.pos[2]); return { index: o.index, x: +x.toFixed(4), y: +y.toFixed(4), mesh: o.pos.map((v) => +v.toFixed(2)), params: o.params }; };
-    const pins = objs.filter((o) => o.group === 2 && o.id === 1).map((o, k) => ({ pin: k, ...conv(o) })).map((p) => ({ ...p, onGreen: inPoly(p.x, p.y, poly) }));
+    const starts = objs.filter((o) => o.group === 2 && o.id === 0).map(conv);
+    const st = starts[0]?.mesh;
+    const pins = objs.filter((o) => o.group === 2 && o.id === 1).map((o, k) => ({ pin: k, ...conv(o), slot: pinSlot(o), set: pinSet(o) }))
+      .map((p) => ({ ...p, onGreen: inPoly(p.x, p.y, poly),
+        yd: st ? Math.floor(Math.hypot(p.mesh[0] - st[0], p.mesh[2] - st[2]) / UNITS_PER_YD) : null }));
     out.holes[hole] = {
-      meshId, source: f.from, pins,
-      starts: objs.filter((o) => o.group === 2 && o.id === 0).map(conv),
+      meshId, source: f.from, pins, spots: pinSpots(pins), starts,
       teeMarkers: objs.filter((o) => o.group === 2 && o.id === 0xa).map(conv),
       frisbee: objs.filter((o) => o.group === 0xb).map((o) => ({ id: o.id, ...conv(o) })),
     };
-    console.log(`   hole ${hole}: ${pins.length} pins (${pins.filter((p) => p.onGreen).length} on the WSR green), ${out.holes[hole].starts.length} player starts, ${out.holes[hole].teeMarkers.length} tee markers`);
+    console.log(`   hole ${hole}: ${pins.length} pins (${pins.filter((p) => p.onGreen).length} on the WSR green) at ${out.holes[hole].spots.length} spots [${out.holes[hole].spots.map((s) => `${s.label} ${s.yd}yd`).join(", ")}], ${starts.length} player starts, ${out.holes[hole].teeMarkers.length} tee markers`);
   }
   writeFileSync(opt.out, JSON.stringify(out, null, 1));
   console.log(`wrote ${opt.out} (${Object.keys(out.holes).length} holes)`);

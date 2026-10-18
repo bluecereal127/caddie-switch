@@ -15,6 +15,7 @@ import { fileURLToPath } from "node:url";
 import { loadImage, savePng, px, onionInpaint } from "./lib/image.mjs";
 import { panelRect, cropRect } from "./lib/panel.mjs";
 import { sessions } from "./lib/ulid.mjs";
+import { isOnline } from "./lib/online.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const INBOX = `${ROOT}/captures/inbox/`;
@@ -116,7 +117,7 @@ const overlayMask = (crop) => {
   // few px for the antialias halo. A fixed box was used here before; on
   // single-pin holes (where this becomes the inpaint hole) a box that wide
   // straddles green AND backdrop and the fill came out a gray smear.
-  // Skip both dial corners: at 20+ mph the wind arrow is PINK, the same pink
+  // Skip both dial corners: at 24+ mph the wind arrow is PINK, the same pink
   // as the flag, and this scan had no exclusion. On H16's 31 mph frames the
   // "flag" centroid came out as a blend of the real flag (127 px at y~78) and
   // the arrow (~190 px at y~250), landing at y=182 — empty grass. The cup
@@ -199,25 +200,79 @@ const overlayMask = (crop) => {
   return { mask, flag };
 };
 
-// centroid+extent of pixels matching a predicate. The wind compass lives
-// INSIDE the panel (bottom-right in map mode) and its arrow is yellow at
-// 10-19 mph and pink at 20+ — the exact colors of the tee pointer and the
-// flag — so that region is always excluded.
-// BOTH bottom corners: the dial floats to whichever one avoids the hole, and
-// its arrow is yellow at 10-19 mph — the exact colour of the avatar pointer.
-// Excluding only the right corner meant that on left-dial holes the arrow was
-// detected AS the avatar, which threw the measured tee position (and so the
-// hole's scale) tens of pixels off, and scattered the tee-frame test.
+// centroid+extent of pixels matching a predicate, outside the wind dial. The
+// dial lives INSIDE the panel, in whichever bottom corner avoids the hole
+// (the player's portrait takes the other). Measured on the 361 map frames
+// with a wind reading, its arrow is blue up to 11 mph (none at 0), LIME at
+// 13-22 and PINK from 24. The lime arrow never passes isPointerYellow (its G
+// runs 215-255, the avatar's 160-215; 0 hits in 78 frames), so it cannot be
+// taken for the avatar. Two things on the dial can be taken for something
+// else: the pink arrow is the flag's pink, and its 177-214 px outsize the
+// cloth (87-144 px, median 130); and the orange landing dot at the end of
+// the aim line passes isPointerYellow and can sit on the dial (7 frames,
+// 9-34 px of it, e.g. H9 KZZM, H14 DDQ0; a centroid over every yellow pixel,
+// which is what the stack's tee is, would move the tee tens of px). So the
+// dial is always excluded. It was once excluded in the right corner only,
+// which left left-dial holes' tees (and so their scales) tens of px off and
+// scattered the tee-frame test; both corners were then masked, and dialMask
+// below narrows that to the dial's own corner.
 const inCompass = (img, x, y) => {
   const cy = 0.822 * img.height, r = 0.14 * img.width;
   return (x - 0.832 * img.width) ** 2 + (y - cy) ** 2 < r * r ||
          (x - 0.168 * img.width) ** 2 + (y - cy) ** 2 < r * r;
 };
-const findCluster = (img, pred) => {
+// The wind dial as the panel draws it: a white ring of radius 0.082w (20.5 px
+// at w=250) centred on (0.18w, 0.829h) in the left corner or (0.82w, 0.829h)
+// in the right, fitted by brute force to the half pixel on 8 frames of either
+// side. findCompassCorner (below; it also places the compass composite and
+// must not change) samples radii 22-30 about (0.168w, 0.822h), which only
+// grazes this ring: its winning corner scores 26-38 of 72 against a null cut
+// of 25, so a small dip would silently bring the two-corner mask back. Scored
+// on the ring itself (72 angles, radii r-2..r+2, the same brightness test),
+// the dial's corner scores 68-72 on all 362 map frames and 69-71 on the 21
+// stacks, the other corner 0-17 (bunker arcs, sand), so a corner is returned
+// only at 50+ with a 25-point lead. Returns findCompassCorner's mask centre
+// (0.168w / 0.832w) so the two interchange in dialMask.
+const DIAL_CX = [0.18, 0.82], DIAL_CY = 0.829, DIAL_R = 0.082, DIAL_MIN = 50, DIAL_LEAD = 25;
+function dialCorner(img) {
+  const w = img.width, h = img.height, r = DIAL_R * w, cy = DIAL_CY * h;
+  const score = (cx) => {
+    let s = 0;
+    for (let a = 0; a < 72; a++) {
+      const th = (a / 72) * 2 * Math.PI;
+      for (let rr = r - 2; rr <= r + 2; rr++) {
+        const x = Math.round(cx + rr * Math.cos(th)), y = Math.round(cy + rr * Math.sin(th));
+        if (x < 0 || y < 0 || x >= w || y >= h) continue;
+        const p = px(img, x, y);
+        if (Math.min(p[0], p[1], p[2]) > 165) { s++; break; }
+      }
+    }
+    return s;
+  };
+  const [L, R] = DIAL_CX.map((f) => score(f * w));
+  if (Math.max(L, R) < DIAL_MIN || Math.abs(L - R) < DIAL_LEAD) return null;
+  return L > R ? 0.168 * w : 0.832 * w;
+}
+// Mask only the corner the dial is in. Masking both clipped whatever sat near
+// the other one: on holes 4, 11 and 14 the avatar stands on that circle's
+// edge, so its triangle lost most of its pixels (or all of them) and its
+// centroid moved 1-4 px. dialCorner decides; findCompassCorner if it abstains;
+// both corners, with a warning, only when neither finds the ring (that
+// re-clips those avatars).
+const dialMask = (img, what = "frame") => {
+  const cx = dialCorner(img) ?? findCompassCorner(img);
+  if (cx == null) {
+    console.warn(`${what}: wind dial not found, masking both bottom corners`);
+    return (x, y) => inCompass(img, x, y);
+  }
+  const cy = 0.822 * img.height, r = 0.14 * img.width;
+  return (x, y) => (x - cx) ** 2 + (y - cy) ** 2 < r * r;
+};
+const findCluster = (img, pred, masked = (x, y) => inCompass(img, x, y)) => {
   let sx = 0, sy = 0, c = 0, maxY = -1;
   for (let y = 0; y < img.height; y++)
     for (let x = 0; x < img.width; x++) {
-      if (inCompass(img, x, y)) continue;
+      if (masked(x, y)) continue;
       const p = px(img, x, y);
       if (pred(p)) { sx += x; sy += y; c++; if (y > maxY) maxY = y; }
     }
@@ -226,6 +281,65 @@ const findCluster = (img, pred) => {
 const isFlagPink = (p) => p[0] > 190 && p[2] > 120 && p[1] < 110 && p[0] - p[1] > 100;
 // avatar direction pointer (bright yellow-orange triangle at the tee)
 const isPointerYellow = (p) => p[0] > 225 && p[1] > 160 && p[1] < 215 && p[2] < 90;
+
+// 4-connected blobs of a predicate outside the dial, largest first
+const blobsOf = (img, pred, masked = (x, y) => inCompass(img, x, y)) => {
+  const w = img.width, h = img.height, seen = new Uint8Array(w * h), out = [];
+  for (let y0 = 0; y0 < h; y0++) for (let x0 = 0; x0 < w; x0++) {
+    if (seen[y0 * w + x0] || masked(x0, y0) || !pred(px(img, x0, y0))) continue;
+    const st = [y0 * w + x0]; seen[y0 * w + x0] = 1;
+    let sx = 0, sy = 0, c = 0, bx0 = x0, bx1 = x0, by0 = y0, by1 = y0;
+    while (st.length) {
+      const j = st.pop(), x = j % w, y = (j / w) | 0;
+      sx += x; sy += y; c++;
+      if (x < bx0) bx0 = x; if (x > bx1) bx1 = x; if (y < by0) by0 = y; if (y > by1) by1 = y;
+      for (const [nx, ny] of [[x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]]) {
+        if (nx < 0 || ny < 0 || nx >= w || ny >= h || seen[ny * w + nx]) continue;
+        if (masked(nx, ny) || !pred(px(img, nx, ny))) continue;
+        seen[ny * w + nx] = 1; st.push(ny * w + nx);
+      }
+    }
+    out.push({ x: sx / c, y: sy / c, n: c, x0: bx0, x1: bx1, y0: by0, y1: by1 });
+  }
+  return out.sort((a, b) => b.n - a.n);
+};
+// Merge blobs whose bounding boxes lie within `gap` empty pixels of each
+// other: n-weighted centroid, summed n, union box; largest first. A merged
+// box is rescanned, so a chain of pieces joins up.
+const mergeBlobs = (blobs, gap) => {
+  const out = blobs.map((b) => ({ ...b }));
+  for (let i = 0; i < out.length; i++)
+    for (let j = i + 1; j < out.length; j++) {
+      const a = out[i], b = out[j];
+      if (Math.max(a.x0 - b.x1, b.x0 - a.x1, a.y0 - b.y1, b.y0 - a.y1) - 1 > gap) continue;
+      const n = a.n + b.n;
+      out[i] = { x: (a.x * a.n + b.x * b.n) / n, y: (a.y * a.n + b.y * b.n) / n, n,
+        x0: Math.min(a.x0, b.x0), x1: Math.max(a.x1, b.x1), y0: Math.min(a.y0, b.y0), y1: Math.max(a.y1, b.y1) };
+      out.splice(j, 1); j = i;
+    }
+  return out.sort((a, b) => b.n - a.n);
+};
+
+// The cup as the minimap draws it: a black ellipse ~15 px wide around the
+// pole's foot. The pole's dark outline joins it to the cloth's outline, so
+// only rows below the cloth whose dark span is at least 8 px wide (the
+// ellipse body) count. Centre in pixel-centre coordinates: measured that
+// way, tee-frame cups sit a mean (-0.2, -0.3) px from the WSR pin they show,
+// mostly within 2 px, a few up to 3.5 px when the aim line or a shadow
+// crosses the ellipse.
+const cupCentre = (img, cloth, masked) => {
+  const isDark = (p) => Math.max(p[0], p[1], p[2]) < 55;
+  const b = blobsOf(img, isDark, masked).find((q) => q.y1 > cloth.y1 && q.y1 < cloth.y1 + 34 &&
+    q.x1 > cloth.x0 - 14 && q.x0 < cloth.x1 + 14 && q.n >= 6);
+  if (!b) return null;
+  let sx = 0, sy = 0, c = 0;
+  for (let y = Math.max(b.y0, cloth.y1 + 2); y <= b.y1; y++) {
+    let lo = -1, hi = -1;
+    for (let x = b.x0; x <= b.x1; x++) if (isDark(px(img, x, y))) { if (lo < 0) lo = x; hi = x; }
+    if (lo >= 0 && hi - lo + 1 >= 8) { sx += (lo + hi) / 2 + 0.5; sy += y + 0.5; c++; }
+  }
+  return c ? { x: +(sx / c).toFixed(1), y: +(sy / c).toFixed(1) } : null;
+};
 
 // pin base: darkest pixels in a narrow column below the pink cloth
 const pinBase = (img, flag) => {
@@ -352,12 +466,24 @@ for (let hole = 1; hole <= 21; hole++) {
   // differently: hole overviews run 4.6-5.0% of the panel, real green
   // captures 9.5-10%, and H18's putt 12.7%. 7% splits them cleanly.
   const CHECKER_MAX = 0.07;
+  // One decode per frame for the per-frame checks: the panel crop, and
+  // whether the frame is online play (the shot timer sits outside the panel,
+  // so it is read while the full frame is in hand). The stacks below load
+  // their own crops and are untouched.
+  const frameCache = new Map();
+  const frameOf = (f) => {
+    if (!frameCache.has(f.file)) {
+      const img = loadImage(INBOX + f.file);
+      frameCache.set(f.file, { c: cropRect(img, panelRect(img)), online: isOnline(img) });
+    }
+    return frameCache.get(f.file);
+  };
   const checkerCache = new Map();
   const checkerFrac = (f) => {
     if (checkerCache.has(f.file)) return checkerCache.get(f.file);
     let frac = 0;
     try {
-      const c = cropRect(loadImage(INBOX + f.file), panelRect(loadImage(INBOX + f.file)));
+      const c = frameOf(f).c;
       const w = c.width, h = c.height, n = w * h;
       const lum = new Float32Array(n);
       for (let p = 0, j = 0; p < n; p++, j += 4) lum[p] = 0.299 * c.data[j] + 0.587 * c.data[j + 1] + 0.114 * c.data[j + 2];
@@ -406,6 +532,57 @@ for (let hole = 1; hole <= 21; hole++) {
     return Number.isFinite(yd) && maxYd > 0 && yd >= 0.88 * maxYd;
   };
   const tees = overviews.filter(isTee);
+  // Every tee frame on its own: where the avatar stands, where the cup is, the
+  // frame's own badge, and whether it is online play. A stack hides that the
+  // tee moves: local play tees off from the WSR start, online Survival Golf
+  // from a platform up to ~12 yd away (tools/PINS.md). build-derived reads
+  // these to count pin sightings and place the online tee.
+  //
+  // Picked by their own mode, not from `tees`: maxYd mixes local badges with
+  // online ones, and the platform can play longer. On H4 it is 186 yd to the
+  // WSR start's 170, so the local W13 round ("159 yd to go") fell under
+  // 0.88*186 and was never read. A mode's tee length is the longest of its
+  // own badges inside the hole-wide band (0.88*maxYd up to maxYd, so H17's
+  // "819" stays out), not its own robust max: a mode can hold more mid-round
+  // frames than tee frames (H18's online badges are 69, 119, 459, 459, whose
+  // lower median would promote the 119-yd frame and drop both 459s). A mode
+  // with no badge in the band keeps maxYd, so this only ever admits frames
+  // the old rule refused. `tees` and the stacks are untouched, so the map
+  // images cannot change.
+  const badgeYd = (f) => { const m = (f.badge ?? "").match(/^(\d+)\s*yd/); return m ? parseInt(m[1]) : null; };
+  const modeYd = (online) => {
+    const own = overviews.filter((f) => frameOf(f).online === online).map(badgeYd)
+      .filter((v) => v != null && v >= 0.88 * maxYd && v <= maxYd);
+    return own.length ? Math.max(...own) : maxYd;
+  };
+  const teeYd = { local: modeYd(false), online: modeYd(true) };
+  const isTeeFrame = (f) => {
+    if (/^Stroke 1$/.test(f.badge ?? "")) return true;
+    const yd = badgeYd(f), mx = frameOf(f).online ? teeYd.online : teeYd.local;
+    return yd != null && mx > 0 && yd >= 0.88 * mx;
+  };
+  const teeFrames = overviews.filter(isTeeFrame).map((f) => {
+    const { c, online } = frameOf(f);
+    const masked = dialMask(c, f.file);
+    const cloth = blobsOf(c, isFlagPink, masked)[0];
+    // Avatar candidates, largest first; the consumer takes the one at the
+    // teeing ground. Pixels at the edge of the isPointerYellow band break
+    // 4-connectivity, so the triangle can come out as a body plus a tip (H11
+    // QAW2: 37 px + 8 px, 4 px apart) and the tip was what stood nearest the
+    // start; the pieces lie within 2 px of each other and nothing else yellow
+    // comes within 9 px (the landing dot, 23 px off), so blobs whose boxes
+    // are within 3 px are merged. Centroids in pixel-centre coordinates
+    // (+0.5), the convention of cupCentre and of the WSR fractions, so
+    // avatar-to-cup and avatar-to-start distances mix no conventions: on
+    // the 161 local frames the avatar lands a mean (-0.17, -0.16) px from the
+    // WSR start (plain indices put it at (-0.67, -0.65)). The triangle turns
+    // with the aim, so a single frame's centroid wanders about 1.5 px around
+    // the ball.
+    const ptrs = mergeBlobs(blobsOf(c, isPointerYellow, masked), 3).filter((b) => b.n >= 6).slice(0, 4)
+      .map((b) => ({ x: +(b.x + 0.5).toFixed(1), y: +(b.y + 0.5).toFixed(1), n: b.n }));
+    return { file: f.file, yd: badgeYd(f), online, ptrs,
+      cup: cloth && cloth.n >= 4 ? cupCentre(c, cloth, masked) : null };
+  });
   const candidates = sessions(tees).filter((s) => s.length >= 2).reverse(); // latest first
   let use = null, stacked = null;
   for (const s of candidates) {
@@ -417,15 +594,16 @@ for (let hole = 1; hole <= 21; hole++) {
   }
   if (!stacked) {
     const old = prev.find((p) => p.hole === hole);
-    if (old) { console.log(`H${hole}: keeping previous stack`); results.push(old); continue; }
+    if (old) { console.log(`H${hole}: keeping previous stack`); results.push({ ...old, teeFrames }); continue; }
     const fallback = sessions(tees.length ? tees : allMaps).pop();
     const crops = fallback.map((f) => { const img = loadImage(INBOX + f.file); return cropRect(img, panelRect(img)); });
     use = fallback; stacked = medianStack(crops);
   }
 
-  const flag = findCluster(stacked, isFlagPink);
+  const stackMask = dialMask(stacked, `H${hole} stack`);
+  const flag = findCluster(stacked, isFlagPink, stackMask);
   const pin = flag ? pinBase(stacked, flag) : null;
-  const tee = findCluster(stacked, isPointerYellow);
+  const tee = findCluster(stacked, isPointerYellow, stackMask);
 
   // IMAGE via darken-stack over a cross-session pool of tee frames —
   // erases aim line/dots and avatar wherever at least one frame is clean.
@@ -572,6 +750,7 @@ for (let hole = 1; hole <= 21; hole++) {
     // let the stack source real art under a flag instead of inpainting it
     poolFlags: overlays.map((o) => o.flag ? { x: Math.round(o.flag.x), y: Math.round(o.flag.y) } : null),
     teeCandidates: tees.map((f) => f.file),
+    teeFrames,
     mapFramesSeen: allMaps.map((f) => f.file),
     w: stacked.width, h: stacked.height,
     pin, tee: tee ? { x: +tee.x.toFixed(1), y: +tee.y.toFixed(1) } : null, yards, scaleYdPerPx: scale });

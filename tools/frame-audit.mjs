@@ -9,6 +9,9 @@
 //   mapDetect    in the median stack that measures pin / tee / scale
 //   teeBench     passed the tee filter but lost the diversity cut (a reserve:
 //                it competes again whenever new frames land)
+//   teeFrame     its own cup and badge were credited to a pin spot, or its
+//                avatar placed the online tee (tools/build-derived.mjs writes
+//                the list to captures/derived/tee-frames-used.json; tools/PINS.md)
 //   greenPair    the plain or heightmap half of a green extraction pair
 //   shotAddress  supplied club/wind/bearing for a shot row
 //   shotPopup    supplied the result distance for a shot row
@@ -35,6 +38,7 @@ for (const m of maps) {
   for (const f of m.frames ?? []) add(f, "mapDetect");
   for (const f of m.teeCandidates ?? []) if (!(m.pool ?? []).includes(f)) add(f, "teeBench");
 }
+for (const f of Object.keys(rd(join(D, "tee-frames-used.json"), {}))) add(f, "teeFrame");
 for (const file of existsSync(join(D, "greens")) ? readdirSync(join(D, "greens")) : []) {
   if (!file.endsWith(".json")) continue;
   const g = rd(join(D, "greens", file), {});

@@ -131,9 +131,14 @@ One-time per hole, tracked in the app (Guide tab → Capture catalog):
 
 ~6 frames/hole × 21 holes ≈ 130 captures; upload in batches of 10 as you go.
 Keep the "Hole N  Par N" banner visible in every frame — it's how the
-classifier knows which hole a frame belongs to. On later rounds only NEW pin
-locations need a capture. Shot Assist ON keeps the power bar straight in all
-frames, which also simplifies gauge reading.
+classifier knows which hole a frame belongs to. WSR's own pin spots are built
+in (tools/PINS.md), so later rounds need captures only when the flag stands
+somewhere new: a tee frame showing the "yd to go" badge plus the two zoomed
+green frames. A spot that isn't one of WSR's ships on two independent
+readings: two rounds, or a zoomed green plus a tee frame (which can be one
+round). Hole 1's 384 yd spot has one round of tee frames and is waiting for a
+zoomed green or a second round. Shot Assist ON keeps the power bar straight
+in all frames, which also simplifies gauge reading.
 
 ## How to capture (per shot, 2 presses of the capture button)
 

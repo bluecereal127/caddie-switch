@@ -224,9 +224,11 @@ adjusts to it. `node tools/wsr-truth.mjs` writes `tools/wsr-truth.json`
   3.69 px before, 1.61 px after, with holes 7/8/10/14/18 down from 5–14 px to
   ~1 px. The old 0.02 map-fraction clustering merged distinct spots 3–6 px
   apart on holes 3/5/14/18. Readings from cropped (zoom-mismatched) pairings
-  are dropped: on hole 10 they shipped as two phantom spots. These are still
-  capture readings; the WSR pins themselves are in the course PMP files (see
-  "Pin positions" below).
+  are dropped: on hole 10 they shipped as two phantom spots. Since 2026-10-17
+  the shipped pins are WSR's own spots from the course PMP files plus
+  Switch-only spots that two independent readings agree on (two rounds, or a
+  zoomed green plus a tee frame, which can be one round); these sightings
+  only count toward them (tools/PINS.md).
 - **Slope grid**: built from the mesh green's heights with the capture
   convention (downhill, normalized to the green's own steepest cell, levels
   1–3) but true physical spacing; `gridPct` keeps absolute percent slopes for
@@ -240,7 +242,12 @@ adjusts to it. `node tools/wsr-truth.mjs` writes `tools/wsr-truth.json`
   in-game yardage better than the pad centre (mean error 3.7 vs 5.6 yd; the
   ball sits a median 3.8 yd toward the green), so the marker is kept while it
   is on the pad and snapped onto it otherwise. Holes 11 and 14 have no marker
-  and get the pad centre moved forward by that median.
+  and get the pad centre moved forward by that median. Superseded 2026-10-17:
+  the tee is now the WSR player start from the PMP file, which is where local
+  play tees off. The markers that sat 6-10 yd off it came from stacks of
+  online Survival Golf frames, whose tee platform ships as `teeOnline`
+  (tools/PINS.md). The pad rule above remains only as the fallback without
+  `tools/wsr-pins.json`.
 
 The app picks this up through `src/derivedMerge.js`: WSR-sourced scale, green box,
 outline and grid overwrite the stored values until the hole's marker `green.src`
@@ -248,11 +255,11 @@ equals the hole's `wsrRev` (a hash of its WSR geometry, so a corrected truth
 re-applies while unchanged holes keep manual edits), and pipeline pins mirror derived.json on every load while
 the player's own pins stay untouched.
 
-## Pin positions (research 2026-10-17)
+## Pin positions (decoded 2026-10-17)
 
 The meshes hold no pins. WSR stores them in each course archive's PMP ("Pack
-MaP") placement file, next to the KCL: the archive (Yaz0-compressed U8, e.g.
-`WS2_glf_course_fc1.carc`) holds `WS2_glf_course_<id>.kcl` and
+MaP") placement file, next to the KCL: the archive (Yaz0-compressed U8,
+`glf_course_<id>.carc`) holds `WS2_glf_course_<id>.kcl` and
 `WS2_glf_course_<id>.pmp`. Pins are PMP objects group 0x0002 / id 0x0001;
 0x0000 is the player start, 0x000A the tee marker, and group 0x000B holds
 Frisbee Golf's start/goal (not pins). Sources: Resort2OG
@@ -264,22 +271,19 @@ fc16, fc12, fc9, fc13 matches our holes 10-18.
     node tools/wsr-pins.mjs <course archives / .pmp files / extracted folders> [--out tools/wsr-pins.json]
 
 decodes every pin, start and tee marker, maps them through the registration
-and checks each pin against the WSR green (tested on a synthetic archive; it
-has not seen real files yet). Get the archives from the disc image with Dolphin
-(right-click the game -> Properties -> Filesystem -> extract the partition) or
-`DolphinTool extract`; WSR golf scenes live under `GlfScene/`.
+and checks each pin against the WSR green. Run on the user's disc
+(`DolphinTool extract -i <rvz> -o <dir>`; the archives are under
+`DATA/files/Stage/Shared2/`), it found all 21 holes. Every pin lies on its WSR
+green, and all 99 pins on holes 1-17 reproduce the community yardage sheet as
+floor(start-to-pin yards). The output `tools/wsr-pins.json` is committed.
 
-How WSR picks the pin (speedrun.com/wsr/forums/0t4mu by tendog; Caddie's code
-for the index layout; choosePin is `Sp2::Glf::GlfConfig::choosePin` at
-0x804066e0 in the US main.dol, which could confirm the rules directly):
-- Holes 2-17 have 6 pins: indices 0-2 the easier "B" set, 3-5 the harder "A"
-  set. Your score going into the hole picks the set, a random draw the pin.
-  18-hole and Resort 9 thresholds for A: H2-3 <=-2, H4-5 <=-3, H6-7 <=-4,
-  H8-9 <=-5, H10-11 <=-6, H12-13 <=-7, H14-15 <=-8, H16-17 <=-9. Classic 9:
-  H10 always B, H11-12 <=-2, H13-14 <=-3, H15-16 <=-4, H17 <=-5. 3-hole courses
-  always use B.
-- Hole 1 has 3 pins, hole 18 one, the three specials 6 each at random.
-- Whether Switch Sports keeps these rules is not documented anywhere public.
+How WSR picks the pin is now read from `main.dol` itself (choosePin, the set
+chooser and the slot table), and agrees with the speedrun community's
+thresholds. That, the per-hole spot table, and what Switch Sports does
+differently are in tools/PINS.md: both sets seen, a few extra spots, and an
+online Survival Golf tee platform 5-12 yd from the start on 10 of the 12
+holes with online captures (holes 1, 2, 3, 6, 7, 12, 13, 17 and 21 have none
+yet).
 
 ## Quirks worth knowing
 

@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo, useId } from "react";
 import { HOLE_MAPS } from "./maps.js";
 import { GREEN_VIEWS } from "./greens.js";
 import { MAP_XFORM_V5 } from "./mapxform.js";
-import { applyDerivedHole } from "./derivedMerge.js";
+import { applyDerivedHole, isPipelinePin } from "./derivedMerge.js";
 
 
 /* ============================================================
@@ -283,7 +283,9 @@ function WindDial({ deg, setDeg, speed, topLabel = "PIN", bottomLabel = "YOU", s
     window.addEventListener("pointermove", mv); window.addEventListener("pointerup", up);
   };
   const len = 8 + Math.min(31, speed) * 0.9;
-  const wcol = speed >= 20 ? "#E5489B" : speed >= 10 ? "#E3B341" : "#3B82C4";
+  // the game's bands (blue to 11 mph, lime 12-23, pink 24+; measured on the
+  // map captures, see HoleMap's badge) in colours that hold up on the sky disc
+  const wcol = speed >= 24 ? "#E5489B" : speed >= 12 ? "#A3C400" : "#3B82C4";
   return (
     <svg ref={ref} viewBox="0 0 120 120" className={`${size} select-none touch-none cursor-pointer shrink-0`} onPointerDown={onDown}>
       <circle cx="60" cy="60" r="54" fill={T.sky} stroke={T.ink} strokeWidth="2.5" />
@@ -307,9 +309,26 @@ function WindDial({ deg, setDeg, speed, topLabel = "PIN", bottomLabel = "YOU", s
 const MAP_PX_W = 250, MAP_PX_H = 304;
 const boxAspect = (b) => (b && b.y1 > b.y0 ? ((b.x1 - b.x0) * MAP_PX_W) / ((b.y1 - b.y0) * MAP_PX_H) : 1);
 
+// Pipeline pins say where they came from (tools/build-derived.mjs): src "wsr"
+// is one of WSR's own spots, decoded from the game files (set "A" = the harder
+// three, "B" = the easier three, label like "BL"); src "switch" is a spot only
+// Switch captures show (label "S1"...). Pins the player adds carry neither and
+// are numbered P1, P2... among themselves, so they never collide with the
+// specials' 1-6 or shift when a load reorders the list.
+const pinLabels = (pins) => {
+  let own = 0, pipe = 0;
+  return pins.map((p) => (isPipelinePin(p) ? (pipe++, p.label ?? String(pipe)) : `P${++own}`));
+};
+const pinTitle = (p) => p.src === "switch"
+  ? `Switch-only spot (not one of WSR's), seen in ${p.seen ?? 0} of your rounds`
+  : p.src === "wsr"
+    ? `${p.set === "A" ? "A pin (harder set)" : p.set === "B" ? "B pin (easier set)" : "WSR pin"}${p.yd != null ? ` · ${p.yd} yd from the tee` : ""} · ${p.seen ? `seen in ${p.seen} of your rounds` : "not in your captures yet"}`
+    : isPipelinePin(p) ? "spot from your captures" : "your own pin";
+
 function GreenCanvas({ mapSrc, green, mode, onGrid, ball, cup, onTap, path, aimPt }) {
   const [phase, setPhase] = useState(0);
   const dragRef = useRef(null);
+  const svgRef = useRef(null);
   useEffect(() => {
     const id = setInterval(() => setPhase((p) => (p + 1) % 1000), 90);
     return () => clearInterval(id);
@@ -318,8 +337,11 @@ function GreenCanvas({ mapSrc, green, mode, onGrid, ball, cup, onTap, path, aimP
   const { x0, y0, x1, y1 } = green.box;
   const iw = 100 / Math.max(0.02, x1 - x0), ih = 100 / Math.max(0.02, y1 - y0);
   const cell = 100 / GRID_N;
+  // measured against the SVG, not the bordered div: the SVG sits inside the
+  // div's 3px border, so the div's rect put taps up to 3 CSS px off (1% of
+  // the green on a phone), like HoleMap's mapRect
   const toBox = (e, el) => {
-    const r = el.getBoundingClientRect();
+    const r = (svgRef.current ?? el).getBoundingClientRect();
     return { x: (e.clientX - r.left) / r.width, y: (e.clientY - r.top) / r.height };
   };
   const down = (e) => {
@@ -349,7 +371,7 @@ function GreenCanvas({ mapSrc, green, mode, onGrid, ball, cup, onTap, path, aimP
   return (
     <div className="relative rounded-xl overflow-hidden select-none touch-none" style={{ border: `3px solid ${T.turfDeep}`, cursor: mode === "view" ? "default" : "crosshair" }}
       onPointerDown={down} onPointerUp={up}>
-      <svg viewBox="0 0 100 100" className="w-full block" style={{ aspectRatio: "1" }}>
+      <svg ref={svgRef} viewBox="0 0 100 100" className="w-full block" style={{ aspectRatio: "1" }}>
         <image href={mapSrc} x={-x0 * iw} y={-y0 * ih} width={iw} height={ih} preserveAspectRatio="none" />
         <rect x="0" y="0" width="100" height="100" fill="rgba(20,48,29,0.08)" />
         {Array.from({ length: GRID_N + 1 }, (_, k) => (
@@ -402,6 +424,7 @@ function GreenView({ holeNum, pins = [], curPinId = null, greenBox = null, green
   // so bbox-local 0..1 maps to (u + M) / (1 + 2M) of the image.
   const M = meta?.margin ?? 0;
   const place = (u) => ((u + M) / (1 + 2 * M)) * 100;
+  const labels = pinLabels(pins);
   const toLocal = (p) => ({ x: place((p.x - greenBox.x0) / bw), y: place((p.y - greenBox.y0) / bh) });
   // green outline in bbox-local units, used to keep slope arrows on the green
   const localPoly = (greenPoly ?? []).map(([x, y]) => [(x - greenBox.x0) / bw, (y - greenBox.y0) / bh]);
@@ -456,14 +479,16 @@ function GreenView({ holeNum, pins = [], curPinId = null, greenBox = null, green
             const q = toLocal(p);
             if (q.x < -8 || q.y < -8 || q.x > 108 || q.y > 108) return null;
             const cur = p.id === curPinId;
+            const lab = labels[i], two = lab.length > 1;
             return (
               <g key={p.id} transform={`translate(${q.x} ${q.y})`}
                 onPointerDown={onPick ? (e) => { e.stopPropagation(); onPick(p.id); } : undefined}
                 style={{ cursor: onPick ? "pointer" : "default" }}>
-                <circle r={cur ? 3 : 2.2} fill={cur ? T.flag : "rgba(255,255,255,0.85)"}
-                  stroke={T.ink} strokeWidth="0.7" />
-                <text y="1.1" textAnchor="middle" fontSize="3.2" fontWeight="700"
-                  fill={cur ? "#fff" : T.ink}>{i + 1}</text>
+                <title>{pinTitle(p)}</title>
+                <circle r={(cur ? 3 : 2.2) + (two ? 0.6 : 0)} fill={cur ? T.flag : "rgba(255,255,255,0.85)"}
+                  stroke={T.ink} strokeWidth="0.7" strokeDasharray={p.src === "switch" ? "1.2 0.8" : undefined} />
+                <text y={two ? 0.9 : 1.1} textAnchor="middle" fontSize={two ? 2.5 : 3.2} fontWeight="700"
+                  fill={cur ? "#fff" : p.set === "A" ? T.flag : T.ink}>{lab}</text>
               </g>
             );
           })}
@@ -474,16 +499,21 @@ function GreenView({ holeNum, pins = [], curPinId = null, greenBox = null, green
 }
 
 /* ---------------- clickable hole map ---------------- */
-function HoleMap({ holeNum, line, onLine, markers, onMarkers, markerMode, aimPreview, cornerMode, onCorner, greenBox, greenPoly = null, pins = [], curPinId = null, pinMode = false, onPins, distLabel = null, windBadge = null, teePos = null, stopMarker = null, showTrees = true }) {
+function HoleMap({ holeNum, line, onLine, markers, onMarkers, markerMode, aimPreview, cornerMode, onCorner, greenBox, greenPoly = null, pins = [], curPinId = null, pinMode = false, onPins, distLabel = null, windBadge = null, teePos = null, teeOnlinePos = null, stopMarker = null, showTrees = true }) {
   const imgRef = useRef(null);
   const [dims, setDims] = useState({ w: 113, h: 140 });
   const gridId = `greengrid${useId().replace(/:/g, "")}`; // ids must be unique per SVG on the page
   const src = HOLE_MAPS[holeNum];
+  const pinLabelList = pinLabels(pins);
 
   const dragMoved = useRef(false);
   const [draggingT, setDraggingT] = useState(false);
+  // Taps are measured against the map image, not the bordered div around it:
+  // the img and the SVG sit inside its 3px border, so the div's rect put every
+  // tap up to 3 CSS px off (over 2 map px on a phone's 330-px map).
+  const mapRect = (el) => (imgRef.current ?? el).getBoundingClientRect();
   const fracOf = (e, el) => {
-    const r = el.getBoundingClientRect();
+    const r = mapRect(el);
     const pt = e.touches ? e.touches[0] : e;
     return { x: Math.min(1, Math.max(0, (pt.clientX - r.left) / r.width)),
              y: Math.min(1, Math.max(0, (pt.clientY - r.top) / r.height)) };
@@ -515,14 +545,31 @@ function HoleMap({ holeNum, line, onLine, markers, onMarkers, markerMode, aimPre
 
   const click = (e) => {
     if (dragMoved.current) { dragMoved.current = false; return; }
-    const r = e.currentTarget.getBoundingClientRect();
-    const fx = (e.clientX - r.left) / r.width;
-    const fy = (e.clientY - r.top) / r.height;
+    const { x: fx, y: fy } = fracOf(e, e.currentTarget);
     if (cornerMode) { onCorner && onCorner(fx, fy); return; }
     if (pinMode) {
-      const near = pins.find((p) => Math.hypot(p.x - fx, p.y - fy) < 0.05);
-      if (near) onPins && onPins(pins.filter((p) => p.id !== near.id));
-      else onPins && onPins([...pins, { id: Date.now(), x: fx, y: fy }]);
+      // Hit-test in CSS px with a finger-sized radius: a pin is hit within
+      // 11 px of its drawn pole (head to flag top) or the flag cloth's
+      // midline, so the head and most of the flag count as "on the pin". The
+      // nearest hit pin decides: one of your own is removed; a built-in spot
+      // (it comes back with every load) swallows the tap, so no pin ever
+      // lands on top of one; no hit adds a pin of your own. The old 1.5/3
+      // map-px radii were smaller than the drawn head (3.5 map px), so a tap
+      // on a spot added a duplicate 72% of the time. Greens hold 1-8 built-in
+      // spots, some only 1.5 map px apart, and their flags cover most of a
+      // green at phone size, so a new pin mostly fits only around its edge.
+      const r = mapRect(e.currentTarget), ux = r.width / 100, uy = r.height / 100; // CSS px per viewBox unit
+      const segDist = (qx, qy, ax, ay, bx, by) => {
+        const vx = bx - ax, vy = by - ay;
+        const t = Math.max(0, Math.min(1, ((qx - ax) * vx + (qy - ay) * vy) / (vx * vx + vy * vy || 1)));
+        return Math.hypot(qx - ax - t * vx, qy - ay - t * vy);
+      };
+      const hit = pins.map((p) => {
+        const qx = (fx - p.x) * r.width, qy = (fy - p.y) * r.height; // the tap, relative to the pin base
+        return { p, d: Math.min(segDist(qx, qy, 0, 0, 0, -6 * uy), segDist(qx, qy, 0, -4.5 * uy, 4.5 * ux, -4.5 * uy)) };
+      }).filter((h) => h.d <= 11).sort((a, b) => a.d - b.d)[0];
+      if (!hit) onPins && onPins([...pins, { id: Date.now(), x: fx, y: fy }]);
+      else if (!isPipelinePin(hit.p)) onPins && onPins(pins.filter((p) => p.id !== hit.p.id));
       return;
     }
     if (markerMode) {
@@ -538,6 +585,8 @@ function HoleMap({ holeNum, line, onLine, markers, onMarkers, markerMode, aimPre
   const px = (p) => ({ x: p.x * 100, y: p.y * 100 });
   const b = line.ball ? px(line.ball) : null;
   const t = line.target ? px(line.target) : null;
+  // the ball is on the online tee: the same test as the ⛳ Online tee chip
+  const onlineTee = !!(b && teeOnlinePos && Math.hypot(line.ball.x - teeOnlinePos.x, line.ball.y - teeOnlinePos.y) < 0.01);
 
   // aim preview point: rotate the aim offset (yd → map fraction handled by parent via aimPreview.fx/fy)
   return (
@@ -585,6 +634,14 @@ function HoleMap({ holeNum, line, onLine, markers, onMarkers, markerMode, aimPre
             <path d="M0,-2.4 L0.72,-0.74 2.5,-0.74 1.06,0.36 1.6,2.1 0,1.05 -1.6,2.1 -1.06,0.36 -2.5,-0.74 -0.72,-0.74 Z" fill="#FFD447" stroke="#8a6d1a" strokeWidth="0.25" />
           </g>
         )}
+        {/* the online (Survival Golf) tee sits only 0.9-2.2 viewBox units
+            from the tee star on 9 of the 10 holes that have one (3.9 on H4),
+            inside the star's 2.5-unit arms, so a marker of its own covered
+            the star. It shows only while the ball is on it (the ⛳ Online
+            tee chip is active): a thin white ring around the ball. */}
+        {onlineTee && (
+          <circle cx={b.x} cy={b.y} r="2.2" fill="none" stroke="#fff" strokeWidth="0.5" />
+        )}
         {stopMarker && (
           <g transform={`translate(${stopMarker.x * 100} ${stopMarker.y * 100})`}>
             <circle r="3.2" fill="none" stroke="#fff" strokeWidth="0.9" />
@@ -593,7 +650,12 @@ function HoleMap({ holeNum, line, onLine, markers, onMarkers, markerMode, aimPre
           </g>
         )}
         {windBadge && (() => {
-          const col = windBadge.speed >= 20 ? "#F06BB8" : windBadge.speed >= 10 ? "#E8D24A" : "#5AC8E8";
+          // the game's own arrow colours, so the badge can be checked against
+          // the minimap at a glance. Measured on the 317 map captures with an
+          // arrow: blue up to 11 mph (median RGB 2,251,228), lime from 13 to
+          // 22 (228,250,0), pink from 24 (253,107,153); 12 and 23 never seen,
+          // so the bands are taken as equal twelfths (floor(mph / 12)).
+          const col = windBadge.speed >= 24 ? "#F06BB8" : windBadge.speed >= 12 ? "#E4FA00" : "#5AC8E8";
           return (
             <g transform="translate(86 80)">
               <circle r="10.5" fill="rgba(10,25,16,0.72)" stroke="rgba(255,255,255,0.7)" strokeWidth="0.7" />
@@ -613,12 +675,22 @@ function HoleMap({ holeNum, line, onLine, markers, onMarkers, markerMode, aimPre
           // during play only the pin in use is drawn; pin-edit mode shows the
           // whole catalog so spots can be picked, added or removed
           if (!cur && !pinMode) return null;
+          const lab = pinLabelList[i];
+          // Built-in spots sit 0.6-2.4 units apart and a two-letter label is
+          // ~4.2 units wide, so in pin-edit mode labelling every spot piled
+          // them into one smear; there, only your own pins and the current
+          // pin are named and the rest are bare flags. Same marks as the
+          // zoomed green and the pin chips: A pins red, Switch-only spots
+          // dashed, and a tooltip with the spot's story.
+          const named = cur || !isPipelinePin(p);
+          const dash = p.src === "switch" ? "0.8 0.6" : undefined;
           return (
-            <g key={p.id} transform={`translate(${p.x * 100} ${p.y * 100})`}>
-              <circle r="1.4" fill={cur ? T.flag : "#fff"} stroke={T.ink} strokeWidth="0.5" />
+            <g key={p.id} transform={`translate(${p.x * 100} ${p.y * 100})`} style={{ pointerEvents: "auto" }}>
+              <title>{pinTitle(p)}</title>
+              <circle r="1.4" fill={cur ? T.flag : "#fff"} stroke={T.ink} strokeWidth="0.5" strokeDasharray={dash} />
               <line x1="0" y1="0" x2="0" y2="-6" stroke={cur ? T.flag : "#fff"} strokeWidth="1" />
-              <path d="M 0 -6 L 4.5 -4.5 L 0 -3 Z" fill={cur ? T.flag : "#EAD9A4"} stroke={T.ink} strokeWidth="0.3" />
-              <text y="-7.5" textAnchor="middle" fontSize="3.4" fontWeight="700" fill="#fff" stroke={T.ink} strokeWidth="0.15">{i + 1}</text>
+              <path d="M 0 -6 L 4.5 -4.5 L 0 -3 Z" fill={cur || p.set === "A" ? T.flag : "#EAD9A4"} stroke={T.ink} strokeWidth="0.3" strokeDasharray={dash} />
+              {named && <text y="-7.5" textAnchor="middle" fontSize="3.4" fontWeight="700" fill="#fff" stroke={T.ink} strokeWidth="0.15">{lab}</text>}
             </g>
           );
         })}
@@ -1123,6 +1195,7 @@ export default function App() {
                     pinMode={false} onPins={(p) => setPins(hole, p)}
                     distLabel={geo ? (scale ? `${Math.round(geo.srcPx * scale)} yd` : "? yd") : null}
                     teePos={holesMeta[hole].tee ?? null}
+                    teeOnlinePos={holesMeta[hole].teeOnline ?? null}
                     stopMarker={stopPoint}
                     showTrees={showTrees} />
                 </div>
@@ -1146,11 +1219,17 @@ export default function App() {
                   <div className="rounded-xl border-2 p-2" style={{ borderColor: T.line, background: "#fff" }}>
                     <div className="disp text-[11px] font-bold mb-1">Today's pin</div>
                     <div className="flex flex-wrap gap-1">
-                      {holesMeta[hole].pins.map((p, i) => (
-                        <button key={p.id} onClick={() => setCurPin(hole, p.id)}
-                          className="w-7 h-7 rounded-full border-2 text-[11px] font-bold"
-                          style={chip(holesMeta[hole].curPin === p.id)}>{i + 1}</button>
-                      ))}
+                      {holesMeta[hole].pins.map((p, i, all) => {
+                        const on = holesMeta[hole].curPin === p.id;
+                        const lab = pinLabels(all)[i]; // under 10 pins: recomputing per chip is fine
+                        return (
+                          <button key={p.id} onClick={() => setCurPin(hole, p.id)} title={pinTitle(p)}
+                            className="h-7 px-1 rounded-full border-2 text-[11px] font-bold"
+                            style={{ ...chip(on), minWidth: "1.75rem",
+                              ...(!on && p.set === "A" ? { color: T.flag } : {}),
+                              ...(p.src === "switch" ? { borderStyle: "dashed" } : {}) }}>{lab}</button>
+                        );
+                      })}
                       {holesMeta[hole].pins.length === 0 && <span className="text-[10px] opacity-60 self-center">none yet — add via ⚙ on the Holes tab</span>}
                     </div>
                     {holesMeta[hole].curPin != null && line.ball && (
@@ -1178,6 +1257,14 @@ export default function App() {
                     </button>
                   </div>
                   <div className="flex gap-2 mt-1.5">
+                    {holesMeta[hole].teeOnline && (
+                      <button onClick={() => setLine({ ball: { x: holesMeta[hole].teeOnline.x, y: holesMeta[hole].teeOnline.y }, target: null })}
+                        title="Online Survival Golf tees off from a platform away from the normal tee; your spot on it can vary by a few yards, so trust the 'yd to go' badge"
+                        className="flex-1 py-1 rounded-xl border-2 text-[11px] font-bold"
+                        style={chip(line.ball && Math.hypot(line.ball.x - holesMeta[hole].teeOnline.x, line.ball.y - holesMeta[hole].teeOnline.y) < 0.01)}>
+                        ⛳ Online tee
+                      </button>
+                    )}
                     <button onClick={() => setShowTrees(!showTrees)} className="flex-1 py-1 rounded-xl border-2 text-[11px] font-bold" style={chip(showTrees)}>
                       🌲 trees {showTrees ? "shown" : "hidden"}
                     </button>
@@ -1721,7 +1808,7 @@ export default function App() {
         {tab === "guide" && (() => {
           const steps = [
             ["Green box + slopes", (n) => !!holesMeta[n].green?.box && (holesMeta[n].green?.grid ?? []).some((r) => r.some(([x, y]) => x || y)), "AUTO (pipeline): boundary + slope grid extracted from your zoomed green captures. Manual paint in Holes → ⚙ stays available as an override."],
-            ["Pins", (n) => (holesMeta[n].pins?.length ?? 0) > 0, "AUTO (pipeline): read from zoomed green captures; new pin spots get appended as later uploads show them."],
+            ["Pins", (n) => (holesMeta[n].pins?.length ?? 0) > 0, "AUTO: WSR's own spots are built in (from the game files). A spot that isn't one of them gets added as S1, S2… once two independent readings agree on it: two rounds, or a zoomed green plus a tee frame (which can be one round)."],
             ["Map scale", (n) => !!holesMeta[n].scale, "AUTO (pipeline): tee 'yd to go' ÷ tee→pin distance on the map. (Manual fallback: Solver → tap ball, tap target, type the in-game distance → Set.)"],
             ["Trees", (n) => true, "AUTO (pipeline): re-seeded from the upgraded maps. Spot-check in Holes → ⚙ only if a solver line looks wrong."],
             ["Log shots", (n) => holeStats[n].shots > 0, "Phase 2: two captures per shot (address + result pop-up) — the pipeline turns them into Log rows."],
@@ -1814,14 +1901,14 @@ export default function App() {
                   <div>3. Driver and Spoon cannot backspin; irons/wedge can (stop the swing mid-way; stronger swing = stronger spin; downhill landings can spin the ball away).</div>
                   <div>4. OB / water: +1 stroke, replay from the same spot.</div>
                   <div>5. Minimap dots = flat-terrain landing points; elevation shifts real carry (uphill shorter, downhill longer).</div>
-                  <div>6. Wind arrow color: blue = weak, yellow = medium, pink = strongest (the dial here matches).</div>
+                  <div>6. Wind arrow colour, measured on the captures: blue through 11 mph, lime from 13 to 22, pink from 24 (12 and 23 mph never came up). The dials here use the same colours, split at 12 and 24.</div>
                   <div>7. Trajectory: driver lowest → spoon → irons rising with number → wedge highest. Low clubs duck under branches; high clubs clear them and feel more wind.</div>
                   <div>8. Wind comes in exactly 8 directions (N/NE/E/SE/S/SW/W/NW) at integer mph, observed 0–31. The dial snaps to the 8 when set "as on minimap".</div>
                   <div>9. All distances here are STOP distances (carry + roll). The game's minimap dots show flat-ground carry; low clubs roll well past their dots, and backspin-capable clubs can stop near them.</div>
                   <div>10. You can physically swing past a capped bar — it goes red and the shot wobbles/curves unpredictably. The solver never plans on it.</div>
                   <div>11. Putter roll depends on surface: green rolls best, fairway noticeably slower, sand slowest. No source in 20 years reports any per-bar flight penalty from rough/sand — caps are the whole mechanic until your logs say otherwise.</div>
                   <div>12. Backspin strength scales with swing power ("the harder you swing, the stronger the backspin" — official). Capped lies therefore also cap max spin; that alone explains weaker spin from rough/sand.</div>
-                  <div>13. Pins are a finite set of fixed spots per hole (WSR data: most holes carry two score-based sets — harder "A pins" when you're playing well, easier "B pins" when you're not; H1 has 3, H18 has 1, Specials 6 each). Cataloged pins here map onto those exact spots.</div>
+                  <div>13. Pins are fixed spots, read straight from Wii Sports Resort's course files: H1 has 3, H2–H17 have 6 (B = the easier three, A = the harder three), H18 has 1, the Specials 6 each. In WSR your score picks the set — A once you're more than k/2 under par going into the round's k-th hole (−3 or better before the 4th), never in 3-hole rounds — and a random draw picks the spot within it. Switch Sports reuses these spots (your captures show both sets) and adds a few of its own, labelled S1, S2… Local play tees off from WSR's own tee spot unless you move it (Shot Position). Online Survival Golf tees off from a platform: on 10 of the 12 holes with online captures it sits 5–12 yd from that spot (⛳ Online tee), on holes 10 and 11 within 3 yd; holes 1, 2, 3, 6, 7, 12, 13, 17 and 21 have no online captures yet, so only the local tee is offered there. Your place on the platform varies a few yards within a round, so trust the "yd to go" badge.</div>
                   <div>14. At 0 mph the wind still HAS a direction — read it off the flag cloth on the pin.</div>
                 </div>
               </section>

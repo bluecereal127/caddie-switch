@@ -15,15 +15,22 @@
 //   that raced the merge (old values written back) simply gets migrated again on
 //   the next load; once it is stored, later manual edits survive (every edit
 //   spreads the existing green object, keeping the marker).
-// - Everything else keeps the original fill-empty behaviour. Tee is not
-//   persisted, so it always follows derived.json.
+// - Everything else keeps the original fill-empty behaviour, except the tees:
+//   tee (the WSR player start, where local play tees off) and teeOnline (the
+//   Survival Golf platform, on holes where it sits apart from the start) always
+//   follow derived.json. Nothing in the app edits a tee, and the loader drops
+//   both from saved state anyway.
 // - Pins the pipeline produced (string ids "d…") mirror derived.json on every
-//   load, so corrections reach the app and stale spots drop out. The player's
-//   own pins (numeric ids) are never touched. If the current pin was a pipeline
-//   pin it moves to the pipeline pin at the same spot on the green: its position
-//   is carried from the stored green box's frame into the new one, then the
-//   nearest current pipeline pin is chosen.
+//   load, so corrections reach the app and stale spots drop out; they keep the
+//   derived fields (label, set, src, yd, seen) and their id is "d<hole>-<derived
+//   id>" (s<slot> for a WSR spot, x<k> for a Switch-only one). The player's own
+//   pins (numeric ids) are never touched. If the current pin was a pipeline pin
+//   it moves to the pipeline pin at the same spot on the green: its position is
+//   carried from the stored green box's frame into the new one, then the nearest
+//   current pipeline pin is chosen.
 export const isPipelinePin = (p) => typeof p?.id === "string" && p.id.startsWith("d");
+// the app's hole-map frame (map px), so "nearest" means nearest on the map
+const MAP_W = 250, MAP_H = 304;
 
 export function applyDerivedHole(cur, n, dh, { fresh }) {
   const out = { ...cur, green: { ...cur.green } };
@@ -39,7 +46,8 @@ export function applyDerivedHole(cur, n, dh, { fresh }) {
     out.green.src = rev;
   }
   if (dh.scale != null && (fresh || out.scale == null)) out.scale = dh.scale;
-  if (dh.tee && (fresh || !out.tee)) out.tee = dh.tee;
+  if (dh.tee) out.tee = dh.tee;
+  out.teeOnline = dh.teeOnline ?? null;
   if (dh.greenBox && (fresh || !out.green.box)) out.green.box = dh.greenBox;
   if (dh.greenPoly && (fresh || !out.green.poly)) out.green.poly = dh.greenPoly;
   // aspect + provenance for the zoomed green view; always take the derived
@@ -50,7 +58,7 @@ export function applyDerivedHole(cur, n, dh, { fresh }) {
 
   const stored = out.pins ?? [];
   const oldCur = stored.find((p) => p.id === out.curPin) ?? null;
-  const pipeline = (dh.pins ?? []).map((p, k) => ({ id: `d${n}-w${k}`, x: p.x, y: p.y }));
+  const pipeline = (dh.pins ?? []).map((p, k) => ({ ...p, id: `d${n}-${p.id ?? `w${k}`}` }));
   out.pins = [...stored.filter((p) => !isPipelinePin(p)), ...pipeline];
   if (oldCur && isPipelinePin(oldCur)) {
     const sb = storedBox, nb = out.green.box;
@@ -60,9 +68,14 @@ export function applyDerivedHole(cur, n, dh, { fresh }) {
           y: nb.y0 + ((oldCur.y - sb.y0) / (sb.y1 - sb.y0)) * (nb.y1 - nb.y0) }
       : oldCur;
     let best = null;
-    for (const p of pipeline) { const d = Math.hypot(p.x - at.x, p.y - at.y); if (!best || d < best.d) best = { id: p.id, d }; }
+    for (const p of pipeline) { const d = Math.hypot((p.x - at.x) * MAP_W, (p.y - at.y) * MAP_H); if (!best || d < best.d) best = { id: p.id, d }; }
     out.curPin = best ? best.id : null;
   }
-  if (out.curPin == null || !out.pins.some((p) => p.id === out.curPin)) out.curPin = out.pins.length ? out.pins[out.pins.length - 1].id : null;
+  // no current pin yet (or it vanished): the pipeline pin seen most often in the
+  // player's captures, the first one if none has been, else the last pin
+  if (out.curPin == null || !out.pins.some((p) => p.id === out.curPin)) {
+    const pick = pipeline.reduce((b, p) => ((p.seen ?? 0) > (b ? b.seen ?? 0 : -1) ? p : b), null);
+    out.curPin = pick ? pick.id : out.pins.length ? out.pins[out.pins.length - 1].id : null;
+  }
   return out;
 }

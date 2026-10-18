@@ -11,7 +11,8 @@
 // relative to the green's own height range.
 //
 // Every session pair is processed (pins move between sessions): the grid is
-// taken from the latest session; pins accumulate across sessions.
+// taken from the latest session; pins accumulate across sessions, each with
+// the frame it was read from (pinSources).
 // Outputs: captures/derived/greens/hNN.json + debug hNN-mask.png / hNN-height.png
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -325,6 +326,13 @@ for (let hole = 1; hole <= 21; hole++) {
     s.some((f) => f.frameType === "greenPlain") && s.some((f) => f.frameType === "greenHeightmap"));
   if (!sess.length) { console.log(`H${hole}: no plain+heightmap pair`); continue; }
   const pins = [];
+  // pinSources[i] is the frame pins[i] was actually read from: a pair's pin
+  // comes from its HEIGHTMAP, a plain-only frame's from that plain. The round
+  // a pin sighting belongs to (time, wind, online) is judged by that frame —
+  // a pair's plain can be from a different round than its heightmap (H1:
+  // plain W6 paired with heightmap W9), and a plain-only pin had no record
+  // at all, so it fell into a round of its own.
+  const pinSources = [];
   const sessionDetails = [];
   const extracted = [];
   // PAIR EVERY FRAME, not just the first of each kind. This used to take
@@ -361,6 +369,7 @@ for (let hole = 1; hole <= 21; hole++) {
     const cropped = r.bbox.x0 <= 1 || r.bbox.y0 <= 1 || r.bbox.x1 >= cw - 2 || r.bbox.y1 >= ch - 2;
     if (r.pin) {
       pins.push(r.pin);
+      pinSources.push({ from: hmapF, plain: plainF, hmap: hmapF });
       sessionDetails.push({ plain: plainF, hmap: hmapF, bboxPx: r.bbox, cropped,
         pinPx: { x: +(r.bbox.x0 + r.pin.gx * (r.bbox.x1 - r.bbox.x0)).toFixed(1),
                  y: +(r.bbox.y0 + r.pin.gy * (r.bbox.y1 - r.bbox.y0)).toFixed(1) } });
@@ -457,7 +466,10 @@ for (let hole = 1; hole <= 21; hole++) {
       if (iou < 0.65) { console.log(`H${hole} ${f.file.slice(-12)}: fringe shape disagrees with the paired outline (IoU ${iou.toFixed(2)})`); continue; }
       absorb(nrm); soloUsed++; fringeFrames.push(f.file);
       const p = findPin(img);
-      if (p) pins.push({ gx: +((p.x - x0) / (x1 - x0)).toFixed(4), gy: +((p.y - y0) / (y1 - y0)).toFixed(4) });
+      if (p) {
+        pins.push({ gx: +((p.x - x0) / (x1 - x0)).toFixed(4), gy: +((p.y - y0) / (y1 - y0)).toFixed(4) });
+        pinSources.push({ from: f.file, plain: f.file, fringe: true });
+      }
     }
     if (soloUsed) console.log(`H${hole}: +${soloUsed} plain-only frame(s) via fringe`);
   }
@@ -542,7 +554,7 @@ for (let hole = 1; hole <= 21; hole++) {
     hole, sources: { plain: final.plainF, heightmap: final.hmapF },
     panelBbox: r.bbox, gridN: GRID_N, grid: fusedGrid ?? r.grid, fusedFrom,
     poly, polyFrom: pool.length + soloUsed, fringeFrames, fusedArea: +fusedArea.toFixed(4),
-    pins, sessions: sessionDetails,
+    pins, pinSources, sessions: sessionDetails,
     convention: "grid[row][col]=[dx,dy] downhill, +x right +y down, normalized to the green's own max slope; pin gx/gy fractional within bbox",
   }, null, 2));
   console.log(`H${hole}: mask=${r.maskSize}px poly=${poly ? poly.length + "pts" : "-"} from ${pool.length} pair(s) fill=${(100 * fusedArea).toFixed(0)}% pins=${pins.length}`);

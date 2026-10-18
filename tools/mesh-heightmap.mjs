@@ -163,20 +163,23 @@ for (const file of files) {
   writePngRGB(join(opt.out, `${name}_preview.png`), rgb, w, h);
   writePng8(join(opt.out, `${name}_classes.png`), classes, w, h);
 
-  // green, cup and tee geometry straight from the mesh (registration anchors for the app's data)
+  // green and tee geometry straight from the mesh (registration anchors for the
+  // app's data). The meshes have no cups (pins live in the PMP files,
+  // tools/wsr-pins.mjs); innerLoops are the green's small interior holes, which
+  // are other surface types: a fringe cell on hole 4, a water cell on hole 8.
   const toPixel = (x, z) => [+(((x - x0) / upp) - 0.5).toFixed(1), +(((opt.flipZ ? z1 - z : z - z0) / upp) - 0.5).toFixed(1)];
   const gi = mesh.groups.findIndex((g) => g.type === 6 && g.tris > 0);
   let green = null, greenLoop = null;
   if (gi >= 0) {
     const loops = groupBoundaryLoops(mesh, gi).filter((l) => l.perim > 50);
     const main = loops.slice().sort((a, b) => b.n - a.n)[0];
-    const cups = loops.filter((l) => l !== main && l.w < 40 && l.d < 40 && l.w > 5);
+    const inner = loops.filter((l) => l !== main && l.w < 40 && l.d < 40 && l.w > 5);
     if (main) {
       greenLoop = main;
       green = {
         centerX: f1(main.cx), centerZ: f1(main.cz), width: f1(main.w), depth: f1(main.d), minY: f1(main.y0), maxY: f1(main.y1),
         pixel: toPixel(main.cx, main.cz),
-        cups: cups.map((c) => ({ x: f1(c.cx), z: f1(c.cz), y: f1((c.y0 + c.y1) / 2), pixel: toPixel(c.cx, c.cz) })),
+        innerLoops: inner.map((c) => ({ x: f1(c.cx), z: f1(c.cz), y: f1((c.y0 + c.y1) / 2), pixel: toPixel(c.cx, c.cz) })),
       };
     }
   }
@@ -231,5 +234,5 @@ for (const file of files) {
     mesh: { vertices: mesh.verts.length / 3, triangles: nt },
   };
   writeFileSync(join(opt.out, `${name}.json`), JSON.stringify(meta, null, 1));
-  console.log(`${name.padEnd(8)} ${meshId.padEnd(7)} ${w}x${h} @ ${upp.toFixed(2)} u/px  y ${minY.toFixed(1)}..${maxY.toFixed(1)}  nodata ${nodata} (floor ${floorDropped}) filled ${nFilled}  green ${green ? `${green.width}x${green.depth} @(${green.centerX},${green.centerZ}) cups ${green.cups.length}` : "-"}  ${((Date.now() - t0) / 1000).toFixed(1)}s`);
+  console.log(`${name.padEnd(8)} ${meshId.padEnd(7)} ${w}x${h} @ ${upp.toFixed(2)} u/px  y ${minY.toFixed(1)}..${maxY.toFixed(1)}  nodata ${nodata} (floor ${floorDropped}) filled ${nFilled}  green ${green ? `${green.width}x${green.depth} @(${green.centerX},${green.centerZ}) inner loops ${green.innerLoops.length}` : "-"}  ${((Date.now() - t0) / 1000).toFixed(1)}s`);
 }

@@ -6,18 +6,31 @@ React app (Vite). No backend; all state in localStorage via `src/storage.js`
 v13 and now diverges (v14: capture catalog); the web repo is the source of truth.
 
 ## Files
-- `src/App.jsx` — entire app (~1300 lines): solver, hole maps, greens, rounds, log, clubs, guide, capture catalog.
+- `src/App.jsx` — entire app (~1970 lines): solver, hole maps, greens, rounds, log, clubs, guide, capture catalog.
 - `src/main.jsx` — mount point + client-side password gate (SHA-256 vs PASS_HASH; casual deterrence only — change via `node tools/hash-password.mjs <pw>`; deliberately kept out of App.jsx).
 - `src/maps.js` — AUTO-GENERATED (tools/build-derived.mjs): 21 hole minimaps as base64 JPEG, 250×304, median-stacked from the user's captures (mapV5; replaced the 219×270 rufusmccoot/chart set). Fractional coordinates everywhere.
 - `src/mapxform.js` — AUTO-GENERATED per-hole old→new fractional transforms used once by the mapV5 migration.
-- `public/derived.json` — AUTO-GENERATED pipeline output (per-hole scale, green box + outline, quantized 9×9 slope grid, pins, tee). Since 2026-10-16 every hole is built with the WSR truth (`source: "wsr"`): scale, green box/outline and slope grid come from `tools/wsr-truth.json`, pins and the transplanted green are placed through the WSR green box, the tee is the detected marker kept on the WSR pad. App fetches it on load and merges via `src/derivedMerge.js`: first application wholesale (derivedV1), WSR holes overwrite until the hole's marker `green.src` equals derived.json's `wsrRev` (a hash of that hole's WSR geometry, so corrected truth re-applies; kept in the hole's own saved state, so a racing save just re-migrates next load), otherwise fill-empty so manual edits survive; pipeline pins (string ids `d…`) mirror derived.json every load, the player's own pins (numeric ids) are never touched. Regenerate: extract-maps → extract-greens → (wsr-truth, only if the meshes or registration change) → build-derived.
+- `public/derived.json` — AUTO-GENERATED pipeline output (per-hole scale, green box + outline, quantized 9×9 slope grid, pins, tee, teeOnline). Since 2026-10-16 every hole is built with the WSR truth (`source: "wsr"`): scale, green box/outline and slope grid come from `tools/wsr-truth.json`, and the transplanted green is placed through the WSR green box. Since 2026-10-17 (tools/PINS.md):
+  - pins are every WSR spot from `tools/wsr-pins.json` (`src: "wsr"`, with `set` A/B, `label`, `yd` and `seen` = rounds), plus Switch-only spots that two independent readings agree on (`src: "switch"`, S1… numbered by first sighting; two rounds, or a zoomed green plus a tee frame). Single readings go to `pinCandidates`; readings tied between two spots, and tee-only readings 5.5–7 yd from a spot that no other round's reading explains, go to `pinAmbiguous`;
+  - `tee` is the WSR player start, where local play tees off by default;
+  - `teeOnline` is the online Survival Golf platform (the raw median avatar of the online tee frames, no badge correction), shipped on the 10 of 12 holes with online captures where it sits 4+ yd from the start (4, 5, 8, 9, 14, 15, 16, 18, 19, 20). Holes 1, 2, 3, 6, 7, 12, 13, 17 and 21 have no online captures yet.
+
+  App fetches it on load and merges via `src/derivedMerge.js`:
+  - first application wholesale (derivedV1);
+  - WSR holes overwrite until the hole's marker `green.src` equals derived.json's `wsrRev` (a hash of that hole's WSR geometry, so corrected truth re-applies; kept in the hole's own saved state, so a racing save just re-migrates next load), otherwise fill-empty so manual edits survive;
+  - pipeline pins (string ids `d<hole>-s<slot>` / `d<hole>-x<k>`) mirror derived.json every load, and the player's own pins (numeric ids, labelled P1…) are never touched;
+  - tee and teeOnline always follow derived.json.
+
+  Regenerate: extract-maps → extract-greens → (wsr-truth / wsr-pins, only if the meshes, archives or registration change) → build-derived.
+- `tools/lib/online.mjs` — tells online Survival Golf captures from local play by the shot timer's stopwatch icon, tried at 1.0–1.4× because the pill pulses (194 of 563 captures are online and score 0.59–0.70; the rest 0.25 or less). extract-maps flags each tee frame with it.
+- `tools/lib/exif.mjs` — the capture time the console writes into each JPEG's EXIF (DateTime). The ULID in a capture's name is when the phone received it, 4–6.5 h later, and a batch transfer reorders files; build-derived groups frames into rounds by the EXIF time.
 - `src/derivedMerge.js` — the per-hole merge rules above, pure so they can be tested outside the app.
-- `tools/wsr-pins.mjs` — decodes WSR pin/start/tee positions from the course archives' PMP files (Yaz0 + U8 + PMP readers) into the map frame; needs the archives extracted from the disc image (see tools/MESHES.md "Pin positions").
+- `tools/wsr-pins.mjs` → `tools/wsr-pins.json` — every WSR pin (slot, set, label, yardage), player start and tee marker, decoded from the course archives' PMP files (Yaz0 + U8 + PMP readers) into the map frame; committed. Rerun only with the archives extracted from the disc image (`DATA/files/Stage/Shared2/glf_course_<id>.carc`); it also reads `tools/mesh-holes.json`, `tools/mesh-registration.json` and `tools/wsr-truth.json`. The selection logic read from main.dol, the per-hole spot table and what NSS does differently are in `tools/PINS.md`.
 - `tools/wsr-truth.mjs` → `tools/wsr-truth.json` — per-hole WSR truth in the app's map frame (scale, green box/outline, tee pad hull, slope grid) from the meshes + registration; committed so build-derived runs without the meshes.
 - `src/storage.js` — window.storage shim (async get/set/delete/list over localStorage, key prefix `caddie:`; app data lives under `caddie:sss-golf-solver-v2`).
 - `tools/frame-audit.mjs` — read-only: joins every stage's record of what it
   consumed and reports, per capture, which roles it holds (mapPool, mapDetect,
-  teeBench, greenPair, shotAddress, shotPopup, labelled) or that it is inert.
+  teeBench, teeFrame, greenPair, shotAddress, shotPopup, labelled) or that it is inert.
   Run it before concluding a frame is unused; `--list` names them, `--json`
   writes captures/derived/frame-audit.json.
 - `tools/` — screenshot ingestion pipeline (pure Node; see tools/README.md). Scaffolded + verified on synthetic frames; ROIs/gauge cal/digit templates await first real captures.
@@ -42,8 +55,9 @@ grid per green (MU=1.35, SLOPE_G=1.1, capture radius 0.22 yd, max capture speed 
 - Gauge = 4 bars, linear (a = max/4). WSR official maxes seed defaults: driver 250, spoon 200, 3i 175, 5i 155, 7i 135, 9i 100, wedge 80.
 - Lies cap the usable BAR; distance per bar is unchanged below the cap. Rough = 3 bars (all clubs). Sand: wedge 3, irons 2, spoon/driver 1 (player-confirmed, hardcoded in BUNKER_CAPS). Putter uncapped, dead roll in sand.
 - Driver & spoon can NEVER backspin. Spin strength scales with swing power (official) → capped lies also cap spin.
-- Wind: exactly 8 directions (N/NE/E/SE/S/SW/W/NW), integer mph, observed 0–31 (odd values exist in NSS; WSR was even-only 0–30). Arrow color: blue <10, yellow 10–19, pink 20+. At 0 mph direction is still readable from the pin flag.
-- Pins: finite fixed spots per hole. WSR (research 2026-10-17, see tools/MESHES.md): pins live in each course archive's PMP placement file, not the KCL; holes 2-17 have 6 (a "B" set of 3 used when your score is not good enough, an "A" set of 3 when it is; score thresholds per hole in the speedrun guide), H1=3, H18=1, specials 6 picked at random. The player's "well over 2 per hole" in NSS fits it reusing these six. the pipeline accumulates every distinct pin seen in uploaded green captures, uncapped, clustering sightings in green-local space at 0.085 of the green's bbox (repeat sightings agree within 0.07; the old 0.02 map-fraction radius merged distinct spots on small greens).
+- Wind: exactly 8 directions (N/NE/E/SE/S/SW/W/NW), integer mph, observed 0–31 (odd values exist in NSS; WSR was even-only 0–30). Arrow colour, measured on the 317 map captures with an arrow: blue through 11 mph, lime at 13–22, pink from 24; 12 and 23 mph were never captured, so the edges lie between 11 and 13 and between 22 and 24 (the app's dials split at 12 and 24). At 0 mph the dial shows no arrow; direction is still readable from the pin flag.
+- Pins (tools/PINS.md): WSR's spots are decoded from its course PMP files. Holes 2–17 have 6 (set 1 = "B", the easier 3; set 2 = "A", the harder 3), H1 has 3, H18 one spot listed under both sets, the specials 6. WSR's choosePin (main.dol, decoded) draws uniformly within a set. The set is B on a round's first hole and in every round of ≤ 3 holes; otherwise A when every player is below −k/2 going into the round's k-th hole, B when none is, and any pin when they straddle. NSS reuses WSR's spots: local badges read WSR's start-to-pin yardage exactly on some spots and 1–4 yd off on others (+4 on H3 AL and H17 BL), and it shows A pins on 11 holes, 8 of them in local play. So it doesn't keep WSR's 3-hole rule, or those weren't 3-hole rounds. It also adds spots of its own: H10 ×2, H18 and H21 confirmed (H21's on one round: a zoom sighting plus a tee frame whose 416 yd badge fits it, 415, not WSR spot 3 at 422); candidates are H1 (one round of tee frames reading 384 yd, 11 yd short of every WSR pin) and one zoom sighting on H19. A reading within 5.5 yd of a WSR spot is that spot, unless the next spot is within 1 px of being as close; then only local badges taken from the start decide (fit one spot within 2 yd, miss the other by 5), else `pinAmbiguous`.
+- Tees (from captures, 2026-10-17; tools/PINS.md): local play tees off from the WSR player start by default; local frames also offer "Shot Position" and "Reset Stance", so the ball can be moved, and the "yd to go" badge is the authority. Local badges match WSR's yardages within the shifts above. Online Survival Golf (shot timer at the top centre, several players on a white-railed platform) tees off from a platform 4.6–11.9 yd from the start on holes 4, 5, 8, 9, 14, 15, 16, 18, 19 and 20, and within 3 yd on 10 and 11; holes 1, 2, 3, 6, 7, 12, 13, 17 and 21 have no online captures yet. The player's place on the platform varies about 5 yd within a round (H5, H8, H9), and H11's two online rounds sit 2 yd apart. The old "Switch moved the tee" reading came from map stacks of online frames. H10's frames 6–8 yd ahead of the tee are post-shot frames, not a tee.
 - Over-swinging a capped bar = red bar + wobble/curve; solver treats caps as hard.
 - Minimap meter dots = flat-terrain carry; elevation shifts real distance (notably holes 8, 12, 17).
 - Community wind-route rules encoded in WIND_RULES (H7/10/12/14/15/16/18/21).
@@ -68,7 +82,12 @@ grid per green (MU=1.35, SLOPE_G=1.1, capture radius 0.22 yd, max capture speed 
 ## Truth source (user's rule, 2026-10-15)
 When in doubt, the data extracted from the WSR collision meshes is the truth.
 Derived/calculated data (scale, green box/outline, pins, tee, slopes, anything
-built from captures) is adjusted to match it, never the other way round.
+built from captures) is adjusted to match it, never the other way round. The
+same holds for WSR's placement files (pins, player start). A Switch-only pin
+spot ships only when two independent readings agree (two rounds, or a zoomed
+green plus a tee frame); a single reading is doubt and goes to
+`pinCandidates`. The online tee doesn't conflict with WSR data (WSR has no
+online mode), so it ships from the online frames themselves.
 
 ## Course geometry (WSR collision meshes — see tools/MESHES.md, do not re-derive)
 - 21 KCL→OBJ meshes, one per hole, Y-up, X/Z ground, -Z = minimap "up"
@@ -80,13 +99,14 @@ built from captures) is adjusted to match it, never the other way round.
   Golf layouts).
 - KCL types: 1 fairway (+ the flat tee pad), 2 rough, 3 sand (bunkers, beaches,
   river gravel), 4 outer ground, 5 floor plane (dead), 6 green (a grid of ~15-unit cells;
-  the meshes carry no cup or pin data), 7 water, 9 fringe ring, 0x0c walls/tree trunks.
+  the meshes carry no cup or pin data, which live in the PMP files), 7 water, 9 fringe ring, 0x0c walls/tree trunks.
 - The meshes are the Wii course and match the Switch art almost everywhere
   (hole 15's apron NE of the green and a hilltop sand strip on 17 differ;
   tools/MESHES.md lists them). src/maps.js is NOT raw game art near greens:
-  the flag is painted out and a green texture is transplanted at the app's
-  derived green box, which is misplaced on holes 5/7/8/10/14/18 — compare
-  against `captures/derived/maps/hNN.png` / `hNN.det.png` before calling a
+  the flag is painted out and a green texture is transplanted (at the WSR
+  green box since 2026-10-16; before that at a capture-derived box that was
+  misplaced on holes 5/7/8/10/14/18) — compare against
+  `captures/derived/maps/hNN.png` / `hNN.det.png` before calling a
   mesh/minimap difference real. Registration to the app frame
   (`tools/mesh-registration.json`) is verified to ~1 px on all 21 holes.
 

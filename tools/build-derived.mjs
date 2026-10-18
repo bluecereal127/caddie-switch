@@ -13,6 +13,8 @@ import jpeg from "jpeg-js";
 import { loadImage, savePng, px, onionInpaint } from "./lib/image.mjs";
 import { panelRect, cropRect } from "./lib/panel.mjs";
 import { flagCupMask, inCompass } from "./lib/greensurface.mjs";
+import { fileMs } from "./lib/ulid.mjs";
+import { exifMs } from "./lib/exif.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const INBOX = join(ROOT, "captures", "inbox");
@@ -22,11 +24,12 @@ const register = JSON.parse(readFileSync(join(D, "register.json"), "utf8"));
 // WSR collision-mesh truth (tools/wsr-truth.json, written by tools/wsr-truth.mjs).
 // The user's rule: when in doubt the WSR data is the truth and derived data
 // adjusts to it. Where a hole has it, the WSR green box replaces the capture
-// projection (so outline, pins, pin zones and the transplanted green all follow
-// it), the WSR scale and slope grid replace the capture ones, and the detected
-// tee is kept only while it sits on the WSR tee pad. Without the file, or for a
-// hole it lacks, the capture projection is used as before (pin clustering and
-// the green transplant changed for every hole, see their comments).
+// projection (so outline, pin sightings, pin zones and the transplanted green
+// all follow it) and the WSR scale and slope grid replace the capture ones.
+// With tools/wsr-pins.json as well, pins are WSR's own spots and the tee is
+// the WSR player start (see WSRP below). Without the files, or for a hole they
+// lack, the capture data is used as before: pins are the sighting clusters and
+// the tee is the detected marker kept on the WSR tee pad.
 let WSR = null;
 try { WSR = JSON.parse(readFileSync(join(ROOT, "tools", "wsr-truth.json"), "utf8")).holes; } catch {}
 
@@ -419,6 +422,133 @@ if (WSR) {
   console.log(`WSR truth: ${Object.keys(WSR).length} holes; detected tee sits a median ${TEE_FORWARD_YD.toFixed(2)} yd toward the green from the pad centre (${offs.length} holes)`);
 }
 
+// WSR's own pin spots and player starts (tools/wsr-pins.json, decoded from the
+// course PMP files by tools/wsr-pins.mjs) are the truth for where pins and the
+// tee are (tools/PINS.md). NSS reuses WSR's spots, both sets, and adds a few of
+// its own. Local play tees off from the WSR start; online Survival Golf from a
+// platform that sits up to ~12 yd from it. derived.json gets every WSR spot
+// with the number of rounds it was seen in, the Switch-only spots that two
+// independent readings agree on, tee = the WSR start and teeOnline = the
+// median avatar of the online tee frames.
+let WSRP = null;
+try { WSRP = JSON.parse(readFileSync(join(ROOT, "tools", "wsr-pins.json"), "utf8")).holes; } catch {}
+// Capture time and wind of every classified frame, and from them the rounds
+// played on each hole. The time is the EXIF DateTime the console writes into
+// each capture (tools/lib/exif.mjs). The ULID in the original file name is
+// not it: that is when the phone received the file, 4 h (time zone) to 6.5 h
+// later (ULID - EXIF = 240.0-389.6 min over the 563 captures, median 240.1),
+// and a batch transfer reverses and interleaves its files (H11's 409K and
+// Y55H show consecutive seconds of one shot clock, 85 and 84, EXIF 00:23:38
+// both, ULIDs 35 min apart). The ULID is the fallback only for a capture with
+// no EXIF time.
+// A "session" is one round on the hole: the hole's frames, of any type, at
+// the same wind with no 20-minute gap between consecutive ones. Wind tells
+// rounds apart even when they follow each other closely: a restart keeps the
+// hole's wind, a new round draws it again. Every frame of the hole takes
+// part, not only the ones that become readings: H10's wind-4 sitting (37
+// frames over 44 min, restart sweeps 2-10 min apart) yields 3 accepted
+// readings 26 min apart, which chained on their own as two rounds.
+const SESSION_GAP_MS = 20 * 60000;
+const FRAMES = new Map(); // file -> { hole, ms, wind ("?" when unread) }
+const ROUNDS = new Map(); // hole -> Map(file -> round index, numbered by first capture)
+let classified = [];
+try { classified = JSON.parse(readFileSync(join(ROOT, "captures", "classification.json"), "utf8")).frames; } catch {}
+{
+  let noExif = 0;
+  for (const f of classified) {
+    let ms = null;
+    try { ms = exifMs(join(INBOX, f.file)); } catch {}
+    if (ms == null) { ms = fileMs(f.originalFile ?? f.file) ?? 0; noExif++; }
+    FRAMES.set(f.file, { hole: f.hole, ms, wind: f.windMph ?? "?" });
+  }
+  const byHole = {};
+  for (const [file, f] of FRAMES) if (f.hole != null) (byHole[f.hole] ??= []).push({ file, ...f });
+  let nRounds = 0;
+  for (const [hole, fs] of Object.entries(byHole)) {
+    const rounds = new Map(), last = new Map(); // wind -> { round, ms }
+    let n = 0;
+    for (const f of fs.sort((a, b) => a.ms - b.ms)) {
+      const prev = last.get(f.wind);
+      const round = prev && f.ms - prev.ms <= SESSION_GAP_MS ? prev.round : n++;
+      last.set(f.wind, { round, ms: f.ms });
+      rounds.set(f.file, round);
+    }
+    ROUNDS.set(+hole, rounds);
+    nRounds += n;
+  }
+  if (classified.length) console.log(`rounds: ${classified.length} classified frames, ${noExif} without an EXIF time (ULID fallback); ${nRounds} round(s) on ${Object.keys(byHole).length} holes`);
+}
+const msOf = (file) => FRAMES.get(file)?.ms ?? 0;
+const windOf = (file) => FRAMES.get(file)?.wind ?? "?";
+// a frame's round on a hole (undefined when it is not a classified frame of
+// that hole), and the number of distinct rounds among some frames of the hole
+const roundOf = (hole, file) => ROUNDS.get(hole)?.get(file);
+const roundsOf = (hole, files) => new Set(files.map((f) => roundOf(hole, f)).filter((r) => r != null)).size;
+// A reading within this many yards of a WSR spot is that spot: the zoom
+// readings credited to one land up to 5.09 yd from it (H7 BM; median 2.7 yd),
+// and the nearest reading that matches none is H10 S2's wind-11 reading at
+// 5.59 yd (3.13 px) from AR, whose round reads 387 yd badges, S2's distance
+// (AR is 384). The margin is 0.1 yd each side of 5.5: a registration shift
+// of half a pixel on H10 would move that round from S2 to AR.
+const PIN_MATCH_YD = 5.5;
+// ...unless the next spot is less than this much further (px): then it is
+// ambiguous, and only a local badge that fits one spot and is well off the
+// other decides. NSS puts some spots up to ~3 yd from WSR's (local badges read
+// 0 yd off on some spots and +-2-3 on others from the same tee), hence the
+// wide margin.
+const AMBIG_PX = 1, BADGE_FIT_YD = 2, BADGE_MISS_YD = 5;
+// A tee frame's cup counts only when its own badge agrees with the measured
+// avatar-to-cup distance, which rejects misdetected cups and avatars. The
+// tolerance is in map px, where the error lives: the avatar centroid turns
+// with the aim (~1.5 px) and the cup is good to ~2 px, while a yard is only
+// 0.4-1.1 px (0.89-2.51 yd/px across the holes). Over the 141 tee frames with
+// a badge, avatar and cup, |badge - measured| in px: 55 under 0.5, 35 to 1,
+// 20 to 1.5, 9 to 2, 2 to 2.5 (the largest sound miss is 2.14 px, H8 NCNJ),
+// then nothing until 2.74 px: 15 frames at 2.7-3.1 px, all from H10's wind-4
+// sitting (374-yd tee frames and 365-367-yd post-shot frames), where the
+// tee-frame cup is detected at (130.5,50.5), 1.5 px north of the round's
+// zoom reading of S1 and 2.1 px from the shipped S1, and the badge sits
+// nearer the zoom position (2.4 yd off it, 5.1 yd off the cup): cup
+// detection errors, not badge errors. Then 5 OCR misreads at 8 px and more
+// (360 for 380, 564 for 584, 367 for 387, 586 for 536, 819 for 219). 2.5 px
+// sits in the gap. A fixed 3 yd was 1.2-1.5 px on the long holes and failed
+// 9 of the sound frames (H8 x3, H9 x4, H12 14DM, H21 A6KE, whose 416 badge
+// supports the Switch-only spot at 415 against WSR spot 3 at 422): 112 of
+// the 141 frames passed it, 121 pass 2.5 px, and no frame that passed 3 yd
+// fails.
+const BADGE_TOL_PX = 2.5;
+// In a badge tie-break only local frames whose ball is on the start count,
+// against each spot's decoded WSR yardage (exact, where the floor of the
+// map-frame distance gives 251 for H16 BR, decoded 250). On-start avatars
+// sit up to 4.8 yd from the start on long holes (3 px at H14's 1.6 yd/px,
+// 1.2-1.8 px on H3/H9/H12/H20 at 2.1-2.5 yd/px); the post-shot frames the
+// tee-frame filter also admits (H10's 365-367 yd restart frames) stand
+// 6.0-8.3 yd out, and their badge is a distance from the ball, not the start.
+const AT_START_YD = 5;
+// Readings of one pin within one session: a tee cup joins a zoom reading
+// within this distance (they disagree by up to 2.3 px), and zoom readings of
+// one pin agree within it.
+const SAME_PIN_PX = 2.5;
+// Tee-frame cups are coarser than zoom sightings (mostly within 2 px of the
+// spot, a few 3.5 px), so a spot only they show must sit clear of every WSR
+// spot by both measures.
+const TEE_ONLY_MIN_YD = 7, TEE_ONLY_MIN_PX = 3;
+// A Switch-only spot ships on two independent readings: two sessions, or a
+// zoom capture and a tee frame. One reading alone is doubt, and the WSR data
+// wins doubt; it goes to pinCandidates. Hole 19's lone zoom sighting is the
+// case in point: 6 px off any spot, while its own session's tee frame shows
+// WSR pin 2.
+const SWITCH_SPOT_MIN_READINGS = 2;
+// The online tee: the median avatar of >= 2 online tee frames, shipped when
+// it is at least this far from the WSR start. On holes 10 and 11 the online
+// avatars stand a median 1.9 and 2.8 yd from it (0.8-6.0 yd per frame), which
+// the WSR start already covers; the shipped ones stand 4.6 (H14), 5.5 (H18)
+// and 6.3-11.9 yd (H4/5/8/9/15/16/19/20) from it.
+const ONLINE_TEE_MIN_YD = 4, TEE_REACH_YD = 25;
+const median = (a) => { const s = [...a].sort((p, q) => p - q), m = s.length >> 1; return s.length & 1 ? s[m] : (s[m - 1] + s[m]) / 2; };
+const teeFramesUsed = {}; // file -> roles, for tools/frame-audit.mjs
+const pinObservations = {}; // hole -> every pin observation and what it was credited to
+
 const pointInPoly = (x, y, poly) => {
   let inside = false;
   for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
@@ -469,7 +599,7 @@ for (let hole = 1; hole <= 21; hole++) {
     const pr = projectGreenBox(det, zoom, meta.pin, s.pinPx, s.bboxPx, kLo, kHi);
     if (!anchor || pr.r > anchor.r) anchor = { ...pr, session: s };
   }
-  let greenBox = null, greenPoly = null, pins = [], pinZones = null, greenPins = 0;
+  let greenBox = null, greenPoly = null, pins = [], pinZones = null, greenPins = 0, pinCandidates = [];
   let box = null, captureBox = null;
   const W = img.width, H = img.height;
   if (anchor && anchor.r > 0.22) {
@@ -593,9 +723,190 @@ for (let hole = 1; hole <= 21; hole++) {
       teeNote = " tee from WSR pad";
     }
   }
+  // ---- pins and tees from WSR's placement file (truth) + Switch readings ----
+  let teeOnline = null, pinAmbiguous = [];
+  const wp = WSRP?.[hole] ?? null;
+  // (a wsr-pins.json from before the spots were decoded has pins and starts
+  // but no spots: the capture pins and tee above stand then)
+  if (wp && wt && pb && wp.starts?.length && Array.isArray(wp.spots)) {
+    const sc = wt.scale; // yd per map px
+    const pxTo = (a, b) => Math.hypot((a.x - b.x) * W, (a.y - b.y) * H); // fractions in, map px out
+    const yd = (a, b) => pxTo(a, b) * sc;
+    const start = { x: wp.starts[0].x, y: wp.starts[0].y };
+    const spots = wp.spots.map((s) => ({ id: `s${s.slots[0]}`, x: s.x, y: s.y, label: s.label, set: s.set, yd: s.yd, src: "wsr", sessions: new Set() }));
+    const toMap = (p) => ({ x: (pb.x0 + p.gx * (pb.x1 - pb.x0)) / W, y: (pb.y0 + p.gy * (pb.y1 - pb.y0)) / H });
+    // the avatar: of a frame's yellow blobs, the one nearest the WSR start, if
+    // it is within reach of the teeing ground at all
+    const avatarOf = (f) => {
+      const near = (f.ptrs ?? []).map((q) => ({ x: q.x / W, y: q.y / H })).sort((a, b) => yd(a, start) - yd(b, start))[0];
+      return near && yd(near, start) <= TEE_REACH_YD ? near : null;
+    };
+    // a round with an online tee frame was played online (Survival Golf)
+    const onlineRounds = new Set((meta.teeFrames ?? []).filter((f) => f.online).map((f) => roundOf(hole, f.file)));
+
+    // Readings, each filed under the round of its source frame. Zoom: one per
+    // source frame (pinSources[i].from: the heightmap of a pair, which is
+    // where extract-greens reads the pin, or the plain frame of a fringe-only
+    // reading; a heightmap paired twice is read once), cropped pairings only
+    // if a hole has nothing else (a fringe-only reading has no pairing and
+    // counts as uncropped). Tee frames: a cup whose own badge agrees with the
+    // measured avatar-to-cup distance within BADGE_TOL_PX (in yd at this
+    // hole's scale). A reading with no source frame, or
+    // whose frame is not a classified frame of this hole, is dropped and
+    // logged rather than given a round of its own.
+    const readings = [];
+    const srcOf = (i) => g.pinSources?.[i]?.from ?? g.sessions?.[i]?.hmap ?? g.sessions?.[i]?.plain ?? null;
+    const okIdx = g.pins.map((_, i) => i).filter((i) => !g.sessions?.[i]?.cropped);
+    const srcSeen = new Set();
+    for (const i of (okIdx.length ? okIdx : g.pins.map((_, k) => k))) {
+      const file = srcOf(i), round = file ? roundOf(hole, file) : undefined;
+      if (file && srcSeen.has(file)) continue;
+      if (file) srcSeen.add(file);
+      if (round == null) { console.log(`H${hole}: zoom reading ${i} dropped: ${file ? `${file} is not a classified frame of this hole` : "no source frame"}`); continue; }
+      readings.push({ kind: "zoom", round, ms: msOf(file), ...toMap(g.pins[i]), file });
+    }
+    for (const f of meta.teeFrames ?? []) {
+      const p = avatarOf(f);
+      if (!p || !f.cup || f.yd == null) continue;
+      const c = { x: f.cup.x / W, y: f.cup.y / H };
+      if (Math.abs(f.yd - yd(p, c)) > BADGE_TOL_PX * sc) continue;
+      const round = roundOf(hole, f.file);
+      if (round == null) { console.log(`H${hole}: tee frame ${f.file} dropped: not a classified frame of this hole`); continue; }
+      readings.push({ kind: "tee", round, ms: msOf(f.file), ...c, file: f.file, badge: f.yd, online: !!f.online, p });
+    }
+    // Within each round the observations: one per physical pin. Zoom readings
+    // place it; a tee cup from the same round joins the zoom observation it
+    // agrees with (one pin, two views), otherwise tee cups form observations
+    // of their own.
+    readings.sort((a, b) => a.ms - b.ms);
+    const obs = [];
+    for (const s of [...new Set(readings.map((r) => r.round))].sort((a, b) => a - b)) {
+      const rs = readings.filter((r) => r.round === s), mine = [];
+      for (const r of rs.filter((q) => q.kind === "zoom")) {
+        const o = mine.find((q) => pxTo(q, r) <= SAME_PIN_PX);
+        if (o) { o.zoom.push(r); o.x = o.zoom.reduce((t, q) => t + q.x, 0) / o.zoom.length; o.y = o.zoom.reduce((t, q) => t + q.y, 0) / o.zoom.length; }
+        else mine.push({ round: s, x: r.x, y: r.y, zoom: [r], tee: [] });
+      }
+      for (const r of rs.filter((q) => q.kind === "tee")) {
+        const zo = mine.filter((q) => q.zoom.length).map((q) => ({ q, d: pxTo(q, r) })).sort((a, b) => a.d - b.d)[0];
+        if (zo && zo.d <= SAME_PIN_PX) { zo.q.tee.push(r); continue; }
+        const to = mine.find((q) => !q.zoom.length && pxTo(q, r) <= SAME_PIN_PX);
+        if (to) { to.tee.push(r); to.x = median(to.tee.map((q) => q.x)); to.y = median(to.tee.map((q) => q.y)); }
+        else mine.push({ round: s, x: r.x, y: r.y, zoom: [], tee: [r] });
+      }
+      obs.push(...mine);
+    }
+    // Which spot each observation shows: the nearest WSR spot within reach,
+    // unless the next one is about as close; then the badges of the local tee
+    // frames whose ball is on the start decide, against each spot's own WSR
+    // yardage, if they clearly fit one and miss the other (local play tees
+    // off from the WSR start), and otherwise nobody is credited.
+    const credit = (o, q) => { o.result = q.label; o.spot = q; q.sessions.add(o.round); for (const r of o.tee) (teeFramesUsed[r.file] ??= []).push(`pin ${q.label}`); };
+    const unmatched = [], band = [];
+    for (const o of obs) {
+      const ds = spots.map((q) => ({ q, d: pxTo(o, q) })).sort((a, b) => a.d - b.d);
+      const teeOnly = !o.zoom.length;
+      if (!ds.length || ds[0].d * sc > PIN_MATCH_YD) {
+        // tee cups alone, out of reach of a WSR spot but not clear of it: they
+        // may repeat another round's credited reading or join a Switch-only
+        // spot below, but cannot start one
+        if (teeOnly && ds.some((q) => q.d * sc < TEE_ONLY_MIN_YD || q.d < TEE_ONLY_MIN_PX)) band.push({ o, near: ds[0].q });
+        else unmatched.push(o);
+        continue;
+      }
+      let pick = ds[0].q;
+      if (ds[1] && ds[1].d - ds[0].d < AMBIG_PX) {
+        const loc = o.tee.filter((r) => !r.online && yd(r.p, start) <= AT_START_YD);
+        const miss = (q) => loc.length ? median(loc.map((r) => Math.abs(r.badge - q.yd))) : Infinity;
+        const m0 = miss(ds[0].q), m1 = miss(ds[1].q);
+        pick = m0 <= BADGE_FIT_YD && m1 >= BADGE_MISS_YD ? ds[0].q : m1 <= BADGE_FIT_YD && m0 >= BADGE_MISS_YD ? ds[1].q : null;
+        if (!pick) { o.result = `ambiguous ${ds[0].q.label}/${ds[1].q.label}`; pinAmbiguous.push({ x: +o.x.toFixed(4), y: +o.y.toFixed(4), spots: [ds[0].q.label, ds[1].q.label] }); continue; }
+      }
+      credit(o, pick);
+    }
+    // Spots WSR doesn't have: unmatched observations, merged across rounds.
+    // They ship on two independent readings (two rounds, or a zoom capture
+    // and a tee frame); the rest are doubt and go to pinCandidates.
+    const groups = [];
+    const place = (gr) => {
+      const z = gr.obs.filter((q) => q.zoom.length), from = z.length ? z : gr.obs;
+      const mean = (a) => a.reduce((t, v) => t + v, 0) / a.length;
+      gr.x = (z.length ? mean : median)(from.map((q) => q.x));
+      gr.y = (z.length ? mean : median)(from.map((q) => q.y));
+    };
+    for (const o of unmatched) {
+      const gr = groups.find((q) => yd(q, o) <= PIN_MATCH_YD);
+      if (gr) { gr.obs.push(o); place(gr); } else groups.push({ x: o.x, y: o.y, obs: [o] });
+    }
+    // The band: a tee cup within SAME_PIN_PX of where another round's reading
+    // was credited to a WSR spot shows that spot (H3's wind-4 round read 536
+    // yd with its cup on the very pixel of the wind-2 round's AL reading, 5.8
+    // yd from AL, and used to ship as a one-spot ambiguity); otherwise it
+    // joins a Switch-only spot in reach, or is left ambiguous.
+    const credited = obs.filter((q) => q.spot);
+    for (const { o, near } of band) {
+      const same = credited.filter((q) => q.round !== o.round && pxTo(q, o) <= SAME_PIN_PX).sort((a, b) => pxTo(a, o) - pxTo(b, o))[0];
+      const gr = groups.map((q) => ({ q, d: yd(q, o) })).sort((a, b) => a.d - b.d)[0];
+      if (same) credit(o, same.spot);
+      else if (gr && gr.d <= PIN_MATCH_YD) gr.q.obs.push(o); // joins without moving it: tee cups are coarse
+      else { o.result = `ambiguous, ${(pxTo(o, near) * sc).toFixed(1)} yd from ${near.label}`; pinAmbiguous.push({ x: +o.x.toFixed(4), y: +o.y.toFixed(4), spots: [near.label] }); }
+    }
+    const readingsOf = (gr) => new Set(gr.obs.flatMap((o) => [...(o.zoom.length ? [`${o.round}:zoom`] : []), ...(o.tee.length ? [`${o.round}:tee`] : [])])).size;
+    const sessionsOf = (gr) => new Set(gr.obs.map((o) => o.round)).size;
+    // Switch-only spots are numbered by first sighting, so a spot keeps its
+    // S-number when later rounds change which one is seen most (ranked by
+    // rounds seen, H10's S1 and S2 would swap as soon as S2 overtook S1, under
+    // the player's chosen pin)
+    const firstMs = (gr) => Math.min(...gr.obs.flatMap((o) => [...o.zoom, ...o.tee].map((r) => r.ms)));
+    const kept = groups.filter((gr) => readingsOf(gr) >= SWITCH_SPOT_MIN_READINGS)
+      .sort((a, b) => firstMs(a) - firstMs(b) || a.x - b.x);
+    const doubt = groups.filter((gr) => readingsOf(gr) < SWITCH_SPOT_MIN_READINGS);
+    kept.forEach((gr, k) => { for (const o of gr.obs) { o.result = `S${k + 1}`; for (const r of o.tee) (teeFramesUsed[r.file] ??= []).push(`pin S${k + 1}`); } });
+    for (const gr of doubt) for (const o of gr.obs) o.result = "candidate (one reading)";
+    pinObservations[hole] = obs.map((o) => {
+      const rs = [...o.zoom, ...o.tee];
+      return { round: o.round, wind: windOf(rs[0].file), at: [+(o.x * W).toFixed(1), +(o.y * H).toFixed(1)],
+        online: onlineRounds.has(o.round), result: o.result ?? "?",
+        readings: rs.map((r) => `${r.kind} ${r.file}${r.badge != null ? ` ${r.badge}yd` : ""}`) };
+    });
+    pins = [...spots.map(({ sessions, ...s }) => ({ ...s, seen: sessions.size })),
+      ...kept.map((gr, k) => ({ id: `x${k}`, x: +gr.x.toFixed(4), y: +gr.y.toFixed(4), label: `S${k + 1}`, set: null,
+        yd: Math.floor(yd(start, gr)), src: "switch", seen: sessionsOf(gr) }))];
+    pinCandidates = doubt.map((gr) => ({ x: +gr.x.toFixed(4), y: +gr.y.toFixed(4), sessions: sessionsOf(gr),
+      seenBy: [...new Set(gr.obs.flatMap((o) => [...(o.zoom.length ? ["zoom"] : []), ...(o.tee.length ? ["tee"] : [])]))],
+      badges: [...new Set(gr.obs.flatMap((o) => o.tee.map((r) => r.badge)))] }));
+
+    // Tees. Local play tees off from the WSR start. Online Survival Golf
+    // starts from a platform of its own: teeOnline is the median avatar of
+    // the online tee frames (each frame's avatar nearest the start, as above),
+    // shipped when it stands ONLINE_TEE_MIN_YD or more from the start. The
+    // badge does not correct it: it is the distance to the pin, and NSS keeps
+    // some spots 2-4 yd from WSR's position, so sliding the avatar to the
+    // badge distance from the WSR spot moved the tee by the spot's offset
+    // (H9's online avatars stand a median 8.6 yd from the start; slid, 3.5 yd,
+    // and the tee was withheld).
+    tee = { x: +start.x.toFixed(4), y: +start.y.toFixed(4) };
+    teeNote = " tee = WSR start";
+    const online = (meta.teeFrames ?? []).filter((f) => f.online).map((f) => ({ f, p: avatarOf(f) })).filter((q) => q.p);
+    let onlineNote = online.length >= 2 ? "" : online.length ? ", 1 online frame only" : ", no online frames";
+    if (online.length >= 2) {
+      const at = { x: median(online.map(({ p }) => p.x)), y: median(online.map(({ p }) => p.y)) };
+      const nSess = roundsOf(hole, online.map(({ f }) => f.file));
+      onlineNote = `, online tee ${yd(at, start).toFixed(1)} yd from it (${online.length} frames, ${nSess} round(s))`;
+      if (yd(at, start) >= ONLINE_TEE_MIN_YD) {
+        teeOnline = { x: +at.x.toFixed(4), y: +at.y.toFixed(4), n: online.length, sessions: nSess };
+        for (const { f } of online) (teeFramesUsed[f.file] ??= []).push("online tee");
+      } else onlineNote += " -> not shipped, the WSR start covers it";
+    }
+    if (process.env.PIN_DEBUG === String(hole)) for (const o of obs)
+      console.log(`  round ${o.round} @ ${(o.x * W).toFixed(1)},${(o.y * H).toFixed(1)}: ${[...o.zoom, ...o.tee].map((r) => `${r.kind} ${r.file}${r.badge ? ` ${r.badge}yd` : ""}${r.online ? " online" : ""}`).join(" | ")}`);
+    const seenWsr = pins.filter((s) => s.src === "wsr" && s.seen).map((s) => `${s.label}x${s.seen}`).join(" ");
+    const fmt = (list) => list.map((gr) => `${(gr.x * W).toFixed(1)},${(gr.y * H).toFixed(1)} ${sessionsOf(gr)} round(s)`).join("; ");
+    console.log(`H${hole}: pins = ${spots.length} WSR spot(s) (rounds on Switch: ${seenWsr || "none"})${kept.length ? ` + ${kept.length} Switch-only (${fmt(kept)})` : ""}${doubt.length ? `; one reading only, left out: ${fmt(doubt)}` : ""}${pinAmbiguous.length ? `; ambiguous: ${pinAmbiguous.map((a) => a.spots.join("/")).join(", ")}` : ""}; tee = WSR start${onlineNote}`);
+  }
   derived.holes[hole] = { scale: wt ? wt.scale : meta.scaleYdPerPx, yards: meta.yards, greenBox, greenPoly,
-    grid: quantizeGrid(wt ? wt.grid : g.grid), pins, pinZones, pinObservations: greenPins,
-    greenView: greenMeta[hole] ?? null, tee,
+    grid: quantizeGrid(wt ? wt.grid : g.grid), pins, pinCandidates, pinAmbiguous, pinZones, pinObservations: greenPins,
+    greenView: greenMeta[hole] ?? null, tee, teeOnline,
     ...(wt ? { source: "wsr", wsrRev: wsrRev(wt), captureGreenBox: captureBox ? { x0: +(captureBox.x0 / W).toFixed(4), y0: +(captureBox.y0 / H).toFixed(4),
       x1: +(captureBox.x1 / W).toFixed(4), y1: +(captureBox.y1 / H).toFixed(4) } : null } : {}) };
   console.log(`H${hole}: k=${anchor?.k?.toFixed(2)} r=${anchor?.r?.toFixed(2)} box=${box ? `${box.x0},${box.y0}..${box.x1},${box.y1}` : "MISS"}${wt ? ` (WSR; capture box ${captureBox ? `${captureBox.x0},${captureBox.y0}..${captureBox.x1},${captureBox.y1}` : "MISS"})` : ""} aspect map=${mapAspect?.toFixed(2) ?? "-"} zoom=${zoomAspect.toFixed(2)} pins=${pins.length}${teeNote}`);
@@ -657,4 +968,8 @@ try {
 
 mkdirSync(join(ROOT, "public"), { recursive: true });
 writeFileSync(join(ROOT, "public", "derived.json"), JSON.stringify(derived));
+// which tee frames the pins and the online tee actually used (tools/frame-audit.mjs),
+// and every pin observation with its outcome (tools/PINS.md)
+writeFileSync(join(D, "tee-frames-used.json"), JSON.stringify(teeFramesUsed, null, 1));
+writeFileSync(join(D, "pin-observations.json"), JSON.stringify(pinObservations, null, 1));
 console.log("wrote src/maps.js, src/mapxform.js, public/derived.json");
