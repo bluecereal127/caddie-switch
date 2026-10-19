@@ -1,0 +1,31 @@
+{
+  "_note": "WSR (US Rev 1 main.dol) tree collision shapes decoded 2026-10-18 by group S; KCL units (0.1 m, 9.144 u/yd) at placement scale 1: radii scale with the PMP x scale, heights with the y scale. Source: shape constants written by 0x803f3ac8 (literal pool r2=0x806fe080), tests 0x803f3630 (broadleaf), 0x803f34f8 (conifer), 0x803f3194 (palm, KCL WS2_glf_tree3.kcl), responses in 0x804138a0 / 0x80413648. The Switch game may differ.",
+  "ballRadius": 0.5,
+  "trunkBounce": { "restitution": 0.5, "tangentialCap": "0.5 * |v_n|", "normalFlattened": true },
+  "kinds": {
+    "2": {
+      "name": "broadleaf", "model": "WS2_glf_tree1", "count": 960,
+      "trunk": { "type": "capsule", "r": 6, "top": 60 },
+      "canopy": { "type": "sphere", "cy": 100, "r": 48, "dampPerStep": 0.98 },
+      "visual": { "trunk": [[-59.9, 59.9], [-4.9, 120.5], [-59.9, 59.9]], "canopy": [[-96.1, 89.4], [19.5, 193.2], [-99.1, 87.3]] },
+      "scale": { "sx": [0.7, 3.0], "sxMedian": 1.7, "sy": [0.6, 3.0], "syOverSx": [0.667, 1.4] }
+    },
+    "3": {
+      "name": "conifer", "model": "WS2_glf_tree2", "count": 409,
+      "trunk": { "type": "capsule", "r": 4.4, "top": 70 },
+      "canopy": { "type": "cone", "y0": 40, "r0": 30, "y1": 170, "dampPerStep": 0.98 },
+      "visual": { "trunk": [[-5.0, 5.0], [-6.1, 113.7], [-4.8, 4.8]], "canopy": [[-50, 50], [28.9, 200], [-50, 50]] },
+      "scale": { "sx": [0.85, 3.952], "sxMedian": 2.3, "sy": [0.85, 4.0], "syOverSx": [0.667, 1.524] }
+    },
+    "6": {
+      "name": "palm", "model": "WS2_glf_tree3", "count": 171,
+      "broadPhase": { "capsule": { "r": 15, "top": 80 }, "sphere": { "cy": 120, "r": 80 } },
+      "kcl": "Common/GlfScene/common.carc:WS2_glf_tree3.kcl (404 tris: 104 trunk type 0x11, 300 fronds type 0x12)",
+      "trunk": { "type": "mesh", "r": 6.7, "top": 132, "lean": { "axis": "local +z", "dzAtTop": 20.6 } },
+      "canopy": { "type": "mesh", "y0": 75.9, "y1": 169.5, "x": [-69.6, 65.5], "z": [-55.2, 69.5], "centre": [0, 120, 15], "dampPerStep": 0.94 },
+      "scale": { "sx": [1.2, 3.0], "sxMedian": 2.2, "sy": [1.2, 3.0], "syOverSx": [0.882, 1.333] }
+    }
+  },
+  "companions": { "4": "WS2_glf_tree1_env reflection of an id-2 tree", "5": "WS2_glf_tree2_env of id 3", "7": "WS2_glf_tree3_env of id 6", "collision": false },
+  "params": "all 16 bytes zero on every tree and companion; nothing is read from them"
+}
