@@ -143,7 +143,7 @@ p1    = curve(raw)  via 0x80407fb4 -> slot 7 (0x80409f60), clamped >= 0:
           raw >= 1: c = (cap >= 1 ? P40 : 1.0);  p1 = max(1, 1 + 0.25 * (raw - c)/(P44 - c))   (max 1.25 at raw 1.3)
 cap   = slot 16: 1.0; rough P48 = 0.75; bunker P50 = 0.25 / 0.25 / 0.5 / 0.5 / 0.5 / 0.5 / 0.75 / 1
 p2    = 0x8041e794: p1 <= 1 (or putter mode) ? p1 * cap : cap + min(p1 - 1, 0.25)
-p3    = 0x8041e664: = p2, except an assist branch (swing+0xe4 flag, GlfConfig+0x28 not 4) that blends toward 0x80407d08(p2) by backspin; not decoded further
+p3    = 0x8041e664: = p2, except an assist branch (swing+0xe4 flag, GlfConfig+0x28 not 4) that blends toward 0x80407d08(p2) by backspin; it cannot touch a launched shot (swing+0xe4 is set only after launch, wsr-ground-phase.md section 6), so p3 = p2 for every human swing. Shot Assist is a Switch addition with no WSR counterpart.
 power = min(p3, slot 17 lie factor): rough P4c = 1.0; bunker P54 = 0.5 woods / 0.75 irons / 1.0 SW,PT; else P58 = 1.0 (putter 2.5)
 ```
 Consequences (WSR): on fairway/tee the launch power never exceeds 1.0, so over-swinging adds no
@@ -151,8 +151,11 @@ carry (it only enters the red zone used for curve/wobble elsewhere). From rough 
 gives 0.75 and an over-swing can add up to +0.25 (back to 1.0). From sand: woods 0.25 (+ up to
 0.25, limited to 0.5), irons 0.5 (limited to 0.75), wedge 0.75 (limited to 1.0). Below the line
 the cap is a **multiplier** on the gauge value, not a clamp: a half swing from rough gives
-0.375. (The Switch note "distance per bar unchanged below the cap" describes a clamp; that is a
-difference, or a display difference, and is not settled here.)
+0.375. The gauge draws the capped power on a fixed 16-segments-per-1.0 scale (decoded since, in
+wsr-swing-redzone-spin.md section 3), so a bar is worth the same distance on every lie and the
+Switch note "distance per bar unchanged below the cap" holds in WSR too; the multiplier only
+changes how hard the swing must be to fill a bar. That document also covers the red zone (power
+from capped lies, the random-sign curve) and the backspin input.
 
 ### 4.3 Ball flight, per tick (`RPGlfBall::Calc` 0x80413b68; 4 ticks per 60 Hz frame: loop at `0x804175b4`, lifetime>>2 at `0x80413bac`)
 
