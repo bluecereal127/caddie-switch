@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo, useId } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { HOLE_MAPS } from "./maps.js";
 import { GREEN_VIEWS } from "./greens.js";
 import { MAP_XFORM_V5 } from "./mapxform.js";
@@ -413,11 +413,13 @@ function GreenCanvas({ mapSrc, green, mode, onGrid, ball, cup, onTap, path, aimP
 }
 
 /* ---------------- zoomed green view ----------------
-   The putting surface at its own scale, fused from the zoomed green
-   captures and free of the flag, pole and cup. It needs no projection onto
-   the hole map: the image IS the green's bounding box, so green-local
-   (0,0)..(1,1) lands on derived.json's greenBox and on the 9x9 slope grid
-   directly. Pins are stored map-fractional, so they convert through the box.
+   The putting surface at its own scale: the WSR green rendered from the game
+   files (tools/render-maps.mjs; meta.source "render") or, for a hole with no
+   render, fused from the zoomed green captures and free of the flag, pole
+   and cup. It needs no projection onto the hole map: the image IS the
+   green's bounding box plus its margin, so green-local (0,0)..(1,1) lands on
+   derived.json's greenBox and on the 9x9 slope grid directly. Pins are
+   stored map-fractional, so they convert through the box.
 */
 function GreenView({ holeNum, pins = [], curPinId = null, greenBox = null, greenPoly = null, grid = null, meta = null, onPick }) {
   const src = GREEN_VIEWS[holeNum];
@@ -461,7 +463,8 @@ function GreenView({ holeNum, pins = [], curPinId = null, greenBox = null, green
       <div className="flex items-center justify-between px-2.5 pt-1.5 pb-1">
         <span className="disp text-[11px] font-bold">Green · hole {holeNum}</span>
         <span className="text-[10px] opacity-60">
-          {meta ? `${meta.sessions} capture${meta.sessions === 1 ? "" : "s"} · ${Math.round(meta.covered * 100)}% seen` : ""}
+          {meta?.source === "render" ? "rendered from the course data"
+            : meta ? `${meta.sessions} capture${meta.sessions === 1 ? "" : "s"} · ${Math.round(meta.covered * 100)}% seen` : ""}
         </span>
       </div>
       <div className="relative mx-auto mb-2" style={{ width: "88%", aspectRatio: String(meta?.aspect || 1) }}>
@@ -512,10 +515,8 @@ function GreenView({ holeNum, pins = [], curPinId = null, greenBox = null, green
 const ballOn = (ball, spot) => !!(ball && spot && Math.hypot(ball.x - spot.x, ball.y - spot.y) < 1e-6);
 
 /* ---------------- clickable hole map ---------------- */
-function HoleMap({ holeNum, line, onLine, markers, onMarkers, markerMode, aimPreview, cornerMode, onCorner, greenBox, greenPoly = null, pins = [], curPinId = null, pinMode = false, onPins, distLabel = null, windBadge = null, teePos = null, teeOnlinePos = null, stopMarker = null, showTrees = true }) {
+function HoleMap({ holeNum, line, onLine, markers, onMarkers, markerMode, aimPreview, cornerMode, onCorner, pins = [], curPinId = null, pinMode = false, onPins, distLabel = null, windBadge = null, teePos = null, teeOnlinePos = null, stopMarker = null }) {
   const imgRef = useRef(null);
-  const [dims, setDims] = useState({ w: 113, h: 140 });
-  const gridId = `greengrid${useId().replace(/:/g, "")}`; // ids must be unique per SVG on the page
   const src = HOLE_MAPS[holeNum];
   const pinLabelList = pinLabels(pins);
 
@@ -587,21 +588,24 @@ function HoleMap({ holeNum, line, onLine, markers, onMarkers, markerMode, aimPre
     }
     if (markerMode) {
       // The nearest of your own markers within 0.06 (a finger's reach) goes.
-      // Failing that, a tap inside the drawn canopy of a course tree (auto,
-      // on the course, and shown) is swallowed: the tree already marks that
-      // hazard, and a marker on it would only cover it. Any other tap adds
-      // your marker. The 0.06 reach (15 x 18 map px) once applied to every
-      // pipeline tree as well, 20-100 per hole with canopies of 2.6-18 px,
-      // the faint off-course ones (where a ball is out of bounds anyway) and
-      // hidden ones included: 20-68% of the map and 34-84% of the playable
-      // ground (H9) refused a marker, with no sign why. The shown canopies
-      // alone are 1-13% of the map (5-36% of the playable ground).
+      // Failing that, a tap inside the painted canopy of a course tree (auto
+      // and on the course) is swallowed: the map shows the tree already, and
+      // a marker on it would only cover it. Any other tap adds your marker.
+      // The canopy is the disc of radius m.r (a fraction of the map's width)
+      // centred m.dy (a fraction of its height, negative = north) from the
+      // trunk at m.x, m.y: the game's sprite stands the canopy north of its
+      // trunk by 0.8 of the radius. The 0.06 reach (15 x 18 map px) once
+      // applied to every pipeline tree as well, 20-100 per hole, the
+      // off-course ones (where a ball is out of bounds anyway) included:
+      // 20-68% of the map and 34-84% of the playable ground (H9) refused a
+      // marker, with no sign why. The on-course canopies alone are 1-13% of
+      // the map (5-36% of the playable ground).
       const own = markers.filter((m) => !m.auto)
         .map((m) => ({ m, d: Math.hypot(m.x - fx, m.y - fy) })).filter((o) => o.d < 0.06).sort((a, b) => a.d - b.d)[0];
       if (own) { onMarkers(markers.filter((m) => m.id !== own.m.id)); return; }
-      const r = mapRect(e.currentTarget); // a canopy is drawn as a circle of m.r * the map's width
-      const canopy = showTrees && markers.some((m) => m.auto && !m.off && m.r > 0
-        && Math.hypot((m.x - fx) * r.width, (m.y - fy) * r.height) < m.r * r.width);
+      const r = mapRect(e.currentTarget);
+      const canopy = markers.some((m) => m.auto && !m.off && m.r > 0
+        && Math.hypot((m.x - fx) * r.width, (m.y + (m.dy ?? 0) - fy) * r.height) < m.r * r.width);
       if (!canopy) onMarkers([...markers, { id: Date.now(), x: fx, y: fy }]);
       return;
     }
@@ -621,8 +625,7 @@ function HoleMap({ holeNum, line, onLine, markers, onMarkers, markerMode, aimPre
   return (
     <div className="relative rounded-xl overflow-hidden select-none touch-none" style={{ border: `3px solid ${T.turfDeep}`, cursor: draggingT ? "grabbing" : "crosshair" }}
       onClick={click} onMouseDown={onDown} onTouchStart={onDown}>
-      <img ref={imgRef} src={src} alt={`Hole ${holeNum} map`} className="w-full block" draggable={false}
-        onLoad={(e) => setDims({ w: e.target.naturalWidth, h: e.target.naturalHeight })} />
+      <img ref={imgRef} src={src} alt={`Hole ${holeNum} map`} className="w-full block" draggable={false} />
       <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 100 100" preserveAspectRatio="none">
         {b && t && <line x1={b.x} y1={b.y} x2={t.x} y2={t.y} stroke="#fff" strokeWidth="1" strokeDasharray="2.5 2" />}
         {b && t && distLabel && (
@@ -634,29 +637,13 @@ function HoleMap({ holeNum, line, onLine, markers, onMarkers, markerMode, aimPre
         {b && t && aimPreview && (
           <line x1={b.x} y1={b.y} x2={aimPreview.x * 100} y2={aimPreview.y * 100} stroke={T.sand} strokeWidth="1" strokeDasharray="1.5 1.5" />
         )}
-        {/* The green: its traced outline (greens are lobed, and the fringe
-            gives a real boundary; the box is the fallback), filled with the
-            mown grid the game paints on a putting surface. Drawn here rather
-            than baked into the map image because the overview renders a green
-            only ~28px across — the real checker is below Nyquist at that size
-            and averages to flat green, and only the holes framed tightest
-            ever showed it. As SVG it stays crisp at whatever size the map is
-            displayed, and every hole gets it. */}
-        <defs>
-          <pattern id={gridId} patternUnits="userSpaceOnUse" width="2.4" height="2.4">
-            <rect width="1.2" height="1.2" fill="rgba(255,255,255,0.17)" />
-            <rect x="1.2" y="1.2" width="1.2" height="1.2" fill="rgba(255,255,255,0.17)" />
-            <rect x="1.2" width="1.2" height="1.2" fill="rgba(0,0,0,0.05)" />
-            <rect y="1.2" width="1.2" height="1.2" fill="rgba(0,0,0,0.05)" />
-          </pattern>
-        </defs>
-        {/* fill only — no outline. The grid already reads as the green, and a
-            stroke around it is just a line the player does not need. */}
-        {greenPoly && greenPoly.length > 2
-          ? <polygon points={greenPoly.map(([x, y]) => `${x * 100},${y * 100}`).join(" ")}
-              fill={`url(#${gridId})`} stroke="none" />
-          : greenBox && <rect x={greenBox.x0 * 100} y={greenBox.y0 * 100} width={(greenBox.x1 - greenBox.x0) * 100} height={(greenBox.y1 - greenBox.y0) * 100}
-              fill={`url(#${gridId})`} stroke="none" />}
+        {/* Nothing is drawn over the green: the map is WSR's own minimap art,
+            rendered from the game files at 2x, its green flat and light like
+            the Switch's overview (the renderer holds WSR's height-contour
+            bands at one; the zoomed GreenView keeps them, lighter = higher).
+            The SVG checker that used to fill the green's outline was drawn
+            when the maps were stacked captures whose 28-px greens averaged
+            to flat colour. */}
         {teePos && (
           <g transform={`translate(${teePos.x * 100} ${teePos.y * 100})`}>
             <circle r="3.4" fill="rgba(20,48,29,0.55)" />
@@ -726,31 +713,17 @@ function HoleMap({ holeNum, line, onLine, markers, onMarkers, markerMode, aimPre
             </g>
           );
         })}
-        {/* Trees. A pipeline marker (auto: WSR's own tree from the course
-            placement files) carries the drawn canopy's radius r as a
-            fraction of the map width and is drawn as that disc, so a canopy
-            reads as the area it covers. One marked off stands where the
-            course does not reach (outer ground or water under the trunk:
-            two thirds of H16's trees), where the minimap draws no canopy and
-            a ball is out of bounds already, so it is a faint disc with a
-            hairline and no glyph; drawn like the course trees they buried
-            the map. The 100x100 viewBox is stretched over the 250x304 map,
-            so a circle on screen is an ellipse here: rx = r*100,
-            ry = rx * width/height. Your own markers stay as they were, and
-            so does an old seed with no radius. */}
-        {showTrees && markers.map((m) => (
-          m.auto && m.r > 0 ? (
-            <g key={m.id} transform={`translate(${m.x * 100} ${m.y * 100})`}>
-              <ellipse rx={m.r * 100} ry={m.r * 100 * dims.w / dims.h} fill={m.off ? "rgba(11,61,30,0.15)" : "rgba(11,61,30,0.45)"}
-                stroke={m.off ? "rgba(255,255,255,0.3)" : "rgba(255,255,255,0.7)"} strokeWidth={m.off ? 0.1 : 0.3} />
-              {!m.off && <text y="1.3" textAnchor="middle" fontSize={Math.max(2.2, Math.min(3.8, m.r * 110))}>🌲</text>}
-            </g>
-          ) : (
-            <g key={m.id} transform={`translate(${m.x * 100} ${m.y * 100})`} opacity={m.auto ? 0.85 : 1}>
-              <circle r={m.auto ? 2.6 : 3.2} fill="#0B3D1E" stroke="#fff" strokeWidth={m.auto ? 0.4 : 0.7} />
-              <text y="1.5" textAnchor="middle" fontSize={m.auto ? 3.8 : 4.5}>🌲</text>
-            </g>
-          )
+        {/* Your own hazard markers. The course's trees are in the map itself
+            (WSR's sprites, rendered from the game files at their placement
+            positions), so the pipeline's tree markers (auto, with the
+            painted canopy's radius r and offset dy) draw nothing here and
+            only serve the tap rule above; the v13 seeds an install may still
+            hold until derived.json loads are auto too, and draw nothing. */}
+        {markers.filter((m) => !m.auto).map((m) => (
+          <g key={m.id} transform={`translate(${m.x * 100} ${m.y * 100})`}>
+            <circle r="3.2" fill="#0B3D1E" stroke="#fff" strokeWidth="0.7" />
+            <text y="1.5" textAnchor="middle" fontSize="4.5">🌲</text>
+          </g>
         ))}
         {b && <circle cx={b.x} cy={b.y} r="1.2" fill="#fff" stroke={T.ink} strokeWidth="0.6" />}
         {t && <g transform={`translate(${t.x} ${t.y})`} style={{ pointerEvents: "auto", cursor: draggingT ? "grabbing" : "grab" }}>
@@ -805,7 +778,6 @@ export default function App() {
   const [line, setLine] = useState({ ball: null, target: null });
   const [markerMode, setMarkerMode] = useState(false);
   const [selRec, setSelRec] = useState(null); // rec card tapped -> stop-marker preview on map
-  const [showTrees, setShowTrees] = useState(true);
   const [calInput, setCalInput] = useState("");
 
   const empty = { club: "driver", power: "3.5", lie: "tee", windSpeed: "0", windDeg: 0, carry: "", lateral: "", hole: 0, stroke: 1 };
@@ -927,7 +899,7 @@ export default function App() {
 
 
   /* ---- map geometry ---- */
-  const MAP_W = 250, MAP_H = 304; // source px of the hole map images (mapV5 stacked captures)
+  const MAP_W = 250, MAP_H = 304; // the hole-map frame in map px (mapV5; the images are rendered at 2x, 500x608, and scale to it)
   const geo = useMemo(() => {
     if (!line.ball || !line.target) return null;
     const dx = (line.target.x - line.ball.x) * MAP_W;
@@ -1241,15 +1213,12 @@ export default function App() {
                   <HoleMap holeNum={hole} line={line} onLine={setLine}
                     markers={holesMeta[hole].markers} onMarkers={(m) => setMarkers(hole, m)}
                     markerMode={markerMode} aimPreview={aimPreview}
-                    greenBox={holesMeta[hole].green?.box ?? null}
-                    greenPoly={holesMeta[hole].green?.poly ?? null}
                     pins={holesMeta[hole].pins} curPinId={holesMeta[hole].curPin}
                     pinMode={false} onPins={(p) => setPins(hole, p)}
                     distLabel={geo ? (scale ? `${Math.round(geo.srcPx * scale)} yd` : "? yd") : null}
                     teePos={holesMeta[hole].tee ?? null}
                     teeOnlinePos={holesMeta[hole].teeOnline ?? null}
-                    stopMarker={stopPoint}
-                    showTrees={showTrees} />
+                    stopMarker={stopPoint} />
                 </div>
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   <div className="rounded-xl border-2 p-2" style={{ borderColor: T.line, background: "#fff" }}>
@@ -1308,34 +1277,36 @@ export default function App() {
                       🌲 {markerMode ? "tap: add / remove" : "Edit trees"}
                     </button>
                   </div>
-                  <div className="flex flex-wrap gap-2 mt-1.5">
-                    {/* the online platform's two tiers; a single chip while none
-                        of the hole's online rounds has a judged tier (x, y only).
-                        Two chips to a line (basis = half the row less half the
-                        gap), each label kept on one line, a chip that does not
-                        fit beside another taking a line of its own: three
-                        abreast had 46 px each in the 155-px cell of a 360-px
-                        phone and broke every label into three lines. Measured
-                        in Chrome (Trebuchet MS bold): "⛳ Lower tier" is 76 px
-                        at 11 px and 70 at 10 px, and the half row is 73.5 px at
-                        360 (77 at 375), so 10 px pairs the tiers on a 360-px
-                        phone; the trees chip (75-78 px) takes the next line. */}
-                    {holesMeta[hole].teeOnline && (() => {
-                      const to = holesMeta[hole].teeOnline;
-                      const tiers = to.lower && to.upper ? [["⛳ Lower tier", to.lower], ["⛳ Upper tier", to.upper]] : [["⛳ Online tee", to]];
-                      return tiers.map(([label, p]) => (
-                        <button key={label} onClick={() => setLine({ ball: { x: p.x, y: p.y }, target: null })}
-                          title="Online Survival Golf tees off from a two-tier platform on every hole: four slots on the lower tier, four on the upper, 4 yd behind and a few feet up. Your slot can shift you up to ~5 yd sideways, so trust the 'yd to go' badge"
-                          className="grow basis-[calc(50%-0.25rem)] py-1 rounded-xl border-2 text-[10px] font-bold whitespace-nowrap"
-                          style={chip(ballOn(line.ball, p))}>
-                          {label}
-                        </button>
-                      ));
-                    })()}
-                    <button onClick={() => setShowTrees(!showTrees)} className="grow basis-[calc(50%-0.25rem)] py-1 rounded-xl border-2 text-[10px] font-bold whitespace-nowrap" style={chip(showTrees)}>
-                      🌲 trees {showTrees ? "shown" : "hidden"}
-                    </button>
-                  </div>
+                  {/* the online platform's two tiers; a single chip while none
+                      of the hole's online rounds has a judged tier (x, y only).
+                      Two chips to a line (basis = half the row less half the
+                      gap), each label kept on one line, a chip that does not
+                      fit beside another taking a line of its own: three
+                      abreast had 46 px each in the 155-px cell of a 360-px
+                      phone and broke every label into three lines. Measured
+                      in Chrome (Trebuchet MS bold): "⛳ Lower tier" is 76 px
+                      at 11 px and 70 at 10 px, and the half row is 73.5 px at
+                      360 (77 at 375), so 10 px pairs the tiers on a 360-px
+                      phone. (The "trees shown / hidden" chip that shared this
+                      row went with the app's own tree markers: the map shows
+                      the game's trees now, and your own markers have the 🌲
+                      button above.) */}
+                  {holesMeta[hole].teeOnline && (() => {
+                    const to = holesMeta[hole].teeOnline;
+                    const tiers = to.lower && to.upper ? [["⛳ Lower tier", to.lower], ["⛳ Upper tier", to.upper]] : [["⛳ Online tee", to]];
+                    return (
+                      <div className="flex flex-wrap gap-2 mt-1.5">
+                        {tiers.map(([label, p]) => (
+                          <button key={label} onClick={() => setLine({ ball: { x: p.x, y: p.y }, target: null })}
+                            title="Online Survival Golf tees off from a two-tier platform on every hole: four slots on the lower tier, four on the upper, 4 yd behind and a few feet up. Your slot can shift you up to ~5 yd sideways, so trust the 'yd to go' badge"
+                            className="grow basis-[calc(50%-0.25rem)] py-1 rounded-xl border-2 text-[10px] font-bold whitespace-nowrap"
+                            style={chip(ballOn(line.ball, p))}>
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
             </section>
@@ -1579,8 +1550,6 @@ export default function App() {
                                 markers={m.markers} onMarkers={(mk) => setMarkers(n, mk)}
                                 markerMode={holeMarkerEdit} aimPreview={null}
                                 cornerMode={cornerMode} onCorner={(fx, fy) => handleCorner(n, fx, fy)}
-                                greenBox={m.green?.box ?? null}
-                                greenPoly={m.green?.poly ?? null}
                                 pins={m.pins} curPinId={m.curPin}
                                 pinMode={pinEdit} onPins={(p) => setPins(n, p)} />
                               <button onClick={() => { setHoleMarkerEdit(!holeMarkerEdit); setPinEdit(false); }} className="w-full mt-2 py-1.5 rounded-xl border-2 text-xs font-bold" style={chip(holeMarkerEdit)}>
@@ -1877,7 +1846,7 @@ export default function App() {
             ["Green box + slopes", (n) => !!holesMeta[n].green?.box && (holesMeta[n].green?.grid ?? []).some((r) => r.some(([x, y]) => x || y)), "AUTO: boundary + slope grid come from Wii Sports Resort's collision meshes (the game files); your zoomed green captures only confirm them. Manual paint in Holes → ⚙ stays available as an override."],
             ["Pins", (n) => (holesMeta[n].pins?.length ?? 0) > 0, "AUTO: WSR's own spots are built in (from the game files). A spot that isn't one of them gets added as S1, S2… once two independent readings agree on it: two rounds, or a zoomed green plus a tee frame (which can be one round)."],
             ["Map scale", (n) => !!holesMeta[n].scale, "AUTO: yards per map pixel from the registration of the WSR meshes to the hole maps; the tee 'yd to go' badges confirm it. (Manual fallback: Solver → tap ball, tap target, type the in-game distance → Set.)"],
-            ["Trees", (n) => (holesMeta[n].markers ?? []).some((m) => m.auto && m.r > 0 && !m.off), "AUTO: every tree is WSR's own, from the game files (the course placement data), with its size; each is drawn as the canopy it covers, faint where it stands beyond the course (outer ground or water under it, where a ball is out of bounds anyway). Add your own markers in Holes → ⚙ for anything else that blocks a line."],
+            ["Trees", (n) => (holesMeta[n].markers ?? []).some((m) => m.auto && m.r > 0 && !m.off), "AUTO: the map is the game's own minimap, rendered from the Wii Sports Resort course files with every tree where the game plants it, at its size. The app keeps those trees (the ones on the course; a tree out on the outer ground or water, where a ball is out of bounds anyway, doesn't count) so that a tap on a canopy in Edit trees mode adds no marker on top of it. Add your own markers in Holes → ⚙ for anything else that blocks a line."],
             ["Log shots", (n) => holeStats[n].shots > 0, "Phase 2: two captures per shot (address + result pop-up) — the pipeline turns them into Log rows."],
             ["Play & score", (n) => holeStats[n].times > 0, "Rounds → Start a round → enter strokes as you play. Mark blocked lines from the Solver when a rec hits trees."],
           ];

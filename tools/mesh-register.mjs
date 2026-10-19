@@ -1,11 +1,19 @@
 // Register each WSR collision mesh to the app's hole-map frame.
 //
 //   node tools/mesh-register.mjs --heightmaps captures/meshes/heightmaps-res4 --out captures/meshes/registration
-//        [--json tools/mesh-registration.json] [--holes 3,11] [--classify-only] [--maps src/maps.js]
+//        [--json tools/mesh-registration.json] [--holes 3,11] [--classify-only] [--maps captures/derived/maps]
 //        [--derived public/derived.json] [--names tools/mesh-holes.json]
 //
-// The app's frame is the 250x304 minimap panel (src/maps.js) with fractional
-// coordinates. For every hole this fits a similarity transform (scale, rotation,
+// The app's frame is the 250x304 minimap panel with fractional coordinates.
+// The input is the Switch's own minimap art: the capture stack of each hole,
+// captures/derived/maps/hNN.png (250x304, extract-maps.mjs), from the --maps
+// directory. NEVER src/maps.js: since 2026-10-18 it holds the 500x608 renders
+// of WSR's minimap model drawn through this very registration
+// (tools/render-maps.mjs), so a fit against it is circular and wrong (on H7:
+// 12.6 degrees of rotation at half the scale, score 0.97 against 3.0). A .js
+// module exporting HOLE_MAPS (the stack-based src/maps.js of an older commit)
+// is still accepted as --maps; any image that is not 250x304 is refused.
+// For every hole this fits a similarity transform (scale, rotation,
 // translation) from map pixels to mesh units by maximising the overlap between
 // the minimap's colour classes (fairway / green / sand / water / rough / outer
 // ground, classified by hue-saturation-value rules) and the mesh surface-class
@@ -17,14 +25,14 @@
 // pins drawn on top, for eyeballing), <out>/hole-NN_mapclass.png (the minimap
 // classification), and one JSON with the transform both ways per hole.
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { PNG } from "pngjs";
 import jpeg from "jpeg-js";
 import { writePngRGB } from "./lib/obj.mjs";
 
 const args = process.argv.slice(2);
-const opt = { heightmaps: "captures/meshes/heightmaps-res4", out: "captures/meshes/registration", json: null, holes: null, classifyOnly: false, maps: "src/maps.js", derived: "public/derived.json", names: "tools/mesh-holes.json", other: "water" };
+const opt = { heightmaps: "captures/meshes/heightmaps-res4", out: "captures/meshes/registration", json: null, holes: null, classifyOnly: false, maps: "captures/derived/maps", derived: "public/derived.json", names: "tools/mesh-holes.json", other: "water" };
 for (let i = 0; i < args.length; i++) {
   const a = args[i];
   if (a === "--other") opt.other = args[++i]; // penalize | water | ignore (see score())
@@ -43,7 +51,9 @@ const names = JSON.parse(readFileSync(opt.names, "utf8"));
 const UPY = names.unitsPerYard || 9.144;
 const holeToMesh = {};
 for (const [k, v] of Object.entries(names)) if (typeof v === "number" && !k.startsWith("_") && !["unitsPerYard", "metresPerUnit"].includes(k)) holeToMesh[v] = k;
-const { HOLE_MAPS } = await import(pathToFileURL(join(process.cwd(), opt.maps)).href);
+// --maps: a directory of capture stacks (hNN.png), or a .js module exporting
+// HOLE_MAPS (base64 JPEG per hole); only the latter is imported, lazily
+const HOLE_MAPS = opt.maps.endsWith(".js") ? (await import(pathToFileURL(resolve(process.cwd(), opt.maps)).href)).HOLE_MAPS : null;
 
 // ---- minimap colour classes ----
 // 1 fairway, 2 rough, 3 sand, 4 outer ground, 6 green, 7 water, 0 other/unknown, 255 excluded (wind dial)
@@ -90,9 +100,11 @@ function detectDial(W, H, data, pad = 4) {
 }
 
 function decodeMinimap(hole) {
-  const b64 = HOLE_MAPS[hole].split(",")[1];
-  const img = jpeg.decode(Buffer.from(b64, "base64"), { useTArray: true, formatAsRGBA: true });
-  const { width: W, height: H, data } = img;
+  let W, H, data;
+  if (HOLE_MAPS) ({ width: W, height: H, data } = jpeg.decode(Buffer.from(HOLE_MAPS[hole].split(",")[1], "base64"), { useTArray: true, formatAsRGBA: true }));
+  else ({ width: W, height: H, data } = PNG.sync.read(readFileSync(join(opt.maps, `h${String(hole).padStart(2, "0")}.png`))));
+  // the renders in today's src/maps.js are 500x608 and drawn through this registration: not an input
+  if (W !== 250 || H !== 304) throw new Error(`hole ${hole}: --maps ${opt.maps} gives a ${W}x${H} image, not the 250x304 Switch minimap panel; src/maps.js holds the renders of WSR's model drawn through this registration (circular), fit against the capture stacks captures/derived/maps/hNN.png`);
   const dial = detectDial(W, H, data);
   const cls = new Uint8Array(W * H);
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
@@ -126,10 +138,11 @@ function makeXform(p, pivot) {
 }
 // Overlap terms: map classes vs mesh classes (weighted IoU). "grass" merges fairway
 // and green on both sides because the minimap colours cannot tell them apart.
-// The app's greenPoly is NOT a term: it is capture-derived and misplaced on six
-// holes (5/7/8/10/14/18), and src/maps.js has a green texture transplanted at that
-// same derived box, so neither may steer the fit. Its offset from the mesh green
-// is reported as a diagnostic instead.
+// The app's greenPoly is NOT a term: it was capture-derived and misplaced on six
+// holes (5/7/8/10/14/18), and the stack-based src/maps.js of the time had a green
+// texture transplanted at that same derived box, so neither may steer the fit
+// (the stacks themselves only have the flag painted out). Its offset from the
+// mesh green is reported as a diagnostic instead.
 const TERMS = [
   { id: "grass", w: 1.0, m: new Set([1, 6]), k: new Set([1, 6]) },
   { id: "sand", w: 1.0, m: new Set([3]), k: new Set([3]) },
@@ -311,6 +324,6 @@ for (const hole of holes) {
   console.log(`hole ${String(hole).padStart(2)} ${r.meshId.padEnd(7)} s ${r.transform.unitsPerMapPx.toFixed(2)} u/px (${r.ydPerPx.toFixed(3)} yd/px, app ${r.appScaleYdPerPx ?? "-"}) rot ${r.transform.rotationDeg.toFixed(2)}deg  score ${r.seedScore.toFixed(3)} -> ${r.score.toFixed(3)}  iou grass ${r.iou.grass} sand ${r.iou.sand} water ${r.iou.water} rough ${r.iou.rough}  tee resid ${r.teeResidualPx ?? "-"} px  pins in ${r.pins.filter((q) => q.insideGreen).length}/${r.pins.length}  ${((Date.now() - t0) / 1000).toFixed(1)}s`);
 }
 if (opt.json && !opt.classifyOnly) {
-  writeFileSync(opt.json, JSON.stringify({ _note: "Similarity transform per hole between the app's 250x304 minimap frame (fractional coords) and the WSR collision mesh units (0.1 m). mapFracToMesh: [X,Z] = M * [fx, fy, 1]; meshToMapFrac: [fx, fy] = M * [X, Z, 1]. Fitted by mesh-register.mjs from colour-class overlap; seeded from derived.json green centre + yardage scale.", unitsPerYard: UPY, holes: results }, null, 1));
+  writeFileSync(opt.json, JSON.stringify({ _note: "Similarity transform per hole between the app's 250x304 minimap frame (fractional coords) and the WSR collision mesh units (0.1 m). mapFracToMesh: [X,Z] = M * [fx, fy, 1]; meshToMapFrac: [fx, fy] = M * [X, Z, 1]. Fitted by mesh-register.mjs from colour-class overlap against the capture stacks captures/derived/maps/hNN.png (the Switch's own minimap art; never src/maps.js, which is rendered through this registration); seeded from derived.json green centre + yardage scale.", unitsPerYard: UPY, holes: results }, null, 1));
   console.log(`wrote ${opt.json}`);
 }

@@ -1,0 +1,1872 @@
+{
+ "_note": "One material spec per name / first-texture pair, from the first archive that has it (`from`); render-maps.mjs draws the backdrop and the raster fallback with these where a hole has no object of the kind.",
+ "materials": {
+  "M_Bunker/glfM_MapBunker1": {
+   "layers": [
+    {
+     "texture": "glfM_MapBunker1",
+     "wrapS": 1,
+     "wrapT": 1
+    }
+   ],
+   "srt": [
+    {
+     "scale": [
+      1,
+      1
+     ],
+     "rot": 0,
+     "trans": [
+      0,
+      0
+     ]
+    }
+   ],
+   "texgen": [
+    "uv0"
+   ],
+   "xlu": false,
+   "tev": {
+    "c0": [
+     60,
+     60,
+     50,
+     0
+    ],
+    "c1": [
+     0,
+     0,
+     0,
+     0
+    ],
+    "c2": [
+     0,
+     0,
+     0,
+     0
+    ]
+   },
+   "konst": {
+    "k0": [
+     0,
+     0,
+     0,
+     0
+    ],
+    "k1": [
+     0,
+     0,
+     0,
+     0
+    ],
+    "k2": [
+     0,
+     0,
+     0,
+     0
+    ],
+    "k3": [
+     0,
+     0,
+     0,
+     128
+    ]
+   },
+   "blend": {
+    "enable": false,
+    "src": 4,
+    "dst": 5,
+    "subtract": false
+   },
+   "zmode": {
+    "test": true,
+    "func": 3,
+    "write": true
+   },
+   "alphaCompare": {
+    "ref0": 0,
+    "ref1": 0,
+    "comp0": 7,
+    "comp1": 7,
+    "logic": 0
+   },
+   "stages": [
+    {
+     "texMap": 0,
+     "texCoord": 0,
+     "texEnable": true,
+     "colorChan": 0,
+     "color": {
+      "a": "texc",
+      "b": "rasc",
+      "c": "texc",
+      "d": "zero",
+      "bias": 0,
+      "sub": false,
+      "clamp": true,
+      "scale": 1,
+      "dest": 0
+     },
+     "alpha": {
+      "a": "texa",
+      "b": "zero",
+      "c": "zero",
+      "d": "zero",
+      "bias": 0,
+      "sub": false,
+      "clamp": true,
+      "scale": 1,
+      "dest": 0
+     },
+     "kc": "k0",
+     "ka": "ak3"
+    }
+   ],
+   "from": "fcJP11"
+  },
+  "M_Color/glfM_MapColor1": {
+   "layers": [
+    {
+     "texture": "glfM_MapColor1",
+     "wrapS": 1,
+     "wrapT": 1
+    }
+   ],
+   "srt": [
+    {
+     "scale": [
+      1,
+      1
+     ],
+     "rot": 0,
+     "trans": [
+      0,
+      0
+     ]
+    }
+   ],
+   "texgen": [
+    "uv0"
+   ],
+   "xlu": false,
+   "tev": {
+    "c0": [
+     0,
+     0,
+     0,
+     0
+    ],
+    "c1": [
+     0,
+     0,
+     0,
+     0
+    ],
+    "c2": [
+     0,
+     0,
+     0,
+     0
+    ]
+   },
+   "konst": {
+    "k0": [
+     0,
+     0,
+     0,
+     0
+    ],
+    "k1": [
+     0,
+     0,
+     0,
+     0
+    ],
+    "k2": [
+     0,
+     0,
+     0,
+     0
+    ],
+    "k3": [
+     0,
+     0,
+     0,
+     0
+    ]
+   },
+   "blend": {
+    "enable": false,
+    "src": 4,
+    "dst": 5,
+    "subtract": false
+   },
+   "zmode": {
+    "test": true,
+    "func": 3,
+    "write": true
+   },
+   "alphaCompare": {
+    "ref0": 0,
+    "ref1": 0,
+    "comp0": 7,
+    "comp1": 7,
+    "logic": 0
+   },
+   "stages": [
+    {
+     "texMap": 0,
+     "texCoord": 0,
+     "texEnable": true,
+     "colorChan": 0,
+     "color": {
+      "a": "texc",
+      "b": "zero",
+      "c": "zero",
+      "d": "zero",
+      "bias": 0,
+      "sub": false,
+      "clamp": true,
+      "scale": 1,
+      "dest": 0
+     },
+     "alpha": {
+      "a": "texa",
+      "b": "zero",
+      "c": "zero",
+      "d": "zero",
+      "bias": 0,
+      "sub": false,
+      "clamp": true,
+      "scale": 1,
+      "dest": 0
+     },
+     "kc": "k0",
+     "ka": "ak0"
+    }
+   ],
+   "from": "fcJP11"
+  },
+  "M_Fairway/glfM_MapFairway1": {
+   "layers": [
+    {
+     "texture": "glfM_MapFairway1",
+     "wrapS": 1,
+     "wrapT": 1
+    },
+    {
+     "texture": "glfM_MapLine1",
+     "wrapS": 1,
+     "wrapT": 1
+    }
+   ],
+   "srt": [
+    {
+     "scale": [
+      1,
+      1
+     ],
+     "rot": 0,
+     "trans": [
+      0,
+      0
+     ]
+    },
+    {
+     "scale": [
+      1,
+      1
+     ],
+     "rot": 180,
+     "trans": [
+      0,
+      0
+     ]
+    }
+   ],
+   "texgen": [
+    "uv0",
+    "uv1"
+   ],
+   "xlu": false,
+   "tev": {
+    "c0": [
+     20,
+     20,
+     20,
+     0
+    ],
+    "c1": [
+     0,
+     0,
+     0,
+     0
+    ],
+    "c2": [
+     0,
+     0,
+     0,
+     0
+    ]
+   },
+   "konst": {
+    "k0": [
+     0,
+     0,
+     0,
+     0
+    ],
+    "k1": [
+     0,
+     0,
+     0,
+     0
+    ],
+    "k2": [
+     0,
+     0,
+     0,
+     0
+    ],
+    "k3": [
+     0,
+     0,
+     0,
+     0
+    ]
+   },
+   "blend": {
+    "enable": false,
+    "src": 4,
+    "dst": 5,
+    "subtract": false
+   },
+   "zmode": {
+    "test": true,
+    "func": 3,
+    "write": true
+   },
+   "alphaCompare": {
+    "ref0": 0,
+    "ref1": 0,
+    "comp0": 7,
+    "comp1": 7,
+    "logic": 0
+   },
+   "stages": [
+    {
+     "texMap": 0,
+     "texCoord": 0,
+     "texEnable": true,
+     "colorChan": 0,
+     "color": {
+      "a": "texc",
+      "b": "zero",
+      "c": "zero",
+      "d": "zero",
+      "bias": 0,
+      "sub": false,
+      "clamp": true,
+      "scale": 1,
+      "dest": 0
+     },
+     "alpha": {
+      "a": "texa",
+      "b": "zero",
+      "c": "zero",
+      "d": "zero",
+      "bias": 0,
+      "sub": false,
+      "clamp": true,
+      "scale": 1,
+      "dest": 0
+     },
+     "kc": 0.125,
+     "ka": "ak0"
+    },
+    {
+     "texMap": 1,
+     "texCoord": 1,
+     "texEnable": true,
+     "colorChan": 0,
+     "color": {
+      "a": "zero",
+      "b": "c0",
+      "c": "texc",
+      "d": "cprev",
+      "bias": 0,
+      "sub": false,
+      "clamp": true,
+      "scale": 1,
+      "dest": 0
+     },
+     "alpha": {
+      "a": "aprev",
+      "b": "zero",
+      "c": "zero",
+      "d": "zero",
+      "bias": 0,
+      "sub": false,
+      "clamp": true,
+      "scale": 1,
+      "dest": 0
+     },
+     "kc": "k0",
+     "ka": "ak3"
+    }
+   ],
+   "from": "fcJP11"
+  },
+  "M_Green/glfM_MapGreen1": {
+   "layers": [
+    {
+     "texture": "glfM_MapGreen1",
+     "wrapS": 1,
+     "wrapT": 1
+    },
+    {
+     "texture": "glf_tokosenFix",
+     "wrapS": 1,
+     "wrapT": 0
+    }
+   ],
+   "srt": [
+    {
+     "scale": [
+      1,
+      1
+     ],
+     "rot": 0,
+     "trans": [
+      0,
+      0
+     ]
+    },
+    {
+     "scale": [
+      1,
+      1
+     ],
+     "rot": 0,
+     "trans": [
+      0,
+      0
+     ]
+    }
+   ],
+   "texgen": [
+    "pos",
+    "uv1"
+   ],
+   "xlu": false,
+   "tev": {
+    "c0": [
+     10,
+     0,
+     10,
+     0
+    ],
+    "c1": [
+     0,
+     0,
+     0,
+     0
+    ],
+    "c2": [
+     0,
+     0,
+     0,
+     0
+    ]
+   },
+   "konst": {
+    "k0": [
+     0,
+     0,
+     0,
+     0
+    ],
+    "k1": [
+     0,
+     0,
+     0,
+     0
+    ],
+    "k2": [
+     30,
+     60,
+     90,
+     255
+    ],
+    "k3": [
+     0,
+     0,
+     0,
+     0
+    ]
+   },
+   "blend": {
+    "enable": false,
+    "src": 4,
+    "dst": 5,
+    "subtract": false
+   },
+   "zmode": {
+    "test": true,
+    "func": 3,
+    "write": true
+   },
+   "alphaCompare": {
+    "ref0": 64,
+    "ref1": 255,
+    "comp0": 6,
+    "comp1": 3,
+    "logic": 0
+   },
+   "stages": [
+    {
+     "texMap": 0,
+     "texCoord": 0,
+     "texEnable": true,
+     "colorChan": 0,
+     "color": {
+      "a": "texc",
+      "b": "zero",
+      "c": "zero",
+      "d": "zero",
+      "bias": 0,
+      "sub": false,
+      "clamp": true,
+      "scale": 1,
+      "dest": 0
+     },
+     "alpha": {
+      "a": "texa",
+      "b": "zero",
+      "c": "zero",
+      "d": "zero",
+      "bias": 0,
+      "sub": false,
+      "clamp": true,
+      "scale": 1,
+      "dest": 0
+     },
+     "kc": "k0",
+     "ka": "ak0"
+    },
+    {
+     "texMap": 1,
+     "texCoord": 1,
+     "texEnable": true,
+     "colorChan": 0,
+     "color": {
+      "a": "texc",
+      "b": "cprev",
+      "c": "konst",
+      "d": "zero",
+      "bias": 0,
+      "sub": false,
+      "clamp": true,
+      "scale": 1,
+      "dest": 0
+     },
+     "alpha": {
+      "a": "zero",
+      "b": "zero",
+      "c": "zero",
+      "d": "aprev",
+      "bias": 0,
+      "sub": false,
+      "clamp": true,
+      "scale": 1,
+      "dest": 0
+     },
+     "kc": "k2",
+     "ka": "bk3"
+    }
+   ],
+   "from": "fcJP11"
+  },
+  "M_Iwa/glfM_MapIwa1": {
+   "layers": [
+    {
+     "texture": "glfM_MapIwa1",
+     "wrapS": 1,
+     "wrapT": 1
+    }
+   ],
+   "srt": [
+    {
+     "scale": [
+      1,
+      1
+     ],
+     "rot": 0,
+     "trans": [
+      0,
+      0
+     ]
+    }
+   ],
+   "texgen": [
+    "uv0"
+   ],
+   "xlu": false,
+   "tev": {
+    "c0": [
+     0,
+     0,
+     0,
+     0
+    ],
+    "c1": [
+     0,
+     0,
+     0,
+     0
+    ],
+    "c2": [
+     0,
+     0,
+     0,
+     0
+    ]
+   },
+   "konst": {
+    "k0": [
+     0,
+     0,
+     0,
+     0
+    ],
+    "k1": [
+     0,
+     0,
+     0,
+     0
+    ],
+    "k2": [
+     0,
+     0,
+     0,
+     0
+    ],
+    "k3": [
+     0,
+     0,
+     0,
+     0
+    ]
+   },
+   "blend": {
+    "enable": false,
+    "src": 4,
+    "dst": 5,
+    "subtract": false
+   },
+   "zmode": {
+    "test": true,
+    "func": 3,
+    "write": true
+   },
+   "alphaCompare": {
+    "ref0": 0,
+    "ref1": 0,
+    "comp0": 7,
+    "comp1": 7,
+    "logic": 0
+   },
+   "stages": [
+    {
+     "texMap": 0,
+     "texCoord": 0,
+     "texEnable": true,
+     "colorChan": 0,
+     "color": {
+      "a": "texc",
+      "b": "zero",
+      "c": "zero",
+      "d": "zero",
+      "bias": 0,
+      "sub": false,
+      "clamp": true,
+      "scale": 1,
+      "dest": 0
+     },
+     "alpha": {
+      "a": "texa",
+      "b": "zero",
+      "c": "zero",
+      "d": "zero",
+      "bias": 0,
+      "sub": false,
+      "clamp": true,
+      "scale": 1,
+      "dest": 0
+     },
+     "kc": "k0",
+     "ka": "ak0"
+    }
+   ],
+   "from": "fcJP11"
+  },
+  "M_Rough/glfM_MapRough1": {
+   "layers": [
+    {
+     "texture": "glfM_MapRough1",
+     "wrapS": 1,
+     "wrapT": 1
+    }
+   ],
+   "srt": [
+    {
+     "scale": [
+      1,
+      1
+     ],
+     "rot": 0,
+     "trans": [
+      0,
+      0
+     ]
+    }
+   ],
+   "texgen": [
+    "uv0"
+   ],
+   "xlu": false,
+   "tev": {
+    "c0": [
+     5,
+     0,
+     0,
+     0
+    ],
+    "c1": [
+     0,
+     0,
+     0,
+     0
+    ],
+    "c2": [
+     0,
+     0,
+     0,
+     0
+    ]
+   },
+   "konst": {
+    "k0": [
+     0,
+     0,
+     0,
+     0
+    ],
+    "k1": [
+     0,
+     0,
+     0,
+     0
+    ],
+    "k2": [
+     0,
+     0,
+     0,
+     0
+    ],
+    "k3": [
+     0,
+     0,
+     0,
+     0
+    ]
+   },
+   "blend": {
+    "enable": false,
+    "src": 4,
+    "dst": 5,
+    "subtract": false
+   },
+   "zmode": {
+    "test": true,
+    "func": 3,
+    "write": true
+   },
+   "alphaCompare": {
+    "ref0": 0,
+    "ref1": 0,
+    "comp0": 7,
+    "comp1": 7,
+    "logic": 0
+   },
+   "stages": [
+    {
+     "texMap": 0,
+     "texCoord": 0,
+     "texEnable": true,
+     "colorChan": 0,
+     "color": {
+      "a": "zero",
+      "b": "texc",
+      "c": "rasc",
+      "d": "zero",
+      "bias": 0,
+      "sub": false,
+      "clamp": true,
+      "scale": 1,
+      "dest": 0
+     },
+     "alpha": {
+      "a": "texa",
+      "b": "zero",
+      "c": "zero",
+      "d": "zero",
+      "bias": 0,
+      "sub": false,
+      "clamp": true,
+      "scale": 1,
+      "dest": 0
+     },
+     "kc": "k0",
+     "ka": "ak0"
+    }
+   ],
+   "from": "fcJP11"
+  },
+  "M_OB/glfM_MapOB2": {
+   "layers": [
+    {
+     "texture": "glfM_MapOB2",
+     "wrapS": 1,
+     "wrapT": 1
+    }
+   ],
+   "srt": [
+    {
+     "scale": [
+      0.1,
+      0.1
+     ],
+     "rot": 0,
+     "trans": [
+      0,
+      0
+     ]
+    }
+   ],
+   "texgen": [
+    "uv0"
+   ],
+   "xlu": true,
+   "tev": {
+    "c0": [
+     0,
+     0,
+     0,
+     0
+    ],
+    "c1": [
+     0,
+     0,
+     0,
+     0
+    ],
+    "c2": [
+     0,
+     0,
+     0,
+     0
+    ]
+   },
+   "konst": {
+    "k0": [
+     0,
+     0,
+     0,
+     0
+    ],
+    "k1": [
+     0,
+     0,
+     0,
+     0
+    ],
+    "k2": [
+     0,
+     0,
+     0,
+     0
+    ],
+    "k3": [
+     0,
+     0,
+     0,
+     0
+    ]
+   },
+   "blend": {
+    "enable": true,
+    "src": 4,
+    "dst": 5,
+    "subtract": false
+   },
+   "zmode": {
+    "test": true,
+    "func": 3,
+    "write": true
+   },
+   "alphaCompare": {
+    "ref0": 0,
+    "ref1": 0,
+    "comp0": 7,
+    "comp1": 7,
+    "logic": 0
+   },
+   "stages": [
+    {
+     "texMap": 0,
+     "texCoord": 0,
+     "texEnable": true,
+     "colorChan": 0,
+     "color": {
+      "a": "texc",
+      "b": "zero",
+      "c": "zero",
+      "d": "zero",
+      "bias": 0,
+      "sub": false,
+      "clamp": true,
+      "scale": 1,
+      "dest": 0
+     },
+     "alpha": {
+      "a": "zero",
+      "b": "zero",
+      "c": "zero",
+      "d": "zero",
+      "bias": 0,
+      "sub": false,
+      "clamp": true,
+      "scale": 1,
+      "dest": 0
+     },
+     "kc": "k0",
+     "ka": "rk0"
+    }
+   ],
+   "from": "fcJP11"
+  },
+  "M_Sea/glfM_MapLake1": {
+   "layers": [
+    {
+     "texture": "glfM_MapLake1",
+     "wrapS": 1,
+     "wrapT": 1
+    },
+    {
+     "texture": "glf_water_ind1",
+     "wrapS": 1,
+     "wrapT": 1
+    }
+   ],
+   "srt": [
+    {
+     "scale": [
+      0.2,
+      0.2
+     ],
+     "rot": 0,
+     "trans": [
+      0,
+      0
+     ]
+    },
+    {
+     "scale": [
+      1,
+      1
+     ],
+     "rot": 0,
+     "trans": [
+      0,
+      0
+     ]
+    }
+   ],
+   "texgen": [
+    "uv0",
+    "uv0"
+   ],
+   "xlu": true,
+   "tev": {
+    "c0": [
+     0,
+     0,
+     0,
+     0
+    ],
+    "c1": [
+     0,
+     0,
+     0,
+     0
+    ],
+    "c2": [
+     0,
+     0,
+     0,
+     0
+    ]
+   },
+   "konst": {
+    "k0": [
+     0,
+     0,
+     0,
+     0
+    ],
+    "k1": [
+     0,
+     0,
+     0,
+     0
+    ],
+    "k2": [
+     0,
+     0,
+     0,
+     0
+    ],
+    "k3": [
+     0,
+     0,
+     0,
+     0
+    ]
+   },
+   "blend": {
+    "enable": true,
+    "src": 4,
+    "dst": 5,
+    "subtract": false
+   },
+   "zmode": {
+    "test": true,
+    "func": 3,
+    "write": false
+   },
+   "alphaCompare": {
+    "ref0": 0,
+    "ref1": 0,
+    "comp0": 7,
+    "comp1": 7,
+    "logic": 0
+   },
+   "stages": [
+    {
+     "texMap": 0,
+     "texCoord": 0,
+     "texEnable": true,
+     "colorChan": 0,
+     "color": {
+      "a": "texc",
+      "b": "zero",
+      "c": "zero",
+      "d": "zero",
+      "bias": 0,
+      "sub": false,
+      "clamp": true,
+      "scale": 1,
+      "dest": 0
+     },
+     "alpha": {
+      "a": "konst",
+      "b": "zero",
+      "c": "zero",
+      "d": "zero",
+      "bias": 0,
+      "sub": false,
+      "clamp": true,
+      "scale": 1,
+      "dest": 2
+     },
+     "kc": "k0",
+     "ka": 0.5
+    }
+   ],
+   "from": "fcJP11"
+  },
+  "tree/glfM_map_tree1": {
+   "layers": [
+    {
+     "texture": "glfM_map_tree1",
+     "wrapS": 0,
+     "wrapT": 0
+    }
+   ],
+   "srt": [
+    {
+     "scale": [
+      1,
+      1
+     ],
+     "rot": 0,
+     "trans": [
+      0,
+      0
+     ]
+    }
+   ],
+   "texgen": [
+    "uv0"
+   ],
+   "xlu": false,
+   "tev": {
+    "c0": [
+     0,
+     0,
+     0,
+     0
+    ],
+    "c1": [
+     0,
+     0,
+     0,
+     0
+    ],
+    "c2": [
+     0,
+     0,
+     0,
+     0
+    ]
+   },
+   "konst": {
+    "k0": [
+     0,
+     0,
+     0,
+     0
+    ],
+    "k1": [
+     0,
+     0,
+     0,
+     0
+    ],
+    "k2": [
+     0,
+     0,
+     0,
+     0
+    ],
+    "k3": [
+     0,
+     0,
+     0,
+     0
+    ]
+   },
+   "blend": {
+    "enable": false,
+    "src": 4,
+    "dst": 5,
+    "subtract": false
+   },
+   "zmode": {
+    "test": true,
+    "func": 3,
+    "write": true
+   },
+   "alphaCompare": {
+    "ref0": 128,
+    "ref1": 255,
+    "comp0": 6,
+    "comp1": 3,
+    "logic": 0
+   },
+   "stages": [
+    {
+     "texMap": 0,
+     "texCoord": 0,
+     "texEnable": true,
+     "colorChan": 0,
+     "color": {
+      "a": "zero",
+      "b": "texc",
+      "c": "rasc",
+      "d": "zero",
+      "bias": 0,
+      "sub": false,
+      "clamp": true,
+      "scale": 1,
+      "dest": 0
+     },
+     "alpha": {
+      "a": "zero",
+      "b": "texa",
+      "c": "rasa",
+      "d": "zero",
+      "bias": 0,
+      "sub": false,
+      "clamp": true,
+      "scale": 1,
+      "dest": 0
+     },
+     "kc": "k0",
+     "ka": "ak0"
+    }
+   ],
+   "from": "fcJP11"
+  },
+  "tree/glfM_map_tree2": {
+   "layers": [
+    {
+     "texture": "glfM_map_tree2",
+     "wrapS": 0,
+     "wrapT": 0
+    }
+   ],
+   "srt": [
+    {
+     "scale": [
+      1,
+      1
+     ],
+     "rot": 0,
+     "trans": [
+      0,
+      0
+     ]
+    }
+   ],
+   "texgen": [
+    "uv0"
+   ],
+   "xlu": false,
+   "tev": {
+    "c0": [
+     0,
+     0,
+     0,
+     0
+    ],
+    "c1": [
+     0,
+     0,
+     0,
+     0
+    ],
+    "c2": [
+     0,
+     0,
+     0,
+     0
+    ]
+   },
+   "konst": {
+    "k0": [
+     0,
+     0,
+     0,
+     0
+    ],
+    "k1": [
+     0,
+     0,
+     0,
+     0
+    ],
+    "k2": [
+     0,
+     0,
+     0,
+     0
+    ],
+    "k3": [
+     0,
+     0,
+     0,
+     0
+    ]
+   },
+   "blend": {
+    "enable": false,
+    "src": 4,
+    "dst": 5,
+    "subtract": false
+   },
+   "zmode": {
+    "test": true,
+    "func": 3,
+    "write": true
+   },
+   "alphaCompare": {
+    "ref0": 128,
+    "ref1": 255,
+    "comp0": 6,
+    "comp1": 3,
+    "logic": 0
+   },
+   "stages": [
+    {
+     "texMap": 0,
+     "texCoord": 0,
+     "texEnable": true,
+     "colorChan": 0,
+     "color": {
+      "a": "zero",
+      "b": "texc",
+      "c": "rasc",
+      "d": "zero",
+      "bias": 0,
+      "sub": false,
+      "clamp": true,
+      "scale": 1,
+      "dest": 0
+     },
+     "alpha": {
+      "a": "zero",
+      "b": "texa",
+      "c": "rasa",
+      "d": "zero",
+      "bias": 0,
+      "sub": false,
+      "clamp": true,
+      "scale": 1,
+      "dest": 0
+     },
+     "kc": "k0",
+     "ka": "ak0"
+    }
+   ],
+   "from": "fcJP11"
+  },
+  "M_Lake/glfM_MapLake1": {
+   "layers": [
+    {
+     "texture": "glfM_MapLake1",
+     "wrapS": 1,
+     "wrapT": 1
+    },
+    {
+     "texture": "glf_water_ind1",
+     "wrapS": 1,
+     "wrapT": 1
+    }
+   ],
+   "srt": [
+    {
+     "scale": [
+      0.2,
+      0.2
+     ],
+     "rot": 0,
+     "trans": [
+      0,
+      0
+     ]
+    },
+    {
+     "scale": [
+      1,
+      1
+     ],
+     "rot": 0,
+     "trans": [
+      0,
+      0
+     ]
+    }
+   ],
+   "texgen": [
+    "uv0",
+    "uv0"
+   ],
+   "xlu": true,
+   "tev": {
+    "c0": [
+     0,
+     0,
+     0,
+     0
+    ],
+    "c1": [
+     0,
+     0,
+     0,
+     0
+    ],
+    "c2": [
+     0,
+     0,
+     0,
+     0
+    ]
+   },
+   "konst": {
+    "k0": [
+     0,
+     0,
+     0,
+     0
+    ],
+    "k1": [
+     0,
+     0,
+     0,
+     0
+    ],
+    "k2": [
+     0,
+     0,
+     0,
+     0
+    ],
+    "k3": [
+     0,
+     0,
+     0,
+     0
+    ]
+   },
+   "blend": {
+    "enable": true,
+    "src": 4,
+    "dst": 5,
+    "subtract": false
+   },
+   "zmode": {
+    "test": true,
+    "func": 3,
+    "write": false
+   },
+   "alphaCompare": {
+    "ref0": 0,
+    "ref1": 0,
+    "comp0": 7,
+    "comp1": 7,
+    "logic": 0
+   },
+   "stages": [
+    {
+     "texMap": 0,
+     "texCoord": 0,
+     "texEnable": true,
+     "colorChan": 0,
+     "color": {
+      "a": "texc",
+      "b": "zero",
+      "c": "zero",
+      "d": "zero",
+      "bias": 0,
+      "sub": false,
+      "clamp": true,
+      "scale": 1,
+      "dest": 0
+     },
+     "alpha": {
+      "a": "konst",
+      "b": "zero",
+      "c": "zero",
+      "d": "zero",
+      "bias": 0,
+      "sub": false,
+      "clamp": true,
+      "scale": 1,
+      "dest": 2
+     },
+     "kc": "k0",
+     "ka": 0.5
+    }
+   ],
+   "from": "fcJP6"
+  },
+  "M_Sea/glfM_MapSea1": {
+   "layers": [
+    {
+     "texture": "glfM_MapSea1",
+     "wrapS": 1,
+     "wrapT": 1
+    },
+    {
+     "texture": "glf_water_ind1",
+     "wrapS": 1,
+     "wrapT": 1
+    }
+   ],
+   "srt": [
+    {
+     "scale": [
+      0.2,
+      0.2
+     ],
+     "rot": 0,
+     "trans": [
+      0,
+      0
+     ]
+    },
+    {
+     "scale": [
+      1,
+      1
+     ],
+     "rot": 0,
+     "trans": [
+      0,
+      0
+     ]
+    }
+   ],
+   "texgen": [
+    "uv0",
+    "uv0"
+   ],
+   "xlu": true,
+   "tev": {
+    "c0": [
+     0,
+     0,
+     0,
+     0
+    ],
+    "c1": [
+     0,
+     0,
+     0,
+     0
+    ],
+    "c2": [
+     0,
+     0,
+     0,
+     0
+    ]
+   },
+   "konst": {
+    "k0": [
+     0,
+     0,
+     0,
+     0
+    ],
+    "k1": [
+     0,
+     0,
+     0,
+     0
+    ],
+    "k2": [
+     0,
+     0,
+     0,
+     0
+    ],
+    "k3": [
+     0,
+     0,
+     0,
+     0
+    ]
+   },
+   "blend": {
+    "enable": true,
+    "src": 4,
+    "dst": 5,
+    "subtract": false
+   },
+   "zmode": {
+    "test": true,
+    "func": 3,
+    "write": false
+   },
+   "alphaCompare": {
+    "ref0": 0,
+    "ref1": 0,
+    "comp0": 7,
+    "comp1": 7,
+    "logic": 0
+   },
+   "stages": [
+    {
+     "texMap": 0,
+     "texCoord": 0,
+     "texEnable": true,
+     "colorChan": 0,
+     "color": {
+      "a": "texc",
+      "b": "zero",
+      "c": "zero",
+      "d": "zero",
+      "bias": 0,
+      "sub": false,
+      "clamp": true,
+      "scale": 1,
+      "dest": 0
+     },
+     "alpha": {
+      "a": "konst",
+      "b": "zero",
+      "c": "zero",
+      "d": "zero",
+      "bias": 0,
+      "sub": false,
+      "clamp": true,
+      "scale": 1,
+      "dest": 2
+     },
+     "kc": "k0",
+     "ka": 0.5
+    }
+   ],
+   "from": "fcJP6"
+  },
+  "tree/glfM_map_tree3": {
+   "layers": [
+    {
+     "texture": "glfM_map_tree3",
+     "wrapS": 0,
+     "wrapT": 0
+    }
+   ],
+   "srt": [
+    {
+     "scale": [
+      1,
+      1
+     ],
+     "rot": 0,
+     "trans": [
+      0,
+      0
+     ]
+    }
+   ],
+   "texgen": [
+    "uv0"
+   ],
+   "xlu": false,
+   "tev": {
+    "c0": [
+     0,
+     0,
+     0,
+     0
+    ],
+    "c1": [
+     0,
+     0,
+     0,
+     0
+    ],
+    "c2": [
+     0,
+     0,
+     0,
+     0
+    ]
+   },
+   "konst": {
+    "k0": [
+     0,
+     0,
+     0,
+     0
+    ],
+    "k1": [
+     0,
+     0,
+     0,
+     0
+    ],
+    "k2": [
+     0,
+     0,
+     0,
+     0
+    ],
+    "k3": [
+     0,
+     0,
+     0,
+     0
+    ]
+   },
+   "blend": {
+    "enable": false,
+    "src": 4,
+    "dst": 5,
+    "subtract": false
+   },
+   "zmode": {
+    "test": true,
+    "func": 3,
+    "write": true
+   },
+   "alphaCompare": {
+    "ref0": 128,
+    "ref1": 255,
+    "comp0": 6,
+    "comp1": 3,
+    "logic": 0
+   },
+   "stages": [
+    {
+     "texMap": 0,
+     "texCoord": 0,
+     "texEnable": true,
+     "colorChan": 0,
+     "color": {
+      "a": "zero",
+      "b": "texc",
+      "c": "rasc",
+      "d": "zero",
+      "bias": 0,
+      "sub": false,
+      "clamp": true,
+      "scale": 1,
+      "dest": 0
+     },
+     "alpha": {
+      "a": "zero",
+      "b": "texa",
+      "c": "rasa",
+      "d": "zero",
+      "bias": 0,
+      "sub": false,
+      "clamp": true,
+      "scale": 1,
+      "dest": 0
+     },
+     "kc": "k0",
+     "ka": "ak0"
+    }
+   ],
+   "from": "fcJP6"
+  },
+  "M_OB/glfM_MapOB2_Mip2": {
+   "layers": [
+    {
+     "texture": "glfM_MapOB2_Mip2",
+     "wrapS": 1,
+     "wrapT": 1
+    }
+   ],
+   "srt": [
+    {
+     "scale": [
+      0.1,
+      0.1
+     ],
+     "rot": 0,
+     "trans": [
+      0,
+      0
+     ]
+    }
+   ],
+   "texgen": [
+    "uv0"
+   ],
+   "xlu": true,
+   "tev": {
+    "c0": [
+     0,
+     0,
+     0,
+     0
+    ],
+    "c1": [
+     0,
+     0,
+     0,
+     0
+    ],
+    "c2": [
+     0,
+     0,
+     0,
+     0
+    ]
+   },
+   "konst": {
+    "k0": [
+     0,
+     0,
+     0,
+     0
+    ],
+    "k1": [
+     0,
+     0,
+     0,
+     0
+    ],
+    "k2": [
+     0,
+     0,
+     0,
+     0
+    ],
+    "k3": [
+     0,
+     0,
+     0,
+     0
+    ]
+   },
+   "blend": {
+    "enable": true,
+    "src": 4,
+    "dst": 5,
+    "subtract": false
+   },
+   "zmode": {
+    "test": true,
+    "func": 3,
+    "write": true
+   },
+   "alphaCompare": {
+    "ref0": 0,
+    "ref1": 0,
+    "comp0": 7,
+    "comp1": 7,
+    "logic": 0
+   },
+   "stages": [
+    {
+     "texMap": 0,
+     "texCoord": 0,
+     "texEnable": true,
+     "colorChan": 0,
+     "color": {
+      "a": "texc",
+      "b": "zero",
+      "c": "zero",
+      "d": "zero",
+      "bias": 0,
+      "sub": false,
+      "clamp": true,
+      "scale": 1,
+      "dest": 0
+     },
+     "alpha": {
+      "a": "konst",
+      "b": "zero",
+      "c": "zero",
+      "d": "zero",
+      "bias": 0,
+      "sub": false,
+      "clamp": true,
+      "scale": 1,
+      "dest": 0
+     },
+     "kc": "k0",
+     "ka": 0.625
+    }
+   ],
+   "from": "fc8"
+  }
+ }
+}

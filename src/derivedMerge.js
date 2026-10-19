@@ -30,14 +30,18 @@
 //   carried from the stored green box's frame into the new one, then the nearest
 //   current pipeline pin is chosen.
 // - Tree markers the pipeline placed carry `auto: true` (today WSR's own trees
-//   from the course placement files, id "t<hole>-<k>", with the drawn canopy's
-//   radius r as a fraction of the map width, and `off: true` on a tree the
-//   course does not reach — outer ground or water under its trunk — which the
-//   app draws faint; before that the v13 hand-placed seeds, also auto). They
-//   mirror derived.json's `trees` on every load; the player's own markers (no
-//   `auto`) are never touched. A derived.json with no `trees` for the hole
-//   leaves the markers as they are, so an old install keeps its seeds until
-//   the pipeline ships trees.
+//   from the course placement files, id "t<hole>-<k>", x, y = the trunk, with
+//   the painted canopy's radius r as a fraction of the map width and its
+//   centre's offset dy from the trunk as a fraction of the map height
+//   (negative = north: the map is rendered from the game files with WSR's own
+//   tree sprites, whose canopy stands north of the trunk), and `off: true` on
+//   a tree the course does not reach — outer ground or water under its trunk —
+//   which the app leaves out of its tap rule; before that the v13 hand-placed
+//   seeds, also auto). The app draws none of them (the map shows the trees);
+//   they serve the tap rule. They mirror derived.json's `trees` on every load;
+//   the player's own markers (no `auto`) are never touched. A derived.json
+//   with no `trees` for the hole leaves the markers as they are, so an old
+//   install keeps its seeds until the pipeline ships trees.
 export const isPipelinePin = (p) => typeof p?.id === "string" && p.id.startsWith("d");
 // the app's hole-map frame (map px), so "nearest" means nearest on the map
 const MAP_W = 250, MAP_H = 304;
@@ -89,7 +93,7 @@ export function applyDerivedHole(cur, n, dh, { fresh }) {
   }
   if (Array.isArray(dh.trees)) {
     out.markers = [...(out.markers ?? []).filter((m) => !m.auto),
-      ...dh.trees.map((t, k) => ({ id: `t${n}-${k}`, x: t.x, y: t.y, r: t.r, auto: true, ...(t.off ? { off: true } : {}) }))];
+      ...dh.trees.map((t, k) => ({ id: `t${n}-${k}`, x: t.x, y: t.y, r: t.r, ...(t.dy != null ? { dy: t.dy } : {}), auto: true, ...(t.off ? { off: true } : {}) }))];
   }
   return out;
 }

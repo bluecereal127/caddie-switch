@@ -8,3 +8,4 @@ tools/gauge-cal.json
 captures/
 # Netlify API token for tools/autosync.ps1 — never commit
 tools/netlify.json
+__pycache__/

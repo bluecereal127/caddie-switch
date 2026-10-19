@@ -353,7 +353,9 @@ out of the frame), each with `lie`, the KCL surface under its trunk read off
 the mesh class rasters (rough 454, fairway 6, outer ground 1,080 of the
 1,540; none on sand, green, fringe or water), and `tools/build-derived.mjs`
 ships the ones on the map with a canopy radius and `off: true` on the outer
-or water ones, which the app draws faint; they replace the app's hand-placed
+or water ones (the app draws no marker for pipeline trees now that the map
+is rendered with WSR's own sprites; `off` only takes a tree out of the
+Edit-trees tap rule and the Guide's count); they replace the app's hand-placed
 v13 seeds through `src/derivedMerge.js`. The radius fit, the lie and on/off
 counts and what the KCL walls are instead (banks, cliffs and retaining walls
 along the water and the edge of the terrain, not trunks) are in

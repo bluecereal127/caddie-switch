@@ -4,8 +4,11 @@ Turns Switch capture frames into Log-tab import JSON rows:
 `{club,power,lie,windSpeed,windDeg,ended,side?,hole?,stroke?}`.
 
 Course geometry from the Wii Sports Resort collision meshes (16-bit heightmaps,
-surface-class maps, mesh→hole mapping, unit scale) is a separate track: see
+surface-class maps, mesh→hole mapping, unit scale) and the hole maps rendered
+from WSR's own minimap model (`render-maps.mjs`) are a separate track: see
 [MESHES.md](MESHES.md) (`mesh-inspect.mjs`, `mesh-heightmap.mjs`, `mesh-holes.json`).
+The order for the app's data is extract-maps → extract-greens → (wsr-truth /
+wsr-pins, when the meshes or archives change) → render-maps → build-derived.
 
 Pure Node (pngjs + jpeg-js, no native deps). PNG and JPG both work — Switch
 album transfers arrive as JPG, capture cards usually give PNG.
@@ -113,32 +116,35 @@ for stragglers that predate the switch.
 **Then:** `npm run ingest` reads `captures/inbox/` and writes
 `captures/rows.json` for the Log-tab importer (after setup below is done).
 
-## Hole cataloging captures (maps, greens, pins — do this sweep FIRST)
+## Hole cataloging captures (pins, tees, scale — the maps themselves are rendered)
 
-One-time per hole, tracked in the app (Guide tab → Capture catalog):
+The hole maps and green views no longer come from captures: since 2026-10-18
+they are rendered from WSR's own minimap model (`render-maps.mjs`, MESHES.md
+"Rendered minimaps"), and the green box, outline, slope grid, pins, tee and
+trees come from the WSR meshes and placement files. Captures supply what WSR
+cannot, and this is what to take, tracked in the app (Guide tab):
 
-1. **From the tee**: 2–3 frames with the camera fixed and the aim line swung
-   left / center / right — median-stacking erases the aim dots and yields the
-   new hole map, registered to the existing fractional coords. Make sure at
-   least one of them shows the "**NNN yd to go**" badge under the player name
-   (it alternates with "Stroke 1") — that number auto-calibrates the hole's
-   yards-per-pixel scale.
+1. **From the tee**: a frame showing the "**NNN yd to go**" badge under the
+   player name (it alternates with "Stroke 1"). The badge confirms the hole's
+   yards-per-pixel scale and is what credits a pin reading to a spot; the
+   frame's avatar places the online tee platform's tier (online rounds) and
+   its cup is a pin reading of its own. The map image is not built from it
+   any more (the stacks under captures/derived/maps are kept for comparison).
 2. **Zoomed minimap green view, plain** — one frame.
 3. **Zoomed minimap green view with the heightmap/Terrain overlay** — one
-   frame. Diffing 2 vs 3 traces the green boundary; the shading becomes the
-   pre-painted 9×9 slope grid. The pin flag in these frames is how pins get
-   cataloged — nothing extra to do.
+   frame. The pin flag in these frames is how pins get cataloged — nothing
+   extra to do; the green outline and shading only confirm the WSR data.
 
-~6 frames/hole × 21 holes ≈ 130 captures; upload in batches of 10 as you go.
 Keep the "Hole N  Par N" banner visible in every frame — it's how the
 classifier knows which hole a frame belongs to. WSR's own pin spots are built
-in (tools/PINS.md), so later rounds need captures only when the flag stands
+in (tools/PINS.md), so a round needs captures only when the flag stands
 somewhere new: a tee frame showing the "yd to go" badge plus the two zoomed
 green frames. A spot that isn't one of WSR's ships on two independent
 readings: two rounds, or a zoomed green plus a tee frame (which can be one
 round). Hole 1's 384 yd spot has one round of tee frames and is waiting for a
-zoomed green or a second round. Shot Assist ON keeps the power bar straight
-in all frames, which also simplifies gauge reading.
+zoomed green or a second round. A new online round also needs its tier judged
+into tools/online-rounds.json. Shot Assist ON keeps the power bar straight in
+all frames, which also simplifies gauge reading.
 
 ## How to capture (per shot, 2 presses of the capture button)
 
@@ -211,9 +217,13 @@ silently drops rows with null club/power, so unfilled rows can't corrupt data.)
   `windDeg` means "relative to shot line, 0 = tailwind" like the importer expects.
 - **Club + lie detection** from the HUD club selector.
 - **Red overswing / capped-bar detection** on the gauge (rough/sand caps).
-- Map/green extraction (roadmap items 2–3) will reuse `lib/image.mjs`. Note
-  the NSS B-grid is STATIC shading (lighter = higher) — slope will come from
-  the luminance gradient of a single grid frame, not dot motion.
+- Map/green extraction was built and then superseded: the maps and green
+  views are rendered from the WSR course data (MESHES.md) and the slope grids
+  come from the mesh heights; the capture stacks and the zoom frames' shading
+  (STATIC, lighter = higher) only confirm them.
 
-Track which captures each hole still needs in the app: Guide tab → Capture
-catalog (also per-hole via ⚙ on the Holes tab; 📷 n/m chip on each tile).
+What each hole still lacks shows in the app's Guide tab: "Per-hole setup,
+in order" lists the steps (green box + slopes, pins, map scale, trees, logged
+shots, rounds played) and its Progress table ticks them per hole from the
+data the pipeline shipped in derived.json and from your own log; the manual
+capture catalog and its 📷 chips are gone.

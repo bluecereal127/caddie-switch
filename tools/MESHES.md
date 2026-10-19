@@ -110,17 +110,34 @@ fringe plus `--pad 600` units; `--crop all` keeps every non-giant surface.
 ## Registration to the app's map frame (`tools/mesh-registration.json`)
 
     node tools/mesh-register.mjs --heightmaps captures/meshes/heightmaps-res4 --out captures/meshes/registration \
-         --json tools/mesh-registration.json [--holes 3,11] [--classify-only]
+         --json tools/mesh-registration.json [--holes 3,11] [--classify-only] [--maps captures/derived/maps]
 
 Fits, per hole, a similarity transform (scale, rotation, translation) between
-the 250x304 minimap panel in `src/maps.js` (fractional coords, the frame every
-app position lives in) and mesh units. The minimap is classified by
+the 250x304 minimap panel (fractional coords, the frame every app position
+lives in) and mesh units. The input is the Switch's own minimap art: the
+capture stack of each hole, `captures/derived/maps/hNN.png` (250x304, the
+flag painted out), from the `--maps` directory. Never `src/maps.js`: since
+2026-10-18 it holds the 500x608 renders of WSR's minimap model drawn through
+this very registration ("Rendered minimaps" below), so a fit against it is
+circular (on H7 it gives 12.6° of rotation at half the scale, score 0.97
+against 3.0); the tool refuses any image that is not 250x304, and accepts a
+`.js` module exporting `HOLE_MAPS` only for the stack-based src/maps.js of an
+older commit. Refitting all 21 holes against the stacks with today's
+derived.json (2026-10-19) reproduces the committed transforms within the
+fit's own flatness: a map point sent to the mesh by the committed transform
+and back by the refit lands 0.0–0.8 map px away on average over the frame,
+at most 1.4 (H12; H7 1.4, H2 1.2, H11 1.3, H18 1.2, every other hole under
+0.9), the scale within 0.5% and the rotation within 0.375° (one to three
+steps of the 0.125° search; H7 0.25° against −0.125°), every catalogued pin
+inside the mesh green. The stack-based src/maps.js of HEAD before the
+renders reproduces H7's committed transform to 0.02 px. The minimap is classified by
 hue/saturation/value into fairway (+ the hex-patterned green, same colour),
 rough, outer ground, sand, water (deep and pale lake); the mesh side is the
 `_classes.png` raster from mesh-heightmap.mjs. Nothing from the app's derived
-green (box, polygon, pins) steers the fit, because it is misplaced on six
-holes and src/maps.js has a green texture transplanted at that same box (see
-below); its offset from the mesh green is only reported. Masked out: the wind dial,
+green (box, polygon, pins) steers the fit, because it was misplaced on six
+holes and the stack-based src/maps.js of the time had a green texture
+transplanted at that same box (see below); its offset from the mesh green is
+only reported. Masked out: the wind dial,
 found per hole as the bbox of near-white pixels (its ring and "NN mph" text)
 in whichever bottom corner has them, since the dial floats to the left
 corner on 11 holes and the right on 10, and the panel's top border line.
@@ -165,13 +182,17 @@ removes hole 7's 0.75° rotation, hole 18's green-island offset and hole 21's
 first fit by at most 4 px anywhere in the frame (hole 7) and under 2 px on
 most holes.
 
-**The minimaps in src/maps.js are edited, so check disagreements near greens
-against the unedited stacks.** extract-maps.mjs paints the flag out of every
-stacked map (onion inpainting), and build-derived.mjs then transplants a green
-texture fused from the zoom captures at the app's derived green box
-(`transplantGreen`). `captures/derived/maps/hNN.png` is the stack before the
-transplant, `hNN.det.png` a single-session stack with the flag still drawn,
-`hNN.final.png` what ships. Five apparent mesh/minimap differences, all at or
+**The capture stacks are edited near greens, so check disagreements there
+against the unedited stacks.** (Since 2026-10-18 src/maps.js ships not the
+stacks but renders of WSR's own minimap, see "Rendered minimaps" below; the
+stacks stay under captures/derived/maps as the Switch's own art, and the
+checks in this section were made against them.) extract-maps.mjs paints the
+flag out of every stacked map (onion inpainting), and build-derived.mjs, for a
+hole it ships from the stack, transplants a green texture fused from the zoom
+captures at the WSR green box (`transplantGreen`). `captures/derived/maps/hNN.png`
+is the stack before the transplant, `hNN.det.png` a single-session stack with
+the flag still drawn, `hNN.final.png` the transplanted stack (written only for
+a hole shipped from it). Five apparent mesh/minimap differences, all at or
 beside greens, were rechecked this way:
 - Not course differences: hole 10's green (the shipped map shows the
   transplanted disc ~5 px east, at the app's own misplaced green box; the
@@ -245,6 +266,9 @@ adjusts to it. `node tools/wsr-truth.mjs` writes `tools/wsr-truth.json`
   relative shading is noise), and opposite on holes 2 and 14.
 - **Transplanted green** in src/maps.js: painted at the WSR box on all 21 holes
   (holes 5, 6 and 8 never had a confident enough projection before).
+  Superseded 2026-10-18: the shipped maps are rendered from WSR's minimap
+  model, which draws its own green; the transplant remains the fallback for a
+  hole with no render.
 - **Tee**: the WSR pad says where the teeing ground is, not where the ball
   sits on it. All 19 detected markers lie on their WSR pads and match the
   in-game yardage better than the pad centre (mean error 3.7 vs 5.6 yd; the
@@ -312,15 +336,17 @@ H9, up to 26 u (3.0 px at 8.8 u/px) on H2 — with exactly that tree's scale on
 164 of the 166 (two on H1 differ by 0.1–0.3): companions of those trees, not
 trees of their own, and not read.
 
-Overlaid on the minimaps the positions sit at the centres of the drawn
-canopies (checked on H7, H16 and H19 by drawing them over the hole maps). The three
+Overlaid on the Switch's minimaps (the capture stacks) the positions sit at
+the centres of the drawn canopies (checked on H7, H16 and H19 by drawing them
+over the hole maps). The three
 ids are three sprites: id 2 is the round broadleaf canopy with a light
 highlight at the centre and a darker rim (the common tree), id 3 a dark dense
 crown with no highlight (conifer-like), id 6 a palm whose fronds draw as a
 thin star with no solid canopy. Their scale is uniform in x and z on 1533 of
 the 1540 (y equals x on 1174 and is within ±12% of it on 1477; the extremes
 are −33% and +52%), so `size` is the footprint scale, and the drawn
-canopy scales with it in world units, not screen px: the sprite edge
+canopy scales with it in world units, not screen px: on the Switch's
+minimaps the sprite edge
 (strongest colour gradient along 36 rays from the centre, median over rays,
 trees with no neighbour in reach and a ray spread under 1.5 px) sits at
 
@@ -335,10 +361,35 @@ trees with no neighbour in reach and a ray spread under 1.5 px) sits at
   detector caught two palms at 61); 9–11 px across at size 2.4–2.5 on H7's
   19.6 u/px map.
 
-In map px that is K·size / (scale·9.144) with the hole's yd/px; derived.json
-carries r as a fraction of the map width. 1,272 of the 1,540 trees ship
-(20–100 per hole, a 0.02 margin outside the frame), many of them in the
-outer ground where the minimap draws no canopy at all.
+**Since the maps are rendered (2026-10-18) the sprites the app shows are
+WSR's own**, from the `glf_tree_<id>` model in each course archive, and
+derived.json's `r` describes those. Measured on the 460 quads and the three
+sprite textures (`tools/wsr-map/glfM_map_tree1..3.png`, 64×64): a quad is
+**160 u wide per unit of size** (160.0 on all 31 of H7's and all 33 of H16's
+quads matched to their PMP trees within 2.5 px; p10–p90 151–172), it lies
+flat in the ground plane, and the PMP position is the trunk base at 0.812 of
+the quad from its north edge. The canopy that survives the material's alpha
+test (a ≥ 128) reaches a median 0.422 / 0.395 / 0.387 of the quad from its
+own centre along 36 rays (kinds 2 / 3 / 6; the widest row spans 0.414 / 0.445
+/ 0.383), that centre sitting 0.477 / 0.469 / 0.477 of the quad from the
+north edge. So on the rendered map
+
+- **kind 2: r = 68 × size u**, kind 3 **63**, kind 6 **62** (broadleaf /
+  conifer / palm), and
+- the canopy's centre stands **54 / 55 / 54 × size u north of the trunk**
+  (derived.json `dy`, a fraction of the map height, negative = north): a
+  disc of radius r around the trunk covers only the canopy's southern half,
+  which drawing both discs over the renders of H7, H16 and H19 shows. A
+  ray-gradient detector on the renders finds the sprites' inner rim (56–58 u
+  per size on kind 2) rather than the edge, so the texture extents are the
+  measurement.
+
+The Switch's own sprites measured above (81 / 48 / 45, centred on the trunk)
+are larger for the broadleaf and smaller for the conifer and palm; the app
+no longer draws them. In map px r is K·size / (scale·9.144) with the hole's
+yd/px; derived.json carries r as a fraction of the map width. 1,272 of the
+1,540 trees ship (20–100 per hole, a 0.02 margin outside the frame), many of
+them in the outer ground where the minimap draws no canopy at all.
 
 **The ground under each tree (`lie`, 2026-10-18).** `tools/wsr-pins.mjs`
 samples the class raster (`hole-NN_classes.png`, 4 u/px; trees and rasters
@@ -360,14 +411,87 @@ the committed file (the tree at the same x, y, kind and size) and says so.
 
 `build-derived` ships `off: true` on a tree whose lie is outer or water: the
 course does not reach there, the minimap draws no canopy and a ball is out
-of bounds already, so the app draws it as a faint disc with no glyph (drawn
-like the course trees they buried the map on H16, H1 and H7), and the Guide's
-Trees step counts on-course trees only. The lie itself stays out of
+of bounds already, so the app's tap rule skips it (the app draws no tree
+marker of its own since the maps are rendered with WSR's sprites; before
+that it drew off trees as faint discs, since drawn like the course trees
+they buried the map on H16, H1 and H7), and the Guide's Trees step counts
+on-course trees only. The lie itself stays out of
 derived.json. Of the 1,272 shipped trees 458 are on the course and 814 off;
 per hole on/off: H1 11/37, H2 14/22, H3 22/64, H4 15/13, H5 24/56, H6
 32/47, H7 31/36, H8 19/12, H9 32/34, H10 33/64, H11 22/39, H12 9/64, H13
 17/27, H14 38/46, H15 27/47, H16 33/67, H17 14/24, H18 19/41, H19 18/40, H20
 20/0, H21 8/34.
+
+## Rendered minimaps (2026-10-18)
+
+`tools/render-maps.mjs` draws each hole map from the WSR data alone, and
+`tools/build-derived.mjs` ships the result as src/maps.js (the 250×304 frame
+at 2×, 500×608, JPEG q78) and src/greens.js (the WSR green box plus 0.12 of
+it on every side at the box's true aspect, q82). By default the art is WSR's
+own: each course archive carries `glf_map_<id>.brres`, a model of the KCL
+ground split by class (bunker, fringe, fairway, green, rock, OB, rough, sea;
+IoU 1.000 against the class rasters on H10) textured with the minimap tiles,
+and `glf_tree_<id>`, one sprite quad per tree on fairway or rough. The
+renderer rasterises the model top-down into the app frame through
+`tools/mesh-registration.json`, evaluating each material's GX TEV program,
+alpha-tests the sprites, and fills what the model leaves uncovered with the
+border class's tile (sea or outer ground) by `tools/map-style.json`'s
+per-hole `beyond` rules. The model's sea plane lies under the whole model
+and shows wherever no land object covers a sample. On H3 that put sea in
+the bottom-right corner, map x 215–250, y 288–304: KCL outer ground, inside
+the raster and continuing past its right edge, that the model's OB object
+does not reach, and OB rough on the Switch (374 map px, the stack OB on all
+but one). There the plane yields where a sample is outer ground both by the
+`beyond` word and by the raster's own pixel (its nearest edge pixel, past
+the raster), and the OB tile is drawn instead. Only on H3 (`SEA_YIELDS`):
+the same two tests fire on two other holes, both times where the Switch
+shows sea, H5's right edge at map y 59–64 (29 px; the KCL's outer ground
+reaches a few px past the model's coastline, the stack has beach and sea)
+and H18's left edge at y 147–160 (165 px, a window map-style's runs leave
+out over KCL outer ground; the stack sea on 142), and no other hole has the
+sea plane over an outer word at all (census 2026-10-19). Every hole's four
+corners (20×16 map px blocks), render against stack by dominant class: 60
+of the 63 not under the wind dial agree; the other three (H1 and H2
+top-left, H8 top-right) sit at the panel's top edge, where the stacks show
+the 3D scene through the panel (H2's palm trunks), not map art.
+`tools/wsr-map/` holds the extracted textures, sprites and geometry
+(committed, 2.2 MB; `--extract <WSR_Extract>/DATA/files/Stage/Shared2`
+rebuilds it from the `glf_course_<id>.carc` archives as DolphinTool
+extracts them, through tools/wsr-pins.mjs's Yaz0 + U8 readers, or from the
+`glf_course_<id>.d/` folders Wiimm's `wszst extract glf_course_*.carc`
+unpacks beside them, read first when present; both give byte-identical
+output); the class rasters (gitignored) are still needed. Flat backdrop, no
+compass, flag, avatar, aim line or landing dots: the app draws its own pins and ball, and the wind is
+the player's input on the solver. The map is thus the mesh frame itself; the
+capture stacks under captures/derived/maps remain the Switch's own art for
+comparison, and a hole with no render falls back to its stack.
+
+The green's second layer, `glf_tokosenFix`, is a 1-D ramp of 12 flat bands
+read through the model's uv set 1, whose v is the vertex height (0 at the
+green's highest point, 1 at its lowest): WSR's own contour shading, lighter
+= higher, lerped with the base tile by konst 30/60/90 per channel. The
+Switch's overview draws no such thing: inside the eroded WSR green polygon
+(1 map px) the capture stacks read luma 158–169 (sd 4–16) on 19 holes, flat;
+H6 (127) and H7 (145, both sd 15) only because the flag and cup cover much
+of those small greens and the stack's inpaint fills them darker. So the
+overview map holds v at the third band (`GREEN_FLAT_V` 0.22), which renders
+luma 170–173, sd 0–1, on all 21 holes. Bands 1–5 render 198–214, 183–200,
+170–173, 152–153 and 135–137 (H3, H6, H7, H14): the third and the fourth
+straddle the stacks' median 161 by 9 either way, the third is the lighter,
+and the lightest is a pale mint no Switch green has. The green crop keeps
+the ramp, where lighter = higher is worth having. (Until 2026-10-19 the
+overview carried the ramp too: greens at luma 78–141 with sd 15–55, H14's
+darker than its own fairway.) WSR's H14 model also decorates the lake with
+five M_Iwa rock cones (40 triangles each, 2.0–4.2 map px across, bases at
+the sea's Y −150 where the collision mesh has water) that the Switch
+minimap does not draw; the renderer drops any M_Iwa connected component
+under 8 map px across (its larger extent), and a census over the 21 holes
+finds every other component (30 more on the 17 holes that have M_Iwa
+objects) a bank or cliff of 108–2,168 triangles and 34 map px or more
+across. Known approximations: the green's height-contour texgen matrix and
+the XLU objects' alpha are runtime state the files do not carry. A hole renders in about 3 s (a full run under two minutes); a
+`--holes` batch merges its entries into `index.json`, and a value outside
+the documented sets of `--art`/`--wsr`/`--trees` exits 1.
 
 ## Quirks worth knowing
 
@@ -392,9 +516,11 @@ per hole on/off: H1 11/37, H2 14/22, H3 22/64, H4 15/13, H5 24/56, H6
 ## Where to take it next
 
 1. (done) Registration mesh → minimap, and the WSR truth applied to scale,
-   greens, pins, slope grids and tees. Next: publish a low-res height + class
-   raster per hole in the map frame under `public/` for the app to fetch like
-   `derived.json`, so the solver can read elevation and lies.
+   greens, pins, slope grids and tees; (done 2026-10-18) the hole maps and
+   green views rendered from WSR's own minimap model ("Rendered minimaps").
+   Next: publish a low-res height + class raster per hole in the map frame
+   under `public/` for the app to fetch like `derived.json`, so the solver
+   can read elevation and lies.
 2. Calibrate the putt model to absolute slopes (`gridPct`): the 9×9 levels are
    still per-green relative, so a level-3 cell means "this green's steepest",
    not a fixed gradient.
