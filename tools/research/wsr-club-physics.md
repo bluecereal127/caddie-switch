@@ -38,8 +38,9 @@ can be carried over, the numbers may not be. The claims are ranked at the end.
 
 The CLAUDE.md line "WSR official maxes seed defaults: driver 250, spoon 200, 3i 175, 5i 155,
 7i 135, 9i 100, wedge 80" is **not** what WSR's binary holds: WSR's nominal carries are
-240/220/190/160/130/100/55 (P0c) and its club-recommender reaches are 279/253/212/176/146/110/60
-(P08). Those 250/200/... numbers are presumably Switch guide values.
+240/220/190/160/130/100/55 (P0c) and its full-power stop distances on flat fairway (carry + roll)
+are 279/253/212/176/146/110/60 (P08, reproduced by `wsr-groundsim.py`; the club recommender uses
+the same column). Those 250/200/... numbers are presumably Switch guide values.
 
 ## 2. Sources and method
 
@@ -64,7 +65,7 @@ Offsets are into the block. "slot N" = vtable slot (byte offset N×4) of RPGlfCl
 |------|-------|-------|------|------|-------|------|-------|-------|------------------------------|
 | 0x00 | 0.02  | 0     | 0    | 0.02 | 0     | 0    | 0.01  | 0.004 | launch speed at power 0 (0x8040a0d4: speed = P00 + q·(P04−P00)) |
 | 0x04 | 3.39  | 3.13  | 2.79 | 2.45 | 2.13  | 1.78 | 1.28  | 0.41  | launch speed at power 1, units/tick (0.1 m, 1/240 s) |
-| 0x08 | 279   | 253   | 212  | 176  | 146   | 110  | 60    | 20    | int, yards: club-recommender reach (0x804090ac compares P08×9.144 with the distance to the pin) |
+| 0x08 | 279   | 253   | 212  | 176  | 146   | 110  | 60    | 20    | int, yards: full-power stop distance on flat fairway (carry + bounces + roll), reproduced by wsr-groundsim.py to 0.4 yd (wsr-ground-phase.md); the recommender also uses it (0x804090ac compares P08×9.144 with the distance to the pin) |
 | 0x0c | 240   | 220   | 190  | 160  | 130   | 100  | 55    | 20    | int, yards: nominal full-power carry (0x80409048 returns P0c×9.144 units; used at 0x803fb448, 0x804031b4). Reproduced by simulation |
 | 0x10 | 10    | 11    | 19   | 23   | 24    | 30   | 43    | 0     | launch angle, degrees (×0.0174533 at 0x8040a0dc; 0x803ed950 builds (aim.x·cosθ, sinθ, aim.z·cosθ)) |
 | 0x14 | 0.65  | 0.70  | 0.5  | 0.5  | 0.5   | 0.5  | 0     | 0     | lift coefficient: ball+0x98 = P14·q (Magnus-like lift in Calc) |
@@ -159,18 +160,20 @@ difference, or a display difference, and is not settled here.)
 1. lift:      v += Lhat * (|v|_prev * 0.0012 * s98);   s98 *= 0.9985
               Lhat = normalize(-vx*vy, vx^2+vz^2, -vy*vz)   (perpendicular to v, in the vertical plane, upward; 0x803edd4c)
 2. side-spin: if lifetime > spinStart: v += Shat * (|v|_prev * 0.001 * s9c);  s9c *= 0.999;  Shat = normalize(vz, 0, -vx)
-3. on ground & lifetime > spinStart: backspin pull-back / roll steering (section 4.6)
+3. on ground & lifetime > spinStart: backspin pull-back / roll steering (wsr-ground-phase.md section 5)
 4. in air (0x804121c4 == 1):  wind, see 4.4
-5. gravity:   v += 0.002 * -normalize(0.5*n + 0.5*yhat)     (n = ground normal from the last contact, yhat in the air -> v.y -= 0.002)
+5. gravity:   v += 0.002 * -normalize(0.5*n + 0.5*yhat)     (n = ball+0x70, the normalised sum of the last four ticks' contact normals, yhat when none -> in the air v.y -= 0.002; wsr-ground-phase.md section 4)
 6. pos += v;  v *= 0.999
 |v|_prev is ball+0x94, set at the end of the previous tick by 0x804144b8.
 ```
 Constants: r2−0x34 = 0.0012, r2−0x30 = 0.9985, r2−0x50 = 0.001, r2−0x2c = 0.999, r2−0x8 = −0.002,
 r2−0xc4 = 0.5. Units: 1 unit = 0.1 m (9.144 units/yd); a tick is 1/240 s, so the driver's
 3.39 units/tick = 81.4 m/s (182 mph) and g = 0.002 units/tick² = 11.5 m/s².
-The ball stops when |v| < 0.0015 (r2+0) for more than 20 ticks on a restable surface
+The ball stops when, on the ground, its displacement over the tick (contact push-out included)
+is < 0.0015 u (r2+0) for more than 20 consecutive ticks on a restable surface
 (mask 0x1ce5e at r2−0x76c = fairway, rough, bunker, OB, green, green edge, side of cup, cup,
-glass, tee, sand OB) or after 0x1c20 = 7200 ticks (30 s); `0x80413b04` zeroes the velocity.
+glass, tee, sand OB) or after 0x1c20 = 7200 ticks (30 s); `0x80413b04` zeroes the velocity
+(wsr-ground-phase.md section 3.3 has the rule in full).
 
 ### 4.4 Wind
 
@@ -193,7 +196,14 @@ glass, tee, sand OB) or after 0x1c20 = 7200 ticks (30 s); `0x80413b04` zeroes th
   display noted in CLAUDE.md that is 2 mph per index. The display conversion was not located in
   the binary.
 
-### 4.5 Landing and bounce (`0x8041228c`, called every tick after Calc)
+### 4.5 Landing and bounce (`0x8041228c`, called every tick after Calc) — superseded
+
+> **Superseded by `wsr-ground-phase.md` sections 3–4 (2026-10-19).** What changed: A is a Coulomb
+> friction coefficient and the tangential term is an **impulse**, `min(|t|, A·vn)` taken off the
+> tangential velocity per contact — not a cap on it (the "scaled down to vn·A" below is a local
+> copy that is then subtracted); B is the restitution. Because the routine runs every tick, a roll
+> is a stream of micro-bounces whose friction impulse `A·vn*` is the whole rolling resistance, and
+> the port reproduces P08 for all seven clubs to 0.4 yd. The tables below are correct as read.
 
 Two 17-entry tables in BSS, filled by `0x80415da4`, indexed by the collision attribute:
 ```
@@ -207,10 +217,18 @@ rebound along n is vn·B[attr]·f where `f = 1 − 0.6·clamp(backspin, 0, 1)^0.
 (`0x804127f0`–`0x8041286c`), and backspin itself is multiplied by f. If the active club is an
 iron and the surface is green or green edge, A is replaced by 0.48 and B by 0.5
 (`0x80412774`–`0x804127ac`). Water (7) and valley (13) raise the penalty event (`0x80411b6c`).
-Interpretation of A/B as "tangential retention" and "restitution" is from one reading of a
-520-instruction routine: medium confidence.
+The "t is scaled down" reading above was from one pass over the routine (832 instructions, not
+520): see the note at the top of this section and wsr-ground-phase.md section 3.2 for the
+block-by-block listing.
 
-### 4.6 Roll and backspin pull-back (Calc `0x80413cd0`–`0x80414084`; low confidence)
+### 4.6 Roll and backspin pull-back (Calc `0x80413cd0`–`0x80414084`) — superseded
+
+> **Superseded by `wsr-ground-phase.md` section 5 (2026-10-19).** What changed: the weight is a
+> per-tick **decay** `w = 0.7 + 0.19·(1 − clamp(A, 0.15, 1))/0.85` (fairway 0.834, green 0.89),
+> not an interpolation "between 0.19 and 0.7"; the pull-back is rotated into the ground plane at
+> constant length, decayed by w and applied as `v += h·P`; and the "8e-5 ground-normal term in the
+> air" was the wind coupling of section 4.4 — there is no ground term in the air. The putter's roll
+> is section 6 there.
 
 Thirty frames after the spin was applied, while on the ground, the ball gets a steering vector
 = −0.06 · min(backspin, 0.9)^0.61 along the original shot direction (rotated by `0x80412ff0`),
@@ -256,8 +274,9 @@ tail carry 262.1, head 220.2; idx 10 (20 mph): 22.8 / 256.3 / 225.2; idx 5 (10 m
    carry ≈ P0c·power yd (240/220/190/160/130/100/55 at full power). The swing gauge value first
    goes through the slot-7 curve (through (0.5, P34)), so if the on-screen bar shows the raw
    value, half a bar is 60 % (woods) / 55 % (irons) / 45 % (wedge) of max carry; if it shows the
-   curved value it is 50 %. P08 (279/253/212/176/146/110/60) is the recommender's reach, not a
-   physics input.
+   curved value it is 50 %. P08 (279/253/212/176/146/110/60) is the full-power stop distance
+   (carry + roll) on flat fairway, reproduced by `wsr-groundsim.py` (wsr-ground-phase.md); the
+   recommender uses it as its reach.
 2. **Elevation per club.** Launch angle P10 = 10°, 11°, 19°, 23°, 24°, 30°, 43° (driver, spoon,
    3i, 5i, 7i, 9i, wedge); putter 0°. Lift P14 = 0.65, 0.70, 0.5, 0.5, 0.5, 0.5, 0. Simulated
    apex 22.7, 22.8, 28.2, 28.4, 22.9, 22.1, 16.2 yd and hang time 4.7, 4.7, 4.8, 4.7, 4.2, 4.1,
@@ -284,7 +303,8 @@ second.
 - Fields 0x24–0x30, 0x5c–0x9c of the club block: readers found for some (slots 6, 9, 10, 13, 14,
   15) but their consumers were not decoded; the rest have no decoded reader.
 - `0x8041e664` assist branch and `0x80407d08` (target-derived power).
-- Putter/green roll physics; the roll/steering block only roughly (section 4.6).
+- Putter/green roll physics and the roll/steering block: decoded since, see
+  `wsr-ground-phase.md` (sections 5 and 6; also the cup, the flagstick and the look-ahead).
 - The mph-per-index display conversion for wind.
 
 ## 8. Confidence
@@ -298,7 +318,8 @@ second.
   not known.
 - Wind storage, 45° steps, direction vector, altitude ramp, Calc coupling: **high**; mph per
   index: medium (external sources only).
-- Landing tables and their reading: **medium**. Roll/pull-back block: **low**.
+- Landing tables and their reading, roll/pull-back block: superseded by `wsr-ground-phase.md`,
+  where both are **high** (independently re-derived 2026-10-19).
 - All of it is WSR (Wii). Switch Sports may change any number; the published Switch maxes
   (250/200/175/155/135/100/80) already differ from WSR's 240/220/190/160/130/100/55.
 

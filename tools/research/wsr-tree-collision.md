@@ -136,9 +136,13 @@ are this one and `WS2_common_tree*.kcl` for the island scenes of other sports).
 - When |v| ≤ 0.8 u/step (4.8 m/s at 60 Hz) the canopy damping only runs on steps where
   (ball frame counter mod 60) < 12, so a slow ball is not ground to a halt in a canopy.
 
-At 60 steps/s a ball crossing a 10 m canopy at 60 m/s spends ~10 steps inside and keeps
-0.98^10 = 0.82 of its speed (0.94^10 = 0.54 through palm fronds); a full second inside keeps
-0.30 (0.02). The steps-per-frame of the ball sim were not verified here (group R's area).
+A step is one physics tick, 1/240 s: the ball manager's tick `0x80410cbc` is called four
+times per 60 Hz frame (loop at `0x804175b4`, last-tick flag in r4) and calls the wrapper
+`0x80414734` (Calc + tree check) once per ball each time (`0x80410cf8` for the active ball,
+`0x80410d54` for the others). So a ball crossing a 10 m canopy at 60 m/s spends ~40 ticks
+inside and keeps 0.98^40 = 0.45 of its speed (0.94^40 = 0.08 through palm fronds); a quarter
+second inside keeps 0.30 (0.02). A ball that enters a canopy at speed therefore drops out of
+it nearly dead; only a glancing clip through its edge survives.
 
 A second user of the tree loop, `0x803fbb88` (called from `0x803fb754/0x803fb910/0x803fb9d0`),
 tests a candidate position with ball radius 6 u and rejects it if any tree is hit: a
@@ -240,9 +244,11 @@ base and horizontal offset d from its trunk:
   palm KCL path, the return codes and the responses (0.5 restitution, 0.98/0.94 damping),
   the empty params, the companions as reflections. Read from the code with the literal
   pool, consistent with the three models' geometry and with the minimap fits.
-- Medium: that the step is one per 60 Hz frame (the damping factors are per call of the
-  tree check, which runs once per `0x80414734`; substeps inside `RPGlfBall::Calc` were not
-  checked); the exact spin update; the "slow ball, 12 of 60 steps" cadence.
+- High: the step is one 1/240 s physics tick (the tree check runs once per call of
+  `0x80414734`, which the ball manager's tick `0x80410cbc` calls per ball, and that tick is
+  called four times per 60 Hz frame from `0x804175b4`; verified 2026-10-18).
+- Medium: the exact spin update; the "slow ball, 12 of 60 steps" cadence (whether that
+  counter runs per tick or per frame was not checked).
 - Not WSR facts, may differ on the Switch: NSS is a different engine, so the constants
   (6/60/100/48 etc.), the sphere-vs-cone choice, the damping and the ball radius are
   WSR's. What carries over is the placement (positions, kinds and scales match the Switch
