@@ -104,9 +104,10 @@ has no online mode), so its two tiers ship from the online frames themselves.
 - KCL types: 1 fairway (+ the flat tee pad), 2 rough, 3 sand (bunkers, beaches,
   river gravel), 4 outer ground, 5 floor plane (dead), 6 green (a grid of ~15-unit cells;
   the meshes carry no cup or pin data, which live in the PMP files), 7 water, 9 fringe ring, 0x0c walls (banks, cliffs and retaining walls: along the water on 14 of the 18 holes that have them, H3's split between its coast and the outer-ground boundary, while H12's follow the drop at the edge of its terrain, H13's are the cliff faces around its island, whose mesh has no water surface at all, and H20's ring the whole course as rock walls; H6, H10 and H16 have none; never tree trunks — the trees are PMP objects too, decoded by tools/wsr-pins.mjs).
-- The meshes are the Wii course and match the Switch art almost everywhere
-  (hole 15's apron NE of the green and a hilltop sand strip on 17 differ;
-  tools/MESHES.md lists them). src/maps.js is NOT raw game art near greens:
+- The meshes are the Wii course and match the Switch minimap art everywhere
+  that matters (re-measured 2026-10-18: the only difference found is an
+  undrawn ~10 yd sand sliver inside hole 17's out-of-bounds landmass; the
+  earlier "hole 15 apron" claim was wrong, tools/MESHES.md has the numbers). src/maps.js is NOT raw game art near greens:
   the flag is painted out and a green texture is transplanted (at the WSR
   green box since 2026-10-16; before that at a capture-derived box that was
   misplaced on holes 5/7/8/10/14/18) — compare against

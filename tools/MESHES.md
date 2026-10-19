@@ -180,10 +180,17 @@ beside greens, were rechecked this way:
   east lobe; raw frames match the mesh within 0.3 px), and the greenside
   bunkers on holes 13 and 17 (the disputed spots are under the flag cloth in
   every capture, 80–100% covered, so the minimap there is paint-out fill).
-- Real, in unedited game art away from the flag: hole 15's fairway apron NE
-  of the green runs ~6.5 px further in the mesh than the Switch fairway, which
-  paints that band as rough. Hole 17's mesh also has a sand strip on the right
-  landmass's NE hilltop that the Switch minimap draws as plain ground.
+- Re-measured 2026-10-18 against the unedited captures (`hNN.det.png`, mesh
+  classes registered onto them, pixels away from class edges and canopies):
+  on every hole 94-99.6% of mesh fairway is painted fairway-light and
+  97-99.8% of mesh rough is painted dark, and every mesh bunker is painted
+  sand except one. Hole 15's apron NE of the green, once reported as a Wii/
+  Switch difference, agrees exactly (127 of 127 mesh-fairway pixels painted
+  fairway, 986 of 994 mesh-rough pixels painted rough), so that claim was
+  wrong. The one real difference is a 63-px sand sliver (~10 yd across) at
+  the NE tip of hole 17's right landmass, which the minimap paints as the
+  landmass's dark ground; that landmass is the out-of-bounds dark ground, so
+  it cannot affect a shot. No other course difference was found.
 - Holes 8, 15 and 17 have small holes in the collision ground (water or nodata
   showing through) that no capture shows; hole 8's was checked against all 20
   raw tee frames.
