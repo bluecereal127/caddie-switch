@@ -902,12 +902,15 @@ export default function App() {
     return () => { live = false; };
   }, [contours, openHole]);
 
-  // auto-fill distance whenever a calibrated line is drawn
+  // auto-fill distance whenever a calibrated line is drawn: the line's own
+  // length (a lie change refreshes it too). The max-reach clamp below bounds
+  // it in the same effect flush, because a new bearing's solve gives a new
+  // maxReach in this render. (It used to clamp here against the previous
+  // line's maxReach through a ref, and the clamp then overrode it with the
+  // new line's: on H17 tapping 120 yd off a 236 yd line left 200 in the field
+  // with a 120 yd line drawn, the recs solved for 200.)
   useEffect(() => {
-    if (geo && scale) {
-      const yd = Math.round(geo.srcPx * scale);
-      setDist(lie !== "green" && maxReachRef.current ? Math.min(yd, Math.floor(maxReachRef.current.yd)) : yd);
-    }
+    if (geo && scale) setDist(Math.round(geo.srcPx * scale));
   }, [geo, scale, lie]);
 
   // the tee box is the default hitting position (derived tee when known)
@@ -990,7 +993,6 @@ export default function App() {
     const ht = heightAlong && dist > 0 ? heightAlong(dist) : null;
     return { ball: hb + ballLift, target: ht == null ? null : ht - ballLift };
   }, [terrain, line.ball, heightAlong, dist, ballLift]);
-  const maxReachRef = useRef(null);
   const { recs, maxReach } = useMemo(
     () => solve(clubs, { dist, windSpeed, relWindDeg, lie, hole, stroke }, blockedRules, solveCtx),
     [clubs, dist, windSpeed, relWindDeg, lie, hole, stroke, blockedRules, solveCtx]
@@ -1027,7 +1029,15 @@ export default function App() {
     window.addEventListener("mouseup", up, { once: true });
     window.addEventListener("touchend", up, { once: true });
   };
-  useEffect(() => { maxReachRef.current = maxReach; if (lie !== "green" && maxReach && dist > Math.floor(maxReach.yd)) setDist(Math.floor(maxReach.yd)); }, [maxReach, dist, lie]);
+  // the distance never exceeds the max reach: a functional update, so the
+  // auto-fill of a shorter line queued in the same flush is not overridden.
+  // A reach that floors to 0 does not clamp: over the terrain a bank right
+  // in front of the ball throws every club's cap flight back behind it and
+  // solve reports a reach of 0 (src/model.js), which would otherwise pin the
+  // distance at 0 and turn every typed value into 0 (the input below too)
+  useEffect(() => {
+    if (lie !== "green" && maxReach && Math.floor(maxReach.yd) > 0 && dist > Math.floor(maxReach.yd)) setDist((v) => Math.min(v, Math.floor(maxReach.yd)));
+  }, [maxReach, dist, lie]);
 
   // aim preview on map: rotate best rec's aim offset around the ball
   const bestRec = recs.find((r) => !r.blocked) ?? recs[0] ?? null;
@@ -1415,7 +1425,7 @@ export default function App() {
                           setLine((l) => ({ ...l, target: { x: l.ball.x + dx * k, y: l.ball.y + dy * k } }));
                         }
                       }
-                      if (lie !== "green" && maxReach) v = Math.min(v, Math.floor(maxReach.yd));
+                      if (lie !== "green" && maxReach && Math.floor(maxReach.yd) > 0) v = Math.min(v, Math.floor(maxReach.yd)); // a reach of 0 does not clamp (the effect above says why)
                       setDist(v);
                     }} />
                   {lie !== "green" && (

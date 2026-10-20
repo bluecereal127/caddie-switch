@@ -41,8 +41,9 @@
 //  g. simPutt / solvePutt moved out of App.jsx unchanged: a fixed grid of putts
 //     gives the outputs recorded from App.jsx before the move
 //  h. elevation: the port's profile ground (a level profile flies plane(attr,
-//     0) to 1e-9 yd for 7 clubs on 5 surfaces, a uniform 3-degree one the
-//     section 8 slope rows within 0.3 yd); the port's scalar tick flies 160
+//     0) to 1e-9 yd for 7 clubs on 5 surfaces, and so does one with a 10 yd
+//     drop 0.5 yd behind the ball; a uniform 3-degree one the section 8
+//     slope rows within 0.3 yd); the port's scalar tick flies 160
 //     recorded runs to the bit; a full driver over a 20 yd step at 150 yd
 //     (down: carries over 10 yd further, dh < 0; up: shorter, dh > 0); H21 and
 //     H17 on the default line over the committed terrain (the full driver
@@ -502,13 +503,20 @@ for (const cl of DEFAULT_CLUBS) {
   // surface), a uniform 3-degree one the 3-degree rows of
   // wsr-ground-phase.md section 8 (within 0.3 yd, and the tilted plane's own
   // runs within 1e-9 yd)
-  let worstFlat = 0, worstTilt = 0;
+  let worstFlat = 0, worstDrop = 0, worstTilt = 0;
   for (const id of IDS) for (const s of ["fairway", "rough", "green", "fringe", "bunker"]) {
     const a = full(id, s), b = run({ club: id, q: 1, profile: { heightAt: () => 0, surfaceAt: () => s } });
     worstFlat = Math.max(worstFlat, Math.abs(a.stop - b.stop), Math.abs(a.carry - b.carry), Math.abs(a.apex - b.apex));
     ok(a.ticks === b.ticks && a.bounces === b.bounces, `${id} on a level ${s} profile: ${b.ticks} ticks / ${b.bounces} bounces, the plane ${a.ticks} / ${a.bounces}`);
+    // the ground behind the ball is not under it: a 10 yd drop 0.5 yd behind
+    // (the ball on a cliff top, flat ahead) is the same shot (the plane's
+    // slope centred on the ball once read it as a 79-degree tilt and flew
+    // every club backwards: a full driver to -98 yd)
+    const d = run({ club: id, q: 1, profile: { heightAt: (x) => (x < -0.5 ? -10 : 0), surfaceAt: () => s } });
+    worstDrop = Math.max(worstDrop, Math.abs(a.stop - d.stop), Math.abs(a.carry - d.carry), Math.abs(a.apex - d.apex));
   }
   ok(worstFlat <= 1e-9, `a level profile is ${worstFlat} yd off plane(attr, 0)`);
+  ok(worstDrop <= 1e-9, `a 10 yd drop 0.5 yd behind the ball is ${worstDrop} yd off plane(attr, 0)`);
   const T3 = Math.tan((3 * Math.PI) / 180), slope3 = (sgn) => ({ heightAt: (x) => sgn * T3 * x, surfaceAt: () => "fairway" });
   const tilt = [];
   for (const [id, down, up] of [["driver", 290.9, 266.7], ["9iron", 115.0, 104.5], ["wedge", 63.5, 57.2]]) {
@@ -519,7 +527,7 @@ for (const cl of DEFAULT_CLUBS) {
     tilt.push(`${id} ${pd.stop.toFixed(1)} / ${pu.stop.toFixed(1)}`);
   }
   ok(worstTilt <= 1e-9, `a 3-degree profile is ${worstTilt} yd off the tilted plane`);
-  console.log(`profile ground: level within ${worstFlat.toExponential(1)} yd of the plane (7 clubs x 5 surfaces); 3 degrees down / up ${tilt.join(", ")} yd (wsr-ground-phase.md 290.9 / 266.7, 115.0 / 104.5, 63.5 / 57.2), within ${worstTilt.toExponential(1)} yd of the tilted plane`);
+  console.log(`profile ground: level within ${worstFlat.toExponential(1)} yd of the plane, a 10 yd drop 0.5 yd behind the ball within ${worstDrop.toExponential(1)} (7 clubs x 5 surfaces); 3 degrees down / up ${tilt.join(", ")} yd (wsr-ground-phase.md 290.9 / 266.7, 115.0 / 104.5, 63.5 / 57.2), within ${worstTilt.toExponential(1)} yd of the tilted plane`);
 
   // h2. the port's tick in scalars flies the committed port's shots to the
   // bit: 160 plane runs of every club and surface with backspin, side spin,

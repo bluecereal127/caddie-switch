@@ -135,7 +135,8 @@ carry = 4a · (1 + h · tailwind_mph) · C(bars/4); sidedrift = c · crosswind_m
   Each club's flat solution (the scan above) is then refined by flying WSR's
   ball over the line's profile (src/wsrsim.js `run({ profile })`, sampled
   every 0.25 yd once per line): contact against the local tangent plane at the
-  ball's x (height from the profile, normal from its slope over ±1 yd, A / B
+  ball's x (height from the profile, normal from its slope over the yard
+  ahead, x .. x + 1, so a drop just behind the ball is not under it, A / B
   from the surface there; the line is level across), so the carry onto lower
   or higher ground, the bounce off the slope it lands on and the roll down or
   up it are WSR's own physics. The sim runs in WSR's yards: k = 4a (1 + h ·
@@ -149,8 +150,10 @@ carry = 4a · (1 + h · tailwind_mph) · C(bars/4); sidedrift = c · crosswind_m
   stop: a dip that catches the roll, a bank it rolls back down, a green edge;
   the terrain makes the stop ragged in power, and 6 flights find a stop
   within 0.5 yd for 96 % of the club-distance pairs that have one on the 21
-  default lines, 3 found 85.5 %). `maxReach` is the top cap flight, and a club
-  whose cap flight stops short is out of reach. A rec adds `stop`, `dh` /
+  default lines, 3 found 85.5 %). `maxReach` is the top cap flight (0 when a
+  bank right in front of the ball throws every club's back behind it; the
+  App's distance clamps skip a reach of 0, so the field is not pinned there),
+  and a club whose cap flight stops short is out of reach. A rec adds `stop`, `dh` /
   `dhStop` (the ground at the carry / the stop minus the ball, yd, + uphill),
   `elev`, `approx`; its surface is the read at the first contact; rollSpin is
   the flight's roll less the shape's full-spin cut (the flight carries no

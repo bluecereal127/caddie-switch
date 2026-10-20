@@ -697,8 +697,12 @@ up to 4.5 yd below on H7), and 184 stand beyond the rasters' crops.
    heights every 0.5 yd (`gNN.bin`); the 9×9 levels are still per-green
    relative, so a level-3 cell means "this green's steepest", not a fixed
    gradient.
-3. Per-hole elevation offsets for the shot model (holes 8/12/17 first) from the
-   tee/landing-zone heights, now in `public/terrain/` (tee to green centre:
-   up to 51 m down on H21, 20 m up on H17). Online rounds add the tee platform's tier:
-   the upper tier is a few feet above the lower one, about 1-2 yd of carry
-   from the drop, small next to the terrain.
+3. (done 2026-10-20) Elevation for the shot model: the solver flies each club
+   over the line's height profile from `public/terrain/` (src/model.js
+   `solve` with `ctx.heightAt`, src/wsrsim.js `run({ profile })`; "Elevation"
+   in CLAUDE.md's Model), and the online platform's upper tier is
+   `ctx.ballLift` (App.jsx `UPPER_TIER_YD` = 1 yd, the player's "a few feet",
+   unmeasured: +1.3 yd of carry on a full driver). Remaining: the fit-residual
+   check of the WSR-shaped descent and bounce on holes 8/12/17 first, which
+   needs logged shots there (tee to green centre: up to 51 m down on H21,
+   20 m up on H17).

@@ -115,9 +115,10 @@ function plane(attr, slopeDeg) {
 // SURFACE_ATTR key, where null or any other read (water, OB, a bank) is
 // fairway, as src/model.js landingSurface. Each contact query is against the
 // local tangent plane at the ball's x: through the profile's height there,
-// its normal from the slope over x - 1 .. x + 1 yd, its attribute from the
-// surface there. WSR queries the KCL's triangles; one plane per tick under
-// the ball is the plane runs' model carried along the line. On a flat or
+// its normal from the slope of the yard ahead of it, x .. x + 1 (query says
+// why), its attribute from the surface there. WSR queries the KCL's
+// triangles; one plane per tick under the ball is the plane runs' model
+// carried along the line. On a flat or
 // uniformly tilted profile that plane is plane()'s, so the run is plane()'s
 // (tools/test-solver.mjs: within 1e-9 yd of plane(attr, 0) for every club,
 // and the 3-degree rows of wsr-ground-phase.md section 8).
@@ -127,9 +128,16 @@ function profileGround(profile) {
     heightAt: (x) => hAt(x / YD) * YD,
     query(x, y, z, r, hit) {
       const xs = x / YD;
-      // the normal: norm([-slope, 1, 0]); the signed distance to the plane
+      // the normal: norm([-slope, 1, 0]) with the slope of the yard ahead of
+      // the ball, x .. x + 1: the ground it rests on and moves onto. The
+      // ground behind it is not under it: centred on x (x - 1 .. x + 1) the
+      // slope read a drop within 1 yd behind the ball as a plane tilted past
+      // 65 degrees and the launch reflected off it (a 10 yd drop 0.5 yd
+      // behind sent a full driver to -98 yd; on the cliff tops of H2, H4, H7,
+      // H8 and H17, 62 of 24,953 on-course cells, every club flew backwards
+      // and the solver found no reach). The signed distance to the plane
       // through (x, h(x)) is (y - h) n.y
-      const a = 0 - (hAt(xs + 1) - hAt(xs - 1)) / 2, m = Math.sqrt(a * a + 1 * 1 + 0 * 0);
+      const a = 0 - (hAt(xs + 1) - hAt(xs)), m = Math.sqrt(a * a + 1 * 1 + 0 * 0);
       const depth = r - (y - hAt(xs) * YD) * (1 / m);
       if (depth <= 0) return 0;
       hit.attr = SURFACE_ATTR[profile.surfaceAt(xs)] ?? SURFACE_ATTR.fairway;
