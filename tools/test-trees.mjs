@@ -35,12 +35,14 @@
 //        the fronds, the full 7-iron into them; a level path 0.2 yd either
 //        side of each edge of the band
 //  c. treesAlong: the line's frame (s along, l right) for a ball and bearing;
-//     off-course trees and the v13 seeds (auto, no kind) skipped; a player's
-//     marker is a median broadleaf on the ground under it; z against the
-//     ball's ground
+//     off-course trees kept (WSR collides with every tree it places), the
+//     v13 seeds (auto, no kind) skipped; a player's marker is a median
+//     broadleaf on the ground under it; z against the ball's ground
 //  d. Hole 7 over the committed terrain, its tee, its most-seen pin, its
 //     trees and scale 2.143: the App's default line (tee to pin) runs along
-//     the out-of-bounds edge, no tree within 3 yd of it; the full driver
+//     the out-of-bounds edge, no on-course tree within 3 yd of it, and the
+//     full driver passes under the off tree t7-25's canopy by 12.4 yd; the
+//     full driver
 //     aimed through the middle tree NOTES[7] plays right of (t7-18) goes
 //     into its canopy at ~198 yd; rotated right in 0.25 degree steps, the
 //     first clear line passes 12.8 yd right of that trunk, and the gap holds
@@ -182,7 +184,7 @@ const level = { heightAt: () => 0, surfaceAt: () => "fairway" };
   const at90 = treesAlong(markers, { ball, bearing: 90, scale, groundAt: ground });
   const get = (list, id) => list.find((t) => t.id === id);
   const near = (a, b) => Math.abs(a - b) < 1e-9;
-  ok(at0.length === 3 && !get(at0, "off") && !get(at0, "seed"), `c. kept ${at0.map((t) => t.id).join(", ")}, expected n, e, 7`);
+  ok(at0.length === 4 && get(at0, "off") && !get(at0, "seed"), `c. kept ${at0.map((t) => t.id).join(", ")}, expected n, e, off, 7`);
   ok(near(get(at0, "n").s, 40) && near(get(at0, "n").l, 0) && near(get(at0, "e").s, 0) && near(get(at0, "e").l, 40), "c. bearing 0: north is ahead, east is right");
   ok(near(get(at90, "e").s, 40) && near(get(at90, "e").l, 0) && near(get(at90, "n").l, -40), "c. bearing 90: east is ahead, north is left");
   const own = get(at0, 7);
@@ -212,9 +214,9 @@ const h7 = holeOf(7);
   const { d, meta, pin } = h7, tee = d.tee;
   ok(d.scale === 2.143 && pin.id === "d7-s1", `d. H7 scale ${d.scale}, pin ${pin.id}`);
   const b0 = bearingTo(tee, pin), c0 = lineCtx(h7, tee, b0);
-  const def = fly("driver", c0.trees, { ctx: c0 });
+  const def = expect(fly("driver", c0.trees, { ctx: c0 }), "under", { min: 10 }, "d. H7's default line, full driver");
   const t23 = c0.trees.find((t) => t.id === "t7-23");
-  ok(def.kind === "clear" && def.tree === null, `d. H7's default line, full driver: ${say(def)}, expected no tree within 3 yd`);
+  ok(def.tree === "t7-25" && def.at > 225 && def.at < 240, `d. H7's default line, full driver: ${say(def)}, expected under the off tree t7-25 at ~231 yd`);
   const m18 = meta.markers.find((m) => m.id === "t7-18"), b18 = bearingTo(tee, m18);
   const s18 = Math.hypot((m18.x - tee.x) * MAP_W, (m18.y - tee.y) * MAP_H) * d.scale;
   const c18 = lineCtx(h7, tee, b18);
@@ -234,7 +236,7 @@ const h7 = holeOf(7);
   const r18 = ask(DEFAULT_CLUBS, Math.floor(stopAt(byId.driver, 4, 0, c18)), c18).recs.find((r) => r.club.id === "driver");
   const bR = b18 + first.deg, cR = lineCtx(h7, tee, bR), rR = ask(DEFAULT_CLUBS, Math.floor(stopAt(byId.driver, 4, 0, cR)), cR).recs.find((r) => r.club.id === "driver");
   ok(r18 && r18.tree?.id === "t7-18" && r18.tree.kind === "canopy" && rR && rR.tree === null, `d. H7 solve: through t7-18 ${r18 ? JSON.stringify(r18.tree) : "no driver rec"}; shifted ${rR ? JSON.stringify(rR.tree) : "no driver rec"}`);
-  console.log(`H7: the default line (tee to ${pin.id}, ${b0.toFixed(1)} deg) runs along the OB edge; the nearest on-course tree t7-23 stands ${(-t23.l).toFixed(1)} yd left of it at ${t23.s.toFixed(0)} yd: the full driver ${say(def)}. Through t7-18 (${b18.toFixed(1)} deg, the trunk ${s18.toFixed(0)} yd out, its base ${(-c18.trees.find((t) => t.id === "t7-18").z).toFixed(1)} yd below the tee): ${say(hit)}. Rotated right: clean from +${first.deg} deg, ${first.off.toFixed(1)} yd right of the trunk (${say(first.c)}), until +${until.deg} deg, ${until.off.toFixed(1)} yd (${say(until.c)})`);
+  console.log(`H7: the default line (tee to ${pin.id}, ${b0.toFixed(1)} deg) runs along the OB edge, the nearest on-course tree t7-23 ${(-t23.l).toFixed(1)} yd left of it at ${t23.s.toFixed(0)} yd, under the off tree t7-25's canopy: the full driver ${say(def)}. Through t7-18 (${b18.toFixed(1)} deg, the trunk ${s18.toFixed(0)} yd out, its base ${(-c18.trees.find((t) => t.id === "t7-18").z).toFixed(1)} yd below the tee): ${say(hit)}. Rotated right: clean from +${first.deg} deg, ${first.off.toFixed(1)} yd right of the trunk (${say(first.c)}), until +${until.deg} deg, ${until.off.toFixed(1)} yd (${say(until.c)})`);
 }
 const h19 = holeOf(19);
 {
@@ -264,7 +266,7 @@ const h19 = holeOf(19);
     ts.sort((p, q) => p - q);
     const mean = ts.reduce((s, v) => s + v, 0) / ts.length, p90 = ts[Math.floor(ts.length * 0.9)];
     ok(mean < 15 && p90 < 15, `e. H${n}: a 7-club solve with ${ctx.trees.length} trees takes ${mean.toFixed(2)} ms mean, ${p90.toFixed(2)} p90 (budget 15)`);
-    console.log(`budget: H${n}'s tee line with its ${ctx.trees.length} on-course trees, a 7-club solve ${mean.toFixed(2)} ms mean, ${p90.toFixed(2)} p90, ${ts[ts.length - 1].toFixed(2)} max over ${ts.length} (budget 15 ms)`);
+    console.log(`budget: H${n}'s tee line with its ${ctx.trees.length} trees, a 7-club solve ${mean.toFixed(2)} ms mean, ${p90.toFixed(2)} p90, ${ts[ts.length - 1].toFixed(2)} max over ${ts.length} (budget 15 ms)`);
   }
 }
 

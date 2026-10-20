@@ -31,9 +31,17 @@
 //     centred on the trunk (the mesh's fronds are narrower above 140 sy, 44 sx
 //     and less, and sit 15 sz off the trunk along the yaw): an approximation
 // These are WSR's; Nintendo Switch Sports is another engine and may differ
-// (its "Hit a Tree!" toast has no WSR counterpart). A ball through the outer
-// half of a drawn broadleaf crown is untouched if the Switch kept the sphere:
-// the sphere sits well inside the crown the minimap paints.
+// (its "Hit a Tree!" toast has no WSR counterpart). Against the canopy the
+// minimap paints (build-derived: 68 sx across, its centre 54 sx NORTH of the
+// trunk) the broadleaf's sphere is narrower, 0.72 of the painted radius at
+// the median of the 327 on-course broadleaves (p10 0.67, max 0.95), but it
+// is centred on the trunk, so its footprint runs out past the painted
+// crown's southern edge on every one of them (median 50 u) and leaves the
+// crown's northern half along the trunk's axis clear (0.54 of its extent at
+// the median): a line through a drawn crown's northern edge can be clear,
+// one along its southern edge is not, if the Switch kept the sphere. The
+// research doc's "outer half untouched" is against the 3D model's larger
+// drawn crown (~90-96 u at scale 1), not the map's.
 import { YD } from "./wsrsim.js";
 
 export const TREE_SHAPES = {
@@ -62,10 +70,18 @@ const MAP_W = 250, MAP_H = 304;
 //   scale     yd per map px; groundAt(x, y) = the ground's height on the
 //             hole's datum at map fractions (src/terrain.js heightAt), null
 //             where the terrain has none
-// Skipped: a tree off the course (`off`: a ball there is out of bounds
-// already) and an auto marker without a kind or scale (the v13 hand-placed
-// seeds an old install keeps until derived.json's trees reach it). A
-// player's marker is OWN_TREE on the ground under it. Heights: heightAt is
+// Skipped: an auto marker without a kind or scale (the v13 hand-placed
+// seeds an old install keeps until derived.json's trees reach it). The
+// off-course trees (`off`) are kept: WSR collides with every tree it
+// places, and 61 of the 814 reach over course ground with their collision
+// canopy (the tap rule and the Guide's count skip them, a different
+// question). None of them stops a full-power flight from a tee to its
+// most-seen pin (H7's default line passes under t7-25 by 12.4 yd), but
+// other lines from the same tees that land on course fly through one: H13
+// at 341 deg, the driver at 1.5 bars into t13-21's canopy at 84 yd; H15 at
+// 13 deg through t15-36; H16 at 6 deg through t16-2; H19 at 269 deg through
+// t19-27 (the R-B3 review's scan). A player's marker is OWN_TREE on the
+// ground under it. Heights: heightAt is
 // within 0.02 yd of the mesh at the median point but reads part way down
 // within a sample (2 map px) of a cliff or a bank down to water (the 99th
 // percentile 2.4 yd, the worst 20 yd at H7's cliffs), so a ball right at
@@ -73,13 +89,8 @@ const MAP_W = 250, MAP_H = 304;
 // marker there stands a little low). A tree's own z is used as shipped,
 // never the ground under its trunk: WSR stands the shapes on the PMP height,
 // which on 16 of the 458 on-course trees is over a yard off the terrain's
-// height there (13 below it, 3 above; 4.5 yd below on H7). WSR tests the
-// off-course trees too, and 61 of the 814 reach over course ground with
-// their collision canopy, but none of them stops a full-power flight from
-// any tee to its most-seen pin: with them, every club's would only pass
-// over or under one (the driver under t7-25 and t11-57, every club over
-// t13-27, five over or under t16-0). -> null when the ball's spot has no
-// height.
+// height there through heightAt (13 below it, 3 above; 4.5 yd below on H7).
+// -> null when the ball's spot has no height.
 export function treesAlong(markers, { ball, bearing, scale, groundAt }) {
   if (!ball || !(scale > 0) || bearing == null) return null;
   const h0 = groundAt(ball.x, ball.y);
@@ -89,7 +100,7 @@ export function treesAlong(markers, { ball, bearing, scale, groundAt }) {
   for (const m of markers ?? []) {
     let t;
     if (m.auto) {
-      if (m.off || !TREE_SHAPES[m.kind] || !(m.size > 0)) continue;
+      if (!TREE_SHAPES[m.kind] || !(m.size > 0)) continue;
       t = { kind: m.kind, sx: m.size, sy: m.sy > 0 ? m.sy : m.size, z: Number.isFinite(m.z) ? m.z : groundAt(m.x, m.y), own: false };
     } else t = { ...OWN_TREE, z: groundAt(m.x, m.y), own: true };
     // east and south of the ball, yd; the line runs (sin, -cos), its right (cos, sin)
