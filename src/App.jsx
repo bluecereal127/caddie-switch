@@ -5,6 +5,7 @@ import { MAP_XFORM_V5 } from "./mapxform.js";
 import { applyDerivedHole, isPipelinePin } from "./derivedMerge.js";
 import { DEFAULT_CLUBS, GRID_N, emptyGreen, solvePutt, fitClub, solve, stopAt, LANDED, MIN_BARS, SHAPE_LABEL } from "./model.js";
 import { loadTerrain, classAt, lieOf, heightAt } from "./terrain.js";
+import { treesAlong } from "./trees.js";
 import { contourDataUrl } from "./relief.js";
 import { MAP_SCALES, mapScaleOf, mapFileUrl, loadMapIndex, preloadImage } from "./mapScale.js";
 import { scrollFor } from "./mapView.js";
@@ -155,6 +156,14 @@ const recRollLine = (r, dist) => {
   const miss = r.approx ? ` · no power stops it at ${dist} yd: the closest stops ${Math.round(Math.abs(off))} yd ${off > 0 ? "past" : "short"}` : "";
   return `${head} · ${lands}${at ? `, ${at}` : ""} · ${roll}${stops}${miss}`;
 };
+// A tree-hit rec's line (src/model.js checkTrees): the tree, how the flight
+// meets it, and the best clean rec as the alternative with how it passes that
+// tree. The shapes are Wii Sports Resort's, the flight's heights WSR-shaped
+// (src/trees.js); a player's own marker is checked as a mid-size broadleaf.
+const TREE_INK = "#8a6d1a";
+const TREE_HIT = { canopy: "through the canopy", trunk: "into the trunk" };
+const ALT_HOW = { over: "clears it (over)", under: "clears it (under)", clear: "passes beside it" };
+const recTreeLine = (t) => `🌲 ${t.own ? "your tree marker (as a mid-size broadleaf)" : t.shape} at ~${Math.round(t.at)} yd: ${TREE_HIT[t.kind]}${t.alt ? ` — ${t.alt.club} at ${fmtPow(t.alt.power)} ${ALT_HOW[t.alt.how]}` : " — every club that stops there meets a tree or is blocked"}`;
 const holeCourse = (n) => COURSES.find((c) => c.holes.includes(n))?.name ?? "";
 const scoreName = (d) => d <= -3 ? "Albatross" : d === -2 ? "Eagle" : d === -1 ? "Birdie" : d === 0 ? "Par" : d === 1 ? "Bogey" : d === 2 ? "Dbl bogey" : `+${d}`;
 const fmtVs = (d) => (d > 0 ? `+${d}` : d === 0 ? "E" : `${d}`);
@@ -462,7 +471,7 @@ function useHoleMapSrc(n, scale) {
 // marks keep their fitted size on screen (each drawn at 1 / zoom about its
 // spot, so 4x shows more map around a pin, not a pin twice the size) and the
 // wind badge stays in the viewport's corner, where the fitted map has it.
-function HoleMap({ holeNum, line, onLine, markers, onMarkers, markerMode, aimPreview, cornerMode, onCorner, pins = [], curPinId = null, pinMode = false, onPins, distLabel = null, windBadge = null, teePos = null, teeOnlinePos = null, stopMarker = null, landMarker = null, overlaySrc = null, mapSrc = null, onMapError, zoom = 1 }) {
+function HoleMap({ holeNum, line, onLine, markers, onMarkers, markerMode, aimPreview, cornerMode, onCorner, pins = [], curPinId = null, pinMode = false, onPins, distLabel = null, windBadge = null, teePos = null, teeOnlinePos = null, stopMarker = null, landMarker = null, treeMarker = null, overlaySrc = null, mapSrc = null, onMapError, zoom = 1 }) {
   const imgRef = useRef(null);
   const src = mapSrc ?? HOLE_MAPS[holeNum];
   const pinLabelList = pinLabels(pins);
@@ -760,6 +769,15 @@ function HoleMap({ holeNum, line, onLine, markers, onMarkers, markerMode, aimPre
             inside them */}
         {landMarker && (
           <path transform={at(landMarker.x * 100, landMarker.y * 100)} d="M0,-2 L1.7,0 0,2 -1.7,0 Z" fill={T.sand} stroke={T.ink} strokeWidth="0.4" />
+        )}
+        {/* the selected rec's tree, when its flight goes into the trunk or
+            through the canopy (src/trees.js): a ring at the trunk, red over
+            white so it reads on a canopy and on the fairway alike */}
+        {treeMarker && (
+          <g transform={at(treeMarker.x * 100, treeMarker.y * 100)}>
+            <circle r="2.6" fill="none" stroke="#fff" strokeWidth="1.4" />
+            <circle r="2.6" fill="none" stroke={T.flag} strokeWidth="0.7" />
+          </g>
         )}
         {!magnified && windMark}
         {pins.map((p, i) => {
@@ -1138,7 +1156,17 @@ export default function App() {
   // course itself, the lower tier included)
   const teeUpper = holesMeta[hole]?.teeOnline?.upper ?? null;
   const ballLift = teeUpper && ballOn(line.ball, teeUpper) ? UPPER_TIER_YD : 0;
-  const solveCtx = useMemo(() => ({ surfaceAt, heightAt: heightAlong, ballLift }), [surfaceAt, heightAlong, ballLift]);
+  // the hole's trees on the line's frame (src/trees.js treesAlong): the
+  // pipeline's on-course trees with their kind, scales and base height, and
+  // your own markers as a mid-size broadleaf on the ground under them; the
+  // solver checks every club's flight against them (src/model.js, "trees").
+  // null without terrain, line or scale, or a height under the ball: no check
+  const holeMarkers = holesMeta[hole]?.markers;
+  const treesOnLine = useMemo(() => {
+    if (!terrain || !scale || !line.ball || shotBearing == null) return null;
+    return treesAlong(holeMarkers, { ball: line.ball, bearing: shotBearing, scale, groundAt: (x, y) => heightAt(terrain, x, y) });
+  }, [terrain, scale, line.ball, shotBearing, holeMarkers]);
+  const solveCtx = useMemo(() => ({ surfaceAt, heightAt: heightAlong, ballLift, trees: treesOnLine }), [surfaceAt, heightAlong, ballLift, treesOnLine]);
   // the readouts under the distance field: the ball's height against the tee
   // (the heights' datum is the WSR start, the local tee spot; the ball's lift
   // included) and the target's against the ball, the target being the point
@@ -1199,7 +1227,7 @@ export default function App() {
   }, [maxReach, dist, lie]);
 
   // aim preview on map: rotate best rec's aim offset around the ball
-  const bestRec = recs.find((r) => !r.blocked) ?? recs[0] ?? null;
+  const bestRec = recs.find((r) => !r.blocked && !r.tree) ?? recs.find((r) => !r.blocked) ?? recs[0] ?? null;
   const aimPreview = useMemo(() => {
     if (!geo || !scale || !bestRec || !line.ball || !line.target) return null;
     const th = (geo.bearing * Math.PI) / 180;
@@ -1222,6 +1250,12 @@ export default function App() {
     return { stop: at(r?.elev ? r.stop : dist), land: r?.carry > 0 ? at(r.carry) : null };
   }, [selRec, recs, scale, line.ball, shotBearing, dist]);
   const stopPoint = recMarks?.stop ?? null, landPoint = recMarks?.land ?? null;
+  // and the trunk of the tree its flight hits, if it does
+  const treePoint = useMemo(() => {
+    const t = selRec != null ? recs[selRec]?.tree : null;
+    const m = t ? (holeMarkers ?? []).find((x) => x.id === t.id) : null;
+    return m ? { x: m.x, y: m.y } : null;
+  }, [selRec, recs, holeMarkers]);
 
   const greenNow = holesMeta[hole]?.green;
   const greenYd = useMemo(() => {
@@ -1462,7 +1496,7 @@ export default function App() {
                     distLabel={geo ? (scale ? `${Math.round(geo.srcPx * scale)} yd` : "? yd") : null}
                     teePos={holesMeta[hole].tee ?? null}
                     teeOnlinePos={holesMeta[hole].teeOnline ?? null}
-                    stopMarker={stopPoint} landMarker={landPoint}
+                    stopMarker={stopPoint} landMarker={landPoint} treeMarker={treePoint}
                     zoom={mapScale / 2} />
                 </div>
                 <div className="grid grid-cols-2 gap-2 text-xs">
@@ -1703,16 +1737,23 @@ export default function App() {
               )}
               <div className="space-y-3">
                 {recs.map((r, i) => {
-                  const isBest = i === 0 && !r.blocked;
+                  const isBest = i === 0 && !r.blocked && !r.tree;
                   return (
                     <div key={r.club.id} onClick={() => setSelRec(selRec === i ? null : i)}
                       className="rounded-2xl border-2 p-4 relative overflow-hidden cursor-pointer"
-                      style={{ borderColor: r.blocked ? T.flag : selRec === i ? T.turfDeep : isBest ? T.turf : T.line,
-                        background: r.blocked ? "#FFF6F6" : selRec === i ? "#F3FAF5" : "#fff",
+                      style={{ borderColor: r.blocked ? T.flag : selRec === i ? T.turfDeep : r.tree ? TREE_INK : isBest ? T.turf : T.line,
+                        background: r.blocked ? "#FFF6F6" : selRec === i ? "#F3FAF5" : r.tree ? "#FFFBF0" : "#fff",
                         boxShadow: selRec === i ? `0 0 0 1px ${T.turfDeep}` : undefined }}>
                       {isBest && <div className="absolute top-0 right-0 disp text-[10px] font-bold px-2 py-1 rounded-bl-xl text-white" style={{ background: T.turf }}>BEST</div>}
                       {r.blocked && <div className="absolute top-0 right-0 disp text-[10px] font-bold px-2 py-1 rounded-bl-xl text-white" style={{ background: T.flag }}>🌲 BLOCKED</div>}
-                      <div className="disp text-base font-bold">{r.club.name}{selRec === i && <span className="text-[10px] font-semibold ml-2 opacity-60">● stop · ◆ landing shown on map</span>}</div>
+                      {r.tree && !r.blocked && <div className="absolute top-0 right-0 disp text-[10px] font-bold px-2 py-1 rounded-bl-xl text-white" style={{ background: TREE_INK }}>🌲 TREE</div>}
+                      <div className="disp text-base font-bold">{r.club.name}{selRec === i && <span className="text-[10px] font-semibold ml-2 opacity-60">● stop · ◆ landing{r.tree ? " · ◯ tree" : ""} shown on map</span>}</div>
+                      {r.tree && (
+                        <div className="text-[11px] font-semibold mt-0.5" style={{ color: TREE_INK }}
+                          title="Checked against Wii Sports Resort's tree collision shapes (a trunk and a canopy per tree, from the game's code) along this club's flight; the heights are WSR's, so the Switch may differ">
+                          {recTreeLine(r.tree)}
+                        </div>
+                      )}
                       {r.blocked && (
                         <div className="text-[11px] font-semibold mt-0.5 flex items-center gap-2" style={{ color: T.flag }}>
                           <span>Marked on stroke {r.blocked.stroke}: {r.blocked.note}</span>
@@ -1763,7 +1804,7 @@ export default function App() {
                 })}
               </div>
               <p className="text-[11px] opacity-60 mt-3">
-                The gold dashed line on the map previews the best shot's wind-corrected aim point. Tree pins you drop are saved to this hole forever.
+                The gold dashed line on the map previews the best shot's wind-corrected aim point. Tree pins you drop are saved to this hole forever, and the solver checks every shot against them as a mid-size tree.
               </p>
               </>}
             </section>
@@ -2207,7 +2248,7 @@ export default function App() {
                   <div>4. OB / water: +1 stroke, replay from the same spot.</div>
                   <div>5. Minimap dots = flat-terrain landing points. The solver doesn't assume flat ground: it flies each club over the hole's real terrain along your line (heights from Wii Sports Resort's course meshes), so downhill carries longer and uphill shorter, and the bounce and roll follow the slope. Each rec card says how far above or below you the ball lands, the map marks its landing ◆ beside the stop ●, and under the distance you see the ball's height against the tee and the target's against you.</div>
                   <div>6. Wind arrow colour, measured on the captures: blue through 11 mph, lime from 13 to 22, pink from 24 (12 and 23 mph never came up). The dials here use the same colours, split at 12 and 24.</div>
-                  <div>7. Trajectory: driver lowest → spoon → irons rising with number → wedge highest. Low clubs duck under branches; high clubs clear them and feel more wind.</div>
+                  <div>7. Trajectory: driver lowest → spoon → irons rising with number → wedge highest. Low clubs duck under branches; high clubs clear them and feel more wind. The solver flies every club that can stop at your distance past the course's trees, using Wii Sports Resort's own tree collision shapes (each tree a trunk plus a canopy: a ball for the round trees, a cone for the dark pointed ones, a band of fronds for the palms, sized by the tree; your own tree markers count as a mid-size round tree) and the flight's heights from WSR. A shot into a trunk or through a canopy, where the ball drops nearly dead, gets a 🌲 TREE badge, ranks below the clear shots and names the best one that clears that tree: a lofted iron over the canopy, or a driver or spoon under the branches. Tap it to ring the tree on the map. The collision canopy sits well inside the crown the map paints, so a line through the outer edge of a drawn tree can be clear. Treat it as WSR's answer until the Switch confirms it.</div>
                   <div>8. Wind comes in exactly 8 directions (N/NE/E/SE/S/SW/W/NW) at integer mph, observed 0–31. The dial snaps to the 8 when set "as on minimap".</div>
                   <div>9. All distances here are STOP distances (carry + roll), and the roll is not a fixed share. In Wii Sports Resort's physics (decoded from the game) the carry grows in step with power but the roll comes from the landing: a flatter, slower landing rolls further, so a driver rolls ~39 yd at 4 bars and ~54 at 1 bar; it rolls ~69 on a green, ~29 in rough and next to nothing in a bunker, and an iron's first bounce on a green is damped. Backspin (irons and wedge, from stopping the swing after impact) can pull a full 9-iron back ~10 yd where it would roll ~10 on without, so the cards show that range. The solver uses WSR's stop-vs-power curve for each club, scaled to your logged distances (WSR-shaped until Switch sweeps calibrate it), and reads where each shot lands from the course map. The minimap dots show flat-ground carry.</div>
                   <div>10. You can physically swing past a capped bar — it goes red and the ball curves to a RANDOM side, more the deeper into the red (WSR: up to ~35 yd for the driver, ~22 yd for a 7-iron). On tee and fairway the red adds no distance; from rough or sand WSR adds up to one more bar (untested on the Switch). The solver never plans on it and flags the recs that need the full bar.</div>

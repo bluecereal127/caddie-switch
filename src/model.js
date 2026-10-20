@@ -18,7 +18,8 @@
 // The shape is level ground; with the course's terrain along the shot line
 // the solver flies WSR's ball over it instead ("elevation" below).
 import { WSR_SHAPE, SHAPE_Q } from "./wsrShape.js";
-import { run } from "./wsrsim.js";
+import { run, CLUBS } from "./wsrsim.js";
+import { treeCheck, TREE_SHAPES } from "./trees.js";
 
 // The seed clubs: a = full-power (4-bar) stop on fairway / 4, from the Switch
 // guide's maxes (driver 250, spoon 200, 3i 175, 5i 155, 7i 135, 9i 100, wedge
@@ -229,7 +230,8 @@ function profHeight(prof, yd) {
   return h[i] + (h[i + 1] - h[i]) * (u - i);
 }
 
-// One club over the profile: bars -> { p, carry, stop } in the Switch's yd.
+// One club over the profile: bars -> { p, carry, stop } in the Switch's yd,
+// and with trace also the run's path (WSR's yd) and k, for the tree check.
 // The ball sits ballLift yd above the profile's origin at launch.
 function flyer(cl, wAlong, prof, ballLift) {
   const k = (4 * cl.a * (1 + cl.h * wAlong)) / WSR_SHAPE[cl.id].stopYd;
@@ -238,9 +240,9 @@ function flyer(cl, wAlong, prof, ballLift) {
     heightAt: (x) => profHeight(prof, k * x),
     surfaceAt: (x) => { const i = Math.round((k * x) / PROF_STEP) + prof.i0; return lies[i < 0 ? 0 : i >= n ? n - 1 : i]; },
   };
-  return (bars) => {
-    const o = run({ club: cl.id, q: bars / 4, profile, ballLift, trace: false });
-    return { p: bars, carry: k * o.carry, stop: k * o.stop };
+  return (bars, trace = false) => {
+    const o = run({ club: cl.id, q: bars / 4, profile, ballLift, trace });
+    return { p: bars, carry: k * o.carry, stop: k * o.stop, ...(trace ? { path: o.path, k } : {}) };
   };
 }
 
@@ -299,6 +301,71 @@ function stopAt(club, bars, wAlong = 0, ctx = {}) {
   const prof = typeof ctx.heightAt === "function" && WSR_SHAPE[club.id] ? lineProfile(ctx) : null;
   if (!prof || !(club.a * (1 + club.h * wAlong) > 0)) return landedStop(club, bars, wAlong, ctx.surfaceAt ?? null);
   return flyer(club, wAlong, prof, Number.isFinite(ctx.ballLift) ? ctx.ballLift : 0)(bars).stop;
+}
+
+/* ---------------- trees ---------------- */
+// With ctx.trees (src/trees.js treesAlong: the hole's trees on the shot
+// line's frame, the App's from the pipeline's tree markers and the player's
+// own) solve checks every club's rec, not only the three it shows, against
+// WSR's tree collision shapes (treeCheck). A rec whose flight goes into a
+// trunk or through a canopy (the ball drops nearly dead under the tree) gets
+// `tree` and TREE_PENALTY on its score; its card names the best clean rec as
+// the alternative (a lofted iron over the canopy, a driver or spoon under the
+// branches) and how it passes that tree.
+
+// The flight a rec's tree check flies: the run's path at `bars`, k (the
+// Switch's yd per WSR yd along the shot), the carry it lands at and ballZ,
+// the ball's height at launch above the ground under it (yd). Over the
+// terrain it is the profile flight the solver refines on, with the same k, so
+// the path lands at the rec's carry; without terrain the flat run, scaled
+// to carryOf (k = carryOf / WSR's carry). The heights are WSR's either way,
+// unscaled (WSR-shaped: its launch angles 10 / 11 / 19 / 23 / 24 / 30 / 43
+// degrees and lift give full-power apexes of 22.7 / 22.8 / 28.2 / 28.4 /
+// 22.9 / 22.1 / 16.2 yd, driver to wedge, until logged shots calibrate the
+// trajectories), with no wind. null for a club WSR lacks.
+function flightOf(club, bars, wAlong = 0, ctx = {}) {
+  if (!CLUBS[club.id]) return null;
+  const prof = typeof ctx.heightAt === "function" && WSR_SHAPE[club.id] ? lineProfile(ctx) : null;
+  const ballLift = Number.isFinite(ctx.ballLift) ? ctx.ballLift : 0;
+  if (prof && club.a * (1 + club.h * wAlong) > 0) {
+    const o = flyer(club, wAlong, prof, ballLift)(bars, true);
+    return { path: o.path, k: o.k, carry: o.carry, ballZ: profHeight(prof, 0) + ballLift };
+  }
+  const o = run({ club: club.id, q: bars / 4 }), carry = carryOf(club, bars, wAlong);
+  return { path: o.path, k: o.carry > 0 ? carry / o.carry : 1, carry, ballZ: ballLift };
+}
+
+// A tree-hit rec sorts below every clean one (a score is |frac - 0.8|, +0.5
+// past 0.97 of the cap and +1 approx: 1.7 at most) and above one the player
+// marked blocked (+10)
+const TREE_PENALTY = 5;
+const treeHit = (c) => c.kind === "canopy" || c.kind === "trunk";
+// recs -> each hit one gets tree = { kind ("canopy" / "trunk"), at (yd along
+// the flight), id (the tree marker's), shape (broadleaf, conifer, palm), own
+// (a player's marker, checked as a median broadleaf), alt } and the
+// penalty; alt = the clean rec with the best score that the player has not
+// blocked, { club (name), power, how: "over" / "under" the canopy of that
+// same tree, or "clear" of it } (null when every rec hits a tree or is
+// blocked). One more flight per rec, traced: a 7-club solve from the 21 tees
+// to their pins takes 4.33 ms mean, 7.5 p90 with the trees against 3.80 and
+// 6.6 without (H7, 31 trees: 4.62 against 4.01; tools/test-trees.mjs keeps
+// H7 and H19 inside the 15 ms budget).
+function checkTrees(recs, trees, wAlong, ctx) {
+  const fl = new Map(), ck = new Map();
+  for (const r of recs) {
+    const f = flightOf(r.club, r.power, wAlong, ctx);
+    if (!f) continue;
+    fl.set(r, f); ck.set(r, treeCheck(f.path, trees, { ...f, aim: r.aim }));
+  }
+  const alt = recs.filter((r) => ck.has(r) && !treeHit(ck.get(r)) && !r.blocked).reduce((b, r) => (!b || r.score < b.score ? r : b), null);
+  for (const r of recs) {
+    const c = ck.get(r);
+    if (!c || !treeHit(c)) continue;
+    const t = trees.find((x) => x.id === c.tree), fa = alt && fl.get(alt);
+    r.score += TREE_PENALTY;
+    r.tree = { kind: c.kind, at: c.at, id: c.tree, shape: TREE_SHAPES[t.kind].name, own: !!t.own,
+      alt: alt ? { club: alt.club.name, power: alt.power, how: treeCheck(fa.path, [t], { ...fa, aim: alt.aim }).kind } : null };
+  }
 }
 
 /* ---------------- putting ---------------- */
@@ -410,10 +477,12 @@ function fitClub(club, shots) {
 // line or scale; ctx.heightAt(yd) -> the ground's height there, yd relative to
 // the ground under the ball (null where the terrain has no data), which turns
 // on the elevation above; ctx.ballLift = how far the ball sits above that
-// ground, yd (0; the online platform's upper tier). ctx is where later inputs
-// go (the trees).
+// ground, yd (0; the online platform's upper tier); ctx.trees = the trees on
+// the line's frame (src/trees.js treesAlong), which turns on the tree check
+// ("trees" above).
 // A rec: { club, power, drift, aim, frac, cap, score, calibrated, blocked,
-// carry, roll, surface, landsOn, rollSpin, red, elev }, and with elevation
+// carry, roll, surface, landsOn, rollSpin, red, elev, tree }, tree null
+// unless the flight hits one (checkTrees), and with elevation
 // (elev true) also stop (= carry + roll, within STOP_TOL of dist unless
 // approx), dh / dhStop = the ground's height at the carry / the stop minus
 // the ball's (yd, + uphill) and approx.
@@ -425,6 +494,7 @@ function solve(clubs, inputs, blockedRules, ctx = {}) {
   const readLie = (yd) => (ctx.surfaceAt ? ctx.surfaceAt(yd) ?? null : null);
   const prof = typeof ctx.heightAt === "function" ? lineProfile(ctx) : null;
   const ballLift = Number.isFinite(ctx.ballLift) ? ctx.ballLift : 0;
+  const trees = Array.isArray(ctx.trees) && ctx.trees.length ? ctx.trees : null;
   const out = [];
   let maxReach = null;
   const reach = (yd, cl) => { if (!maxReach || yd > maxReach.yd) maxReach = { yd, club: cl.name }; };
@@ -482,7 +552,7 @@ function solve(clubs, inputs, blockedRules, ctx = {}) {
       const roll = stopOf(cl, p, surface, 0, wAlong) - carry;
       const rollSpin = spinsBack(cl) ? stopOf(cl, p, surface, 1, wAlong) - carry : null;
       out.push({ club: cl, power: p, drift: best.drift, aim: best.aim, frac: best.frac, cap, score: best.score, calibrated: cl.shots, blocked: best.rule || null,
-        carry, roll, surface, landsOn, rollSpin, red: p >= cap - RED_MARGIN, elev: false });
+        carry, roll, surface, landsOn, rollSpin, red: p >= cap - RED_MARGIN, elev: false, tree: null });
       return;
     }
     // Over the terrain: the cap's flight is the club's reach (its surfaces
@@ -517,12 +587,14 @@ function solve(clubs, inputs, blockedRules, ctx = {}) {
     const rollSpin = spinsBack(cl) ? roll - (stopOf(cl, p, surface, 0, wAlong) - stopOf(cl, p, surface, 1, wAlong)) : null;
     out.push({ club: cl, power: p, drift: sc.drift, aim: sc.aim, frac: sc.frac, cap, score: sc.score + (approx ? APPROX_PENALTY : 0), calibrated: cl.shots, blocked: sc.rule || null,
       carry: r.carry, roll, surface, landsOn, rollSpin, red: p >= cap - RED_MARGIN,
-      elev: true, stop: r.stop, dh: profHeight(prof, r.carry) - h0, dhStop: profHeight(prof, r.stop) - h0, approx });
+      elev: true, stop: r.stop, dh: profHeight(prof, r.carry) - h0, dhStop: profHeight(prof, r.stop) - h0, approx, tree: null });
   });
+  if (trees) checkTrees(out, trees, wAlong, ctx);
   return { recs: out.sort((x, y) => x.score - y.score).slice(0, 3), wAlong, wCross, maxReach };
 }
 
 export {
   DEFAULT_CLUBS, BUNKER_CAPS, capFor, SHAPE_LABEL, LANDED, MIN_BARS, landingSurface, shapeAt, stopOf, carryOf, landedStop, stopAt, STOP_TOL,
+  flightOf, TREE_PENALTY,
   GRID_N, emptyGreen, MU, SLOPE_G, CUP_R, CUP_V, simPutt, solvePutt, fitClub, solve,
 };
