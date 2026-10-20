@@ -143,7 +143,7 @@ p1    = curve(raw)  via 0x80407fb4 -> slot 7 (0x80409f60), clamped >= 0:
           raw >= 1: c = (cap >= 1 ? P40 : 1.0);  p1 = max(1, 1 + 0.25 * (raw - c)/(P44 - c))   (max 1.25 at raw 1.3)
 cap   = slot 16: 1.0; rough P48 = 0.75; bunker P50 = 0.25 / 0.25 / 0.5 / 0.5 / 0.5 / 0.5 / 0.75 / 1
 p2    = 0x8041e794: p1 <= 1 (or putter mode) ? p1 * cap : cap + min(p1 - 1, 0.25)
-p3    = 0x8041e664: = p2, except an assist branch (swing+0xe4 flag, GlfConfig+0x28 not 4) that blends toward 0x80407d08(p2) by backspin; it cannot touch a launched shot (swing+0xe4 is set only after launch, wsr-ground-phase.md section 6), so p3 = p2 for every human swing. Shot Assist is a Switch addition with no WSR counterpart.
+p3    = 0x8041e664: = p2 on the launch frame; on every later follow-through frame (swing+0xe4 = "the shot has been fired") the hidden pin-power assist of wsr-swing-redzone-spin.md section 3.5 (corrected 2026-10-19, C10): on a PARTIAL swing (p2 < cap) whose aim can land within 300 u of the pin, p2 is pulled halfway toward the power whose simulated landing is nearest the pin (up to 0.107 of full power), unless the swing is past that power and carries backspin (s7c * P1c >= 0.5 keeps the swung power); the per-frame relaunch (0x8041490c) carries the last frame's p3 into the real shot. A full swing (p2 >= cap) is never touched. Shot Assist is a Switch addition with no WSR counterpart.
 power = min(p3, slot 17 lie factor): rough P4c = 1.0; bunker P54 = 0.5 woods / 0.75 irons / 1.0 SW,PT; else P58 = 1.0 (putter 2.5)
 ```
 Consequences (WSR): on fairway/tee the launch power never exceeds 1.0, so over-swinging adds no

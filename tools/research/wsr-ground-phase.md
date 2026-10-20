@@ -338,9 +338,13 @@ The putter's slot-7 curve is linear (P34 = 0.5, P3c = 0.05, P40 = 1, P44 = 1.25 
 max(0.05, raw)`) and its caps are 1.0 on every lie, so `power = clamp(raw, 0.05, 2.5)` on
 fairway, green and fringe and `clamp(raw, 0.05, 1.0)` from rough or sand (P4c = P54 = 1, P58 =
 2.5). Where the Wii's raw putt value tops out is motion-side and not in the binary. The p3 stage
-`0x8041e664` has a putter-specific assist path, but it cannot touch the launched power:
-`swing+0xe4` is set only after the launch, so it only alters the post-launch recomputation of
-`swing+0x98` that the look-ahead reads.
+`0x8041e664` also has an assist path, taken on every follow-through frame once `swing+0xe4`
+("the shot has been fired") is set: on a partial swing it pulls the power toward the one whose
+simulated landing is nearest the pin, and the per-frame relaunch carries that into the real shot
+(wsr-swing-redzone-spin.md section 3.5, corrected 2026-10-19, C10; the earlier reading here,
+that it could not touch a launched shot, was wrong). For the putter the routine has two further
+windows (`0x80407e10`–`0x80407f28`, read from the pin distance) that were not decoded, so what
+it does to a putt below power 1.0 is open; a putt at power ≥ 1.0 (its cap) is never touched.
 
 **Launch**: P10 = 0 (horizontal), lift 0, spin 0, `v0 = 0.004 + 0.406·power^0.6666` u/tick (the
 exponent is log2(1/0.63); 0.26 u/tick = 6.2 m/s at power 0.5; 0.41 = 9.8 m/s at 1.0; 0.75 =

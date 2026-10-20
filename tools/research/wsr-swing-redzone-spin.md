@@ -13,9 +13,12 @@ Three decoders worked separately: A (over-swing power and direction), C (backspi
 D (randomness). The first eight claims of each were then re-derived from the binary by
 independent readers: 19 were confirmed and 5 refuted (C1, C2, C5, C7, D3). The corrections are
 applied below, and the numbers that depended on a refuted claim were recomputed with the
-decoder's own scripts (section 5.6). Claims past the eighth of each decoder were not re-checked;
-they are marked **decoder only** where they are used. Each item ends with a status line:
-*re-checked* (with the claim id), *corrected* (refuted, correction applied), or *decoder only*.
+decoder's own scripts (section 5.6). A second pass (2026-10-19) re-derived ten of the later
+claims (A9, A10, A13, C9, C10, C11, D11, D13, D15, D16): six were confirmed and four refuted in
+part (A10, C10, D11, D13); those corrections are applied below too. The remaining later claims
+were not re-checked; they are marked **decoder only** where they are used. Each item ends with a
+status line: *re-checked* (with the claim id), *corrected* (refuted, correction applied), or
+*decoder only*.
 
 Units: 1 unit (u) = 0.1 m, 9.144 u/yd; one physics tick = 1/240 s, 4 ticks per 60 Hz frame.
 "Frame" below always means a 60 Hz frame (one call of the swing update).
@@ -29,7 +32,9 @@ named under it were not kept in the repository. Re-derive from main.dol with the
   to 1.0, so a red swing carries no further than a full one. From rough or sand it is **real
   power, exactly up to one more bar**: rough 3 → 4 bars, bunker wedge 3 → 4, irons 2 → 3,
   driver and spoon 1 → 2. The bar draws the capped launch power on a fixed scale, so a bar is
-  worth the same distance on every lie. The putter has no red curve; its power runs to 2.5.
+  worth the same distance on every lie; on a full lie the fill stops at the full bar and turns
+  red, so how deep the over-swing went shows only in the wobble. The putter has no red curve;
+  its power runs to 2.5.
 - **What the red zone does to direction.** It does not tilt the launch: the ball leaves along the
   aim line. It adds **side-spin**: a curve whose **size** is set by how far into the red the swing
   went (a fixed 20 % of the strongest deliberate curve the moment the bar turns red, rising
@@ -44,7 +49,7 @@ named under it were not kept in the repository. Re-derive from main.dol with the
   other side cancels it. (5) The swing's power value is recomputed on every frame of that
   window, so the red depth, and with it the curve size, is not fixed at impact. From rough or
   sand there is also a deterministic launch yaw of at least 2° (a lie effect, not the red;
-  decoder only).
+  re-checked, section 4.1).
 - **What decides backspin.** Not chance, and not the power directly: the **motion in the 0.3–0.4 s
   after impact**. The game tracks the Wii Remote's swing angle with a slow tracker and a springy
   follower; when the remote stops sharply soon after the ball (the game's own help text: "swing
@@ -59,12 +64,16 @@ named under it were not kept in the repository. Re-derive from main.dol with the
   the club stops after it. The spin input is steep: in a model of the Wii input, stopping the
   club within about 40° past the ball gives full spin, at 80° three quarters, at 120° under half,
   at 160° or with a full follow-through none, and a slower downswing into the same stop none at
-  all; a swing about 20° off its plane loses about 40 %. Backspin never
-  touches the flight (carry, apex and hang time are the same with and without it); it softens the
-  first bounce and pulls the ball back during the roll, and that is worth a lot: a full-power
-  9-iron onto a green stops at 109 yd with no spin and 90 yd with full spin (10 yd short of where
-  it landed); a wedge 72 vs 52 yd. A ball that lands past the pin is pulled back 30 % harder than
-  one that lands short of it.
+  all; a swing about 20° off its plane loses about 40 %. The flight itself never reads the
+  backspin: it softens the first bounce and pulls the ball back during the roll, and that is
+  worth a lot: a full-power 9-iron onto a green stops at 109 yd with no spin and 90 yd with full
+  spin (10 yd short of where it landed); a wedge 72 vs 52 yd. A ball that lands past the pin is
+  pulled back 30 % harder than one that lands short of it. One hidden coupling (corrected, C10):
+  on a **partial** swing WSR quietly pulls the launch power toward the power that lands nearest
+  the pin, by half the difference (up to 0.11 of full power, about 10 yd for a 9-iron) — always
+  when the swing is short of it, and when it is past it only to the extent the swing carries no
+  backspin (full backspin keeps the swung power). So on a partial approach the no-spin and the
+  full-spin shot can differ in carry as well as in roll; a full swing is never assisted.
 - **What triggers the smoke puff.** In WSR the landing puff is a **surface effect, not a spin
   effect**: `WS2_glf_fairway_bound` / `rough_bound` / `bunker_fall` / `rock_bound`, raised on
   **every** bounce whose normal impact speed is above 0.05 u/tick (1.2 m/s), scaled by that speed,
@@ -76,8 +85,10 @@ named under it were not kept in the repository. Re-derive from main.dol with the
   first-contact flag (section 6). Decoder only.
 - **Is anything in the shot random?** One random number generator, seeded once at power-on from
   the clock. Inside a shot it decides exactly two things: the **over-swing coin** (only when the
-  bar went red) and a **jitter of the default aim line** (−0.17° ± 0.04°, when the line is set for
-  a stroke; not when it is set to the hole's tee target, and never on the green; decoder only).
+  bar went red) and a **jitter of the default aim line** (−0.17° ± 0.04°, one draw in a thousand
+  exactly +0.2°; on every stroke after the tee shot, never on the green or fringe; the tee shot's
+  line is the player start's own facing with no jitter, except the round's first tee shot after
+  the swing tutorial; re-checked, D11 and D13 corrected).
   Wind (per round) and the pin (per hole) are random but drawn before any shot. Launch, flight,
   spin, landing and roll are deterministic functions of the swing values and the wind.
 - **Shot Assist** (Switch only, section 8) amounts in this model to: launch yaw error 0, side-spin
@@ -98,6 +109,11 @@ named under it were not kept in the repository. Re-derive from main.dol with the
 - Recomputations for this document: `$S/research/swing/synth/` (`recompute.py`,
   `recompute_s88.py`, `gate_backswing.py`, `spinsweep_synth.py`, with copies of the decoders' and
   group T's simulators; outputs `*_out.txt`). No repository file was changed.
+- Second pass (2026-10-19): A9, A10, A13, C9, C10, C11, D11, D13, D15, D16 re-derived from
+  main.dol by independent readers, scratch `$S/next/work/F2/<claim>/` (listings, scripts and
+  outputs, e.g. `A10/verify_A10.py`, `A13/notes.txt`, `C10/c10.py`, `D11/jitter_enum.py`,
+  `D16/reach16.py`); the numbers that changed were recomputed with
+  `$S/next/work/F2/patch/c10_d15_d11_numbers.py`.
 
 | claim | subject | re-check |
 |---|---|---|
@@ -125,6 +141,16 @@ named under it were not kept in the repository. Re-derive from main.dol with the
 | D6 | m is deterministic, clamp(0.2 + 3.2(p3 − cap), 0.2, 1) | confirmed |
 | D7 | resets of m and the coin; sign kept for the swing | confirmed |
 | D8 | the coin reaches the ball only through 0x8041e594 | confirmed |
+| A9 | the red never changes the launch direction; the lie-yaw formula | confirmed (curve = the shaped, clamped output of 0x80422c78, frozen in states 1–2; radians; a straight swing from rough or sand is deflected exactly 2.000°) |
+| A10 | the gauge draws capped power on a fixed scale; 16–20 is the red range | **refuted** in part: fixed scale, 16 = power 1.0, red at the lie cap and the rough/bunker ranges hold; the swing clubs' fill is clamped at 16, so "full lies red from 16 to 20" is putter-only |
+| A13 | launch and spin timing; the ball carries the last state-1 frame's values | confirmed (state 1 lasts ceil(n) frames; the spin write lands at tick 4·ceil(n), in the frame of the 1→2 transition) |
+| C9 | backspin range per club; s7c in [0, 1] | confirmed (club blocks and vtable slot re-read; the bound comes from min(f24, gate), not a product) |
+| C10 | backspin has no effect in the air | **refuted**: the flight integrator never reads it, but swing+0x7c also sets the launch power through the pin-power assist branch of 0x8041e664 on partial swings (swing+0xe4 means "shot fired", not "non-human") |
+| C11 | equal-power shots differ only after the first contact; spin stop tables | confirmed (every number reproduced; wording: equal-curve shots, every contact after ≥ 4 air ticks, the chain's one RNG contact is the coin) |
+| D11 | default aim-line jitter, formula and distribution | **refuted** in part: the bias helper returns 0 below u = 0.001, so the positive tail is exactly +0.2° with P = 1.0e-3, not 1e-4; mean, median and percentiles unchanged |
+| D13 | when the jitter applies | **refuted** in part: 0x80402bf8 returns the player start's facing direction, not a target point, and 0x803f5318 ends the swing tutorial, it is not the next-stroke setup; the tee shot is unjittered except after that tutorial |
+| D15 | the rough/bunker launch yaw is deterministic | confirmed (deterministic in the curve input, the lie and the player's distance to the pin; its closure reaches no generator or clock) |
+| D16 | the ball physics is deterministic (reachability) | confirmed at unbounded depth with conditional-branch and jump-table edges; golf-side virtual calls resolved sink-free |
 
 ## 3. Over-swing: power
 
@@ -140,7 +166,11 @@ p1    = 0x80407fb4 -> slot 7 (0x80409f60), then max(0, .):
           raw >= 1: c = (cap >= 1 ? P40 : 1.0); p1 = max(1, 1 + 0.25*(raw - c)/(P44 - c))     no upper clamp
 cap   = slot 16 (0x80409cb0): rough (attr 2) P48, bunker (attr 3) P50, any other lie 1.0
 p2    = 0x8041e794: (p1 <= 1 or club type 3 = putter) ? p1*cap : cap + min(p1 - 1, 0.25)
-p3    = 0x8041e664: = p2 for a human swing (returns swing+0x90 when swing+0xe4 == 0)
+p3    = 0x8041e664: = p2 on the launch frame (swing+0xe4 == 0); on every later state-1 frame (0xe4 = 1,
+          "the shot has been fired", set by 0x803fb01c right after the real shot) the pin-power assist of 3.5:
+          f29 = 0x80407d08(p2) = p2 when p2 >= cap or no simulated landing is within 300 u of the pin,
+          else p2 pulled toward the power that lands nearest the pin;
+          p3 = f29 if f29 >= p2, else f29 + (p2 - f29) * min(s7c * P1c, 0.5) / 0.5     (P20 in a bunker)
 power = min(p3, slot 17 lie factor (0x80409c70 via 0x80407c88))   -> swing+0x98 (0x80421344-0x80421364)
 ```
 
@@ -165,24 +195,38 @@ Inside the red on a capped lie the power rises linearly with raw: power = cap + 
 1.0)/0.3. On a full lie raw 1.0–1.1 is a hidden dead band (p1 stays 1), and raw 1.1–1.3 fills the
 red with no power added.
 
-Status: re-checked, confirmed (A1, A2, A3, A4). Confidence high. The lie numbers are the
+Status: re-checked, confirmed (A1, A2, A3, A4); the p3 line corrected (C10): the swing+0xe4
+branch is the assist of 3.5, live for every club, and it returns p2 whenever p2 ≥ cap, so nothing
+in the red changes. Confidence high. The lie numbers are the
 `ECollision` attributes (2 rough, 3 bunker), consistent with the KCL types and with the Switch's
 player-confirmed 3-bar rough and 1/2/3-bar sand caps.
 
-### 3.2 What the gauge shows (decoder only, A10)
+### 3.2 What the gauge shows (corrected, A10)
 
 The gauge (`0x804226fc` updates, `0x8041e80c` draws) fills 16·a0 of a 20-segment strip, with a0
 a smoothed copy of min(p3, 1.25): an intermediate value at swing+0x9c chases that target by steps
-of 0.001 + sqrt(0.02·|diff|), and a0 += 0.3·(swing+0x9c − a0) per frame.
-So 16 segments = launch power 1.0, four segments per bar, and 16–20 is the red range up to 1.25.
-The fill turns red (colour 0xf05028a0 instead of 0x7850ffb4) when a0 reaches the cap: rough from
-12/16 to 16/16 (all real power), bunker from 4, 8 or 12 to 8, 12 or 16, full lies from 16 to 20
-(no power). The display does not re-scale per lie: it draws the capped launch power, so a bar is
+of 0.001 + sqrt(0.02·|diff|), and a0 += 0.3·(swing+0x9c − a0) per frame. But at
+`0x804229ac`–`0x804229dc`, right after the red check and before anything draws, the smoother
+clamps a0 to 1.0 for every club whose type (club+4, set by the base constructor `0x8040a1d4`) is
+not 3, the putter. So 16 segments = launch power 1.0, four segments per bar, and the seven swing
+clubs never draw more than 16: rough red from 12/16 to 16/16 and bunker red from 4, 8 or 12 to 8,
+12 or 16 are real power as stated, but on tee, fairway and every other full lie the fill stops at
+16 and simply turns red (colour 0xf05028a0 instead of 0x7850ffb4) once a0 reaches the cap (which
+takes p3 > 1.0, i.e. raw past the 1.1 dead band; an exact 1.0 target converges to 1 − 2^−24 in
+float32 and never trips it), with the depth of the over-swing shown only by the wobble (4.5).
+There is no 16–20 red extension for them. The 16–20 range exists only for the putter, whose
+p3 = raw·cap runs to 2.5, whose display saturates at 1.25 and whose fill is red from 16.
+Equivalently, for the swing clubs the fill is the smoothed launch power swing+0x98 = min(p3, lie
+factor). The display does not re-scale per lie: it draws the capped launch power, so a bar is
 worth the same distance on every lie. This settles the open point in wsr-club-physics.md section
 4.2 in the Switch observation's favour: the cap multiplies only how hard one must swing to reach
-a given fill, not what a filled bar is worth.
+a given fill, not what a filled bar is worth. A scene flag swing+0xa5 (set only by `0x803f5a04`
+when playerManager+0x8a8, the tutorial flag, is set; cleared by the reset `0x8042260c`)
+additionally caps the target at 1.0 for all clubs.
 
-Status: decoder only, not independently re-checked (A10). Confidence medium.
+Status: corrected (A10, re-checked: the fixed scale, 16 = power 1.0, the lie-cap red trigger and
+the rough/bunker ranges reproduced; the 16–20 over-swing range and "full lies red from 16 to 20"
+refuted, putter only). Confidence high.
 
 ### 3.3 Capped lies make the red easier to reach
 
@@ -211,10 +255,63 @@ power and aim (`0x8041490c`; section 4.3), so the shot carries the **last** stat
 values. During state 1, s48 and s50 are frozen (C7), so only the bonus E can still change; its
 accumulators (s68, s6c, s70, s74) are updated only in state 1, and their meaning was not decoded.
 E adds at most 0.05 once S ≥ 1, but up to 2 − 1.95·S below that: part of an over-swing can be
-completed in the follow-through.
+completed in the follow-through. On a partial swing p3 also moves with the backspin the writer
+accumulates during the window, through the assist of 3.5.
 
-Status: the per-frame recomputation and the replay are re-checked (C7, C8); "the ball carries the
-last state-1 frame's values" is decoder only (A13). Confidence medium.
+Status: the per-frame recomputation and the replay are re-checked (C7, C8, A13: state 1 lasts
+ceil(n) frames, and on its last frame the manager relaunches with that frame's values before the
+spin write, so nothing later changes the power or the yaw). Confidence high.
+
+### 3.5 The hidden pin-power assist on partial swings (corrected, C10)
+
+`0x8041e664` returns p2 only on the launch frame. swing+0xe4 is not a "non-human" flag: it is set
+to 1 by `0x804224b4` (via `0x803fee94` ← `0x803fb01c`, in the player update `0x803fabb0` directly
+after the real shot `bl 0x8041210c` at `0x803fafac`, for the players' own balls, ball+0x51 == 0)
+and cleared only by the swing init `0x8042260c`, so it means "the real shot has been fired". On
+every later state-1 frame (GlfConfig+0x28 is 1 from its constructor and read nowhere else, so
+for every club) p3 comes from the other branch:
+
+```
+f29 = 0x80407d08(clubMgr, p2):
+      p2                                   if p2 >= cap (slot 16), or aim+0x187c >= 300 u (no simulated landing
+                                           within 32.8 yd of the pin)
+      p2 + (1 - w) * cap * (p_pin - p2)    otherwise (kept if <= cap, floored at 0)
+      p_pin = aim+0x1880/256               the power (of 257 steps) whose simulated landing is nearest the pin
+      w     = clamp(0.5 + 0.5 * (|p2 - p_pin|/0.3)^log2(1000), 0.5, 1)   (a +-0.05 window when a power holes out)
+p3  = f29                                                    if f29 >= p2 (short of the pin's power)
+      f29 + (p2 - f29) * clamp(s7c * P1c, 0, 0.5) / 0.5      if f29 < p2 (past it; P20 from a bunker)
+```
+
+The aim table (`0x8040854c`, called per frame at `0x803fadd4` while addressing, manager+0x8a8 == 0)
+launches 257 simulated balls at powers i/256 along the current aim, 160 per frame, steps each to
+rest (`0x80408120` through `0x80414734`), measures its distance to the pin, smooths over 9 taps and
+keeps the power whose rest point is nearest the pin (+0x1880) and that distance (+0x187c; reset
+to 9999 on an aim change, `0x804087ec`).
+
+So on a partial swing (p2 below the lie cap) whose aim line can reach within 32.8 yd of the pin,
+WSR pulls the launch power halfway toward the pin's power while the two are within about 0.25 of
+each other (the pull fades to zero between 0.25 and 0.3): a swing short of it is raised whatever
+the backspin; a swing past it is lowered unless it carries backspin, s7c·P1c ≥ 0.5 keeping the
+swung power in full (the 5-iron only at full spin, the 7-iron from s7c 0.71, the 9-iron from 0.56,
+the wedge from 0.5; the 3-iron's 0.25 removes at most half of the pull; driver, spoon and putter
+have P1c = 0 and are always pulled). The largest pull is 0.107 of full power at |p2 − p_pin| =
+0.236, i.e. with carry linear in power 26 yd for the driver, 14 for a 7-iron, 11 for a 9-iron and
+6 for the wedge; an approach 0.1 past the pin's power loses 0.05 (9-iron 5 yd). Full swings (p2 ≥
+cap, so every red swing too) and pins the club cannot land within 32.8 yd of are never touched;
+the putter has two further windows (`0x80407e10`–`0x80407f28`, read from the pin distance
+`0x803fc950`) that were not decoded. Since `0x8041490c` relaunches the real ball with swing+0x98 =
+min(p3, lie factor) on every state-1 frame (3.4), the shot flies with the last state-1 frame's
+p3, which follows s7c as the writer raises it during the window.
+
+For the Switch: WSR has a hidden pin-power assist on partial approach swings that backspin
+switches off; whether Switch Sports kept it is a Switch test (section 12, item 10), and until it
+is ruled out, partial-power calibration sweeps should land well clear of the pin.
+
+Status: corrected (C10; the branch of `0x8041e664`, `0x80407d08`, the writers of swing+0xe4 and
+GlfConfig+0x28, and the aim table's builder re-derived from the binary). Confidence high for the
+code path, medium for the aim table's meaning (read from the code only) and for the size of the
+effect (from the decoded formula, not simulated). Residual doubt: a writer of GlfConfig+0x28
+through a non-SDA copy of the pointer would have been missed (the field has a single reader).
 
 ## 4. Over-swing: direction
 
@@ -230,14 +327,24 @@ yaw = sign(curve) * (lo + (hi - lo) * x^log2(1/b)),   x = clamp((180 - clamp(d, 
       d = horizontal distance to the pin in yd (0x803fc950 to GetPinPos 0x80402bd8, x 0.10936); curve <= 0 counts as negative
 ```
 
-So the red never changes the start line; from rough or sand there is a **deterministic** yaw of
-at least 2° even for a perfectly straight swing (7 yd at 200 yd), up to 4° (rough) or 12° (sand)
-close to the pin with a full curve. Which side a negative curve maps to was not resolved.
+Here "curve" is the shaped, clamped output of `0x80422c78`, curve =
+clamp(sign(−c)·(|c|/0.7)^log2(1/0.4), −1, 1) with c the curve tracker's value ((swing+0xb4)+4),
+which is frozen during swing states 1 and 2, so the yaw is constant through the relaunch window; the
+code works in radians (lo and hi are multiplied by r2+0x148 = π/180) and the launch applies −yaw. So
+the red never changes the start line; from rough or sand there is a **deterministic** yaw of exactly
+2.000° for a dead-straight swing or for any swing from 180 yd or more (7 yd across at 200 yd),
+rising with the curve input and with the pin's closeness to 4° (rough) or 12° (sand) at 30 yd with
+|curve| = 1 (rough at |curve| = 1: 3.26° at 100 yd, 2.61° at 150 yd; bunker 9.24° and 6.37°). Which
+map side a curve ≤ 0 is deflected to was not resolved (the sin/cos output order of `0x8013bc70` was
+not decoded).
 
 Status: the red's own outputs (m at swing+0xc0, the coin at +0xd8) reach the ball only through the
-side-spin writer, re-checked (A5, D7, D8). That the yaw routine reads no power value, and the yaw
-formula itself, are decoder only (A9; decoder D found the same routine and constants
-independently, D15). Confidence high for "no red in the yaw", medium for the lie yaw.
+side-spin writer, re-checked (A5, D7, D8). Re-checked (A9, D15): the yaw routine's only swing read
+is the curve tracker, whose feed reads neither p1, p2, p3, raw, the cap, m nor the coin; no
+direct-call path from the swing update, the launch or the relaunch reaches the other writers of
+player+0x84; the formula and constants reproduce to 0.002° in an independent port using the DOL's
+own ln/exp tables; and the routine's 39-function closure reaches no generator or clock read.
+Confidence high.
 
 ### 4.2 The red curve
 
@@ -280,19 +387,26 @@ frame k+1   first state-1 frame: the power pipeline runs, 0x80420d84 returns 1 (
             ball start 0x80414ebc with side = back = 0, ball+0x16c = swing (0x80415044)
 each frame  ball manager 0x80410b78 -> 0x8041490c: replays the shot from launch with the swing's
             latest power and aim, one frame further (copy r13-0x2c38, copied back by 0x8041549c)
-end of 1    after ceil(n) state-1 frames, n = clamp(18 + 28*(1.25 - raw), 18, 25)
+end of 1    after ceil(n) state-1 frames (the counter is compared after its increment),
+            n = clamp(18 + 28*(1.25 - raw), 18, 25)
             (25 at raw <= 1, 18 at raw >= 1.25; r2+0x254/0x258/0x194/0x25c = 18, 7, 25, 1.25),
             or earlier when the follower's velocity (swing+0x10, +8) turns negative (0x8042144c),
             or when the ball is already at the cup (0x80421464-0x804214ec); on 1 -> 2, s48 = 0
-state 2     0x8041e650 is true: 0x80414854 writes ball+0x9c (side), +0xa0 (backspin), +0x58 = this
-            tick, copies the ball into the look-ahead balls and clears +0x16c
+same frame  a frame runs the player update (swing update, shot) first, then four ball ticks, then
+            the ball manager (0x804175ac-0x804175dc): on the last state-1 frame the manager still
+            relaunches with that frame's power and yaw, steps to tick 4*ceil(n), and then, 0x8041e650
+            being true (state 2), 0x80414854 writes ball+0x9c (side), +0xa0 (backspin), +0x58 = that
+            tick, copies the ball into the look-ahead balls and clears +0x16c; no relaunch follows
 ```
 
-So both spins start 72–100 ticks (0.30–0.42 s) after launch; an over-swing (raw > 1) shortens the
-window and makes them start up to 28 ticks sooner. The ball flies straight until then.
+So both spins are written at tick 4·ceil(n) = 72–100 (0.30–0.42 s) after launch and act from the
+next tick; an over-swing (raw > 1) shortens the window and makes them start up to 28 ticks
+sooner. The ball flies straight until then.
 
 Status: re-checked (C5 corrected: the shot fires one frame after the 0→1 transition, on the
-first state-1 frame; C6, C8; A5 and A8 for the window). Confidence high.
+first state-1 frame; C6, C8; A5 and A8 for the window; A13 for the replay, the frame order and
+the hand-off: the two other callers of `0x80414854`, `0x80410d44` and `0x804110ac`, are
+finalisers for balls other than the one in flight). Confidence high.
 
 ### 4.4 How far the red curve bends
 
@@ -341,8 +455,10 @@ emitters; which one was not traced). The only reader of swing+0xc8 is the gauge 
 
 Whether the wobble's direction shows the coin is **unresolved**: decoder D reads swing+0xd8 at
 `0x80422a44` / `0x80422ac4` as the sign of the phase step (D10), but the A6 re-check found those
-two reads gated by swing+0xe4, the flag whose branches the brief excluded from decoding, so when
-they run for a human swing is not known.
+two reads gated by swing+0xe4. That flag is now decoded (C10): it means "the real shot has been
+fired" (set on the launch frame, cleared by the swing init), so the open question is which side
+of the gate the reads sit on, i.e. whether the wobble can show the coin before the ball leaves
+or only during the follow-through window; that was not checked.
 
 Status: decoder only (A11, D10). Confidence high that it is display only, low on its direction.
 
@@ -358,7 +474,8 @@ Status: decoder only (A11, D10). Confidence high that it is display only, low on
    bending the ball.
 5. The red depth is re-evaluated on every frame of the follow-through window (3.4), so the same
    impact can end at different depths.
-6. On a full lie all of this comes with no extra distance at all.
+6. On a full lie all of this comes with no extra distance at all, and the bar does not even
+   show the depth: its fill stops at the full bar and turns red (3.2).
 
 ## 5. Backspin
 
@@ -368,9 +485,12 @@ Per 60 Hz frame, `0x803faf3c` → `0x803fcd44` → (`0x803fce70`) `0x80422d70` �
 `0x80420570` (bl at `0x80422ee0`, skipped when the player+0x7c flag is set) → then the state machine
 `0x80420d84` (bl at `0x80422ef8`). Each link has one caller. swing+0x7c (the swing-side backspin,
 s7c) is written only by `0x80420570` at `0x80420c40`, only while swing+0x30 == 1; the only other
-stores write 0 (`0x804212b4` at the 0→1 transition, `0x8042258c` in the reset `0x80422510`).
+stores write 0 (`0x804212b4` at the 0→1 transition, `0x8042258c` in the reset `0x80422510`). It
+is read by the hand-off `0x80414854` (through `0x80407988`), by the gauge, and by p3's assist
+branch `0x8041e6e0` on every state-1 frame after the launch (3.5).
 
-Status: re-checked (C1 for the writer's callers and stores). Confidence high.
+Status: re-checked (C1 for the writer's callers and stores; C10 for the third reader).
+Confidence high.
 
 ### 5.2 The input: the remote's swing angle, a tracker and a follower
 
@@ -409,7 +529,8 @@ stops after the ball.
 
 Status: re-checked, confirmed (C3, C4; the putter constants are from those re-checks). In C4,
 "k = 0.01 for a human swing" means for any non-putter swing outside one post-launch case (state
-2, swing+0xe4 set, follower moving back), which does not affect the spin. Confidence high.
+2, the shot fired (swing+0xe4, C10), follower moving back), which does not affect the spin.
+Confidence high.
 
 ### 5.3 The writer (corrected)
 
@@ -439,7 +560,13 @@ text says the same in plain terms (`sports2.bmg`: "Using an iron or wedge, swing
 snap to put backspin on the ball. It can help stop the ball from rolling off the green."; decoder
 only, C12).
 
-Status: corrected (C1, C2; the f24 and gate formulas themselves were confirmed). Confidence high.
+Status: corrected (C1, C2; the f24 and gate formulas themselves were confirmed). The hand-off's
+per-club factors and s7c ∈ [0, 1] re-checked (C9): slot 5 is `0x80409dfc` in all four club vtables
+(woods 0x806d5040, wedge 0x806d5088, putter 0x806d50d0, irons 0x806d5440), reading P1c / P20 at
++0x1c / +0x20 of the club blocks DR 0x806d4f00, SP 0x806d4fa0, 3i 0x806d51c0, 5i 0x806d5260, 7i
+0x806d5300, 9i 0x806d53a0, SW 0x8067b968, PT 0x8067ba08 (0 / 0.25 / 0.5 / 0.7 / 0.9 / 1.0 / 0 and
+0 / 0.2 / 0.35 / 0.5 / 0.6 / 0.7 / 0); hi − lo ≥ 0.01, so u, f24 and the gate are in [0, 1] and so
+is s7c. Confidence high.
 
 ### 5.4 The backswing-depth gate (corrected)
 
@@ -486,6 +613,8 @@ follower more at low power (less overshoot produced). In the model the same moti
 (after the curve, the lie cap and the lie factor) never enters: **the lie cap does not cap the
 spin in WSR**. Only the bunker's own factor column P20 (0.2–0.7 instead of 0.25–1.0) reduces it.
 An over-swing adds no spin (r is clamped at 1) and shortens the window from 25 to 18 frames.
+The reverse coupling does exist: on a partial swing the spin input keeps or releases the launch
+power through the assist of 3.5.
 
 Status: follows from the re-checked writer and state machine (C1–C4, C7, C8). That the writer
 reads no lie value at all rests on the decoder's listing and the re-checks of its arithmetic.
@@ -545,10 +674,17 @@ ball+0xa0 at s7c = 1, the landing factor f = 1 − 0.6·bs^0.737 and the pull-ba
 | wedge | 1.0 | 0.7 | 1.0 | 0.40 | 0.056 |
 | woods, putter | 0 | 0 | 0 | 1 | 0 |
 
-**In the air it does nothing.** The lift ball+0x98 = P14·q is set at launch, and the hand-off
-`0x80414854` never writes it (re-checked, C8). Calc's lift and side terms read only +0x98 and
-+0x9c; backspin is read only in the ground blocks. So carry, apex and hang time are the same with
-and without backspin. The decoder's scan of every ball+0xa0 read (C10) is decoder only.
+**The flight never reads it.** The lift ball+0x98 = P14·q is set at launch, and the hand-off
+`0x80414854` never writes it (re-checked, C8). Calc's lift and side terms read only +0x98 and +0x9c;
+Calc reads +0xa0 once, at `0x80413d44`, inside the ground block that runs only when lifetime >
+ball+0x58 and `0x804121c4` says the ball is not in the air (a contact attribute in ball+0xb4, the
+largest of the last four ticks, after the first 8 ticks, or the ball in water); every other read of
+ball+0xa0 in the binary is the landing factor (`0x804127f0` / `0x80412864`, inside the contact loop)
+or a copy (`0x804148e4`, `0x80415580`), and the side spin +0x9c does not depend on s7c (re-checked,
+C10, C11). But carry, apex and hang time are the same with and without backspin **only at equal
+launch power**: on a partial swing past the pin's power the backspin input keeps the swung power
+while a no-spin swing is pulled back by up to 0.11 of full power (3.5, corrected C10), so the
+no-spin ball of such an approach also lands shorter. A full swing is never pulled.
 
 **On the ground** (wsr-ground-phase.md sections 3.2 and 5, not redone here): on a contact after at
 least four ticks in the air the restitution is multiplied by f, and bs by f once the steering has
@@ -569,12 +705,14 @@ correction):
 
 The spread from no spin to full spin is 12–20 yd on a green (19–20 yd for the 9-iron and the
 wedge, which finish 10 and 3 yd behind their landing spots) and 6–10 yd on fairway; at 3 bars
-(power 0.75) 15–19 yd on a green. Half the input already buys most of the effect (the 9-iron on a
-green: 109.3 → 98.8 → 89.7).
+(power 0.75) 15–19 yd on a green at equal launch power (in WSR a 3-bar swing past the pin's power
+is also pulled back without spin, 3.5, which widens that spread by the carry difference). Half
+the input already buys most of the effect (the 9-iron on a green: 109.3 → 98.8 → 89.7).
 
-Status: factors and hand-off re-checked (C8; block values in wsr-club-physics.md); ground model
-re-checked by group T. Confidence high for the mechanism, medium for the tables (flat plane, h =
-1, no wind).
+Status: factors and hand-off re-checked (C8, C9); the stop tables reproduced from the same port
+(C11, with the landing factor's and the pull-back's constants re-derived from the binary); ground
+model re-checked by group T. Confidence high for the mechanism, medium for the tables (flat
+plane, h = 1, no wind, equal launch power).
 
 ### 5.8 Why two shots with the same power can finish far apart
 
@@ -587,8 +725,12 @@ re-checked by group T. Confidence high for the mechanism, medium for the tables 
 4. Where the ball lands relative to the pin changes the pull-back by up to 30 % (pin homing), the
    green's first-contact rule for irons (A = 0.48 instead of 0.15) and the surface's decay w also
    differ between a green and its fringe.
-5. Nothing random is involved: no path from the writer, the state machine, the hand-off or the
-   contact routine reaches the random number generator (section 7).
+5. Nothing random is involved: no generator output enters s7c, ball+0xa0, the landing factor, the
+   pull-back or the ball's velocity and position. The chain's one contact with the generator is
+   the over-swing coin, drawn in the swing update's tail (`0x804221cc`) only when the bar is red
+   and reaching the ball only as side spin (section 7). So two equal-power shots with the same
+   curve input and no red differ only from the first contact on; an over-swung pair also differs
+   in the air, by the random side.
 
 ## 6. The landing puff (decoder only; dispatch re-checked)
 
@@ -679,7 +821,7 @@ Air Sports modules) are exactly these 11:
 |---|---|---|---|
 | 0x803fd4dc, 0x803fd558, 0x803fd5c0 | 0x803fd458, per player per frame | int(60u) + 120, int(240u) + 240, int(60u) + 60 | avatar gaze countdowns |
 | 0x803febc4, 0x803fec08 | 0x803feb54, per-stroke reset | int(300u) | avatar gaze countdowns |
-| 0x803feddc | 0x803fed50, aim-line setup | u as a float, u^log2(1/0.95) | default-aim yaw jitter |
+| 0x803feddc | 0x803fed50, aim-line setup | u as a float, u^log2(1/0.95), 0 below u = 0.001 | default-aim yaw jitter |
 | 0x803ff7dc | 0x803ff70c | int(u·N) + a base | a prop animation timer |
 | 0x80406748 | choosePin 0x804066e0 | int(u·count) | the pin spot, once per hole (tools/PINS.md) |
 | 0x80407070 | 0x80406ffc | int(u·(n − used)) | the wind permutation, once per round |
@@ -692,35 +834,64 @@ Outside the golf range, wrappers the golf code calls also draw: the putting-soun
 (0x802bfc94, from 0x803fdf74), idle-animation timing (0x80348720), Mii model creation (0x8027bf84,
 own state) and a scene-init object (0x8026ce6c).
 
-Status: the 11 sites and their arithmetic re-checked (D3 corrected, D4); what each decides,
-except the coin, is decoder only (D11–D13, D19, D21, D22). Confidence high for the list, medium
-for the meanings.
+Status: the 11 sites and their arithmetic re-checked (D3 corrected, D4); what the coin and the
+aim jitter decide is re-checked (D11, D13, both corrected in detail); the pin, the wind and the
+cosmetic draws are decoder only (D19, D21, D22). Confidence high for the list, medium for the
+cosmetic meanings.
 
 ### 7.3 The two draws that touch a shot
 
 - **The over-swing coin** (section 4.2): one draw per swing, only when p3 exceeds the cap. In the
-  ported generator it is fair (P(left) = 0.497–0.500 over 200 000 draws for four seeds,
-  P(same as the previous swing) = 0.499; decoder only, D23).
-- **The aim jitter** (decoder only, D11–D14): when the default aim line is set for a stroke
-  (`0x803fed50`), unless its noJitter argument is set or the lie is green, fringe or cup:
-  angle += (π/180)·0.2·(1 − 2·u^0.074). The result is one-sided: mean −0.172°, median −0.180°,
-  5–95 % from −0.199° to −0.121°, positive only with probability 1e-4. That is a 0.72 yd offset at
-  240 yd with about 0.3 yd of spread. The hole-start line to the hole's tee target is set with
-  noJitter = 1 (no jitter); a line toward the pin gets it on the tee; the next-stroke setup
-  (`0x803feedc` from `0x803f5318`) gets it. Manual aiming is incremental from the jittered angle,
-  so the jitter survives into the launch (player+0x84 in `0x8041210c`). Which side of the
-  minimap it lands on was not checked.
+  ported generator it is fair (P(left) = 0.497–0.500 over 200 000 draws for four seeds, P(same as
+  the previous swing) = 0.499; decoder only, D23).
+- **The aim jitter** (D11 and D13 re-checked and corrected; D12, D14 decoder only): when the default
+  aim line is set (`0x803fed50(player, dir, noJitter)`), unless noJitter is set or the lie is green,
+  fringe or cup (6, 9, 10, 11): angle += (π/180)·0.2·(1 − 2·q), q = u^log2(1/0.95) = u^0.074 for u ≥
+  0.001 and 0 below it (the bias helper `0x803ef330` returns 0 for |x| < 0.001), u = rand16/65536.
+  The result is one-sided: mean −0.172°, median −0.180°, 5–95 % from −0.199° to −0.121°, never
+  between −0.040° and +0.2°; the 66 draws of 65536 with u < 0.001 (P = 1.0e-3) give exactly +0.2°.
+  That is a 0.72 yd offset at 240 yd with about 0.3 yd of spread (0.84 yd the other way once in a
+  thousand). Where it applies (D13 corrected): (a) the hole start (`0x803ff268`, per player from
+  `0x803fbd50` ← GlfMain hole init `0x80417738`) sets the line to the selected player start's own
+  facing direction, row 2 of its rotation matrix built from the PMP rotation (`0x80402bf8` returns
+  [[fieldMgr+0x48]+0x48]+0x18, not a target point), with noJitter = 1; the alternative pin − player
+  line with noJitter = (lie is 6 or 9) runs only for a start whose kind ([start]+0x50, from the PMP
+  params) is not 0, and all 21 shipped starts have kind 0 (tools/wsr-pins.json); (b) the next-stroke
+  setup (GlfMain `0x80417644` on the first frame of the hole-start state and of the post-shot phase
+  → `0x803fb548` → `0x803ff170(player, 0)` → `0x803fef1c`; it sets no line while player+0x44 is 0 or
+  5) sets the facing direction with noJitter = 1 while the ball lies on the tee (lie 15,
+  `0x80411aa4`) and otherwise the line from `0x80401074` with noJitter = 0, i.e. jittered unless the
+  lie forbids it; (c) the end of the swing tutorial (`0x803feedc` ← `0x803f5318`, state 0x25 of
+  SequenceMain's tutorial sub-machine `0x803f46d0`, which runs on the round's first hole, stroke 1,
+  for a player who has seen fewer than four tutorials, and ends after a fade or on the minus button)
+  re-sets the current player's line to the facing direction with noJitter = 0. Net: no tee shot is
+  jittered except the round's first after the swing tutorial (completed or skipped); every later
+  stroke off the tee is, lie permitting; a ball back on the tee is not. Manual aiming is incremental
+  from the jittered angle, so the jitter survives into the launch (player+0x84 in `0x8041210c`;
+  D14). Which side of the minimap it lands on was not checked.
 
 ### 7.4 Everything else is deterministic
 
 - Re-checked: the 11 sites above are the only direct callers in the golf code, nothing reaches
   Rand through a pointer (D4), and the side-spin path (`0x8041e594`, `0x80422c78`, `0x80420c9c`,
   `0x80414854`) reaches no generator or clock read at any call depth up to 10 (D8).
-- Decoder only (D16–D18): a whole-binary call-graph search from Calc, the contact routine, the
-  spin writer, the ball start, the real and look-ahead launches, the backspin writer, the curve
-  input and the wind code finds no Sp2::Rand, no other generator (the MSVC 0x343fd cluster, the
-  inlined ANSI and NR generators, MSL rand) and no clock read. The caveat is 2–29 unresolved
-  virtual calls per root.
+- Re-checked (D16): a whole-binary call-graph search from Calc, the contact routine, the spin
+  writer, the ball start, the real and look-ahead launches, the backspin writer, the curve input
+  and the wind code finds no Sp2::Rand, no other generator (the LCG constants, the caller-state
+  Rand, the seeders, MSL's ANSI rand) and no clock read (mftb, the time-base registers) at any
+  depth, with edges from every direct and conditional branch and from jump tables (the closures
+  grow past the decoder's depth-8 cut, 85 → 105 functions for Calc and 255/309 → 379 for the
+  launches, and still reach no sink).
+  The golf-side virtual calls in those closures resolve to sink-free targets (the club vtable
+  slots `0x80409e44` / `0x80409e30` / `0x80409dfc`, the putter's `0x804078b0` / `0x804078a4` /
+  `0x804078f0`, the wind set's avatar-animator vtable 0x806b9b88); what remains unresolved are
+  library-internal dispatches (MSL array ctor/dtor, EGG heap, the controller manager, nw4r effect
+  and sound) that return nothing to the physics. The other-generator scan (D17–D18) is decoder
+  only beyond those sinks; one of its points was checked for this document: the ball's per-tick
+  post step `0x804144b8` (on a green contact) enters the effect library through `0x801e5d00`, a
+  five-instruction stub ending `b 0x8018c4d0` (a matrix setter that draws nothing); a function
+  model that reads on through that branch merges the stub with the next function, which does
+  call Sp2::Rand (`0x801e5d58`), and reports a draw that never happens.
 - Wind (decoder only, D19): drawn once per round at the GlfConfig setup (`0x80406920` →
   `0x804061fc` → `0x80406e00`, only on a fresh round) as random permutations, so every 8
   consecutive holes get each direction once; stored in StaticMem var 7+hole and never redrawn.
@@ -744,22 +915,25 @@ was decoded for it. In the decoded model it amounts to: **launch yaw error 0** (
 no rough/sand lie yaw), **side-spin 0** (curve input 0 and no red, so m = 0 and the coin is never
 drawn), and **power = min(p, cap)** (the red quarter above the cap is unreachable). It says
 nothing about backspin, which in WSR is the post-impact input, and it would not remove WSR's aim
-jitter, which sits on the default aim line before the swing. That is what makes it the control
-for every experiment in section 12: it removes the red-zone coin and both direction terms, and
-pins the power to an exact bar.
+jitter, which sits on the default aim line before the swing. WSR itself has a hidden power
+assist on partial swings (3.5), unrelated to the Switch feature; whether the Switch kept it, with
+or without Shot Assist, is a test of its own (section 12, item 10). That is what makes Shot
+Assist the control for every experiment in section 12: it removes the red-zone coin and both
+direction terms, and pins the power to an exact bar.
 
 ## 9. What is WSR-only and what is structure
 
 Structure that Switch Sports may well keep (each needs a Switch test, section 12):
 - The bar shows launch power on a fixed scale; a capped lie caps the fill; the red is a fixed span
-  above the cap.
+  above the cap on capped lies; on a full lie it is the full bar turning red.
 - On a full lie the red adds no distance; on a capped lie it is real power up to one more bar
   (lie factor = cap + one span).
 - The red adds side-spin, never a launch-angle change; its size is deterministic in the red depth
   with a floor, its side random; it equals a full deliberate curve at the end of the red.
 - Spin is attached when a post-impact window closes, so the ball starts straight and bends later.
 - Backspin is decided by the motion after impact, separately from the power, capped by the
-  backswing; a per-club factor with woods at 0; it acts only on landing and in the roll.
+  backswing; a per-club factor with woods at 0; the ball feels it only on landing and in the
+  roll, but its input also switches off a hidden pin-power assist on partial swings (3.5).
 - Landing effects are named by surface, raised in the contact routine and scaled by impact speed.
 - One shared generator; the physics is deterministic.
 
@@ -780,8 +954,8 @@ neither in WSR); Shot Assist itself.
 
 - The meaning of the raw accumulators s68, s6c, s70, s74 (the bonus E) and s80, s84 (P), and the
   sensor vectors sensor+0x44, +0x80, +0xd8 (Wii fusion).
-- The swing+0xe4 branches (`0x8041e664`, `0x80407d08`), excluded by the brief; whether +0xe4 gates
-  the wobble's use of the coin (4.5).
+- Which side of the swing+0xe4 gate (now decoded as "the shot has been fired", C10) the wobble's
+  two coin reads sit on (4.5); the putter's extra windows in `0x80407d08` (3.5).
 - Which way a positive deliberate curve, or the rough/sand lie yaw, goes for a given avatar hand.
 - The names of sounds 0x5b7 / 0x5b8 / 0x5de and of the `0x80407a48` effect; the purpose of
   `0x80408854` (receives min(raw, 1)); a gauge element drawn only when the cap is 1.
@@ -795,21 +969,26 @@ neither in WSR); Shot Assist itself.
 ## 11. Confidence
 
 - Over-swing power pipeline, lie caps and factors, red = real power only from capped lies:
-  **high** (re-checked A1–A4).
+  **high** (re-checked A1–A4; the p3 branch corrected, C10).
 - The red curve: size formula, coin, side formula, delayed start, equal bend to a full curve:
-  **high** (re-checked A5–A8, D5–D8); drift tables **medium** (flat, no wind).
-- The gauge draws the capped power on a fixed scale; the wobble is cosmetic: **medium** and
-  **high**, decoder only.
-- The lie yaw from rough and sand: **medium**, decoder only (two decoders agree).
+  **high** (re-checked A5–A8, A13, D5–D8); drift tables **medium** (flat, no wind).
+- The gauge draws the capped power on a fixed scale, clamped at the full bar for the swing clubs:
+  **high** (A10 corrected and re-checked); the wobble is cosmetic: **high**, decoder only (A11).
+- The lie yaw from rough and sand: **high** (re-checked A9, D15: formula, constants, no RNG).
+- The hidden pin-power assist on partial swings and its backspin switch: **high** for the code
+  path (C10), **medium** for the aim table's meaning and for the size of the effect (decoded
+  formula, not simulated).
 - Backspin chain (X, tracker, spring, writer, gate as a ceiling, window, hand-off): **high**
-  (re-checked C1–C8, with three corrections); profile and gate-ramp tables: **medium** (model of
+  (re-checked C1–C9, with three corrections); profile and gate-ramp tables: **medium** (model of
   the Wii input).
-- Backspin does nothing in the air; its landing and roll effects: **high** (C8 plus group T).
+- The flight never reads the backspin; its landing and roll effects: **high** (C8, C10, C11 plus
+  group T); equal carry with and without spin holds only at equal launch power (C10).
 - The landing puff's names, gate and surfaces: **high** for the names, the surface dispatch and the
   absence of any spin read (re-checked), **medium** for the exact speed gate (decoder only).
 - One generator, seeded at boot; the 11 call sites: **high** (re-checked D1–D4). Physics
-  deterministic: **high** for the spin and side-spin path, medium-high overall (decoder-only
-  reachability, unresolved virtual calls). Aim jitter: **medium**, decoder only.
+  deterministic: **high** (re-checked D16 at unbounded depth; the unresolved virtual calls are
+  library-internal and return nothing to the physics). Aim jitter: **high** for the formula, the
+  distribution and the callers (D11, D13 corrected); **medium** for the tutorial gate's meaning.
 - All of it is WSR (Wii).
 
 ## 12. Switch experiments that would calibrate or refute each term
@@ -833,7 +1012,9 @@ stop as the "yd to go" change.
    no link to the swing. A side that follows the swing means the Switch replaced the coin.
 4. **The size has a 20 % floor and grows with depth.** Note the red fill at release (gauge
    screenshot) and the lateral miss. WSR: miss ∝ 0.2 + 0.8·(depth into the red); the slightest
-   red gives a fifth of the full-red miss (driver 7 vs 35 yd).
+   red gives a fifth of the full-red miss (driver 7 vs 35 yd). From rough the fill itself shows
+   the depth (12 → 16); on a full lie WSR's fill stops at 16 and only the wobble grows (3.2), so
+   there the depth has to be read from the wobble or from the swing.
 5. **The bend starts late.** Ball-cam or minimap trail of a red shot: WSR flies straight for
    0.30–0.42 s and then bends. A bend from the first frame means the spin is applied at launch
    (and the drift is about 16 % larger).
@@ -853,8 +1034,13 @@ stop as the "yd to go" change.
    a full swing; compare the pull-back (stop minus landing spot), not the finish. WSR: the same
    spin from rough as from fairway; less from a bunker (P20 ≈ 0.7·P1c). CLAUDE.md's "capped lies
    also cap spin" would show as a smaller pull-back from rough.
-10. **Backspin does nothing in the air.** Same carry and apex with full and no spin (ball-cam
-    landing spot). WSR: identical; only the bounce and roll change.
+10. **Backspin does nothing in the air; the hidden power assist.** Same carry and apex with full
+    and no spin (ball-cam landing spot). WSR: identical on a full swing, where only the bounce
+    and roll change. On a partial approach that would fly past the pin (say a 9-iron at 3 bars
+    with the pin at its 2.5-bar distance) WSR pulls the no-spin shot's power back by half the
+    excess (3.5): a shorter no-spin carry there means the Switch kept the assist, and the
+    partial-power sweeps (driver at 1, 2, 3 bars) should then land more than 33 yd from the pin,
+    where WSR's assist is off, to measure the raw carry.
 11. **Pin homing.** Two equal-spin shots, one landing just short of the pin and one just past:
     WSR pulls the one past the pin back 30 % harder.
 12. **The puff's trigger.** (a) The same landing with and without spin on fairway, rough and
@@ -868,7 +1054,8 @@ stop as the "yd to go" change.
 13. **The aim jitter.** On a second stroke (not a tee shot, not a putt), take the identical shot
     from the identical spot twice after restarts (Shot Assist, same aim ticks). WSR: the default
     line differs by up to about 0.08° (0.3 yd at 240 yd) between restarts, below the minimap's
-    pixel but visible in "yd to go". Identical results mean no jitter, or a seed per restart.
+    pixel but visible in "yd to go" (one restart in a thousand lands 0.4° the other way).
+    Identical results mean no jitter, or a seed per restart.
 14. **The wobble's direction.** Record whether the red bar's shake direction predicts the side
     the ball curves (unresolved in WSR).
 
@@ -888,3 +1075,8 @@ stop as the "yd to go" change.
   `synth/`
 - decoder reports: `$S/research/swing/A/report.md`, `C/report.md`, `D/report.md`; re-checks:
   `$S/research/swing/verify/`, `$S/fix/U/verdicts-done.json`
+- second pass: `$S/next/work/F2/<claim>/` (A9, A10, A13, C9, C10, C11, D11, D13, D15, D16
+  listings, scripts and outputs), `$S/next/work/F2/patch/` (`c10_d15_d11_numbers.py` →
+  `c10_d15_d11_numbers_out.txt`: the assist's size, the lie-yaw examples, the jitter
+  enumeration; `dis_8018c4d0.txt`: the effect stub's target), `$S/next/reports/F2-patch.md`
+  (what changed)
