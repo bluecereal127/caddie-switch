@@ -1,10 +1,19 @@
 // Render the app's hole maps from the WSR data alone. Two arts:
 //
 //  --art wsr (default): WSR's own minimap. Each course archive holds
-//    glf_map_<id>.brres: a model glf_map_<id> that is the KCL ground split by
-//    class (bunker / fringe / fairway / green / rock / OB / rough / sea objects,
-//    identical triangle counts, IoU 1.000 against the class rasters on H10)
-//    in the KCL frame, textured with WSR's minimap tiles, and glf_tree_<id>:
+//    glf_map_<id>.brres: a model glf_map_<id> in the KCL frame, textured with
+//    WSR's minimap tiles, that is the KCL ground by class (bunker / fringe /
+//    fairway / green / rock / OB / rough / sea objects) with WSR's own edits:
+//    per-class IoU against the class rasters is 1.000 on H1, H6, H10, H11,
+//    H13, H14, H16 and H20; elsewhere the model paints OB over KCL water on
+//    H3's right edge and top-left coast (1,150 map px), H5's and H7's edges
+//    (180 / 400) and H21's bottom-left, x41-72 y207-303 (1,400), sand over
+//    KCL water on H3's and H19's beaches (360 / 490), fairway over an 8x8 px
+//    KCL sand square on H4 (x147-154 y122-129) and OB over a 10x10 px KCL
+//    pond and a rough strip on H12 (x140-149 y267-276; x109-118 y114-120);
+//    H3 and H21 agree on 97-98% of live pixels, every other hole on 99% or
+//    more, and the Switch minimap follows the model where checked
+//    (tools/MESHES.md "Rendered minimaps"). And glf_tree_<id>:
 //    one sprite quad per placement tree on rough or fairway. tools/wsr-map/
 //    holds the extracted copies (textures, sprites, per-hole geometry; see
 //    --extract), so no disc is needed. The model is rasterised top-down into
@@ -26,7 +35,11 @@
 //    the same textures tiled at the model's world scale, sprites at the
 //    placement positions.
 //  --art switch: the style tools/map-style.mjs sampled from the captures
-//    (tools/map-style.json) over the class-raster geometry.
+//    (tools/map-style.json) over the class-raster geometry, the cross-check.
+//    It and --wsr raster write to captures/derived/render-switch /
+//    render-raster unless --out says otherwise, never over the shipped
+//    renders; each index.json entry records its art, and build-derived ships
+//    the capture stack for a hole whose render is not the WSR art.
 //
 // Both read the mesh class rasters (captures/meshes/heightmaps-res4), the
 // mesh registration, the PMP trees and starts (tools/wsr-pins.json) and the
@@ -35,7 +48,7 @@
 // draws its own pins and ball.
 //
 //   node tools/render-maps.mjs [--art wsr|switch] [--wsr model|raster] [--trees model|placement]
-//        [--scale 2] [--ss 4] [--holes 7,16] [--out captures/derived/render]
+//        [--scale 2] [--ss 4] [--holes 7,16] [--out captures/derived/render (render-switch / render-raster for the cross-checks)]
 //        [--style tools/map-style.json] [--green-scale 4] [--green-min 256] [--no-green]
 //   node tools/render-maps.mjs --extract <WSR_Extract>/DATA/files/Stage/Shared2 [--holes 1] [--wsr-dir tools/wsr-map]
 //     rebuilds tools/wsr-map from the course archives: glf_course_<id>.carc as
@@ -70,7 +83,7 @@ import { MAP_W, MAP_H, CLS, LAND, loadHole, fracToRaster, resolveRaster, cleanRa
 import { readArchive, archiveTextures, objectTriangles } from "./lib/brres.mjs";
 
 const args = process.argv.slice(2);
-const opt = { scale: 2, ss: 4, holes: null, out: "captures/derived/render", style: "tools/map-style.json", greenScale: 4, greenMin: 256, green: true, art: "wsr", wsr: "model", trees: "model", extract: null, wsrDir: "tools/wsr-map" };
+const opt = { scale: 2, ss: 4, holes: null, out: null, style: "tools/map-style.json", greenScale: 4, greenMin: 256, green: true, art: "wsr", wsr: "model", trees: "model", extract: null, wsrDir: "tools/wsr-map" };
 for (let i = 0; i < args.length; i++) {
   const a = args[i];
   if (a === "--scale") opt.scale = +args[++i];
@@ -91,8 +104,14 @@ for (let i = 0; i < args.length; i++) {
 // the model and the raster's bunker rim and shipped, exit 0, a third image
 const CHOICES = { art: ["wsr", "switch"], wsr: ["model", "raster"], trees: ["model", "placement"] };
 for (const [k, v] of Object.entries(CHOICES)) if (!v.includes(opt[k])) { console.error(`--${k} must be one of ${v.join("|")}, got "${opt[k]}"`); process.exit(1); }
+// the shipped art has the default directory; a cross-check art writes beside
+// it (the file names are the same, so a cross-check run into the shipped
+// directory replaced the renders build-derived ships, with nothing to tell
+// them apart but the art recorded in index.json, which it now checks)
+opt.out ??= opt.art === "wsr" && opt.wsr === "model" ? "captures/derived/render" : `captures/derived/render-${opt.art === "wsr" ? opt.wsr : opt.art}`;
 const ROOT = process.cwd();
-const STYLE = readJson(join(ROOT, opt.style));
+// --style, --out and --wsr-dir resolve against the cwd, so absolute paths work too
+const STYLE = readJson(resolve(ROOT, opt.style));
 const HOLES = opt.holes ?? Array.from({ length: 21 }, (_, i) => i + 1);
 const WSR_DIR = resolve(ROOT, opt.wsrDir), OUT = resolve(ROOT, opt.out);
 
@@ -810,9 +829,11 @@ function dropSmallRocks(o, hole) {
 }
 
 // The green's second layer is glf_tokosenFix, a 1-D ramp of 12 flat bands
-// from light to dark, read through the model's uv set 1 whose v is the vertex
-// height (0 at the green's highest point, 1 at its lowest, on every hole
-// tested): WSR's own contour shading, lighter = higher. The Switch's overview
+// from light to dark, read through the model's uv set 1 whose v falls
+// linearly with the vertex height (0-1 spans the green's own range on 15
+// holes; on H1, H2, H10, H12, H14 and H18 the window is wider, v 0.26-0.74
+// on H1, so those crops show part of the ramp; tools/MESHES.md "Rendered
+// minimaps"): WSR's own contour shading, lighter = higher. The Switch's overview
 // draws no such thing: its green is flat and light (capture stacks, luma mean
 // 158-169 inside the eroded WSR green polygon on 19 holes, sd 4-16; H6 127
 // and H7 145 only because the flag and cup cover much of those small greens
@@ -959,11 +980,13 @@ mkdirSync(OUT, { recursive: true });
 
 // index.json: a --holes batch keeps the other holes' entries (their PNGs are
 // untouched too) and refreshes its own, so build-derived's stale-crop check
-// sees every hole whichever way the directory was built
+// sees every hole whichever way the directory was built; each entry records
+// the art it was rendered with (the file level says only the last run's), so
+// build-derived can tell a cross-check batch from the shipped art
 const idxPath = join(OUT, "index.json");
 let prevHoles = {};
 if (opt.holes) { try { prevHoles = JSON.parse(readFileSync(idxPath, "utf8")).holes ?? {}; } catch {} }
-const index = { _note: "Written by tools/render-maps.mjs. map: the 250x304 hole-map frame at `scale` px per map px. green: the WSR green box (wsr-truth.json) plus `margin` of it on every side, at the box's true aspect (width/height in map px); bbox-local (u,v) in 0..1 sits at ((u + margin) / (1 + 2 margin)) of the image, as the app's GreenView places pins.", scale: opt.scale, ss: opt.ss, style: opt.style, art: opt.art, wsr: opt.art === "wsr" ? { mode: opt.wsr, trees: opt.trees } : undefined, holes: { ...prevHoles } };
+const index = { _note: "Written by tools/render-maps.mjs. map: the 250x304 hole-map frame at `scale` px per map px. green: the WSR green box (wsr-truth.json) plus `margin` of it on every side, at the box's true aspect (width/height in map px); bbox-local (u,v) in 0..1 sits at ((u + margin) / (1 + 2 margin)) of the image, as the app's GreenView places pins. art, wsr: per entry, what that hole was rendered with (the top level is the last run's; build-derived ships only art wsr, mode model).", scale: opt.scale, ss: opt.ss, style: opt.style, art: opt.art, wsr: opt.art === "wsr" ? { mode: opt.wsr, trees: opt.trees } : undefined, holes: { ...prevHoles } };
 for (const n of HOLES) {
   const t0 = Date.now();
   const P = prepareHole(n);
@@ -973,7 +996,7 @@ for (const n of HOLES) {
   const map = render({ fx0: 0, fy0: 0, fx1: 1, fy1: 1, width: MAP_W * opt.scale, height: MAP_H * opt.scale, ss: opt.ss, flatGreen: true });
   savePng(join(OUT, `h${nn}.png`), map);
   const t1 = Date.now();
-  const entry = { map: { file: `h${nn}.png`, width: map.width, height: map.height, scale: opt.scale } };
+  const entry = { art: opt.art, ...(opt.art === "wsr" ? { wsr: { mode: opt.wsr, trees: opt.trees } } : {}), map: { file: `h${nn}.png`, width: map.width, height: map.height, scale: opt.scale } };
   if (opt.green && P.hole.truth.greenBox) {
     const b = P.hole.truth.greenBox, bw = (b.x1 - b.x0) * MAP_W, bh = (b.y1 - b.y0) * MAP_H;
     const cw = bw * (1 + 2 * GREEN_MARGIN), ch = bh * (1 + 2 * GREEN_MARGIN);

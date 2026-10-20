@@ -112,6 +112,11 @@ fringe plus `--pad 600` units; `--crop all` keeps every non-giant surface.
     node tools/mesh-register.mjs --heightmaps captures/meshes/heightmaps-res4 --out captures/meshes/registration \
          --json tools/mesh-registration.json [--holes 3,11] [--classify-only] [--maps captures/derived/maps]
 
+A `--holes` batch merges its holes into an existing `--json` file and keeps
+the other holes' entries (since 2026-10-19; before, a one-hole refit replaced
+the 21-hole file with that hole alone); without `--holes` the file is
+rewritten whole.
+
 Fits, per hole, a similarity transform (scale, rotation, translation) between
 the 250x304 minimap panel (fractional coords, the frame every app position
 lives in) and mesh units. The input is the Switch's own minimap art: the
@@ -205,13 +210,29 @@ beside greens, were rechecked this way:
   classes registered onto them, pixels away from class edges and canopies):
   on every hole 94-99.6% of mesh fairway is painted fairway-light and
   97-99.8% of mesh rough is painted dark, and every mesh bunker is painted
-  sand except one. Hole 15's apron NE of the green, once reported as a Wii/
+  sand except two. Hole 15's apron NE of the green, once reported as a Wii/
   Switch difference, agrees exactly (127 of 127 mesh-fairway pixels painted
   fairway, 986 of 994 mesh-rough pixels painted rough), so that claim was
-  wrong. The one real difference is a 63-px sand sliver (~10 yd across) at
-  the NE tip of hole 17's right landmass, which the minimap paints as the
-  landmass's dark ground; that landmass is the out-of-bounds dark ground, so
-  it cannot affect a shot. No other course difference was found.
+  wrong. The differences that are there (measured 2026-10-19 by rasterising
+  WSR's own minimap model into each class raster and checking the blobs
+  against the capture stacks; the model and the Switch agree on every one):
+  a 63-px sand sliver (~10 yd across) at the NE tip of hole 17's right
+  landmass (x217-225 y57-70), which both minimaps paint as the landmass's
+  out-of-bounds dark ground; an 80-unit KCL sand cell inside hole 4's
+  fairway at x147-154 y122-129 (64 map px, ~9x9 yd, 134 yd from the tee and
+  61 yd short of the green) that neither minimap draws, both show fairway; a
+  rough triangle on hole 6 at x84-94 y192-202 (82 px, ~22x22 yd) and, on
+  hole 12, a 200-unit water cell plus a rough cell at x140-154 y257-276 (194
+  px, beside the tee) and a rough polygon at x109-118 y114-120 (55 px), all
+  drawn as outer ground (OB) by both minimaps; and the KCL sea plane under
+  the drawn OB along hole 3's right edge (x214-236 y0-140) and top-left
+  coast (x55-93 y0-28), hole 5's bottom edge, hole 7's top edge (x20-40 and
+  x189-216, y0-17) and hole 21's bottom-left (x41-72 y207-303, ~61x189 yd),
+  plus beaches the model paints over the KCL water plane on holes 3 and 19
+  (360 / 490 px). A terrain built from the class rasters (the B4 build) says
+  sand, rough or water at those spots while the shipped map shows fairway,
+  OB or sea; per the truth rule the terrain keeps the KCL class, and the
+  spots are listed so they are recorded as known, not fixed.
 - Holes 8, 15 and 17 have small holes in the collision ground (water or nodata
   showing through) that no capture shows; hole 8's was checked against all 20
   raw tee frames.
@@ -365,8 +386,9 @@ trees with no neighbour in reach and a ray spread under 1.5 px) sits at
 WSR's own**, from the `glf_tree_<id>` model in each course archive, and
 derived.json's `r` describes those. Measured on the 460 quads and the three
 sprite textures (`tools/wsr-map/glfM_map_tree1..3.png`, 64×64): a quad is
-**160 u wide per unit of size** (160.0 on all 31 of H7's and all 33 of H16's
-quads matched to their PMP trees within 2.5 px; p10–p90 151–172), it lies
+**160 u wide per unit of size** (all 31 of H7's and all 33 of H16's quads
+match their PMP trees within 2.5 px; width/size is exactly 160.0 on 28 and
+32 of them, the other four 137–169; p10–p90 151–172), it lies
 flat in the ground plane, and the PMP position is the trunk base at 0.812 of
 the quad from its north edge. The canopy that survives the material's alpha
 test (a ≥ 128) reaches a median 0.422 / 0.395 / 0.387 of the quad from its
@@ -384,12 +406,39 @@ north edge. So on the rendered map
   per size on kind 2) rather than the edge, so the texture extents are the
   measurement.
 
+**Since 2026-10-19 the on-course trees take `r` and `dy` (and `dx`) from
+the quad the renderer paints for them**, not from that rule: the rule assumes
+a 160 u quad anchored on the PMP trunk, but the quads run 137–192 u per unit
+of size and a few are painted off their trunk, so its disc missed the painted
+canopy by over 2 px or 18% in radius on about 20 of the 458 (H1 k28 painted
+4.6 px east of its trunk, the disc covering 61% of the paint; H4 k24 3.9 px
+north with r 1.41×, 53% of the disc unpainted; H6 k45 r 0.67×, 41% covered),
+and a tap on the painted canopy then added a marker. `tools/build-derived.mjs`
+(`TREE_SPRITE`) reads each hole's quads from `tools/wsr-map/hNN.json`
+through the registration, matches each on-course trunk to the quad anchored
+nearest it within 5 px (458 of 458: 456 within 0.7 px, p50 0.03; H1 k28 and
+H20 k6 at 4.6 / 3.4 px), and ships r = the quad's width × 0.422 / 0.395 /
+0.387 and the canopy centre at 0.477 / 0.508 / 0.508 of the width and 0.477
+/ 0.469 / 0.477 of the height from the quad's north-west corner (the sprite
+textures' widest alpha row and alpha rows, kinds 2 / 3 / 6), the trunk at
+0.812 of the height; `dy` is that centre's offset from the trunk and `dx`
+(a fraction of the map width) ships when the centre is at least 0.5 px east
+or west of the trunk: 57 trees, most of them the textures' own 0.5–0.9 px
+asymmetry, three sprites 2.6–4.6 px off their trunks (H1 k28 +4.2, H20 k6
++2.9, H19 k15 −2.6). On the outliers the new discs cover 85–93% of the
+painted canopy with 7–16% of the disc unpainted (the canopy is not a disc);
+a tree of the rule's own size is unchanged (H16 k10, 92% / 15% both ways).
+The app's tap rule tests the disc at (x + dx, y + dy) (`src/App.jsx`), and
+`src/derivedMerge.js` mirrors dx with r and dy. An unmatched tree and the
+off trees keep the rule below.
+
 The Switch's own sprites measured above (81 / 48 / 45, centred on the trunk)
 are larger for the broadleaf and smaller for the conifer and palm; the app
-no longer draws them. In map px r is K·size / (scale·9.144) with the hole's
-yd/px; derived.json carries r as a fraction of the map width. 1,272 of the
-1,540 trees ship (20–100 per hole, a 0.02 margin outside the frame), many of
-them in the outer ground where the minimap draws no canopy at all.
+no longer draws them. In map px the rule's r is K·size / (scale·9.144) with
+the hole's yd/px; derived.json carries r as a fraction of the map width.
+1,272 of the 1,540 trees ship (20–100 per hole, a 0.02 margin outside the
+frame), many of them in the outer ground where the minimap draws no canopy
+at all.
 
 **The ground under each tree (`lie`, 2026-10-18).** `tools/wsr-pins.mjs`
 samples the class raster (`hole-NN_classes.png`, 4 u/px; trees and rasters
@@ -429,8 +478,8 @@ per hole on/off: H1 11/37, H2 14/22, H3 22/64, H4 15/13, H5 24/56, H6
 at 2×, 500×608, JPEG q78) and src/greens.js (the WSR green box plus 0.12 of
 it on every side at the box's true aspect, q82). By default the art is WSR's
 own: each course archive carries `glf_map_<id>.brres`, a model of the KCL
-ground split by class (bunker, fringe, fairway, green, rock, OB, rough, sea;
-IoU 1.000 against the class rasters on H10) textured with the minimap tiles,
+ground by class (bunker, fringe, fairway, green, rock, OB, rough, sea) with
+WSR's own edits (the table below) textured with the minimap tiles,
 and `glf_tree_<id>`, one sprite quad per tree on fairway or rough. The
 renderer rasterises the model top-down into the app frame through
 `tools/mesh-registration.json`, evaluating each material's GX TEV program,
@@ -455,7 +504,7 @@ of the 63 not under the wind dial agree; the other three (H1 and H2
 top-left, H8 top-right) sit at the panel's top edge, where the stacks show
 the 3D scene through the panel (H2's palm trunks), not map art.
 `tools/wsr-map/` holds the extracted textures, sprites and geometry
-(committed, 2.2 MB; `--extract <WSR_Extract>/DATA/files/Stage/Shared2`
+(committed, 2.1 MB; `--extract <WSR_Extract>/DATA/files/Stage/Shared2`
 rebuilds it from the `glf_course_<id>.carc` archives as DolphinTool
 extracts them, through tools/wsr-pins.mjs's Yaz0 + U8 readers, or from the
 `glf_course_<id>.d/` folders Wiimm's `wszst extract glf_course_*.carc`
@@ -466,10 +515,52 @@ the player's input on the solver. The map is thus the mesh frame itself; the
 capture stacks under captures/derived/maps remain the Switch's own art for
 comparison, and a hole with no render falls back to its stack.
 
+**Where the model and the KCL differ (measured 2026-10-19).** The model is
+not the KCL ground split by class everywhere: rasterised top-down into each
+hole's class raster (4 u/px; the M_Iwa bank strips WSR paints over KCL water
+and the outer ground the backdrop fills from the raster word excluded), the
+per-class IoU inside the 250×304 frame is 1.000 on H1, H6, H10, H11, H13,
+H14, H16 and H20 and the pixel agreement is 99% or better on every hole but
+H3 (0.976) and H21 (0.969):
+
+| hole | agree | classes under 0.99 (IoU) | what differs |
+|---|---|---|---|
+| H2 | 0.9999 | sand 0.988 | a thin class's edge |
+| H3 | 0.976 | sand 0.857, water 0.914, outer 0.963, fringe 0.936 | OB over KCL water on the right edge x214-236 y0-140 (865 px) and the top-left coast x55-93 y0-28 (299); beaches over the water plane (362) |
+| H4 | 0.9988 | sand 0.890, fairway 0.985, fringe 0.982 | fairway over the 8×8 px KCL sand cell x147-154 y122-129 |
+| H5 | 0.9959 | water 0.982 | OB over KCL water at the bottom edge (181) |
+| H7 | 0.9931 | outer 0.979, water 0.983 | OB over KCL water at the top edge, x20-40 and x189-216 y0-17 (397) |
+| H8 | 0.9996 | fringe 0.972 | the fringe's edge |
+| H9 | 0.9994 | sand 0.950, fringe 0.817, green 0.988 | a 7×3 px KCL sand patch drawn rough (x99-105 y280-282); the fringe's edge |
+| H12 | 0.9943 | water 0.000, rough 0.977, fringe 0.962 | OB over the 10×10 px KCL pond x140-149 y267-276 and the rough strip above it, and over the rough at x109-118 y114-120; the model's pond x154-171 y236-266 is a KCL nodata region |
+| H15 | 0.9998 | sand 0.987 | a thin class's edge |
+| H17 | 0.9987 | sand 0.883, fringe 0.927, green 0.988 | the 63-px sand sliver drawn OB |
+| H18 | 0.9998 | fringe 0.986 | the fringe's edge |
+| H19 | 0.9933 | sand 0.532, water 0.956 | beach over the water plane x0-56 y266-303 (488, under the wind dial) |
+| H21 | 0.969 | water 0.758, outer 0.953 | OB over KCL water bottom-left x41-72 y207-303 (1,419 px, ~61×189 yd) |
+
+The differences are in WSR's own model, not the rasteriser: at H4 (0.60,
+0.41) the KCL and the model share one triangle, typed sand and drawn
+M_Fairway; at H12 (0.58, 0.89) the same triangle is KCL water and M_OB. The
+Switch minimap follows the model wherever the capture stacks can be read
+(HSV class grids on the stacks: grass on H4's cell, outer ground beside
+H12's tee), so the shipped maps are right; a terrain built from the class
+rasters (B4) says sand / water / rough there, and the course-difference list
+in "What the meshes are" names the spots. The renderer's old "identical
+triangle counts" held on H5 and H11 only (H10: fairway 1123 vs 1121, and no
+OB object against the KCL's 2813 outer triangles).
+
 The green's second layer, `glf_tokosenFix`, is a 1-D ramp of 12 flat bands
-read through the model's uv set 1, whose v is the vertex height (0 at the
-green's highest point, 1 at its lowest): WSR's own contour shading, lighter
-= higher, lerped with the base tile by konst 30/60/90 per channel. The
+read through the model's uv set 1, whose v falls linearly with the vertex
+height (lighter = higher). v 0–1 spans the green's own height range on 15
+holes (within 0.03 at both ends) but a wider window on six, so their crops
+show only part of the ramp: H1 v 0.26–0.74 (bands 4–9 of the 12; a 10.5 u
+window round the green's 5.1), H2 0.10–0.90, H10 0.05–0.90, H12 0.00–0.82,
+H14 0.23–1.00, H18 0.00–0.83 (measured 2026-10-19 on the M_Green vertices
+in tools/wsr-map/hNN.bin); the window matches neither the model polygon's
+nor the KCL green's or fringe's range, so v is a per-hole window, not a
+normalised height (heights come from the meshes). WSR's own contour
+shading, lerped with the base tile by konst 30/60/90 per channel. The
 Switch's overview draws no such thing: inside the eroded WSR green polygon
 (1 map px) the capture stacks read luma 158–169 (sd 4–16) on 19 holes, flat;
 H6 (127) and H7 (145, both sd 15) only because the flag and cup cover much

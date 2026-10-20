@@ -31,11 +31,14 @@ const register = JSON.parse(readFileSync(join(D, "register.json"), "utf8"));
 // rasterised into the 250x304 frame at 2x, and each WSR green box plus its
 // margin at the box's true aspect). A hole that has them ships them; one
 // that does not falls back to its median-stacked captures and the fused zoom
-// texture, and the log says so. index.json is read only to check that a crop
-// on disk was rendered for the green box the truth now has.
+// texture, and the log says so. index.json is read to check that a crop on
+// disk was rendered for the green box the truth now has, and that a render
+// is the WSR art (the renderer's cross-check arts write to another directory
+// by default, but an explicit --out can put them here under the same names).
 const RENDER = join(D, "render");
-let renderIndex = {};
-try { renderIndex = JSON.parse(readFileSync(join(RENDER, "index.json"), "utf8")).holes ?? {}; } catch {}
+let renderIdx = {};
+try { renderIdx = JSON.parse(readFileSync(join(RENDER, "index.json"), "utf8")); } catch {}
+const renderIndex = renderIdx.holes ?? {};
 // JPEG quality of the shipped renders. A map at 2x has four times the pixels
 // of the stack it replaces and WSR's textures are dense (the mottled rough and
 // the OB pattern cover most of a frame), so a 500x608 frame runs 62-108 KB at
@@ -43,8 +46,9 @@ try { renderIndex = JSON.parse(readFileSync(join(RENDER, "index.json"), "utf8"))
 // base64 at q82. At q78 it is 2.08 MB (55-96 KB per hole), and crops of H7
 // encoded at q78, q80 and q82, shown at 2x of the render, cannot be told
 // apart; the quantisation hides in the textures' own noise. The green crops
-// (250-290 px) total 244 KB at q82, under the 288 KB the fused capture
-// textures took at q86, so they keep q82.
+// (250-290 px) total 244 KB at q82 (227 KB at q80, 288 KB at q86), under
+// the 352 KB (360,042 B) the fused 256x256 capture textures took at q86,
+// so they keep q82.
 const MAP_JPEG_Q = 78, GREEN_JPEG_Q = 82;
 let mapBytes = 0, greenBytes = 0, mapsFromRender = 0, greensFromRender = 0;
 // WSR collision-mesh truth (tools/wsr-truth.json, written by tools/wsr-truth.mjs).
@@ -471,9 +475,10 @@ try { WSRP = JSON.parse(readFileSync(join(ROOT, "tools", "wsr-pins.json"), "utf8
 // from the course archives (tools/wsr-map), so the app draws no marker of its
 // own over them and `r` only says how far the painted canopy reaches, for
 // the tap rule. Measured on the quads and the sprite textures (2026-10-18):
-// a quad is 160 KCL units wide per unit of size (160.0 on all 31 of H7's and
-// all 33 of H16's quads matched to their PMP trees; p10-p90 151-172 over the
-// 460), the PMP position is the trunk base at 0.812 of the quad from its
+// a quad is 160 KCL units wide per unit of size (all 31 of H7's and all 33 of
+// H16's quads match their PMP trees within 2.5 px; width/size is exactly
+// 160.0 on 28 and 32 of them, the other four 137-169; p10-p90 151-172 over
+// the 460), the PMP position is the trunk base at 0.812 of the quad from its
 // north edge, and the alpha-tested canopy (a >= 128, the material's test)
 // reaches a median 0.422 / 0.395 / 0.387 of the quad from its own centre
 // along 36 rays (kind 2 broadleaf / 3 conifer / 6 palm; the widest row spans
@@ -488,6 +493,67 @@ try { WSRP = JSON.parse(readFileSync(join(ROOT, "tools", "wsr-pins.json"), "utf8
 const TREE_CANOPY_UNITS = { 2: 68, 3: 63, 6: 62 };
 const TREE_CANOPY_UP = { 2: 54, 3: 55, 6: 54 };
 const UNITS_PER_YD = 9.144;
+// Since 2026-10-19 that rule is the fallback: an on-course tree takes r and
+// dy from the quad the renderer paints for it (tools/wsr-map/hNN.json
+// `trees.quads`, WSR's own glf_tree model, [material, x0, z0, x1, z1, y] in
+// mesh units with u 0 -> x0 and v 0 -> z0, the north edge, through
+// tools/mesh-registration.json). The rule assumes a 160 u quad per unit of
+// size anchored on the PMP trunk; the quads run 137-192 u per unit and a few
+// are painted off their trunk, so the rule's disc missed the painted canopy
+// by over 2 px or 18% in radius on ~20 of the 458 (H1 k28 painted 4.6 px
+// east of its trunk, H4 k24 3.9 px north with r 1.41x, H6 k45 r 0.67x), and
+// a tap on the painted canopy then added a marker. The canopy within a quad,
+// measured on the three 64x64 sprite textures (the material's alpha test
+// keeps a >= 128): its centre at cx / cy of the quad from the west / north
+// edge (the widest alpha row's middle; the alpha rows' middle), its median
+// reach along 36 rays r of the quad's width; the trunk base, the PMP
+// position, at TREE_QUAD_ANCHOR_V from the north edge. A quad whose anchor is
+// within TREE_QUAD_MATCH px of a trunk is that tree's, closest pairs first:
+// 456 of the 458 on-course trees within 0.7 px (p50 0.03), and the sprites
+// of H1 k28 and H20 k6 stand 4.6 / 3.4 px east of their trunks, hence the
+// radius; an unmatched tree and the off trees keep the rule. A canopy at
+// least TREE_DX_MIN_PX east or west of its trunk ships that offset as dx (a
+// fraction of the map width): the textures' canopies sit 0.5-0.9 px off the
+// quad's middle on some 50 trees, and three sprites stand 2.6-4.6 px off.
+const TREE_SPRITE = { 2: { cx: 0.4766, cy: 0.4766, r: 0.4219 }, 3: { cx: 0.5078, cy: 0.4688, r: 0.3945 }, 6: { cx: 0.5078, cy: 0.4766, r: 0.3867 } };
+const TREE_QUAD_KIND = { Map_tree1: 2, Map_tree2: 3, Map_tree3: 6 }; // the quad material's trailing name -> PMP kind
+const TREE_QUAD_ANCHOR_V = 0.812;
+const TREE_QUAD_MATCH = 5;
+const TREE_DX_MIN_PX = 0.5;
+// the mesh registration (tools/mesh-registration.json), for the painted quads
+let REG = null;
+try { REG = JSON.parse(readFileSync(join(ROOT, "tools", "mesh-registration.json"), "utf8")).holes; } catch {}
+// the hole's painted quads in the map frame: anchor (ax, ay), canopy centre
+// (cx, cy) and radius r (fractions of the frame), or null without the model
+// or the registration
+function paintedQuads(hole) {
+  const reg = REG?.[hole];
+  let model;
+  try { model = JSON.parse(readFileSync(join(ROOT, "tools", "wsr-map", `h${String(hole).padStart(2, "0")}.json`), "utf8")); } catch { return null; }
+  if (!reg || !Array.isArray(model?.trees?.quads)) return null;
+  const M = reg.meshToMapFrac, upp = reg.transform.unitsPerMapPx;
+  const toMap = (X, Z) => [M[0][0] * X + M[0][1] * Z + M[0][2], M[1][0] * X + M[1][1] * Z + M[1][2]];
+  const out = [];
+  for (const [mat, x0, z0, x1, z1] of model.trees.quads) {
+    const kind = TREE_QUAD_KIND[/Map_tree\d$/.exec(mat)?.[0]], s = TREE_SPRITE[kind];
+    if (!s) continue;
+    const w = x1 - x0, h = z1 - z0;
+    const [ax, ay] = toMap((x0 + x1) / 2, z0 + TREE_QUAD_ANCHOR_V * h), [cx, cy] = toMap(x0 + s.cx * w, z0 + s.cy * h);
+    out.push({ kind, ax, ay, cx, cy, r: (w * s.r) / upp / MAP_W });
+  }
+  return out;
+}
+// each on-course tree's quad (index in `trees` -> quad), closest pairs first, each quad once
+function matchQuads(trees, quads) {
+  const painted = new Map();
+  if (!quads) return painted;
+  const pairs = [];
+  trees.forEach((t, i) => { if (TREE_OFF_LIES.has(t.lie)) return; for (const q of quads) { const d = Math.hypot((q.ax - t.x) * MAP_W, (q.ay - t.y) * MAP_H); if (d <= TREE_QUAD_MATCH) pairs.push({ i, q, d }); } });
+  pairs.sort((a, b) => a.d - b.d);
+  const used = new Set();
+  for (const { i, q } of pairs) { if (painted.has(i) || used.has(q)) continue; painted.set(i, q); used.add(q); }
+  return painted;
+}
 // a tree this far outside the frame (fraction) still ships: its canopy reaches in
 const TREE_MARGIN = 0.02;
 // A tree on one of these lies (wsr-pins.json `lie`: the KCL surface under the
@@ -649,8 +715,19 @@ mkdirSync(join(D, "boxes"), { recursive: true });
 for (let hole = 1; hole <= 21; hole++) {
   const id = `h${String(hole).padStart(2, "0")}`;
   // the hole's render and green crop (tools/render-maps.mjs), when it has them
-  const renderMap = existsSync(join(RENDER, `${id}.png`)) ? join(RENDER, `${id}.png`) : null;
-  const renderGreen = existsSync(join(RENDER, `${id}-green.png`)) ? join(RENDER, `${id}-green.png`) : null;
+  let renderMap = existsSync(join(RENDER, `${id}.png`)) ? join(RENDER, `${id}.png`) : null;
+  let renderGreen = existsSync(join(RENDER, `${id}-green.png`)) ? join(RENDER, `${id}-green.png`) : null;
+  // Only the WSR art ships (--art wsr --wsr model, the renderer's default).
+  // The cross-check arts write the same file names, and their green entries
+  // carry the same box and margin, so the art index.json records is the only
+  // sign: per entry since 2026-10-19, else the file level (which a --holes
+  // batch rewrites for the whole directory). A hole rendered in another art
+  // ships its capture stack, and the summary count says so.
+  const rIdx = renderIndex[hole], renderArt = rIdx?.art ?? renderIdx.art, renderMode = (rIdx?.wsr ?? renderIdx.wsr)?.mode ?? "model";
+  if ((renderMap || renderGreen) && (renderArt !== "wsr" || renderMode !== "model")) {
+    console.warn(`H${hole}: captures/derived/render/${id}.png was rendered with --art ${renderArt ?? "unknown"}${renderArt === "wsr" ? ` --wsr ${renderMode}` : ""} (the cross-check), not the WSR art the app ships; using the capture stack instead; rerun tools/render-maps.mjs --holes ${hole}`);
+    renderMap = renderGreen = null;
+  }
   // The median-stacked captures: the shipped map only for a hole with no
   // render (loaded at the end of the loop, where the green is transplanted
   // into it), while the detection stack (flag and cup intact) anchors the
@@ -1038,17 +1115,30 @@ for (let hole = 1; hole <= 21; hole++) {
   }
   // ---- trees from WSR's placement file: the ones on the map, x, y = the
   // trunk, with the painted canopy's radius r as a fraction of the map WIDTH
-  // and its centre's offset dy from the trunk as a fraction of the map HEIGHT
-  // (negative = north; the app's tap rule tests the disc at y + dy) ----
+  // and its centre's offset from the trunk, dy as a fraction of the map
+  // HEIGHT (negative = north) and dx as a fraction of the WIDTH (only when
+  // the sprite stands east or west of its trunk); the app's tap rule tests
+  // the disc at x + dx, y + dy. From the quad the renderer paints where it
+  // has one (TREE_SPRITE), else from the per-kind sprite rule ----
   let trees = null;
   if (Array.isArray(wp?.trees) && wt?.scale) {
     const unitsPerPx = wt.scale * UNITS_PER_YD;
-    trees = wp.trees.filter((t) => t.x >= -TREE_MARGIN && t.x <= 1 + TREE_MARGIN && t.y >= -TREE_MARGIN && t.y <= 1 + TREE_MARGIN)
-      .map((t) => ({ x: +t.x.toFixed(4), y: +t.y.toFixed(4), r: +(((TREE_CANOPY_UNITS[t.kind] ?? TREE_CANOPY_UNITS[2]) * t.size) / unitsPerPx / W).toFixed(4),
-        dy: +(-((TREE_CANOPY_UP[t.kind] ?? TREE_CANOPY_UP[2]) * t.size) / unitsPerPx / H).toFixed(4), kind: t.kind,
-        ...(TREE_OFF_LIES.has(t.lie) ? { off: true } : {}) }));
-    const off = trees.filter((t) => t.off).length;
-    console.log(`H${hole}: trees = ${trees.length} on the map of ${wp.trees.length} in the PMP (${[2, 3, 6].map((k) => `${trees.filter((t) => t.kind === k).length} of kind ${k}`).join(", ")}), ${trees.length - off} on the course, ${off} off (outer ground or water under the trunk), canopy r ${Math.min(...trees.map((t) => t.r * W)).toFixed(1)}-${Math.max(...trees.map((t) => t.r * W)).toFixed(1)} px, centred ${Math.min(...trees.map((t) => -t.dy * H)).toFixed(1)}-${Math.max(...trees.map((t) => -t.dy * H)).toFixed(1)} px north of the trunk`);
+    const onMap = wp.trees.filter((t) => t.x >= -TREE_MARGIN && t.x <= 1 + TREE_MARGIN && t.y >= -TREE_MARGIN && t.y <= 1 + TREE_MARGIN);
+    const quads = paintedQuads(hole), painted = matchQuads(onMap, quads);
+    trees = onMap.map((t, i) => {
+      const q = painted.get(i);
+      const r = q ? q.r : ((TREE_CANOPY_UNITS[t.kind] ?? TREE_CANOPY_UNITS[2]) * t.size) / unitsPerPx / W;
+      const dy = q ? q.cy - t.y : -((TREE_CANOPY_UP[t.kind] ?? TREE_CANOPY_UP[2]) * t.size) / unitsPerPx / H;
+      const dx = q && Math.abs(q.cx - t.x) * W >= TREE_DX_MIN_PX ? q.cx - t.x : null;
+      return { x: +t.x.toFixed(4), y: +t.y.toFixed(4), r: +r.toFixed(4), dy: +dy.toFixed(4), ...(dx != null ? { dx: +dx.toFixed(4) } : {}), kind: t.kind,
+        ...(TREE_OFF_LIES.has(t.lie) ? { off: true } : {}) };
+    });
+    const off = trees.filter((t) => t.off).length, on = trees.length - off;
+    const kindMismatch = [...painted].filter(([i, q]) => q.kind !== onMap[i].kind).length;
+    const quadNote = quads
+      ? `; canopy from the painted quad on ${painted.size} of ${on} on-course trees (${trees.filter((t) => t.dx != null).length} with dx${on - painted.size ? `; ${on - painted.size} with no quad within ${TREE_QUAD_MATCH} px keep the sprite rule` : ""}${kindMismatch ? `; ${kindMismatch} quad(s) of another kind than the PMP tree` : ""})`
+      : "; no painted quads (tools/wsr-map or the registration missing), all from the sprite rule";
+    console.log(`H${hole}: trees = ${trees.length} on the map of ${wp.trees.length} in the PMP (${[2, 3, 6].map((k) => `${trees.filter((t) => t.kind === k).length} of kind ${k}`).join(", ")}), ${trees.length - off} on the course, ${off} off (outer ground or water under the trunk), canopy r ${Math.min(...trees.map((t) => t.r * W)).toFixed(1)}-${Math.max(...trees.map((t) => t.r * W)).toFixed(1)} px, centred ${Math.min(...trees.map((t) => -t.dy * H)).toFixed(1)}-${Math.max(...trees.map((t) => -t.dy * H)).toFixed(1)} px north of the trunk${quadNote}`);
   }
   derived.holes[hole] = { scale: wt ? wt.scale : meta.scaleYdPerPx, yards: meta.yards, greenBox, greenPoly,
     grid: quantizeGrid(wt ? wt.grid : g.grid), pins, pinCandidates, pinAmbiguous, pinZones, pinObservations: greenPins,
@@ -1079,14 +1169,18 @@ for (let hole = 1; hole <= 21; hole++) {
     // for: it must be the truth's box exactly (a registration correction
     // translates the box and leaves the aspect alone, and the app would then
     // place pins and slope arrows at the new box's coordinates on the old
-    // image); the aspect stands in only for a hole with no truth
-    const aspect = wt ? +(((wt.greenBox.x1 - wt.greenBox.x0) * W) / ((wt.greenBox.y1 - wt.greenBox.y0) * H)).toFixed(4) : +(gimg.width / gimg.height).toFixed(4);
+    // image)
     const ri = renderIndex[hole]?.green;
+    // without truth nothing says what the box should be: the crop is checked
+    // against its own index.json entry by its integer size (the entry's aspect
+    // is the box's in fractional map px, which the PNG's integer ratio misses
+    // at 4 dp on 20 of the 21 crops) and ships the entry's aspect
+    const aspect = wt ? +(((wt.greenBox.x1 - wt.greenBox.x0) * W) / ((wt.greenBox.y1 - wt.greenBox.y0) * H)).toFixed(4) : ri?.aspect ?? +(gimg.width / gimg.height).toFixed(4);
     const sameBox = (a, b) => !!a && !!b && ["x0", "y0", "x1", "y1"].every((k) => a[k] === b[k]);
-    const stale = !ri || ri.margin !== GT_MARGIN || (wt ? !sameBox(ri.box, wt.greenBox) : ri.aspect !== aspect);
-    const want = `${wt ? `green box ${JSON.stringify(wt.greenBox)}` : `aspect ${aspect}`} (margin ${GT_MARGIN})`;
+    const stale = !ri || ri.margin !== GT_MARGIN || (wt ? !sameBox(ri.box, wt.greenBox) : ri.width !== gimg.width || ri.height !== gimg.height);
+    const want = wt ? `green box ${JSON.stringify(wt.greenBox)} (margin ${GT_MARGIN})` : `a ${gimg.width}x${gimg.height} crop (margin ${GT_MARGIN}; no WSR truth for this hole, so restore its tools/wsr-truth.json entry before the rerun)`;
     if (stale) console.warn(ri
-      ? `H${hole}: ${id}-green.png was rendered for green box ${JSON.stringify(ri.box)} (aspect ${ri.aspect}, margin ${ri.margin}) but the truth now gives ${want}; rerun tools/render-maps.mjs`
+      ? `H${hole}: ${id}-green.png was rendered for green box ${JSON.stringify(ri.box)} (${ri.width}x${ri.height}, aspect ${ri.aspect}, margin ${ri.margin}) but ${wt ? "the truth now gives" : "the file on disk is"} ${want}; rerun tools/render-maps.mjs`
       : `H${hole}: ${id}-green.png has no index.json entry, so nothing says it was rendered for the truth's ${want}; rerun tools/render-maps.mjs`);
     greenMeta[hole] = { aspect, margin: GT_MARGIN, source: "render" };
     greenNote = `green view: render crop ${gimg.width}x${gimg.height} -> ${gj.data.length} B JPEG q${GREEN_JPEG_Q}`;

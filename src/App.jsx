@@ -592,9 +592,12 @@ function HoleMap({ holeNum, line, onLine, markers, onMarkers, markerMode, aimPre
       // and on the course) is swallowed: the map shows the tree already, and
       // a marker on it would only cover it. Any other tap adds your marker.
       // The canopy is the disc of radius m.r (a fraction of the map's width)
-      // centred m.dy (a fraction of its height, negative = north) from the
-      // trunk at m.x, m.y: the game's sprite stands the canopy north of its
-      // trunk by 0.8 of the radius. The 0.06 reach (15 x 18 map px) once
+      // centred m.dx, m.dy (fractions of its width and height; dy negative =
+      // north, dx only on the few sprites painted east or west of their
+      // trunk) from the trunk at m.x, m.y: the game's sprite stands the
+      // canopy north of its trunk by 0.8 of the radius, and the pipeline
+      // measures all three on the quad the map paints (build-derived.mjs,
+      // TREE_SPRITE). The 0.06 reach (15 x 18 map px) once
       // applied to every pipeline tree as well, 20-100 per hole, the
       // off-course ones (where a ball is out of bounds anyway) included:
       // 20-68% of the map and 34-84% of the playable ground (H9) refused a
@@ -605,7 +608,7 @@ function HoleMap({ holeNum, line, onLine, markers, onMarkers, markerMode, aimPre
       if (own) { onMarkers(markers.filter((m) => m.id !== own.m.id)); return; }
       const r = mapRect(e.currentTarget);
       const canopy = markers.some((m) => m.auto && !m.off && m.r > 0
-        && Math.hypot((m.x - fx) * r.width, (m.y + (m.dy ?? 0) - fy) * r.height) < m.r * r.width);
+        && Math.hypot((m.x + (m.dx ?? 0) - fx) * r.width, (m.y + (m.dy ?? 0) - fy) * r.height) < m.r * r.width);
       if (!canopy) onMarkers([...markers, { id: Date.now(), x: fx, y: fy }]);
       return;
     }
@@ -716,7 +719,7 @@ function HoleMap({ holeNum, line, onLine, markers, onMarkers, markerMode, aimPre
         {/* Your own hazard markers. The course's trees are in the map itself
             (WSR's sprites, rendered from the game files at their placement
             positions), so the pipeline's tree markers (auto, with the
-            painted canopy's radius r and offset dy) draw nothing here and
+            painted canopy's radius r and offset dy, dx) draw nothing here and
             only serve the tap rule above; the v13 seeds an install may still
             hold until derived.json loads are auto too, and draw nothing. */}
         {markers.filter((m) => !m.auto).map((m) => (

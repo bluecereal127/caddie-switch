@@ -3,6 +3,8 @@
 //   node tools/mesh-register.mjs --heightmaps captures/meshes/heightmaps-res4 --out captures/meshes/registration
 //        [--json tools/mesh-registration.json] [--holes 3,11] [--classify-only] [--maps captures/derived/maps]
 //        [--derived public/derived.json] [--names tools/mesh-holes.json]
+//   A --holes batch merges its holes into an existing --json file and keeps
+//   the others' entries; without --holes the file is rewritten whole.
 //
 // The app's frame is the 250x304 minimap panel with fractional coordinates.
 // The input is the Switch's own minimap art: the capture stack of each hole,
@@ -324,6 +326,12 @@ for (const hole of holes) {
   console.log(`hole ${String(hole).padStart(2)} ${r.meshId.padEnd(7)} s ${r.transform.unitsPerMapPx.toFixed(2)} u/px (${r.ydPerPx.toFixed(3)} yd/px, app ${r.appScaleYdPerPx ?? "-"}) rot ${r.transform.rotationDeg.toFixed(2)}deg  score ${r.seedScore.toFixed(3)} -> ${r.score.toFixed(3)}  iou grass ${r.iou.grass} sand ${r.iou.sand} water ${r.iou.water} rough ${r.iou.rough}  tee resid ${r.teeResidualPx ?? "-"} px  pins in ${r.pins.filter((q) => q.insideGreen).length}/${r.pins.length}  ${((Date.now() - t0) / 1000).toFixed(1)}s`);
 }
 if (opt.json && !opt.classifyOnly) {
-  writeFileSync(opt.json, JSON.stringify({ _note: "Similarity transform per hole between the app's 250x304 minimap frame (fractional coords) and the WSR collision mesh units (0.1 m). mapFracToMesh: [X,Z] = M * [fx, fy, 1]; meshToMapFrac: [fx, fy] = M * [X, Z, 1]. Fitted by mesh-register.mjs from colour-class overlap against the capture stacks captures/derived/maps/hNN.png (the Switch's own minimap art; never src/maps.js, which is rendered through this registration); seeded from derived.json green centre + yardage scale.", unitsPerYard: UPY, holes: results }, null, 1));
-  console.log(`wrote ${opt.json}`);
+  // a --holes batch keeps the other holes' entries and refreshes its own, as
+  // render-maps does for index.json: a one-hole refit once replaced the
+  // 21-hole file with that hole alone, and every reader of .holes[n] then
+  // threw (render-maps, map-style) or silently built one hole (wsr-truth)
+  let prevHoles = {};
+  if (opt.holes) { try { prevHoles = JSON.parse(readFileSync(opt.json, "utf8")).holes ?? {}; } catch {} }
+  writeFileSync(opt.json, JSON.stringify({ _note: "Similarity transform per hole between the app's 250x304 minimap frame (fractional coords) and the WSR collision mesh units (0.1 m). mapFracToMesh: [X,Z] = M * [fx, fy, 1]; meshToMapFrac: [fx, fy] = M * [X, Z, 1]. Fitted by mesh-register.mjs from colour-class overlap against the capture stacks captures/derived/maps/hNN.png (the Switch's own minimap art; never src/maps.js, which is rendered through this registration); seeded from derived.json green centre + yardage scale.", unitsPerYard: UPY, holes: { ...prevHoles, ...results } }, null, 1));
+  console.log(`wrote ${opt.json}${opt.holes ? ` (${Object.keys(results).length} hole(s) refreshed, ${Object.keys(prevHoles).filter((h) => !results[h]).length} kept)` : ""}`);
 }

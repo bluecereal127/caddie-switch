@@ -39,7 +39,7 @@
 //               and the sprite radius of every isolated kind-2/3 tree (max luma
 //               gradient along 36 rays) fitted as r = a*size + b KCL units.
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { loadImage, savePng } from "./lib/image.mjs";
 import { MAP_W as W, MAP_H as H, CLS, CLASS_NAME, LIVE, LAND, loadHole, fracToRaster, deadRegions, waterComponents, beyondSide, components, edt2, luma, median, medianRGB } from "./lib/minimap.mjs";
 
@@ -119,7 +119,7 @@ const r3 = (v) => (v == null ? null : Array.isArray(v) ? v.map(r3) : typeof v ==
 // HUD colours never occur in the art: the flag's pink, the avatar's yellow
 // star, the cyan aim line, the white pole / dial ring, the black cup.
 function loadCapture(hole) {
-  const cap = loadImage(join(ROOT, opt.maps, `h${hole.nn}.det.png`));
+  const cap = loadImage(resolve(ROOT, opt.maps, `h${hole.nn}.det.png`));
   if (cap.width !== W || cap.height !== H) throw new Error(`h${hole.nn}.det.png is ${cap.width}x${cap.height}, expected ${W}x${H}`);
   const hud = new Uint8Array(W * H), col = new Uint8Array(W * H);
   const wd = hole.reg.map.windDialMasked;
@@ -645,7 +645,9 @@ for (const rec of recs) {
   if (rec.palette.water && colorDist(rec.palette.water, palette[rec.waterStyle]) > PALETTE_KEEP) h.palette.water = r3(rec.palette.water);
   out.holes[rec.hole] = h;
 }
-if (!opt.holes) writeFileSync(join(ROOT, opt.out), JSON.stringify(out, null, 1) + "\n");
+// --maps and --out resolve against the cwd, so an absolute path works too
+// (join doubled it onto the repo root, after the 21 holes had been sampled)
+if (!opt.holes) writeFileSync(resolve(ROOT, opt.out), JSON.stringify(out, null, 1) + "\n");
 else console.log("(--holes given: not writing " + opt.out + ")");
 // --debug: the capture at 4x with every measured tree ringed (yellow = measured
 // radius, white = the rule's, red = dropped as an outlier) and the dead

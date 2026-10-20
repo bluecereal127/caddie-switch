@@ -4,8 +4,12 @@
 // shaders' texture-map / texcoord pairing per TEV stage, the objects with
 // their GX display lists decoded to primitives, and the draw lists (which
 // material each object is drawn with, in what order). Normals, bones beyond
-// the root, fur, user data and the TEX0 pixel data are skipped (wszst has
-// already decoded the textures to PNG).
+// the root, fur and user data are skipped. The TEX0 pixel data is decoded
+// too (decodeTex0 / archiveTextures below: the GX tiled formats, PLT0
+// palettes, top mip level only); render-maps.mjs --extract writes
+// tools/wsr-map/*.png from it, so the raw .carc archives suffice, and
+// wszst's own PNG decode is only the cross-check (it leaves the C4
+// glf_tokosenFix undecoded).
 //
 // Layout references: the Custom Mario Kart wiki's BRRES and MDL0 pages and
 // szs.wiimm.de. Everything is big-endian. Offsets inside an index group are

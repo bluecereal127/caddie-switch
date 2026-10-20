@@ -452,7 +452,7 @@ tools/MESHES.md, "Trees".
   - "⛳ Lower tier" and "⛳ Upper tier" put the ball on the platform's tiers
     ("⛳ Online tee" on a hole none of whose online rounds has a judged tier),
     and a thin white ring around the ball shows while it is on one. Your own
-    hazard markers go anywhere except inside a shown on-course canopy, which
-    is a hazard already; a tap there does nothing.
+    hazard markers go anywhere except inside the painted canopy of an
+    on-course tree, which is a hazard already; a tap there does nothing.
   - Pipeline pins keep the player's current pin on the nearest new spot when
     they change (`src/derivedMerge.js`).
