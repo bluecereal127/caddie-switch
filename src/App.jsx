@@ -6,6 +6,7 @@ import { applyDerivedHole, isPipelinePin } from "./derivedMerge.js";
 import { DEFAULT_CLUBS, GRID_N, emptyGreen, solvePutt, fitClub, solve, stopAt, LANDED, MIN_BARS, SHAPE_LABEL } from "./model.js";
 import { loadTerrain, classAt, lieOf, heightAt } from "./terrain.js";
 import { contourDataUrl } from "./relief.js";
+import { MAP_SCALES, mapScaleOf, mapFileUrl, loadMapIndex, preloadImage } from "./mapScale.js";
 
 
 /* ============================================================
@@ -407,14 +408,54 @@ const ballOn = (ball, spot) => !!(ball && spot && Math.hypot(ball.x - spot.x, ba
 // the lower tier is taken as the ground itself.
 const UPPER_TIER_YD = 1.0;
 // the debug contour image's size (src/relief.js): the maps' own 2x of the
-// 250x304 frame, so its lines sit on the map image's pixels; 25-65 ms a hole
+// 250x304 frame, so its lines sit on the 2x image's pixels (over a 3x / 4x map
+// it stretches over the same box, the frame being the same); 25-65 ms a hole
 // in Node, built once per hole and session
 const CONTOUR_PX = { w: 500, h: 608 };
 
+// The hole map's image at the mapScale setting (src/mapScale.js): the 2x
+// bundle image (HOLE_MAPS) at once, the larger file from public/maps/ once a
+// preload of it has loaded, so a slow connection never shows a blank map (a
+// first view costs 100-196 KB at 3x, 154-317 KB at 4x). A file once loaded
+// shows at once on every later view this session; one whose <img> fails
+// (onError) gives 2x for the session. n null (the view is not on screen)
+// loads nothing. -> { src, shown (the scale on screen), pending, onError }
+const MAP_LOADED = new Map(); // "n:scale" -> its url, loaded this session
+const MAP_BROKEN = new Set(); // "n:scale" whose <img> failed
+function useHoleMapSrc(n, scale) {
+  const key = `${n}:${scale}`;
+  const want = n != null && scale > 2 && !MAP_BROKEN.has(key);
+  const [, rerender] = useState(0);
+  const [missKey, setMissKey] = useState(null); // the key whose load gave no file
+  useEffect(() => {
+    if (!want || MAP_LOADED.has(key)) return;
+    let live = true;
+    setMissKey(null);
+    loadMapIndex()
+      .then((ix) => { const url = mapFileUrl(ix, n, scale); return url ? preloadImage(url).then((ok) => (ok ? url : null)) : null; })
+      .then((url) => {
+        if (url) MAP_LOADED.set(key, url);
+        if (!live) return;
+        if (url) rerender((k) => k + 1); else setMissKey(key);
+      });
+    return () => { live = false; };
+  }, [key, want]);
+  const url = want ? MAP_LOADED.get(key) ?? null : null;
+  return {
+    src: url ?? (n != null ? HOLE_MAPS[n] : null),
+    shown: url ? scale : 2,
+    pending: want && !url && missKey !== key,
+    onError: url ? () => { MAP_BROKEN.add(key); rerender((k) => k + 1); } : undefined,
+  };
+}
+
 /* ---------------- clickable hole map ---------------- */
-function HoleMap({ holeNum, line, onLine, markers, onMarkers, markerMode, aimPreview, cornerMode, onCorner, pins = [], curPinId = null, pinMode = false, onPins, distLabel = null, windBadge = null, teePos = null, teeOnlinePos = null, stopMarker = null, landMarker = null, overlaySrc = null }) {
+// mapSrc: the map image (useHoleMapSrc; the 2x bundle image when absent) and
+// onMapError its <img>'s fallback. The image is the 250x304 frame at any
+// scale, so the overlays, the taps and the markers, all fractional, are the same.
+function HoleMap({ holeNum, line, onLine, markers, onMarkers, markerMode, aimPreview, cornerMode, onCorner, pins = [], curPinId = null, pinMode = false, onPins, distLabel = null, windBadge = null, teePos = null, teeOnlinePos = null, stopMarker = null, landMarker = null, overlaySrc = null, mapSrc = null, onMapError }) {
   const imgRef = useRef(null);
-  const src = HOLE_MAPS[holeNum];
+  const src = mapSrc ?? HOLE_MAPS[holeNum];
   const pinLabelList = pinLabels(pins);
 
   const dragMoved = useRef(false);
@@ -525,7 +566,7 @@ function HoleMap({ holeNum, line, onLine, markers, onMarkers, markerMode, aimPre
   return (
     <div className="relative rounded-xl overflow-hidden select-none touch-none" style={{ border: `3px solid ${T.turfDeep}`, cursor: draggingT ? "grabbing" : "crosshair" }}
       onClick={click} onMouseDown={onDown} onTouchStart={onDown}>
-      <img ref={imgRef} src={src} alt={`Hole ${holeNum} map`} className="w-full block" draggable={false} />
+      <img ref={imgRef} src={src} alt={`Hole ${holeNum} map`} className="w-full block" draggable={false} onError={onMapError} />
       {/* a debug layer between the map and the marks: the Holes tab's contour lines (src/relief.js) */}
       {overlaySrc && <img src={overlaySrc} alt="" className="absolute inset-0 w-full h-full pointer-events-none" draggable={false} />}
       <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 100 100" preserveAspectRatio="none">
@@ -540,8 +581,8 @@ function HoleMap({ holeNum, line, onLine, markers, onMarkers, markerMode, aimPre
           <line x1={b.x} y1={b.y} x2={aimPreview.x * 100} y2={aimPreview.y * 100} stroke={T.sand} strokeWidth="1" strokeDasharray="1.5 1.5" />
         )}
         {/* Nothing is drawn over the green: the map is WSR's own minimap art,
-            rendered from the game files at 2x, its green flat and light like
-            the Switch's overview (the renderer holds WSR's height-contour
+            rendered from the game files at 2x (3x / 4x by the Map chips),
+            its green flat and light like the Switch's overview (the renderer holds WSR's height-contour
             bands at one; the zoomed GreenView keeps them, lighter = higher).
             The SVG checker that used to fill the green's outline was drawn
             when the maps were stacked captures whose 28-px greens averaged
@@ -664,6 +705,10 @@ export default function App() {
   });
   const [rounds, setRounds] = useState([]);
   const [activeRound, setActiveRound] = useState(null);
+  // the hole maps' resolution: 2 (the bundle's image), 3 or 4 (public/maps/,
+  // src/mapScale.js); stored at the root of the app state, an additive key (an
+  // install without it reads 2). A toggle for picking one on the phone.
+  const [mapScale, setMapScale] = useState(2);
   const [saveState, setSaveState] = useState("");
   const [openHole, setOpenHole] = useState(null);
   const [holeMarkerEdit, setHoleMarkerEdit] = useState(false);
@@ -737,6 +782,7 @@ export default function App() {
           return m;
         });
         if (d.activeRound) setActiveRound(d.activeRound);
+        setMapScale(mapScaleOf(d.mapScale));
         // mapV5: maps.js swapped from the 219x270 originals to 250x304
         // median-stacked captures; migrate stored fractional positions with
         // the per-hole registration transforms (fNew = fOld*a + b)
@@ -806,7 +852,7 @@ export default function App() {
   }, []);
 
   const persist = async (patch = {}) => {
-    const data = { clubs, shots, holesMeta, rounds, activeRound, parFixV3: true, mapV4: true, treesV9: true, mapV5: true, derivedV1: true, ...patch };
+    const data = { clubs, shots, holesMeta, rounds, activeRound, mapScale, parFixV3: true, mapV4: true, treesV9: true, mapV5: true, derivedV1: true, ...patch };
     try {
       await window.storage.set(STORE_KEY, JSON.stringify(data));
       setSaveState("saved"); setTimeout(() => setSaveState(""), 1500);
@@ -815,7 +861,7 @@ export default function App() {
 
 
   /* ---- map geometry ---- */
-  const MAP_W = 250, MAP_H = 304; // the hole-map frame in map px (mapV5; the images are rendered at 2x, 500x608, and scale to it)
+  const MAP_W = 250, MAP_H = 304; // the hole-map frame in map px (mapV5; the images are rendered at 2x, 500x608, or 3x / 4x by mapScale, and scale to it)
   const geo = useMemo(() => {
     if (!line.ball || !line.target) return null;
     const dx = (line.target.x - line.ball.x) * MAP_W;
@@ -826,6 +872,12 @@ export default function App() {
   }, [line]);
 
   const scale = holesMeta[hole]?.scale ?? null;
+
+  // the map image at the mapScale setting for the solver's hole and the Holes
+  // tab's open one, each only while its tab shows; HoleMap and GreenCanvas
+  // take the same source
+  const solverMap = useHoleMapSrc(tab === "solver" ? hole : null, mapScale);
+  const openMap = useHoleMapSrc(tab === "holes" ? openHole : null, mapScale);
 
   // the solver's hole's terrain (src/terrain.js: the KCL surface class and the
   // ground height from the WSR meshes); null while it loads or when missing,
@@ -1208,8 +1260,23 @@ export default function App() {
 
               {/* --- the map (full width for a bigger canvas) --- */}
               <div className="space-y-2">
+                {/* the map's resolution (mapScale, stored; the Holes tab's
+                    maps follow it, its thumbnails stay 2x): the bundle's 2x,
+                    or the 3x / 4x files, fetched on a hole's first view; the
+                    note says when the larger one is not on screen yet */}
+                <div className="flex items-center justify-end gap-1 text-[10px]">
+                  {mapScale > 2 && solverMap.shown === 2 && (
+                    <span className="opacity-60 mr-1">{solverMap.pending ? `loading ${mapScale}x…` : `no ${mapScale}x map here: 2x`}</span>
+                  )}
+                  <span className="disp font-bold mr-0.5">Map</span>
+                  {MAP_SCALES.map((s) => (
+                    <button key={s} onClick={() => { setMapScale(s); persist({ mapScale: s }); }}
+                      className="font-bold px-2 py-0.5 rounded-full border-2" style={chip(mapScale === s)}>{s}x</button>
+                  ))}
+                </div>
                 <div>
                   <HoleMap holeNum={hole} line={line} onLine={setLine}
+                    mapSrc={solverMap.src} onMapError={solverMap.onError}
                     markers={holesMeta[hole].markers} onMarkers={(m) => setMarkers(hole, m)}
                     markerMode={markerMode} aimPreview={aimPreview}
                     pins={holesMeta[hole].pins} curPinId={holesMeta[hole].curPin}
@@ -1379,7 +1446,7 @@ export default function App() {
                   {!greenNow?.box && <div className="text-xs">No green captured yet for this hole. Open <b>Holes → Hole {hole} → Set green corners</b>, then copy the in-game B-button grid.</div>}
                   {greenNow?.box && (
                     <>
-                      <GreenCanvas mapSrc={HOLE_MAPS[hole]} green={greenNow} mode="putt"
+                      <GreenCanvas mapSrc={solverMap.src} green={greenNow} mode="putt"
                         ball={putt.ball} cup={putt.cup} path={puttSol?.r.path} aimPt={puttSol?.aimPt}
                         onTap={(x, y) => {
                           if (!putt.ball || (putt.ball && putt.cup)) setPutt({ ball: { x, y }, cup: null });
@@ -1558,6 +1625,7 @@ export default function App() {
                           <div className="grid md:grid-cols-2 gap-4 mt-2">
                             <div>
                               <HoleMap holeNum={n} line={{ ball: null, target: null }} onLine={() => {}}
+                                mapSrc={openMap.src} onMapError={openMap.onError}
                                 markers={m.markers} onMarkers={(mk) => setMarkers(n, mk)}
                                 markerMode={holeMarkerEdit} aimPreview={null}
                                 cornerMode={cornerMode} onCorner={(fx, fy) => handleCorner(n, fx, fy)}
@@ -1586,7 +1654,7 @@ export default function App() {
                                       <button onClick={() => setGreen(n, { ...m.green, grid: emptyGreen().grid })} className="text-[10px] font-bold px-2 py-0.5 rounded-full border-2" style={chip(false)}>clear</button>
                                     </div>
                                   </div>
-                                  <GreenCanvas mapSrc={HOLE_MAPS[n]} green={m.green} mode={greenPaint ? "paint" : "view"}
+                                  <GreenCanvas mapSrc={openMap.src} green={m.green} mode={greenPaint ? "paint" : "view"}
                                     onGrid={(grid) => setGreen(n, { ...m.green, grid })} />
                                   <div className="text-[10px] opacity-60">Open the in-game elevation grid (B on the green) and copy it: drag in a cell in the downhill direction — short drag = gentle, long drag = steep. Tap a cell to clear it.</div>
                                 </div>
