@@ -21,7 +21,8 @@
 //  7. derived.json's trees: kind, size and sy as in wsr-pins.json, z = the
 //     tree's meshY above the WSR start's height in yd
 //  8. lieOf, and the loaders through a fetch stand-in (one fetch per file,
-//     null for a missing one, which is fetched again next time)
+//     null for a missing one, which is fetched again next time, and for a
+//     header that reads an empty grid)
 import { readFileSync, existsSync, mkdtempSync, readdirSync, rmSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -71,6 +72,7 @@ const KNOWN = [
   [21, "OB over the KCL sea plane, bottom-left", 41, 207, 72, 303, 7, 230],
   [19, "beach sand over the KCL water plane", 0, 266, 56, 303, 7, 280],
   [17, "OB over a KCL sand sliver", 217, 57, 225, 70, 3, 10],
+  [9, "rough over a 7x3 px KCL sand patch behind the tee", 99, 280, 105, 282, 3, 4],
   [12, "a pond where the KCL has nodata (map-style.json: pond)", 154, 236, 171, 266, 7, 80],
 ];
 const LIE_CLASS = { fairway: 1, rough: 2, sand: 3, outer: 4, green: 6, water: 7, fringe: 9 };
@@ -199,6 +201,10 @@ ok(T.lieOf(1) === "fairway" && T.lieOf(2) === "rough" && T.lieOf(3) === "bunker"
   ok(g && g.w === green[7].w && g.data[100] === green[7].data[100] && g.mask.length === g.w * g.h, "loadGreenHeights");
   ok((await T.loadTerrain(99, opt)) === null && (await T.loadTerrain(99, opt)) === null && calls.filter((u) => u === "/test/h99.bin").length === 2, "a missing file gives null and is fetched again");
   ok((await T.loadGreenHeights(5, { base: "/test/", fetch: async () => { throw new Error("offline"); } })) === null, "a failed fetch gives null");
+  // a header that reads an empty grid is malformed too (heightAt on it would be NaN, not null)
+  const emptyHdr = (magic, len) => { const b = new Uint8Array(len); b.set([...magic].map((c) => c.charCodeAt(0))); b[4] = 1; return b.buffer; };
+  const serve = (buf) => ({ base: "/test/", fetch: async () => ({ ok: true, arrayBuffer: async () => buf }) });
+  ok((await T.loadTerrain(98, serve(emptyHdr("CTRN", 20)))) === null && (await T.loadGreenHeights(98, serve(emptyHdr("CGRN", 40)))) === null, "a file whose header reads a 0x0 grid gives null");
   ok(T.heightAt(a, -0.1, 0.5) === null && T.classAt(a, 1.2, 0.5) === 0 && T.heightAt(null, 0.5, 0.5) === null, "outside the frame");
 }
 

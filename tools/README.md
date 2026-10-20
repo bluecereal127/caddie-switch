@@ -10,9 +10,9 @@ the app (`build-terrain.mjs` → `public/terrain/`: ground height and surface
 class per hole, fine green heights) are a separate track: see
 [MESHES.md](MESHES.md) (`mesh-inspect.mjs`, `mesh-heightmap.mjs`, `mesh-holes.json`).
 The order for the app's data is extract-maps → extract-greens → (wsr-truth /
-wsr-pins, then build-terrain, when the meshes, archives or registration
-change) → render-maps → build-derived. `node tools/test-terrain.mjs` checks
-the terrain files.
+wsr-pins, then build-terrain, when the meshes, archives, registration or
+map-style.json's regions change) → render-maps → build-derived.
+`node tools/test-terrain.mjs` checks the terrain files.
 
 Pure Node (pngjs + jpeg-js, no native deps). PNG and JPG both work — Switch
 album transfers arrive as JPG, capture cards usually give PNG.

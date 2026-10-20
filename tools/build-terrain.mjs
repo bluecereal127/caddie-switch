@@ -13,9 +13,11 @@
 // datum), tools/wsr-truth.json (green box, outline, yd per map px) and
 // tools/map-style.json (what the minimap draws over the raster's nodata).
 // Writes public/terrain/hNN.bin, gNN.bin and index.json; the app reads them
-// through src/terrain.js. Rerun when the meshes or the registration change,
-// like tools/wsr-truth.mjs. A --holes batch merges its entries into the
-// existing index.json; every file is written only after all holes are built.
+// through src/terrain.js. Rerun when the meshes, the registration or
+// tools/map-style.json's `regions` change (wsr-truth.mjs's triggers plus the
+// style, which decides the nodata classes). A --holes batch merges its
+// entries into the existing index.json; every file is written only after all
+// holes are built.
 //
 // hNN.bin, little-endian, 20-byte header then two arrays, row-major from the
 // map's top-left (row 0 = the north edge, column 0 = the west edge):
@@ -47,10 +49,11 @@
 // (the part of a cell past the raster's crop votes 0; ties take the class
 // under the centre). The KCL class stays wherever the KCL has a surface, also
 // where WSR's own minimap model draws something else (tools/MESHES.md "Where
-// the model and the KCL differ": fairway over a sand cell on H4, OB over KCL
-// water and rough on H12 and over the sea plane on H3, H5, H7 and H21, beaches
-// over the water plane on H3 and H19; tools/test-terrain.mjs lists them). Two
-// things in the rasters are not KCL surfaces and are mended first:
+// the model and the KCL differ": fairway over a sand cell on H4, rough over a
+// sand patch behind H9's tee, OB over KCL water and rough on H12 and over the
+// sea plane on H3, H5, H7 and H21, beaches over the water plane on H3 and H19;
+// tools/test-terrain.mjs lists them). Two things in the rasters are not KCL
+// surfaces and are mended first:
 //  - nodata (no surface at all): enclosed collision gaps in the ground, the
 //    void past the mesh, H12's ponds and H8's strait. Each nodata region takes
 //    what tools/map-style.json says the minimap draws there (sea or pond ->
@@ -62,7 +65,8 @@
 //  - cracks: max-Y rasterising leaves 1-2 px slits along shared and T-junction
 //    triangle edges where what lies below shows through: 1,008 px over the 21
 //    holes, 5-705 u down (627 water, 367 nodata, 8 floor, 6 sand or rough;
-//    219 of them round H1's zone, one in H3's green, 16 yd under it). A 3x3
+//    219 of them round H1's zone; 11 in H3's green box, 16-17 yd down at the
+//    edges of the water holes round its green, none inside the outline). A 3x3
 //    grey-scale closing lifts a slit at most 2 px wide to the surface around
 //    it and leaves wider features and slopes alone (a concave kink rises by
 //    its slope x 4 u at most); a pixel it lifts by more than CRACK_DEPTH takes

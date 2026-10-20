@@ -30,7 +30,8 @@ export function parseTerrain(buf) {
   const u8 = bytesOf(buf), dv = new DataView(u8.buffer, u8.byteOffset, u8.byteLength);
   if (u8.byteLength < 20 || magic(dv) !== "CTRN" || dv.getUint16(4, true) !== LAYOUT) throw new Error("not a terrain file of layout 1");
   const w = dv.getUint16(6, true), h = dv.getUint16(8, true), n = w * h;
-  if (u8.byteLength !== 20 + 3 * n) throw new Error(`terrain file is ${u8.byteLength} bytes, ${w}x${h} needs ${20 + 3 * n}`);
+  // an empty grid (w or h 0) is malformed too: it passes the size check, and heightAt on it would be NaN
+  if (!n || u8.byteLength !== 20 + 3 * n) throw new Error(`terrain file is ${u8.byteLength} bytes, ${w}x${h} needs ${20 + 3 * n}`);
   const heights = new Int16Array(n);
   for (let k = 0; k < n; k++) heights[k] = dv.getInt16(20 + 2 * k, true);
   return { hole: dv.getUint16(10, true), w, h, datumY: dv.getFloat32(12, true), unitYd: dv.getFloat32(16, true), heights, classes: u8.slice(20 + 2 * n, 20 + 3 * n) };
@@ -73,7 +74,7 @@ export function parseGreenHeights(buf) {
   const u8 = bytesOf(buf), dv = new DataView(u8.buffer, u8.byteOffset, u8.byteLength);
   if (u8.byteLength < 40 || magic(dv) !== "CGRN" || dv.getUint16(4, true) !== LAYOUT) throw new Error("not a green height file of layout 1");
   const w = dv.getUint16(6, true), h = dv.getUint16(8, true), n = w * h;
-  if (u8.byteLength !== 40 + 3 * n) throw new Error(`green height file is ${u8.byteLength} bytes, ${w}x${h} needs ${40 + 3 * n}`);
+  if (!n || u8.byteLength !== 40 + 3 * n) throw new Error(`green height file is ${u8.byteLength} bytes, ${w}x${h} needs ${40 + 3 * n}`);
   const f = (k) => dv.getFloat32(12 + 4 * k, true);
   const data = new Int16Array(n);
   for (let k = 0; k < n; k++) data[k] = dv.getInt16(40 + 2 * k, true);

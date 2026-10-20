@@ -549,7 +549,7 @@ Switch minimap follows the model wherever the capture stacks can be read
 (HSV class grids on the stacks: grass on H4's cell, outer ground beside
 H12's tee), so the shipped maps are right; a terrain built from the class
 rasters (B4) says sand / water / rough there, and the course-difference list
-in "What the meshes are" names the spots. The renderer's old "identical
+under "Registration to the app's map frame" names the spots. The renderer's old "identical
 triangle counts" held on H5 and H11 only (H10: fairway 1123 vs 1121, and no
 OB object against the KCL's 2813 outer triangles).
 
@@ -625,16 +625,21 @@ renderer's `resolveRaster` does (sea or pond → water, outer → outer ground,
 the rest the nearest class; H8's start stands in an 80×80 u gap in its tee
 pad). And the max-Y rasteriser leaves 1–2 px cracks along shared and
 T-junction triangle edges where what lies below shows through: 1,008 px over
-the 21 holes, 5–705 u deep (627 of them water; 219 round H1's zone; one in
-H3's green, 16 yd deep), which a 3×3 grey-scale closing finds (lifts over
-5 u; it lifts concave kinks and beach alternation too, 207 px by 2–5 u,
-which stay) and fills from the neighbours. The wider holes in the ground
-("Quirks") are in the KCL and stay. Everywhere else the KCL class stays, also at the spots
-"What the meshes are" lists where WSR's own model, the shipped map and the
-Switch draw another class (H4's sand cell, H6's and H12's rough, H12's pond,
-the sea plane under drawn OB on H3, H5, H7 and H21, the beaches on H3 and
-H19, H17's sand sliver): `tools/test-terrain.mjs` records them as known
-differences.
+the 21 holes, 5–705 u deep (627 of them water; 219 round H1's zone; 11 in
+H3's green box, 16–17 yd deep: the ragged edges of the KCL water holes round
+its green, none inside the outline), which a 3×3 grey-scale closing finds
+(lifts over 5 u; it lifts concave kinks and beach alternation too, 207 px by
+2–5 u, which stay) and fills from the neighbours. The wider holes in the
+ground are in the KCL and stay, the closing trimming only their ragged edges
+(in the frame five round H3's green, 15–170 px, water 130–160 u down; one
+north of H17's green, 50 px, 230 u; a shallow one on H2). Everywhere else the
+KCL class stays, also at the spots where WSR's own model, the shipped map and
+the Switch draw another class, those the 2026-10-18 re-measurement under
+"Registration to the app's map frame" lists and the table at "Where the model
+and the KCL differ" measures (H4's sand cell, H6's and H12's rough, H12's
+pond, a sand patch behind H9's tee, the sea plane under drawn OB on H3, H5,
+H7 and H21, the beaches on H3 and H19, H17's sand sliver):
+`tools/test-terrain.mjs` records them as known differences.
 
 Checked by `node tools/test-terrain.mjs` (no gitignored file needed): the
 tee's height above the green's mean is within 0.4 m of the sidecars' tee pad
@@ -680,8 +685,9 @@ up to 4.5 yd below on H7), and 184 stand beyond the rasters' crops.
    green views rendered from WSR's own minimap model ("Rendered minimaps");
    (done 2026-10-19) the height and class grid per hole and the fine green
    heights under `public/terrain/` ("The terrain shipped to the app"),
-   `tools/build-terrain.mjs`, which runs when the meshes or the registration
-   change, like `wsr-truth.mjs`. Next: the solver reads them (the landing
+   `tools/build-terrain.mjs`, which runs when the meshes, the registration or
+   map-style.json's `regions` change (`wsr-truth.mjs`'s triggers plus the
+   style, which decides the nodata classes). Next: the solver reads them (the landing
    surface for the stop distance, the ball's height for the tree check, the
    green heights for the putts).
 2. Calibrate the putt model to absolute slopes: `gridPct`, and now the green
