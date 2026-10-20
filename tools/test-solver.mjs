@@ -1,7 +1,8 @@
 // node tools/test-solver.mjs [repoRoot]
 // Acceptance for the stop-distance model: WSR's ball physics ported to
 // src/wsrsim.js, its stop-vs-power shape in src/wsrShape.js
-// (tools/build-wsr-shape.mjs) and the solver and club fit in src/model.js.
+// (tools/build-wsr-shape.mjs) and the solver and club fit in src/model.js,
+// and for the elevation (the solver flying the terrain along the line).
 // Runs on the committed files alone (no rasters, no Python).
 //  a. the port against tools/research/wsr-groundsim.py's numbers (its tables in
 //     wsr-ground-phase.md sections 4-8 and wsr-swing-redzone-spin.md 4.4 / 5.7):
@@ -39,7 +40,19 @@
 //     fairway rows' a once it says where it finished
 //  g. simPutt / solvePutt moved out of App.jsx unchanged: a fixed grid of putts
 //     gives the outputs recorded from App.jsx before the move
-//  h. App.jsx and src/model.js parse with @babel/parser (skipped without it)
+//  h. elevation: the port's profile ground (a level profile flies plane(attr,
+//     0) to 1e-9 yd for 7 clubs on 5 surfaces, a uniform 3-degree one the
+//     section 8 slope rows within 0.3 yd); the port's scalar tick flies 160
+//     recorded runs to the bit; a full driver over a 20 yd step at 150 yd
+//     (down: carries over 10 yd further, dh < 0; up: shorter, dh > 0); H21 and
+//     H17 on the default line over the committed terrain (the full driver
+//     carries further on H21, less on H17); a level profile gives the flat
+//     scan's power within 0.01 bar; H21's round trip (a rec's own stop solves
+//     back to its power within 0.02 bar); stopAt is the rec's stop, maxReach
+//     the top cap flight, ballLift, no terrain heights solve flat (elev
+//     false), a distance under a bank gets the closest flight flagged approx;
+//     a 7-club solve on H21's line within the 15 ms budget (mean and p90)
+//  i. App.jsx and src/model.js parse with @babel/parser (skipped without it)
 import { readFileSync, mkdtempSync, rmSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -52,7 +65,7 @@ const imp = (p) => import(pathToFileURL(join(root, p)).href);
 const { run, CLUBS } = await imp("tools/lib/wsrsim.mjs");
 const { WSR_SHAPE, SHAPE_Q, SHAPE_SURFACES } = await imp("src/wsrShape.js");
 const M = await imp("src/model.js");
-const { DEFAULT_CLUBS, BUNKER_CAPS, capFor, landingSurface, stopOf, carryOf, landedStop, solve, fitClub, simPutt, solvePutt } = M;
+const { DEFAULT_CLUBS, BUNKER_CAPS, capFor, landingSurface, stopOf, carryOf, landedStop, stopAt, STOP_TOL, solve, fitClub, simPutt, solvePutt } = M;
 let fails = 0; const ok = (c, msg) => { if (!c) { fails++; console.log("FAIL:", msg); } };
 const near = (got, want, tol, what) => ok(Math.abs(got - want) <= tol, `${what}: ${got.toFixed(3)}, expected ${want} ± ${tol}`);
 const IDS = ["driver", "spoon", "3iron", "5iron", "7iron", "9iron", "wedge"];
@@ -289,16 +302,18 @@ console.log(`round trip: 7 clubs x 13 powers, worst ${worstTrip.toExponential(2)
 // ---- d, real holes: the App's default line (the derived tee to the
 // pipeline pin seen most, as src/derivedMerge.js picks curPin) over the
 // committed terrain, read through src/terrain.js, no wind ----
-const { parseTerrain, classAt, lieOf } = await imp("src/terrain.js");
+const { parseTerrain, classAt, lieOf, heightAt: terrainHeightAt } = await imp("src/terrain.js");
 const DERIVED = JSON.parse(readFileSync(join(root, "public/derived.json"), "utf8")).holes;
 const MAP_W = 250, MAP_H = 304;
-const lineOf = (n) => {
+// the hole's terrain, its tee and the map fraction yd along the default line
+const lineGeo = (n) => {
   const d = DERIVED[n], t = parseTerrain(readFileSync(join(root, `public/terrain/h${String(n).padStart(2, "0")}.bin`)));
   const pin = d.pins.reduce((b, p) => ((p.seen ?? 0) > (b ? b.seen ?? 0 : -1) ? p : b), null) ?? d.pins[0];
   const ball = d.tee, scale = d.scale, dx = (pin.x - ball.x) * MAP_W, dy = (pin.y - ball.y) * MAP_H;
   const th = ((((Math.atan2(dx, -dy) * 180) / Math.PI + 360) % 360) * Math.PI) / 180;
-  return (yd) => lieOf(classAt(t, ball.x + (Math.sin(th) * yd) / scale / MAP_W, ball.y - (Math.cos(th) * yd) / scale / MAP_H));
+  return { t, ball, at: (yd) => [ball.x + (Math.sin(th) * yd) / scale / MAP_W, ball.y - (Math.cos(th) * yd) / scale / MAP_H] };
 };
+const lineOf = (n) => { const { t, at } = lineGeo(n); return (yd) => lieOf(classAt(t, ...at(yd))); };
 {
   const onHole = (n, lie, d) => { const surfaceAt = lineOf(n); return { surfaceAt, o: ask(DEFAULT_CLUBS, d, lie, { surfaceAt }) }; };
   const list = (o) => o.recs.map((r) => `${r.club.name} ${r.power.toFixed(3)} on ${r.surface}`).join("; ") || "no rec";
@@ -480,7 +495,163 @@ for (const cl of DEFAULT_CLUBS) {
   console.log(`putts: ${sims.length} simPutt + ${solves.length} solvePutt runs (${sims.filter((x) => x.r.holed).length} + ${solves.filter((x) => x.r.r.holed).length} holed) ${sha.slice(0, 12)}…, as recorded before the move`);
 }
 
-// ---- h. the parser ----
+// ---- h. elevation: the solver flies the terrain along the line ----
+{
+  // h1. the profile ground in the port: a level profile flies plane(attr, 0)
+  // (asked within 1e-9 yd; every club at full power on every landing
+  // surface), a uniform 3-degree one the 3-degree rows of
+  // wsr-ground-phase.md section 8 (within 0.3 yd, and the tilted plane's own
+  // runs within 1e-9 yd)
+  let worstFlat = 0, worstTilt = 0;
+  for (const id of IDS) for (const s of ["fairway", "rough", "green", "fringe", "bunker"]) {
+    const a = full(id, s), b = run({ club: id, q: 1, profile: { heightAt: () => 0, surfaceAt: () => s } });
+    worstFlat = Math.max(worstFlat, Math.abs(a.stop - b.stop), Math.abs(a.carry - b.carry), Math.abs(a.apex - b.apex));
+    ok(a.ticks === b.ticks && a.bounces === b.bounces, `${id} on a level ${s} profile: ${b.ticks} ticks / ${b.bounces} bounces, the plane ${a.ticks} / ${a.bounces}`);
+  }
+  ok(worstFlat <= 1e-9, `a level profile is ${worstFlat} yd off plane(attr, 0)`);
+  const T3 = Math.tan((3 * Math.PI) / 180), slope3 = (sgn) => ({ heightAt: (x) => sgn * T3 * x, surfaceAt: () => "fairway" });
+  const tilt = [];
+  for (const [id, down, up] of [["driver", 290.9, 266.7], ["9iron", 115.0, 104.5], ["wedge", 63.5, 57.2]]) {
+    const pd = run({ club: id, q: 1, profile: slope3(-1) }), pu = run({ club: id, q: 1, profile: slope3(1) });
+    near(pd.stop, down, 0.3, `${id} on a 3-degree downhill profile`);
+    near(pu.stop, up, 0.3, `${id} on a 3-degree uphill profile`);
+    worstTilt = Math.max(worstTilt, Math.abs(pd.stop - full(id, "fairway", { slopeDeg: -3 }).stop), Math.abs(pu.stop - full(id, "fairway", { slopeDeg: 3 }).stop));
+    tilt.push(`${id} ${pd.stop.toFixed(1)} / ${pu.stop.toFixed(1)}`);
+  }
+  ok(worstTilt <= 1e-9, `a 3-degree profile is ${worstTilt} yd off the tilted plane`);
+  console.log(`profile ground: level within ${worstFlat.toExponential(1)} yd of the plane (7 clubs x 5 surfaces); 3 degrees down / up ${tilt.join(", ")} yd (wsr-ground-phase.md 290.9 / 266.7, 115.0 / 104.5, 63.5 / 57.2), within ${worstTilt.toExponential(1)} yd of the tilted plane`);
+
+  // h2. the port's tick in scalars flies the committed port's shots to the
+  // bit: 160 plane runs of every club and surface with backspin, side spin,
+  // slopes, wind and spinStart, their carry, stop, apex, lateral, bounces,
+  // ticks, reason and path digested as recorded from src/wsrsim.js at 09a118a
+  {
+    let s = 20261020;
+    const rnd = () => (s = (s * 16807) % 2147483647) / 2147483647;   // Park-Miller: exact in doubles
+    const CL = [...IDS, "putter"], SURF = ["fairway", "rough", "bunker", "green", "fringe", "tee"], rows = [];
+    for (let i = 0; i < 160; i++) {
+      const o = { club: CL[i % 8], q: 0.05 + 0.95 * rnd(), surface: SURF[Math.floor(rnd() * 6)] };
+      if (rnd() < 0.4) o.back = rnd();
+      if (rnd() < 0.3) o.side = rnd() - 0.5;
+      if (rnd() < 0.3) o.slopeDeg = (rnd() - 0.5) * 20;
+      if (rnd() < 0.3) o.wind = { mph: Math.floor(rnd() * 32), deg: Math.floor(rnd() * 360) };
+      if (rnd() < 0.3) o.spinStart = Math.floor(rnd() * 100);
+      const r = run(o);
+      rows.push([r.carry, r.stop, r.apex, r.lateral, r.bounces, r.ticks, r.reason, r.path]);
+    }
+    const json = JSON.stringify(rows), sha = createHash("sha256").update(json).digest("hex");
+    ok(sha === "81a4f109d5dba8f421f725a0ba8c5eea5d5017f804d6399e74d2fdd4bdac5b54" && json.length === 2175986, `the port's runs differ from the committed port's (sha256 ${sha}, ${json.length} bytes)`);
+    ok(rows[0][1] === 210.01056093614878 && rows[0][5] === 2096 && rows[159][5] === 195, "the port's first / last recorded run differs");
+  }
+
+  const dr = byId.driver, c7 = byId["7iron"], lvl = (s = "fairway") => ({ heightAt: () => 0, surfaceAt: () => s });
+  // h3. a full driver over a 20 yd step at 150 yd (the ball passes 22.4 yd up
+  // there): down, it falls further and carries longer; up, it lands on the
+  // step's top, short, and dh says which
+  const steps = {};
+  for (const dz of [-20, 20]) {
+    const ctx = { heightAt: (yd) => (yd < 150 ? 0 : dz), surfaceAt: () => "fairway" };
+    const r = ask([dr], stopAt(dr, 4, 0, ctx), "tee", ctx).recs[0];
+    ok(r && r.elev && Math.abs(r.power - 4) < 0.01, `full driver over a ${dz} yd step: ${r ? r.power.toFixed(3) : "no rec"}, expected 4.00`);
+    if (!r) continue;
+    steps[dz] = r;
+    const gain = r.carry - carryOf(dr, 4);
+    if (dz < 0) ok(gain > 10 && r.dh < 0, `20 yd step down: carry ${r.carry.toFixed(1)} (${gain.toFixed(1)} past the level ${carryOf(dr, 4).toFixed(1)}), dh ${r.dh.toFixed(2)}`);
+    else ok(gain < 0 && r.dh > 0, `20 yd step up: carry ${r.carry.toFixed(1)} (${gain.toFixed(1)} past the level), dh ${r.dh.toFixed(2)}`);
+    near(r.dh, dz, 1e-9, `dh over the ${dz} yd step`);
+  }
+  if (steps[-20] && steps[20]) console.log(`steps: a full driver carries ${carryOf(dr, 4).toFixed(1)} yd on level ground; over a 20 yd step down at 150 yd ${steps[-20].carry.toFixed(1)} (+${(steps[-20].carry - carryOf(dr, 4)).toFixed(1)}, stops ${steps[-20].stop.toFixed(1)}, dh ${steps[-20].dh.toFixed(0)}), up ${steps[20].carry.toFixed(1)} (${(steps[20].carry - carryOf(dr, 4)).toFixed(1)}, stops ${steps[20].stop.toFixed(1)}, dh +${steps[20].dh.toFixed(0)})`);
+
+  // h4. H21 and H17 on the default line over the committed terrain, built as
+  // the App builds ctx (heights relative to the ground under the ball): the
+  // full driver lands 49 yd below the tee on H21 and carries further than on
+  // level ground, 18 yd above it on H17 and carries less
+  const groundOf = (n) => {
+    const { t, ball, at } = lineGeo(n), h0 = terrainHeightAt(t, ball.x, ball.y);
+    return { surfaceAt: (yd) => lieOf(classAt(t, ...at(yd))), heightAt: (yd) => { const h = terrainHeightAt(t, ...at(yd)); return h == null ? null : h - h0; } };
+  };
+  const g21 = groundOf(21), g17 = groundOf(17), hole = {};
+  for (const [n, ctx] of [[21, g21], [17, g17]]) {
+    const r = ask([dr], stopAt(dr, 4, 0, ctx), "tee", ctx).recs[0];
+    ok(r && r.elev && Math.abs(r.power - 4) < 0.01, `H${n}: the full driver's rec ${r ? r.power.toFixed(3) : "missing"}, expected 4.00`);
+    if (!r) continue;
+    hole[n] = r;
+    if (n === 21) ok(r.carry > carryOf(dr, 4) && r.dh < 0, `H21: the full driver carries ${r.carry.toFixed(1)} (level ${carryOf(dr, 4).toFixed(1)}), dh ${r.dh.toFixed(1)}`);
+    else ok(r.carry < carryOf(dr, 4) && r.dh > 0, `H17: the full driver carries ${r.carry.toFixed(1)} (level ${carryOf(dr, 4).toFixed(1)}), dh ${r.dh.toFixed(1)}`);
+  }
+  if (hole[21] && hole[17]) console.log(`holes: the full driver carries ${carryOf(dr, 4).toFixed(1)} / stops ${stopOf(dr, 4).toFixed(1)} yd on level ground; on H21's line ${hole[21].carry.toFixed(1)} / ${hole[21].stop.toFixed(1)}, landing ${(-hole[21].dh).toFixed(1)} yd below the tee on ${hole[21].surface}; on H17's ${hole[17].carry.toFixed(1)} / ${hole[17].stop.toFixed(1)}, ${hole[17].dh.toFixed(1)} yd above (stopping ${hole[17].dhStop.toFixed(1)} above)`);
+
+  // h5. a level profile changes nothing: every flat rec comes back at the
+  // flat scan's power (within 0.01 bar asked; the shape interpolates the
+  // flights between 0.05-q knots, so the flight at the flat power can stop a
+  // little off, which the refinement trims) for 7 clubs, 5 landing surfaces,
+  // 3 lies and distances 20-258 yd. The profile may add a rec the flat scan
+  // has not (a distance within STOP_TOL past the floor's stop): counted
+  {
+    let n = 0, worst = 0, extra = 0;
+    for (const s of ["fairway", "rough", "green", "fringe", "bunker"]) for (const lie of ["tee", "rough", "bunker"]) for (const cl of DEFAULT_CLUBS) for (let d = 20; d <= 260; d += 7) {
+      const a = ask([cl], d, lie, { surfaceAt: () => s }).recs[0], b = ask([cl], d, lie, lvl(s)).recs[0];
+      ok(a == null || (a.elev === false && b && b.elev === true), `${cl.id} from ${lie} at ${d} yd on ${s}: the level profile ${b ? "flags" : "drops"} the flat rec`);
+      if (a && b) { n++; worst = Math.max(worst, Math.abs(a.power - b.power)); }
+      else if (b) extra++;
+    }
+    ok(worst <= 0.01, `a level profile moves a flat rec by ${worst.toFixed(4)} bar`);
+    console.log(`level profile: ${n} recs at the flat scan's power (worst ${worst.toExponential(1)} bar); ${extra} more within ${STOP_TOL} yd past a floor`);
+  }
+
+  // h6. H21's round trip: every exact rec (7 clubs from the tee at 30-260 yd)
+  // solved again at its own stop comes back at its power within 0.02 bar
+  {
+    let n = 0, worst = 0;
+    for (const cl of DEFAULT_CLUBS) for (let d = 30; d <= 260; d += 10) {
+      const r = ask([cl], d, "tee", g21).recs[0];
+      if (!r || r.approx) continue;
+      const r2 = ask([cl], r.stop, "tee", g21).recs[0];
+      n++;
+      const diff = r2 ? Math.abs(r2.power - r.power) : Infinity;
+      worst = Math.max(worst, diff);
+      ok(diff <= 0.02, `H21 round trip: ${cl.id} at ${d} yd ${r.power.toFixed(3)} bars stops ${r.stop.toFixed(2)}, which solves to ${r2 ? r2.power.toFixed(3) : "nothing"}`);
+    }
+    console.log(`H21 round trip: ${n} recs solved again at their own stop, worst ${worst.toFixed(4)} bar`);
+  }
+
+  // h7. the rest of the contract: the rec's stop is stopAt's (the rec card's
+  // bar maps through it), maxReach is the clubs' top cap flight, a ball 1 yd
+  // up carries further and lands 1 yd below itself, no terrain (or a ctx
+  // whose heights are all null) solves flat with elev false, and a distance
+  // inside a jump (a bank the ball rolls back from) gets the closest flight,
+  // flagged approx
+  {
+    const o = ask(DEFAULT_CLUBS, 180, "tee", g21);
+    for (const r of o.recs) ok(Math.abs(stopAt(r.club, r.power, 0, g21) - r.stop) < 1e-9 && Math.abs(r.carry + r.roll - r.stop) < 1e-9, `H21 at 180 yd: ${r.club.id}'s stop ${r.stop} is not stopAt's`);
+    const top = Math.max(...DEFAULT_CLUBS.map((cl) => stopAt(cl, capFor(cl, "tee"), 0, g21)));
+    ok(o.maxReach && Math.abs(o.maxReach.yd - top) < 1e-9, `H21 maxReach ${o.maxReach?.yd}, the top cap flight ${top}`);
+    const up = { ...lvl(), ballLift: 1 }, r0 = ask([dr], stopAt(dr, 4, 0, lvl()), "tee", lvl()).recs[0], r1 = ask([dr], stopAt(dr, 4, 0, up), "tee", up).recs[0];
+    ok(r0 && r1 && r1.carry > r0.carry && Math.abs(r1.dh + 1) < 1e-9 && Math.abs(r1.power - 4) < 0.01, `ballLift 1: carry ${r1?.carry} vs ${r0?.carry}, dh ${r1?.dh}`);
+    for (const ctx of [{}, { surfaceAt: () => "rough" }, { surfaceAt: () => "rough", heightAt: () => null }]) {
+      const x = ask(DEFAULT_CLUBS, 150, "tee", ctx);
+      ok(x.recs.length > 0 && x.recs.every((r) => r.elev === false), `no terrain heights (${Object.keys(ctx).join(", ") || "empty ctx"}): recs not flat`);
+    }
+    const bank = { heightAt: (yd) => (yd < 100 ? 0 : yd < 102 ? (yd - 100) * 5 : 10), surfaceAt: () => "fairway" };
+    const b = ask([c7], 102, "tee", bank).recs[0];
+    ok(b && b.approx === true && Math.abs(b.stop - 102) > STOP_TOL && Math.abs(stopAt(c7, b.power, 0, bank) - b.stop) < 1e-9, `the 7-iron to 102 yd below a 10 yd bank at 100: ${b ? `${b.power.toFixed(3)} bars stops ${b.stop.toFixed(2)}, approx ${b.approx}` : "no rec"}`);
+    console.log(`contract: ballLift 1 yd carries the full driver ${r1 ? (r1.carry - r0.carry).toFixed(2) : "?"} yd further; the 7-iron to 102 yd under a 10 yd bank: ${b ? `the closest flight stops ${b.stop.toFixed(1)} (approx)` : "no rec"}`);
+  }
+
+  // h8. the budget: one solve with 7 clubs on H21's line, from the tee at
+  // 40-300 yd after a warm-up, under 15 ms (mean and 90th percentile)
+  {
+    for (let d = 40; d <= 300; d += 20) ask(DEFAULT_CLUBS, d, "tee", g21);
+    const ts = [];
+    for (let rep = 0; rep < 2; rep++) for (let d = 40; d <= 300; d += 5) { const t0 = performance.now(); ask(DEFAULT_CLUBS, d, "tee", g21); ts.push(performance.now() - t0); }
+    ts.sort((a, b) => a - b);
+    const mean = ts.reduce((s, x) => s + x, 0) / ts.length, p90 = ts[Math.floor(ts.length * 0.9)];
+    ok(mean < 15 && p90 < 15, `a 7-club solve on H21's line takes ${mean.toFixed(2)} ms mean, ${p90.toFixed(2)} ms p90 (budget 15)`);
+    console.log(`budget: a 7-club solve on H21's line ${mean.toFixed(2)} ms mean, ${p90.toFixed(2)} p90, ${ts[ts.length - 1].toFixed(2)} max over ${ts.length} solves (budget 15 ms)`);
+  }
+}
+
+// ---- i. the parser ----
 try {
   const { parse } = createRequire(join(root, "package.json"))("@babel/parser");
   for (const f of ["src/App.jsx", "src/model.js", "src/wsrsim.js", "src/wsrShape.js"]) {

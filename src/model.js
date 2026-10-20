@@ -15,7 +15,10 @@
 // landing (a Coulomb friction impulse and a restitution per surface), and a
 // flatter, slower landing rolls further: WSR's driver stops at 112 / 179 /
 // 233 / 279 yd on 1 / 2 / 3 / 4 bars, rolling 54 / 58 / 50 / 39 of it.
+// The shape is level ground; with the course's terrain along the shot line
+// the solver flies WSR's ball over it instead ("elevation" below).
 import { WSR_SHAPE, SHAPE_Q } from "./wsrShape.js";
+import { run } from "./wsrsim.js";
 
 // The seed clubs: a = full-power (4-bar) stop on fairway / 4, from the Switch
 // guide's maxes (driver 250, spoon 200, 3i 175, 5i 155, 7i 135, 9i 100, wedge
@@ -163,6 +166,141 @@ function landingRuns(club, cap, wAlong, readLie) {
   return { runs, split };
 }
 
+/* ---------------- elevation ---------------- */
+// With ctx.heightAt (the ground's height along the shot line, yd above + or
+// below - the ground under the ball, at yd from the ball in the Switch's
+// yards; the App reads it from src/terrain.js) the solver flies each club
+// over the line's terrain with WSR's own ball (src/wsrsim.js run with a
+// profile): the carry onto lower or higher ground, the bounce off the slope
+// it lands on and the roll down or up it, where the shape assumes level
+// ground. The flight is deterministic and ported, so nothing is guessed but
+// the scaling: the sim runs in WSR's yards, and k = 4a (1 + h wAlong) /
+// WSR_SHAPE[club].stopYd (the shape's own normalisation, so a level profile
+// flies the shape's stop) scales its horizontal distances, heights unscaled
+// (a 20 yd drop is 20 yd in both): the sim's ground at x is ctx.heightAt(k x)
+// and its stop x is k x of the Switch's yd. WSR-shaped until logged shots on
+// the big-drop holes (8, 12, 17, 21) calibrate them: the descent angle (from
+// WSR's launch angle and lift) and the bounce on a slope. No wind in the
+// flight: h and c stay the fitted multipliers.
+
+// The line's profile, sampled once per ctx.heightAt / ctx.surfaceAt pair (the
+// App keeps both while only the distance changes): the height every PROF_STEP
+// yd from PROF_BACK behind the ball (the slope at x - 1, a bounce back) to
+// PROF_LEN ahead (past any club's stop; the profile holds its last sample
+// beyond), linear between samples; the lie at the nearest sample, so a
+// surface edge sits within 0.125 yd of the terrain's own (its cells are
+// 1.8-5 yd). Where the terrain has no data (past the frame or the raster's
+// crop) the height holds the sample on the ball's side of the gap.
+const PROF_STEP = 0.25, PROF_BACK = 8, PROF_LEN = 500;
+const profiles = new WeakMap();
+function lineProfile(ctx) {
+  const hit = profiles.get(ctx.heightAt);
+  if (hit && hit.surfaceAt === ctx.surfaceAt) return hit.prof;
+  const i0 = Math.round(PROF_BACK / PROF_STEP), n = i0 + Math.round(PROF_LEN / PROF_STEP) + 1;
+  const h = new Float64Array(n), lies = new Array(n);
+  let any = false;
+  for (let i = 0; i < n; i++) {
+    const yd = (i - i0) * PROF_STEP, z = ctx.heightAt(yd);
+    h[i] = typeof z === "number" && Number.isFinite(z) ? z : NaN;
+    if (!Number.isNaN(h[i])) any = true;
+    lies[i] = ctx.surfaceAt ? ctx.surfaceAt(yd) ?? null : null;
+  }
+  let prof = null;
+  if (any) {
+    if (Number.isNaN(h[i0])) {
+      for (let d = 1; ; d++) {
+        const v = [h[i0 + d], h[i0 - d]].find((x) => x !== undefined && !Number.isNaN(x));
+        if (v !== undefined) { h[i0] = v; break; }
+      }
+    }
+    for (let i = i0 + 1; i < n; i++) if (Number.isNaN(h[i])) h[i] = h[i - 1];
+    for (let i = i0 - 1; i >= 0; i--) if (Number.isNaN(h[i])) h[i] = h[i + 1];
+    prof = { h, lies, n, i0 };
+  }
+  profiles.set(ctx.heightAt, { surfaceAt: ctx.surfaceAt, prof });
+  return prof;
+}
+// the profile's height at yd (the Switch's yd from the ball)
+function profHeight(prof, yd) {
+  const { h, n, i0 } = prof, u = yd / PROF_STEP + i0;
+  if (!(u > 0)) return h[0];
+  if (u >= n - 1) return h[n - 1];
+  const i = Math.floor(u);
+  return h[i] + (h[i + 1] - h[i]) * (u - i);
+}
+
+// One club over the profile: bars -> { p, carry, stop } in the Switch's yd.
+// The ball sits ballLift yd above the profile's origin at launch.
+function flyer(cl, wAlong, prof, ballLift) {
+  const k = (4 * cl.a * (1 + cl.h * wAlong)) / WSR_SHAPE[cl.id].stopYd;
+  const { lies, n } = prof;
+  const profile = {
+    heightAt: (x) => profHeight(prof, k * x),
+    surfaceAt: (x) => { const i = Math.round((k * x) / PROF_STEP) + prof.i0; return lies[i < 0 ? 0 : i >= n ? n - 1 : i]; },
+  };
+  return (bars) => {
+    const o = run({ club: cl.id, q: bars / 4, profile, ballLift, trace: false });
+    return { p: bars, carry: k * o.carry, stop: k * o.stop };
+  };
+}
+
+// The power whose flight stops at dist: from p0 (the flat scan's solution) a
+// Newton step on the flat curve's slope there, then secant steps through the
+// last two flights, at most REFINE_SIMS flights after p0's, inside the
+// bracket the flights have narrowed from [MIN_BARS, cap] (a step leaving it
+// bisects it; the cap's flight top is known to reach), until a flight stops
+// within AIM_TOL yd of dist. The closest flight (the cap's among them) is
+// the answer, exact within STOP_TOL yd, else flagged approx: a distance
+// inside a jump of the stop (a dip that catches the roll, a bank it rolls
+// back down, the carry crossing onto a green) has none closer.
+// The terrain makes the stop ragged in power. Of the 3,357 club-distance
+// pairs that have a stop within STOP_TOL on the 21 holes' default lines from
+// the tee (5 yd apart; a 0.01-bar scan says which), 3 secant flights (the
+// first design) found 85.5 %, 6 find 96.0 % (8: 97.9 %, at a 7-club solve's
+// max 12.5 ms against 9.9). Aiming at AIM_TOL rather than stopping at
+// STOP_TOL costs 0.9 flights a pair and makes the round trip hold (a rec's
+// own stop solves back to its power within 0.02 bar for 527 of 534 recs over
+// 8 holes, against 514 when stopping at STOP_TOL). A 7-club solve takes
+// 3.3 ms mean, 8.3 ms p99, 9.9 ms at most in Node over 2,394 solves on the
+// 21 lines from the tee and rough (tools/test-solver.mjs times H21's).
+// -> the closest flight { p, carry, stop, e = stop - dist }.
+const STOP_TOL = 0.5, AIM_TOL = 0.05, REFINE_SIMS = 6;
+function refine(fly, top, cap, dist, p0, slope0) {
+  const pts = [];
+  let lo = MIN_BARS, loKnown = false, hi = cap;
+  const flyAt = (p) => {
+    const o = p === cap ? top : fly(p), e = o.stop - dist;
+    pts.push({ ...o, e });
+    if (e < 0) { if (p >= lo) { lo = p; loKnown = true; } } else if (p <= hi) hi = p;
+    return e;
+  };
+  let e = flyAt(p0);
+  for (let it = 0; it < REFINE_SIMS && Math.abs(e) > AIM_TOL; it++) {
+    const b = pts[pts.length - 1], a = pts[pts.length - 2];
+    let p = a && b.e !== a.e ? b.p - (b.e * (b.p - a.p)) / (b.e - a.e) : b.p - b.e / slope0;
+    if (!(p > lo && p < hi)) {
+      // below the floor while the floor is unflown: fly the floor itself
+      if (!loKnown && !(p > lo) && !pts.some((x) => x.p === lo)) p = lo;
+      else p = (lo + hi) / 2;
+    }
+    if (pts.some((x) => x.p === p)) break;
+    e = flyAt(p);
+  }
+  if (!pts.some((x) => x.p === cap)) pts.push({ ...top, e: top.stop - dist });
+  return pts.reduce((m, x) => (Math.abs(x.e) < Math.abs(m.e) || (Math.abs(x.e) === Math.abs(m.e) && x.p < m.p) ? x : m));
+}
+// an approximate rec ranks after the exact ones of a like power fraction
+const APPROX_PENALTY = 1;
+
+// The stop of `bars` by the solver's own f: over the profile when ctx has
+// the terrain (as solve flies it), else landedStop's flat curve. The rec
+// card's power bar maps through it (App.jsx dragBar).
+function stopAt(club, bars, wAlong = 0, ctx = {}) {
+  const prof = typeof ctx.heightAt === "function" && WSR_SHAPE[club.id] ? lineProfile(ctx) : null;
+  if (!prof || !(club.a * (1 + club.h * wAlong) > 0)) return landedStop(club, bars, wAlong, ctx.surfaceAt ?? null);
+  return flyer(club, wAlong, prof, Number.isFinite(ctx.ballLift) ? ctx.ballLift : 0)(bars).stop;
+}
+
 /* ---------------- putting ---------------- */
 const GRID_N = 9;
 const emptyGreen = () => ({ box: null, grid: Array.from({ length: GRID_N }, () => Array.from({ length: GRID_N }, () => [0, 0])) });
@@ -269,30 +407,52 @@ function fitClub(club, shots) {
 
 // ctx.surfaceAt(yd) -> the lie the course map shows `yd` along the shot line
 // (the App reads it from the terrain, src/terrain.js), or null without terrain,
-// line or scale. ctx is where later inputs go (the landing's height for
-// elevation, the trees).
+// line or scale; ctx.heightAt(yd) -> the ground's height there, yd relative to
+// the ground under the ball (null where the terrain has no data), which turns
+// on the elevation above; ctx.ballLift = how far the ball sits above that
+// ground, yd (0; the online platform's upper tier). ctx is where later inputs
+// go (the trees).
+// A rec: { club, power, drift, aim, frac, cap, score, calibrated, blocked,
+// carry, roll, surface, landsOn, rollSpin, red, elev }, and with elevation
+// (elev true) also stop (= carry + roll, within STOP_TOL of dist unless
+// approx), dh / dhStop = the ground's height at the carry / the stop minus
+// the ball's (yd, + uphill) and approx.
 function solve(clubs, inputs, blockedRules, ctx = {}) {
   const { dist, windSpeed, relWindDeg, lie, hole, stroke } = inputs;
   const rad = (relWindDeg * Math.PI) / 180;
   const wAlong = windSpeed * Math.cos(rad);
   const wCross = windSpeed * Math.sin(rad);
   const readLie = (yd) => (ctx.surfaceAt ? ctx.surfaceAt(yd) ?? null : null);
+  const prof = typeof ctx.heightAt === "function" ? lineProfile(ctx) : null;
+  const ballLift = Number.isFinite(ctx.ballLift) ? ctx.ballLift : 0;
   const out = [];
   let maxReach = null;
+  const reach = (yd, cl) => { if (!maxReach || yd > maxReach.yd) maxReach = { yd, club: cl.name }; };
+  // a solution's aim, power fraction and score (a blocked rule's aim within 10 yd)
+  const scored = (cl, cap, p) => {
+    const drift = cl.c * wCross * p;
+    const aim = -drift;
+    const frac = p / cap;
+    const rule = hole ? blockedRules.find(
+      (r) => r.hole === hole && r.club === cl.id && (r.stroke === 0 || r.stroke === stroke) && Math.abs(r.aim - aim) <= 10
+    ) : null;
+    let score = Math.abs(frac - 0.8) + (frac > 0.97 ? 0.5 : 0);
+    if (rule) score += 10;
+    return { drift, aim, frac, score, rule };
+  };
   clubs.forEach((cl) => {
     const cap = capFor(cl, lie);
     const denom = cl.a * (1 + cl.h * wAlong);
     if (denom <= 0 || cap < MIN_BARS) return;
+    const fly = prof && WSR_SHAPE[cl.id] ? flyer(cl, wAlong, prof, ballLift) : null;
     // The landing surface by a power scan (landingRuns): every power from the
     // floor to the cap with the surface its own carry lands on. maxReach is the
     // top of f, at the end of a run (f need not rise overall: a bunker under a
-    // long carry stops it short of a shorter one's roll).
+    // long carry stops it short of a shorter one's roll); over the terrain it
+    // is the cap's flight instead (below).
     const { runs, split } = landingRuns(cl, cap, wAlong, readLie);
     const f = (p, s) => stopOf(cl, p, s, 0, wAlong);
-    for (const r of runs) {
-      const yd = f(r.b, r.s);
-      if (!maxReach || yd > maxReach.yd) maxReach = { yd, club: cl.name };
-    }
+    if (!fly) for (const r of runs) reach(f(r.b, r.s), cl);
     // The solutions: each run whose ends straddle dist, bisected on its surface
     // and kept when the read at its own carry agrees. A strip narrower than a
     // step that the solution's carry lands in cuts the run again around it.
@@ -309,32 +469,60 @@ function solve(clubs, inputs, blockedRules, ctx = {}) {
     // it): the best score as before, ties to the lower power
     let best = null;
     for (const sol of sols) {
-      const p = sol.p;
-      const drift = cl.c * wCross * p;
-      const aim = -drift;
-      const frac = p / cap;
-      const rule = hole ? blockedRules.find(
-        (r) => r.hole === hole && r.club === cl.id && (r.stroke === 0 || r.stroke === stroke) && Math.abs(r.aim - aim) <= 10
-      ) : null;
-      let score = Math.abs(frac - 0.8) + (frac > 0.97 ? 0.5 : 0);
-      if (rule) score += 10;
-      if (!best || score < best.score || (score === best.score && p < best.p)) best = { ...sol, drift, aim, frac, score, rule };
+      const sc = scored(cl, cap, sol.p);
+      if (!best || sc.score < best.score || (sc.score === best.score && sol.p < best.p)) best = { ...sol, ...sc };
     }
-    if (!best) return;
-    const { p, surface, landsOn } = best;
-    // carry and roll at the solved power; rollSpin = the same with the full
-    // backspin of that bar (irons and wedge): the range the card shows,
-    // because the spin is a motion input the app cannot know (D4)
-    const carry = carryOf(cl, p, wAlong);
-    const roll = stopOf(cl, p, surface, 0, wAlong) - carry;
-    const rollSpin = spinsBack(cl) ? stopOf(cl, p, surface, 1, wAlong) - carry : null;
-    out.push({ club: cl, power: p, drift: best.drift, aim: best.aim, frac: best.frac, cap, score: best.score, calibrated: cl.shots, blocked: best.rule || null,
-      carry, roll, surface, landsOn, rollSpin, red: p >= cap - RED_MARGIN });
+    if (!fly) {
+      if (!best) return;
+      const { p, surface, landsOn } = best;
+      // carry and roll at the solved power; rollSpin = the same with the full
+      // backspin of that bar (irons and wedge): the range the card shows,
+      // because the spin is a motion input the app cannot know (D4)
+      const carry = carryOf(cl, p, wAlong);
+      const roll = stopOf(cl, p, surface, 0, wAlong) - carry;
+      const rollSpin = spinsBack(cl) ? stopOf(cl, p, surface, 1, wAlong) - carry : null;
+      out.push({ club: cl, power: p, drift: best.drift, aim: best.aim, frac: best.frac, cap, score: best.score, calibrated: cl.shots, blocked: best.rule || null,
+        carry, roll, surface, landsOn, rollSpin, red: p >= cap - RED_MARGIN, elev: false });
+      return;
+    }
+    // Over the terrain: the cap's flight is the club's reach (its surfaces
+    // read at its own contacts; not below 0, where a bank in front of the ball
+    // throws it back behind), and a club whose cap stops short of dist is
+    // out of reach. The rest refines the flat best on the profile (refine);
+    // without one (dist past the flat reach, or inside a jump of the flat
+    // curve) it starts from the flat fairway curve shifted by the cap's
+    // difference between the flight and the flat stop.
+    const top = fly(cap);
+    reach(Math.max(0, top.stop), cl);
+    if (top.stop < dist) return;
+    const slopeOf = (p, s) => {
+      const d = Math.min(0.01, (cap - MIN_BARS) / 2), a = Math.max(MIN_BARS, Math.min(cap - 2 * d, p - d));
+      return (f(a + 2 * d, s) - f(a, s)) / (2 * d);
+    };
+    let p0, s0;
+    if (best) { p0 = best.p; s0 = best.surface; }
+    else {
+      s0 = "fairway";
+      p0 = powerFor(cl, dist - (top.stop - landedStop(cl, cap, wAlong, readLie)), s0, wAlong, MIN_BARS, cap).p;
+    }
+    const r = refine(fly, top, cap, dist, p0, Math.max(1e-3, slopeOf(p0, s0) || 0));
+    const approx = Math.abs(r.e) > STOP_TOL;
+    // the floor flies past dist: the club cannot hit it that short
+    if (approx && r.e > 0 && r.p <= MIN_BARS) return;
+    const p = r.p, landsOn = readLie(r.carry), surface = landingSurface(landsOn), sc = scored(cl, cap, p);
+    const roll = r.stop - r.carry, h0 = profHeight(prof, 0) + ballLift;
+    // rollSpin: the flight carries no spin; the full backspin's effect on the
+    // stop is the shape's (flat ground, that power and landing surface),
+    // taken off the terrain's roll
+    const rollSpin = spinsBack(cl) ? roll - (stopOf(cl, p, surface, 0, wAlong) - stopOf(cl, p, surface, 1, wAlong)) : null;
+    out.push({ club: cl, power: p, drift: sc.drift, aim: sc.aim, frac: sc.frac, cap, score: sc.score + (approx ? APPROX_PENALTY : 0), calibrated: cl.shots, blocked: sc.rule || null,
+      carry: r.carry, roll, surface, landsOn, rollSpin, red: p >= cap - RED_MARGIN,
+      elev: true, stop: r.stop, dh: profHeight(prof, r.carry) - h0, dhStop: profHeight(prof, r.stop) - h0, approx });
   });
   return { recs: out.sort((x, y) => x.score - y.score).slice(0, 3), wAlong, wCross, maxReach };
 }
 
 export {
-  DEFAULT_CLUBS, BUNKER_CAPS, capFor, SHAPE_LABEL, LANDED, MIN_BARS, landingSurface, shapeAt, stopOf, carryOf, landedStop,
+  DEFAULT_CLUBS, BUNKER_CAPS, capFor, SHAPE_LABEL, LANDED, MIN_BARS, landingSurface, shapeAt, stopOf, carryOf, landedStop, stopAt, STOP_TOL,
   GRID_N, emptyGreen, MU, SLOPE_G, CUP_R, CUP_V, simPutt, solvePutt, fitClub, solve,
 };

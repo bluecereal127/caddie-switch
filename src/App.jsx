@@ -3,8 +3,9 @@ import { HOLE_MAPS } from "./maps.js";
 import { GREEN_VIEWS } from "./greens.js";
 import { MAP_XFORM_V5 } from "./mapxform.js";
 import { applyDerivedHole, isPipelinePin } from "./derivedMerge.js";
-import { DEFAULT_CLUBS, GRID_N, emptyGreen, solvePutt, fitClub, solve, landedStop, LANDED, MIN_BARS, SHAPE_LABEL } from "./model.js";
-import { loadTerrain, classAt, lieOf } from "./terrain.js";
+import { DEFAULT_CLUBS, GRID_N, emptyGreen, solvePutt, fitClub, solve, stopAt, LANDED, MIN_BARS, SHAPE_LABEL } from "./model.js";
+import { loadTerrain, classAt, lieOf, heightAt } from "./terrain.js";
+import { contourDataUrl } from "./relief.js";
 
 
 /* ============================================================
@@ -130,17 +131,27 @@ const fmtPow = (p) => (Math.round(p * 20) / 20).toFixed(2);
 // from full backspin to none (D4: the spin comes from the swing's stop after
 // impact, which the app cannot know). Where the course map shows water, OB
 // or a bank at the carry, the card says so (the stop beyond assumes fairway).
+// Flown over the terrain (r.elev), it also says how far above or below the
+// ball the carry lands (from a yard), and where the ball stops when that is
+// a yard or more higher or lower again; a rec no power of its club stops at
+// the distance (r.approx) says how far off its closest flight stops.
+// fmtRise words the readouts under the distance field too ("… the tee").
 const HAZARD_LIE = { water: "water", outer: "out of bounds", wall: "a bank or wall" };
 const LANDS = { fairway: "on fairway", rough: "in rough", green: "on the green", fringe: "on the fringe", bunker: "in a bunker" };
 const fmtRoll = (v) => (Math.round(v) > 0 ? `+${Math.round(v)}` : Math.round(v) < 0 ? `−${-Math.round(v)}` : "0");
-const recRollLine = (r) => {
+const fmtRise = (dh, ref = "you") => (Math.round(Math.abs(dh)) === 0 ? "" : `${Math.round(Math.abs(dh))} yd ${dh > 0 ? "above" : "below"} ${ref}`);
+const recRollLine = (r, dist) => {
   const head = `carry ≈ ${Math.round(r.carry)} yd`;
   if (HAZARD_LIE[r.landsOn]) return `${head} · ⚠ the course map shows ${HAZARD_LIE[r.landsOn]} there`;
   const lands = `lands ${LANDS[r.surface] ?? `on ${r.surface}`}${r.landsOn == null ? " (assumed)" : ""}`;
   const roll = r.rollSpin != null && (r.surface === "green" || r.surface === "fairway")
     ? `rolls ${fmtRoll(r.rollSpin)} … ${fmtRoll(r.roll)} yd (full spin … none)`
     : `rolls ≈ ${Math.round(r.roll)} yd`;
-  return `${head} · ${lands} · ${roll}`;
+  if (!r.elev) return `${head} · ${lands} · ${roll}`;
+  const at = fmtRise(r.dh), stops = Math.abs(r.dhStop - r.dh) >= 1 ? ` · stops ${fmtRise(r.dhStop) || "level with you"}` : "";
+  const off = r.stop - dist;
+  const miss = r.approx ? ` · no power stops it at ${dist} yd: the closest stops ${Math.round(Math.abs(off))} yd ${off > 0 ? "past" : "short"}` : "";
+  return `${head} · ${lands}${at ? `, ${at}` : ""} · ${roll}${stops}${miss}`;
 };
 const holeCourse = (n) => COURSES.find((c) => c.holes.includes(n))?.name ?? "";
 const scoreName = (d) => d <= -3 ? "Albatross" : d === -2 ? "Eagle" : d === -1 ? "Birdie" : d === 0 ? "Par" : d === 1 ? "Bogey" : d === 2 ? "Dbl bogey" : `+${d}`;
@@ -388,9 +399,20 @@ function GreenView({ holeNum, pins = [], curPinId = null, greenBox = null, green
 // 12 holes with tiers (the tiers are 4 yd apart, 0.0052-0.0152 of the map;
 // only H4 and H11 clear 0.01) and From tee as well on H10/H11/H15/H16/H18.
 const ballOn = (ball, spot) => !!(ball && spot && Math.hypot(ball.x - spot.x, ball.y - spot.y) < 1e-6);
+// The online platform's upper tier stands "a few feet" above the lower (the
+// player: upper-tier players see little more than the tops of the lower-tier
+// players' heads); unmeasured, so 1 yd. A ball there sits that far above the
+// course's ground under it (the terrain has no platform), which the solver
+// flies from (ctx.ballLift: +1.3 yd of carry on a full driver, src/model.js);
+// the lower tier is taken as the ground itself.
+const UPPER_TIER_YD = 1.0;
+// the debug contour image's size (src/relief.js): the maps' own 2x of the
+// 250x304 frame, so its lines sit on the map image's pixels; 25-65 ms a hole
+// in Node, built once per hole and session
+const CONTOUR_PX = { w: 500, h: 608 };
 
 /* ---------------- clickable hole map ---------------- */
-function HoleMap({ holeNum, line, onLine, markers, onMarkers, markerMode, aimPreview, cornerMode, onCorner, pins = [], curPinId = null, pinMode = false, onPins, distLabel = null, windBadge = null, teePos = null, teeOnlinePos = null, stopMarker = null }) {
+function HoleMap({ holeNum, line, onLine, markers, onMarkers, markerMode, aimPreview, cornerMode, onCorner, pins = [], curPinId = null, pinMode = false, onPins, distLabel = null, windBadge = null, teePos = null, teeOnlinePos = null, stopMarker = null, landMarker = null, overlaySrc = null }) {
   const imgRef = useRef(null);
   const src = HOLE_MAPS[holeNum];
   const pinLabelList = pinLabels(pins);
@@ -504,6 +526,8 @@ function HoleMap({ holeNum, line, onLine, markers, onMarkers, markerMode, aimPre
     <div className="relative rounded-xl overflow-hidden select-none touch-none" style={{ border: `3px solid ${T.turfDeep}`, cursor: draggingT ? "grabbing" : "crosshair" }}
       onClick={click} onMouseDown={onDown} onTouchStart={onDown}>
       <img ref={imgRef} src={src} alt={`Hole ${holeNum} map`} className="w-full block" draggable={false} />
+      {/* a debug layer between the map and the marks: the Holes tab's contour lines (src/relief.js) */}
+      {overlaySrc && <img src={overlaySrc} alt="" className="absolute inset-0 w-full h-full pointer-events-none" draggable={false} />}
       <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 100 100" preserveAspectRatio="none">
         {b && t && <line x1={b.x} y1={b.y} x2={t.x} y2={t.y} stroke="#fff" strokeWidth="1" strokeDasharray="2.5 2" />}
         {b && t && distLabel && (
@@ -545,6 +569,13 @@ function HoleMap({ holeNum, line, onLine, markers, onMarkers, markerMode, aimPre
             <circle r="1.2" fill="#fff" />
             <circle r="4.6" fill="none" stroke="rgba(255,255,255,0.45)" strokeWidth="0.5" strokeDasharray="1.4 1.2" />
           </g>
+        )}
+        {/* the selected rec's first landing (its carry), a sand diamond drawn
+            over the stop marker's rings, whose outer one reaches 10-35 yd
+            from the stop (0.89-2.51 yd per map px), so a short roll lands
+            inside them */}
+        {landMarker && (
+          <path transform={`translate(${landMarker.x * 100} ${landMarker.y * 100})`} d="M0,-2 L1.7,0 0,2 -1.7,0 Z" fill={T.sand} stroke={T.ink} strokeWidth="0.4" />
         )}
         {windBadge && (() => {
           // the game's own arrow colours, so the badge can be checked against
@@ -640,6 +671,12 @@ export default function App() {
   const [cornerTmp, setCornerTmp] = useState(null);
   const [greenPaint, setGreenPaint] = useState(false);
   const [pinEdit, setPinEdit] = useState(false);
+  // Holes -> ⚙: the debug contour overlay (src/relief.js) of the open hole;
+  // component state, never stored. contourImg = { hole, url } (url null: no
+  // terrain for that hole), each hole's image built once and kept for the session
+  const [contours, setContours] = useState(false);
+  const [contourImg, setContourImg] = useState(null);
+  const contourCache = useRef(new Map());
   const [ioOpen, setIoOpen] = useState(false);
   const [ioText, setIoText] = useState("");
   const [solverPinMode, setSolverPinMode] = useState(false);
@@ -655,7 +692,7 @@ export default function App() {
   const [lie, setLie] = useState("tee");
   const [line, setLine] = useState({ ball: null, target: null });
   const [markerMode, setMarkerMode] = useState(false);
-  const [selRec, setSelRec] = useState(null); // rec card tapped -> stop-marker preview on map
+  const [selRec, setSelRec] = useState(null); // rec card tapped -> its stop and landing markers on the map
   const [calInput, setCalInput] = useState("");
 
   const empty = { club: "driver", power: "3.5", lie: "tee", landed: "fairway", windSpeed: "0", windDeg: 0, carry: "", lateral: "", hole: 0, stroke: 1 };
@@ -800,6 +837,18 @@ export default function App() {
     loadTerrain(hole).then((t) => { if (live) setTerrain(t); });
     return () => { live = false; };
   }, [hole]);
+  useEffect(() => {
+    if (!contours || openHole == null) return;
+    const n = openHole;
+    if (contourCache.current.has(n)) { setContourImg({ hole: n, url: contourCache.current.get(n) }); return; }
+    let live = true;
+    loadTerrain(n).then((t) => {
+      const url = t ? contourDataUrl(t, CONTOUR_PX) : null;
+      if (url) contourCache.current.set(n, url);
+      if (live) setContourImg({ hole: n, url });
+    });
+    return () => { live = false; };
+  }, [contours, openHole]);
 
   // auto-fill distance whenever a calibrated line is drawn
   useEffect(() => {
@@ -854,21 +903,58 @@ export default function App() {
     const th = (shotBearing * Math.PI) / 180;
     return (yd) => lieOf(classAt(terrain, line.ball.x + (Math.sin(th) * yd) / scale / MAP_W, line.ball.y - (Math.cos(th) * yd) / scale / MAP_H));
   }, [terrain, scale, line.ball, shotBearing]);
+  // the ground's height along the same line, yd above (+) or below (-) the
+  // ground under the ball (src/terrain.js; the hole's datum cancels): the
+  // solver flies each club over it (src/model.js, "elevation"). null where
+  // the terrain has no sample; no function at all while the ball's own spot
+  // has none, and the solver keeps the flat shape, as without terrain
+  const heightAlong = useMemo(() => {
+    if (!terrain || !scale || !line.ball || shotBearing == null) return null;
+    const h0 = heightAt(terrain, line.ball.x, line.ball.y);
+    if (h0 == null) return null;
+    const th = (shotBearing * Math.PI) / 180;
+    return (yd) => {
+      const h = heightAt(terrain, line.ball.x + (Math.sin(th) * yd) / scale / MAP_W, line.ball.y - (Math.cos(th) * yd) / scale / MAP_H);
+      return h == null ? null : h - h0;
+    };
+  }, [terrain, scale, line.ball, shotBearing]);
+  // what the solver reads along the line; ballLift = how far the ball sits
+  // above that ground at address, yd: UPPER_TIER_YD on the online platform's
+  // upper tier (its ⛳ chip; ballOn, the chips' own test), else 0 (on the
+  // course itself, the lower tier included)
+  const teeUpper = holesMeta[hole]?.teeOnline?.upper ?? null;
+  const ballLift = teeUpper && ballOn(line.ball, teeUpper) ? UPPER_TIER_YD : 0;
+  const solveCtx = useMemo(() => ({ surfaceAt, heightAt: heightAlong, ballLift }), [surfaceAt, heightAlong, ballLift]);
+  // the readouts under the distance field: the ball's height against the tee
+  // (the heights' datum is the WSR start, the local tee spot; the ball's lift
+  // included) and the target's against the ball, the target being the point
+  // dist along the line, where the solver aims to stop (the drawn target
+  // unless max reach clamped dist). null without terrain or a height under
+  // the ball; target null where the line has none there
+  const elevNote = useMemo(() => {
+    if (!terrain || !line.ball) return null;
+    const hb = heightAt(terrain, line.ball.x, line.ball.y);
+    if (hb == null) return null;
+    const ht = heightAlong && dist > 0 ? heightAlong(dist) : null;
+    return { ball: hb + ballLift, target: ht == null ? null : ht - ballLift };
+  }, [terrain, line.ball, heightAlong, dist, ballLift]);
   const maxReachRef = useRef(null);
   const { recs, maxReach } = useMemo(
-    () => solve(clubs, { dist, windSpeed, relWindDeg, lie, hole, stroke }, blockedRules, { surfaceAt }),
-    [clubs, dist, windSpeed, relWindDeg, lie, hole, stroke, blockedRules, surfaceAt]
+    () => solve(clubs, { dist, windSpeed, relWindDeg, lie, hole, stroke }, blockedRules, solveCtx),
+    [clubs, dist, windSpeed, relWindDeg, lie, hole, stroke, blockedRules, solveCtx]
   );
   // drag a rec card's power bar -> power -> implied stop distance (the solver's
-  // own f: the club's stop curve on the surface that power's carry lands on).
-  // The bar's left end is the solver's floor (MIN_BARS of the cap), where its
-  // recs start. The rounded distance can still fall where the club has no rec
-  // (half the time at the floor's own stop, a hair past the club's top, or
-  // inside a jump of f at a surface edge: 280 of 88,494 bar positions on the
-  // holes' default lines), and the card then unmounts until the next move: a
-  // detached element's rect is all zeros, which would pin frac at 1 and the
-  // distance at the cap's stop for the rest of the drag, so the rect is kept
-  // from the last move it was mounted
+  // own f, src/model.js stopAt: the club flown over the terrain along the
+  // line, or without terrain its stop curve on the surface that power's carry
+  // lands on). The bar's left end is the solver's floor (MIN_BARS of the
+  // cap), where its recs start. The rounded distance can still fall where the
+  // club has no rec (half the time at the floor's own stop, a hair past the
+  // club's top, or inside a jump of f at a surface edge: 280 of 88,494 bar
+  // positions on the holes' default lines on the flat curve; over the terrain
+  // a jump keeps the closest flight as an approximate rec), and the card then
+  // unmounts until the next move: a detached element's rect is all zeros,
+  // which would pin frac at 1 and the distance at the cap's stop for the rest
+  // of the drag, so the rect is kept from the last move it was mounted
   const dragBar = (e, r) => {
     e.stopPropagation(); e.preventDefault();
     const el = e.currentTarget;
@@ -878,7 +964,7 @@ export default function App() {
       if (el.isConnected) rect = el.getBoundingClientRect();
       const pt = ev.touches ? ev.touches[0] : ev;
       const frac = Math.min(1, Math.max(MIN_BARS / r.cap, (pt.clientX - rect.left) / rect.width));
-      const d = Math.round(landedStop(r.club, frac * r.cap, wAlongNow, surfaceAt));
+      const d = Math.round(stopAt(r.club, frac * r.cap, wAlongNow, solveCtx));
       if (d > 0) setDist(d);
     };
     apply(e);
@@ -901,15 +987,20 @@ export default function App() {
     return { x: line.target.x + ox / MAP_W, y: line.target.y + oy / MAP_H };
   }, [geo, scale, bestRec, line]);
 
-  // where the ball should STOP for the current distance, along the drawn
-  // line or the default alignment — the in-game-meter mockup on the minimap
-  const stopPoint = useMemo(() => {
+  // the selected rec on the minimap, along the drawn line or the default
+  // alignment (the in-game-meter mockup): where its ball should STOP (dist,
+  // or over the terrain the flight's own stop, which differs when no power of
+  // the club stops at dist: r.approx) and where it first LANDS (its carry;
+  // over the terrain the flight's, so the marker shows where a drop or a rise
+  // moved the landing)
+  const recMarks = useMemo(() => {
     if (selRec == null || !scale || !line.ball || shotBearing == null || !(dist > 0)) return null;
     const th = (shotBearing * Math.PI) / 180;
-    const pxLen = dist / scale;
-    return { x: line.ball.x + (Math.sin(th) * pxLen) / MAP_W,
-             y: line.ball.y - (Math.cos(th) * pxLen) / MAP_H };
-  }, [selRec, scale, line.ball, shotBearing, dist]);
+    const at = (yd) => ({ x: line.ball.x + (Math.sin(th) * yd) / scale / MAP_W, y: line.ball.y - (Math.cos(th) * yd) / scale / MAP_H });
+    const r = recs[selRec];
+    return { stop: at(r?.elev ? r.stop : dist), land: r?.carry > 0 ? at(r.carry) : null };
+  }, [selRec, recs, scale, line.ball, shotBearing, dist]);
+  const stopPoint = recMarks?.stop ?? null, landPoint = recMarks?.land ?? null;
 
   const greenNow = holesMeta[hole]?.green;
   const greenYd = useMemo(() => {
@@ -1126,7 +1217,7 @@ export default function App() {
                     distLabel={geo ? (scale ? `${Math.round(geo.srcPx * scale)} yd` : "? yd") : null}
                     teePos={holesMeta[hole].tee ?? null}
                     teeOnlinePos={holesMeta[hole].teeOnline ?? null}
-                    stopMarker={stopPoint} />
+                    stopMarker={stopPoint} landMarker={landPoint} />
                 </div>
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   <div className="rounded-xl border-2 p-2" style={{ borderColor: T.line, background: "#fff" }}>
@@ -1265,6 +1356,12 @@ export default function App() {
                       {maxReach ? <>max reachable in this wind/lie: {Math.floor(maxReach.yd)} yd ({maxReach.club})</> : "—"}
                     </div>
                   )}
+                  {lie !== "green" && elevNote && (
+                    <div className="text-[11px] font-semibold opacity-70" title="Heights from the course's terrain (Wii Sports Resort's meshes): the ball against the tee spot, and the target (the distance along your line) against the ball">
+                      <div>ball {fmtRise(elevNote.ball, "the tee") || "level with the tee"}</div>
+                      {elevNote.target != null && <div>target {fmtRise(elevNote.target) || "level with you"}</div>}
+                    </div>
+                  )}
                 </div>
                 <div className="flex-1">
                   <label className="disp text-sm font-semibold">Lie</label>
@@ -1369,7 +1466,7 @@ export default function App() {
                         boxShadow: selRec === i ? `0 0 0 1px ${T.turfDeep}` : undefined }}>
                       {isBest && <div className="absolute top-0 right-0 disp text-[10px] font-bold px-2 py-1 rounded-bl-xl text-white" style={{ background: T.turf }}>BEST</div>}
                       {r.blocked && <div className="absolute top-0 right-0 disp text-[10px] font-bold px-2 py-1 rounded-bl-xl text-white" style={{ background: T.flag }}>🌲 BLOCKED</div>}
-                      <div className="disp text-base font-bold">{r.club.name}{selRec === i && <span className="text-[10px] font-semibold ml-2 opacity-60">● stop point shown on map</span>}</div>
+                      <div className="disp text-base font-bold">{r.club.name}{selRec === i && <span className="text-[10px] font-semibold ml-2 opacity-60">● stop · ◆ landing shown on map</span>}</div>
                       {r.blocked && (
                         <div className="text-[11px] font-semibold mt-0.5 flex items-center gap-2" style={{ color: T.flag }}>
                           <span>Marked on stroke {r.blocked.stroke}: {r.blocked.note}</span>
@@ -1403,7 +1500,7 @@ export default function App() {
                         ))}
                         <div className="absolute -top-1 h-5 w-0.5 pointer-events-none" style={{ left: `${Math.min(100, r.frac * 100)}%`, background: T.ink }} />
                       </div>
-                      <div className="mt-2 text-[11px] font-semibold" style={{ color: HAZARD_LIE[r.landsOn] ? T.flag : T.ink }}>{recRollLine(r)}</div>
+                      <div className="mt-2 text-[11px] font-semibold" style={{ color: HAZARD_LIE[r.landsOn] ? T.flag : T.ink }}>{recRollLine(r, dist)}</div>
                       {r.red && (
                         <div className="mt-1 text-[10px] font-semibold" style={{ color: T.flag }}>
                           ⚠ needs the full bar — past the cap the bar goes red and the ball curves to a RANDOM side (WSR: up to ~35 yd for the driver, ~22 yd for a 7-iron){(lie === "rough" || lie === "bunker") && " (in WSR the red adds up to one bar of power; untested on the Switch)"}
@@ -1465,7 +1562,8 @@ export default function App() {
                                 markerMode={holeMarkerEdit} aimPreview={null}
                                 cornerMode={cornerMode} onCorner={(fx, fy) => handleCorner(n, fx, fy)}
                                 pins={m.pins} curPinId={m.curPin}
-                                pinMode={pinEdit} onPins={(p) => setPins(n, p)} />
+                                pinMode={pinEdit} onPins={(p) => setPins(n, p)}
+                                overlaySrc={contours && contourImg?.hole === n ? contourImg.url : null} />
                               <button onClick={() => { setHoleMarkerEdit(!holeMarkerEdit); setPinEdit(false); }} className="w-full mt-2 py-1.5 rounded-xl border-2 text-xs font-bold" style={chip(holeMarkerEdit)}>
                                 🌲 {holeMarkerEdit ? "Tap map to add/remove hazards" : "Edit hazard pins"}
                               </button>
@@ -1475,6 +1573,10 @@ export default function App() {
                               <button onClick={() => { setCornerMode(!cornerMode); setCornerTmp(null); setHoleMarkerEdit(false); }} className="w-full mt-2 py-1.5 rounded-xl border-2 text-xs font-bold" style={chip(cornerMode)}>
                                 ⛳ {cornerMode ? (cornerTmp ? "Tap opposite corner of green" : "Tap first corner of green") : m.green?.box ? "Redefine green area" : "Set green corners"}
                               </button>
+                              <div className="flex items-center gap-2 mt-2">
+                                <button onClick={() => setContours(!contours)} className="shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full border-2" style={chip(contours)}>Contours (debug)</button>
+                                <span className="text-[10px] opacity-60">every line 2 yd vs the tee (labelled every 10); for checking the terrain against the real hole{contours && contourImg?.hole === n && !contourImg.url ? " · no terrain for this hole" : ""}</span>
+                              </div>
                               {m.green?.box && (
                                 <div className="mt-2 space-y-2">
                                   <div className="flex items-center justify-between">
@@ -1856,7 +1958,7 @@ export default function App() {
                   <div>2. Bunker caps: driver & spoon = 1 bar, every other club = 2 bars, putter = uncapped but the ball rolls far less in sand. So from sand, irons out-reach the driver and spoon.</div>
                   <div>3. Driver and Spoon cannot backspin; irons/wedge can (stop the swing mid-way; stronger swing = stronger spin; downhill landings can spin the ball away).</div>
                   <div>4. OB / water: +1 stroke, replay from the same spot.</div>
-                  <div>5. Minimap dots = flat-terrain landing points; elevation shifts real carry (uphill shorter, downhill longer).</div>
+                  <div>5. Minimap dots = flat-terrain landing points. The solver doesn't assume flat ground: it flies each club over the hole's real terrain along your line (heights from Wii Sports Resort's course meshes), so downhill carries longer and uphill shorter, and the bounce and roll follow the slope. Each rec card says how far above or below you the ball lands, the map marks its landing ◆ beside the stop ●, and under the distance you see the ball's height against the tee and the target's against you.</div>
                   <div>6. Wind arrow colour, measured on the captures: blue through 11 mph, lime from 13 to 22, pink from 24 (12 and 23 mph never came up). The dials here use the same colours, split at 12 and 24.</div>
                   <div>7. Trajectory: driver lowest → spoon → irons rising with number → wedge highest. Low clubs duck under branches; high clubs clear them and feel more wind.</div>
                   <div>8. Wind comes in exactly 8 directions (N/NE/E/SE/S/SW/W/NW) at integer mph, observed 0–31. The dial snaps to the 8 when set "as on minimap".</div>
