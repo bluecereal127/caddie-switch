@@ -14,6 +14,21 @@ wsr-pins, then build-terrain, when the meshes, archives, registration or
 map-style.json's regions change) → render-maps → build-derived.
 `node tools/test-terrain.mjs` checks the terrain files.
 
+The hole maps at 3x and 4x (`build-map-scales.mjs` → `public/maps/`) sit
+beside the 2x maps that src/maps.js bundles, and come right after
+render-maps: render the two scales into their own directories
+(`node tools/render-maps.mjs --scale 3 --out captures/derived/render-3x --no-green`,
+likewise `--scale 4` into `render-4x`; about 5 and 8 s per hole against 2.5
+at 2x), then `node tools/build-map-scales.mjs` encodes them as JPEG q78
+(`hNN-3x.jpg` 750×912, `hNN-4x.jpg` 1000×1216; 2.9 and 4.6 MB for the 21
+holes) with an `index.json` (size, bytes, SHA-1 per hole and scale) that the
+app reads only when its map-resolution setting asks for more than 2x. Like
+build-derived it ships only the WSR art (`--art wsr --wsr model`), and it
+box-filters each render and the 2x one to the 250×304 frame to warn about a
+scale left stale by a renderer change, so rerun all three scales whenever
+render-maps' inputs change. `--scales 3` refreshes one scale and keeps the
+other's files.
+
 Pure Node (pngjs + jpeg-js, no native deps). PNG and JPG both work — Switch
 album transfers arrive as JPG, capture cards usually give PNG.
 
