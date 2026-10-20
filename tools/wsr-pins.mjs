@@ -36,6 +36,19 @@
 // on H1 and H9, up to 26 u = 3 px on H2) with the tree's exact scale on 164 of
 // them; those are not trees of their own and are not read.
 //
+// Each tree also carries `sy`, its y scale (WSR's tree collision scales every
+// height by it and every radius by x: tools/research/wsr-tree-collision.md;
+// it differs from x on 366 of the 1,540, by a factor 0.67-1.52), and `meshY`,
+// the object's own height in mesh units: the trunk base its collision shapes
+// stand on. That is not always the ground under the trunk: against the class
+// rasters' height at the same spot (bilinear, 4 u/px) it is within 1 u on 886
+// of the 1,356 trees the rasters reach, but a tree on a slope is often sunk
+// (p5 -6.8 u) and 36 sit more than a yard below the ground, 15 more than a
+// yard above it (on the course, rough or fairway: 13 below, 2 above, the
+// extremes 41 u = 4.5 yd below on H7 and 15 u above on H5), and the other 184
+// stand beyond the rasters' crops. build-derived ships it as the tree's base
+// height `z` on the hole's datum.
+//
 // Each tree also carries the ground under its trunk, `lie`, read off the
 // per-hole class rasters tools/mesh-heightmap.mjs writes
 // (captures/meshes/heightmaps-res4/hole-NN_classes.png: 8-bit, pixel = KCL
@@ -252,7 +265,7 @@ if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) 
   const lieFrom = { raster: 0, file: 0, none: 0 }, lieTally = {};
   const pmps = [];
   for (const p of inputs) collect(p, pmps);
-  const out = { _note: "WSR golf pins, player starts, tee markers and trees decoded from the course PMP files by tools/wsr-pins.mjs; x/y are fractions of the app's 250x304 map, mesh = KCL units, yd = floor of the flat distance from the player start (what WSR shows). spots = distinct pin positions with labels; set B = 1 (easier), A = 2. trees = every tree object, also outside the map frame: kind = PMP id (2 round canopy, 3 dark crown, 6 palm), size = its x scale (the drawn canopy scales with it, see tools/MESHES.md), lie = the KCL surface under the trunk from the mesh class rasters (fairway, rough, sand, green, fringe, outer = type-4 ground / the floor plane / beyond the raster, water, other); missing when neither the rasters nor a previous file had it.", holes: {} };
+  const out = { _note: "WSR golf pins, player starts, tee markers and trees decoded from the course PMP files by tools/wsr-pins.mjs; x/y are fractions of the app's 250x304 map, mesh = KCL units, yd = floor of the flat distance from the player start (what WSR shows). spots = distinct pin positions with labels; set B = 1 (easier), A = 2. trees = every tree object, also outside the map frame: kind = PMP id (2 round canopy, 3 dark crown, 6 palm), size = its x scale (the drawn canopy scales with it, see tools/MESHES.md), sy = its y scale (every collision height scales with it), meshY = its height in KCL units (the trunk base the collision shapes stand on; not always the ground), lie = the KCL surface under the trunk from the mesh class rasters (fairway, rough, sand, green, fringe, outer = type-4 ground / the floor plane / beyond the raster, water, other); missing when neither the rasters nor a previous file had it.", holes: {} };
   for (const f of pmps) {
     const m = /glf_course_(fc(?:JP)?\d+)\.pmp$/i.exec(f.name);
     const meshId = m ? m[1].replace(/^fcjp/i, "fcJP") : null;
@@ -281,7 +294,7 @@ if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) 
     const trees = objs.filter((o) => o.group === 2 && (o.id === 2 || o.id === 3 || o.id === 6))
       .map((o) => {
         const [x, y] = toFrac(o.pos[0], o.pos[2]);
-        const t = { x: +x.toFixed(4), y: +y.toFixed(4), kind: o.id, size: +o.scale[0].toFixed(3) };
+        const t = { x: +x.toFixed(4), y: +y.toFixed(4), kind: o.id, size: +o.scale[0].toFixed(3), sy: +o.scale[1].toFixed(3), meshY: +o.pos[1].toFixed(2) };
         const lie = ras ? ras.at(o.pos[0], o.pos[2]) : prevLie(hole, t);
         from[ras ? "raster" : lie ? "file" : "none"]++;
         if (lie) { hist[lie] = (hist[lie] || 0) + 1; (lieTally[o.id] ??= {})[lie] = (lieTally[o.id][lie] || 0) + 1; }

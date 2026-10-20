@@ -4,11 +4,15 @@ Turns Switch capture frames into Log-tab import JSON rows:
 `{club,power,lie,windSpeed,windDeg,ended,side?,hole?,stroke?}`.
 
 Course geometry from the Wii Sports Resort collision meshes (16-bit heightmaps,
-surface-class maps, mesh→hole mapping, unit scale) and the hole maps rendered
-from WSR's own minimap model (`render-maps.mjs`) are a separate track: see
+surface-class maps, mesh→hole mapping, unit scale), the hole maps rendered
+from WSR's own minimap model (`render-maps.mjs`) and the terrain shipped to
+the app (`build-terrain.mjs` → `public/terrain/`: ground height and surface
+class per hole, fine green heights) are a separate track: see
 [MESHES.md](MESHES.md) (`mesh-inspect.mjs`, `mesh-heightmap.mjs`, `mesh-holes.json`).
 The order for the app's data is extract-maps → extract-greens → (wsr-truth /
-wsr-pins, when the meshes or archives change) → render-maps → build-derived.
+wsr-pins, then build-terrain, when the meshes, archives or registration
+change) → render-maps → build-derived. `node tools/test-terrain.mjs` checks
+the terrain files.
 
 Pure Node (pngjs + jpeg-js, no native deps). PNG and JPG both work — Switch
 album transfers arrive as JPG, capture cards usually give PNG.

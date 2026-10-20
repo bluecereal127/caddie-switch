@@ -1,0 +1,3 @@
+# the terrain and WSR map geometry files are binary; every one carries a NUL
+# byte in its header, so git would detect that anyway, but say it
+*.bin binary

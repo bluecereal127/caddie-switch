@@ -350,8 +350,11 @@ frame, `kind` = the id, `size` = the object's x scale) and
 `tools/build-derived.mjs` ships the ones on the map, with a canopy radius, as
 derived.json `trees`; the app mirrors them into its tree markers on every
 load (`src/derivedMerge.js`), replacing the v13 hand-placed seeds, of which
-only 24 of 130 were within 6 px of a real tree. Holes 1, 2, 9, 11 and 12 also
-carry 166 objects of ids 4, 5 and 7 (48, 33, 42, 24 and 19), each 0–26 u from
+only 24 of 130 were within 6 px of a real tree. Since 2026-10-19 each tree
+also has `sy` (the y scale, which every collision height scales by) and
+`meshY` (its height, KCL units), and derived.json ships `size`, `sy` and the
+base height `z` with each tree ("The terrain shipped to the app"). Holes 1,
+2, 9, 11 and 12 also carry 166 objects of ids 4, 5 and 7 (48, 33, 42, 24 and 19), each 0–26 u from
 a tree of ids 2, 3 or 6 — 0 u on H11 and H12, under 13 u (0.6 px) on H1 and
 H9, up to 26 u (3.0 px at 8.8 u/px) on H2 — with exactly that tree's scale on
 164 of the 166 (two on H1 differ by 0.1–0.3): companions of those trees, not
@@ -584,6 +587,72 @@ the XLU objects' alpha are runtime state the files do not carry. A hole renders 
 `--holes` batch merges its entries into `index.json`, and a value outside
 the documented sets of `--art`/`--wsr`/`--trees` exits 1.
 
+## The terrain shipped to the app (2026-10-19)
+
+The class and height rasters are gitignored, so `tools/build-terrain.mjs`
+ships what the solver needs from them under `public/terrain/` (committed),
+read by `src/terrain.js`:
+
+    node tools/build-terrain.mjs [--heightmaps captures/meshes/heightmaps-res4] [--out public/terrain] [--holes 7]
+
+- `hNN.bin`: the ground height and the KCL class on a 125×152 grid over the
+  250×304 map frame, one sample per 2 map px (1.8–5.0 yd), 57,020 bytes per
+  hole. Heights are int16 in 0.1 yd above the hole's datum, the WSR player
+  start's height (the PMP start's Y, which equals the tee pad's on every hole
+  within 0.1 u; `datumY` in index.json), read bilinearly at the sample's centre;
+  against the median of the raster px in the sample's cell they differ by
+  under 0.04 yd at the median cell and 0.07–0.13 yd at the 99th percentile,
+  more only where a cell straddles a cliff or bank (it reads part way down).
+  The class is the majority of the raster px in the cell. Past the raster's
+  crop (the core surfaces plus 600 u) there is no height and class 0: up to
+  42% of the frame (H5; 28–39% on H1, H9, H10 and H21), none on eight holes.
+- `gNN.bin`: the green's heights every 0.5 yd over the WSR green box plus
+  0.12 of it on every side (63×68 to 103×87 nodes, 13–27 KB), int16 in
+  0.001 yd above the green's mean, with the WSR outline as a mask. Their 9×9
+  cell slopes reproduce `gridPct` (built from the mesh's green triangles at
+  1 u/px): the median cell within 0.1–0.5° and 1% in size on every green,
+  97–100% of the cells over 1% within 20° and 20%. The unit is 0.001 yd
+  because 0.01 yd over 0.5 yd is a 2% slope step, against 1.9 / 5.5 / 11.8%
+  at the p10 / p50 / p90 of the green cells.
+- `index.json`: the layouts, each hole's datum, file sizes and SHA-1s, and
+  sample counts by class. 1,169 KB of terrain and 415 KB of green heights
+  raw, 230 + 208 KB gzipped.
+
+Two things in the rasters are not KCL surfaces and are mended first. Their
+nodata (no surface: collision gaps, the void past the mesh, H12's ponds,
+H8's strait) takes what map-style.json says the minimap draws there, as the
+renderer's `resolveRaster` does (sea or pond → water, outer → outer ground,
+the rest the nearest class; H8's start stands in an 80×80 u gap in its tee
+pad). And the max-Y rasteriser leaves 1–2 px cracks along shared and
+T-junction triangle edges where what lies below shows through: 1,008 px over
+the 21 holes, 5–705 u deep (627 of them water; 219 round H1's zone; one in
+H3's green, 16 yd deep), which a 3×3 grey-scale closing finds (lifts over
+5 u; it lifts concave kinks and beach alternation too, 207 px by 2–5 u,
+which stay) and fills from the neighbours. The wider holes in the ground
+("Quirks") are in the KCL and stay. Everywhere else the KCL class stays, also at the spots
+"What the meshes are" lists where WSR's own model, the shipped map and the
+Switch draw another class (H4's sand cell, H6's and H12's rough, H12's pond,
+the sea plane under drawn OB on H3, H5, H7 and H21, the beaches on H3 and
+H19, H17's sand sliver): `tools/test-terrain.mjs` records them as known
+differences.
+
+Checked by `node tools/test-terrain.mjs` (no gitignored file needed): the
+tee's height above the green's mean is within 0.4 m of the sidecars' tee pad
+minus the middle of the green's height range on all 21 holes (H21 51.1 m,
+H17 −19.8 m); the height at the start is 0 within 0.2 yd and its class
+fairway on every hole; every WSR pin spot (118) is green and every on-course
+trunk in the frame (455) has its lie's class; the trees in derived.json carry
+the scales and base height from wsr-pins.json; and, where the rasters are,
+two builds are byte-identical to each other and to the committed files.
+
+The trees' base heights do not come from this grid: derived.json's `z` is
+the PMP object's own height (wsr-pins.json `meshY`), which is where WSR's
+collision shapes stand. Against the ground under the trunk (the rasters,
+bilinear) it is within 1 u on 886 of the 1,356 trees the rasters reach; a
+tree on a slope is often sunk a little (p5 −6.8 u), 36 sit more than a yard
+below the ground and 15 more than a yard above it (on the course 13 and 2,
+up to 4.5 yd below on H7), and 184 stand beyond the rasters' crops.
+
 ## Quirks worth knowing
 
 - fcJP12 (H3) and fcJP6 (H2) carry extra type-6 quads sitting on the floor plane
@@ -608,15 +677,19 @@ the documented sets of `--art`/`--wsr`/`--trees` exits 1.
 
 1. (done) Registration mesh → minimap, and the WSR truth applied to scale,
    greens, pins, slope grids and tees; (done 2026-10-18) the hole maps and
-   green views rendered from WSR's own minimap model ("Rendered minimaps").
-   Next: publish a low-res height + class raster per hole in the map frame
-   under `public/` for the app to fetch like `derived.json`, so the solver
-   can read elevation and lies.
-2. Calibrate the putt model to absolute slopes (`gridPct`): the 9×9 levels are
-   still per-green relative, so a level-3 cell means "this green's steepest",
-   not a fixed gradient.
+   green views rendered from WSR's own minimap model ("Rendered minimaps");
+   (done 2026-10-19) the height and class grid per hole and the fine green
+   heights under `public/terrain/` ("The terrain shipped to the app"),
+   `tools/build-terrain.mjs`, which runs when the meshes or the registration
+   change, like `wsr-truth.mjs`. Next: the solver reads them (the landing
+   surface for the stop distance, the ball's height for the tree check, the
+   green heights for the putts).
+2. Calibrate the putt model to absolute slopes: `gridPct`, and now the green
+   heights every 0.5 yd (`gNN.bin`); the 9×9 levels are still per-green
+   relative, so a level-3 cell means "this green's steepest", not a fixed
+   gradient.
 3. Per-hole elevation offsets for the shot model (holes 8/12/17 first) from the
-   tee/landing-zone heights in the sidecars (tee to green centre: up to 51 m
-   down on H21, 20 m up on H17). Online rounds add the tee platform's tier:
+   tee/landing-zone heights, now in `public/terrain/` (tee to green centre:
+   up to 51 m down on H21, 20 m up on H17). Online rounds add the tee platform's tier:
    the upper tier is a few feet above the lower one, about 1-2 yd of carry
    from the drop, small next to the terrain.

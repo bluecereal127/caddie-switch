@@ -1119,10 +1119,19 @@ for (let hole = 1; hole <= 21; hole++) {
   // HEIGHT (negative = north) and dx as a fraction of the WIDTH (only when
   // the sprite stands east or west of its trunk); the app's tap rule tests
   // the disc at x + dx, y + dy. From the quad the renderer paints where it
-  // has one (TREE_SPRITE), else from the per-kind sprite rule ----
+  // has one (TREE_SPRITE), else from the per-kind sprite rule. For the flight
+  // check (WSR's tree collision, tools/research/wsr-tree-collision.md: radii
+  // scale with the x scale, heights with the y scale, both from the PMP
+  // object's own position) each tree also carries kind, size (x scale), sy
+  // (y scale) and z, the object's base height in yd above the hole's datum,
+  // the WSR start's height (public/terrain's datum, so z compares with
+  // src/terrain.js heightAt): wsr-pins.json meshY, which is not always the
+  // ground under the trunk (13 of the 460 on-course trees sit over a yard
+  // below it, 2 above) ----
   let trees = null;
   if (Array.isArray(wp?.trees) && wt?.scale) {
     const unitsPerPx = wt.scale * UNITS_PER_YD;
+    const datumY = wp.starts?.[0]?.mesh?.[1];
     const onMap = wp.trees.filter((t) => t.x >= -TREE_MARGIN && t.x <= 1 + TREE_MARGIN && t.y >= -TREE_MARGIN && t.y <= 1 + TREE_MARGIN);
     const quads = paintedQuads(hole), painted = matchQuads(onMap, quads);
     trees = onMap.map((t, i) => {
@@ -1130,15 +1139,19 @@ for (let hole = 1; hole <= 21; hole++) {
       const r = q ? q.r : ((TREE_CANOPY_UNITS[t.kind] ?? TREE_CANOPY_UNITS[2]) * t.size) / unitsPerPx / W;
       const dy = q ? q.cy - t.y : -((TREE_CANOPY_UP[t.kind] ?? TREE_CANOPY_UP[2]) * t.size) / unitsPerPx / H;
       const dx = q && Math.abs(q.cx - t.x) * W >= TREE_DX_MIN_PX ? q.cx - t.x : null;
+      // a wsr-pins.json from before sy and meshY ships without them
+      const z = t.meshY != null && datumY != null ? +((t.meshY - datumY) / UNITS_PER_YD).toFixed(2) : null;
       return { x: +t.x.toFixed(4), y: +t.y.toFixed(4), r: +r.toFixed(4), dy: +dy.toFixed(4), ...(dx != null ? { dx: +dx.toFixed(4) } : {}), kind: t.kind,
-        ...(TREE_OFF_LIES.has(t.lie) ? { off: true } : {}) };
+        size: t.size, ...(t.sy != null ? { sy: t.sy } : {}), ...(z != null ? { z } : {}), ...(TREE_OFF_LIES.has(t.lie) ? { off: true } : {}) };
     });
     const off = trees.filter((t) => t.off).length, on = trees.length - off;
     const kindMismatch = [...painted].filter(([i, q]) => q.kind !== onMap[i].kind).length;
     const quadNote = quads
       ? `; canopy from the painted quad on ${painted.size} of ${on} on-course trees (${trees.filter((t) => t.dx != null).length} with dx${on - painted.size ? `; ${on - painted.size} with no quad within ${TREE_QUAD_MATCH} px keep the sprite rule` : ""}${kindMismatch ? `; ${kindMismatch} quad(s) of another kind than the PMP tree` : ""})`
       : "; no painted quads (tools/wsr-map or the registration missing), all from the sprite rule";
-    console.log(`H${hole}: trees = ${trees.length} on the map of ${wp.trees.length} in the PMP (${[2, 3, 6].map((k) => `${trees.filter((t) => t.kind === k).length} of kind ${k}`).join(", ")}), ${trees.length - off} on the course, ${off} off (outer ground or water under the trunk), canopy r ${Math.min(...trees.map((t) => t.r * W)).toFixed(1)}-${Math.max(...trees.map((t) => t.r * W)).toFixed(1)} px, centred ${Math.min(...trees.map((t) => -t.dy * H)).toFixed(1)}-${Math.max(...trees.map((t) => -t.dy * H)).toFixed(1)} px north of the trunk${quadNote}`);
+    const zs = trees.filter((t) => t.z != null).map((t) => t.z);
+    const zNote = zs.length ? `, base z ${Math.min(...zs).toFixed(1)} to ${Math.max(...zs).toFixed(1)} yd on the start's datum` : ", no base heights (wsr-pins.json has no meshY)";
+    console.log(`H${hole}: trees = ${trees.length} on the map of ${wp.trees.length} in the PMP (${[2, 3, 6].map((k) => `${trees.filter((t) => t.kind === k).length} of kind ${k}`).join(", ")}), ${trees.length - off} on the course, ${off} off (outer ground or water under the trunk), canopy r ${Math.min(...trees.map((t) => t.r * W)).toFixed(1)}-${Math.max(...trees.map((t) => t.r * W)).toFixed(1)} px, centred ${Math.min(...trees.map((t) => -t.dy * H)).toFixed(1)}-${Math.max(...trees.map((t) => -t.dy * H)).toFixed(1)} px north of the trunk${zNote}${quadNote}`);
   }
   derived.holes[hole] = { scale: wt ? wt.scale : meta.scaleYdPerPx, yards: meta.yards, greenBox, greenPoly,
     grid: quantizeGrid(wt ? wt.grid : g.grid), pins, pinCandidates, pinAmbiguous, pinZones, pinObservations: greenPins,

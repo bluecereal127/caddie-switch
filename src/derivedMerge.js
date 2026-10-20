@@ -40,11 +40,17 @@
 //   a tree the course does not reach — outer ground or water under its trunk —
 //   which the app leaves out of its tap rule; before that the v13 hand-placed
 //   seeds, also auto). The app draws none of them (the map shows the trees);
-//   they serve the tap rule. They mirror derived.json's `trees` on every load;
+//   they serve the tap rule and, through kind, size (the x scale), sy (the y
+//   scale) and z (the base height in yd above the hole's datum, the WSR
+//   start), the flight check against WSR's tree collision shapes. They mirror
+//   derived.json's `trees` on every load (the fields in TREE_FIELDS, each
+//   only when derived.json has it);
 //   the player's own markers (no `auto`) are never touched. A derived.json
 //   with no `trees` for the hole leaves the markers as they are, so an old
 //   install keeps its seeds until the pipeline ships trees.
 export const isPipelinePin = (p) => typeof p?.id === "string" && p.id.startsWith("d");
+// what an auto tree marker carries besides id, x, y, r, auto and off
+const TREE_FIELDS = ["dy", "dx", "kind", "size", "sy", "z"];
 // the app's hole-map frame (map px), so "nearest" means nearest on the map
 const MAP_W = 250, MAP_H = 304;
 
@@ -95,7 +101,11 @@ export function applyDerivedHole(cur, n, dh, { fresh }) {
   }
   if (Array.isArray(dh.trees)) {
     out.markers = [...(out.markers ?? []).filter((m) => !m.auto),
-      ...dh.trees.map((t, k) => ({ id: `t${n}-${k}`, x: t.x, y: t.y, r: t.r, ...(t.dy != null ? { dy: t.dy } : {}), ...(t.dx != null ? { dx: t.dx } : {}), auto: true, ...(t.off ? { off: true } : {}) }))];
+      ...dh.trees.map((t, k) => {
+        const m = { id: `t${n}-${k}`, x: t.x, y: t.y, r: t.r };
+        for (const f of TREE_FIELDS) if (t[f] != null) m[f] = t[f];
+        return { ...m, auto: true, ...(t.off ? { off: true } : {}) };
+      })];
   }
   return out;
 }

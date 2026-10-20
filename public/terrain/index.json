@@ -1,0 +1,992 @@
+{
+ "_note": "Course terrain for the app, written by tools/build-terrain.mjs from the WSR collision-mesh rasters (tools/mesh-heightmap.mjs) through tools/mesh-registration.json; read by src/terrain.js. hNN.bin: the ground height and KCL class on a w x h grid over the 250x304 map frame (sample (i, j) = the map px square [2i, 2i+2) x [2j, 2j+2), its centre at ((i+0.5)/w, (j+0.5)/h)), heights in ydPerUnit above the hole's datum (datumY, KCL units = 0.1 m: the WSR player start's height; datumYd the same in yd), nodata past the raster's crop; the classes are the KCL's, except that the raster's nodata takes what tools/map-style.json says the minimap draws there and its 1-2 px rasterising cracks are closed (the tool's header). gNN.bin: heights over the WSR green box + margin at stepYd, in unitYd above z0Yd (the green's mean height above the datum), with a mask of the WSR green outline. Byte layouts in the tool's header; both files repeat their own sizes, datum, box and units in a header. classes: per-hole sample counts by class; noHeight: samples past the raster's crop; cracks: raster px mended; deadPx: nodata raster px by what they became.",
+ "version": 1,
+ "w": 125,
+ "h": 152,
+ "mapPxPerSample": 2,
+ "ydPerUnit": 0.1,
+ "nodata": -32768,
+ "headerBytes": 20,
+ "classNames": {
+  "0": "nodata (beyond the raster's crop)",
+  "1": "fairway (and the tee pad)",
+  "2": "rough",
+  "3": "bunker (sand, beaches, river gravel)",
+  "4": "outer ground (OB terrain)",
+  "5": "floor plane (the dead plane under water and OB)",
+  "6": "green",
+  "7": "water",
+  "9": "fringe",
+  "14": "zone (H1)",
+  "16": "fall boundary (H14)"
+ },
+ "green": {
+  "stepYd": 0.5,
+  "margin": 0.12,
+  "unitYd": 0.001,
+  "headerBytes": 40
+ },
+ "holes": {
+  "1": {
+   "file": "h01.bin",
+   "meshId": "fcJP11",
+   "datumY": 150,
+   "datumYd": 16.4042,
+   "bytes": 57020,
+   "sha1": "4144c1dbc43b90463a83ca083392bddb1c9dff77",
+   "classes": {
+    "0": 5624,
+    "1": 1205,
+    "2": 2629,
+    "3": 42,
+    "4": 9031,
+    "6": 64,
+    "7": 249,
+    "9": 15,
+    "14": 141
+   },
+   "noHeight": 5624,
+   "cracks": 219,
+   "deadPx": {
+    "water": 0,
+    "outer": 0,
+    "nearest": 2248
+   },
+   "green": {
+    "file": "g01.bin",
+    "w": 91,
+    "h": 90,
+    "box": {
+     "x0": 0.495504,
+     "y0": 0.165984,
+     "x1": 0.590596,
+     "y1": 0.243316
+    },
+    "stepYd": 0.5,
+    "z0Yd": -22.7666,
+    "unitYd": 0.001,
+    "inside": 3578,
+    "rangeYd": [
+     -0.7,
+     0.335
+    ],
+    "bytes": 24610,
+    "sha1": "c2c4089cc76ff0a966e12e3d1dd020048a9fdfe3"
+   }
+  },
+  "2": {
+   "file": "h02.bin",
+   "meshId": "fcJP6",
+   "datumY": -4.4,
+   "datumYd": -0.4812,
+   "bytes": 57020,
+   "sha1": "42a056fac62ae9a8c4e5c2120aa7855aef8637d0",
+   "classes": {
+    "1": 1041,
+    "2": 4529,
+    "3": 74,
+    "4": 8128,
+    "5": 1,
+    "6": 189,
+    "7": 4972,
+    "9": 66
+   },
+   "noHeight": 0,
+   "cracks": 19,
+   "deadPx": {
+    "water": 0,
+    "outer": 0,
+    "nearest": 0
+   },
+   "green": {
+    "file": "g02.bin",
+    "w": 87,
+    "h": 73,
+    "box": {
+     "x0": 0.407886,
+     "y0": 0.24793,
+     "x1": 0.586014,
+     "y1": 0.37057
+    },
+    "stepYd": 0.5,
+    "z0Yd": -18.4802,
+    "unitYd": 0.001,
+    "inside": 2843,
+    "rangeYd": [
+     -1.27,
+     1.28
+    ],
+    "bytes": 19093,
+    "sha1": "87455b5abd8a3c605ed97f2cc2bc73910d947e30"
+   }
+  },
+  "3": {
+   "file": "h03.bin",
+   "meshId": "fcJP12",
+   "datumY": -338,
+   "datumYd": -36.9641,
+   "bytes": 57020,
+   "sha1": "7452f95faffa0c5cb426c0c0e4d1052125da7a17",
+   "classes": {
+    "0": 1333,
+    "1": 1087,
+    "2": 2600,
+    "3": 573,
+    "4": 7580,
+    "5": 215,
+    "6": 37,
+    "7": 5568,
+    "9": 7
+   },
+   "noHeight": 1335,
+   "cracks": 57,
+   "deadPx": {
+    "water": 219008,
+    "outer": 59416,
+    "nearest": 1249
+   },
+   "green": {
+    "file": "g03.bin",
+    "w": 92,
+    "h": 74,
+    "box": {
+     "x0": 0.570509,
+     "y0": 0.123151,
+     "x1": 0.645691,
+     "y1": 0.172749
+    },
+    "stepYd": 0.5,
+    "z0Yd": -7.918,
+    "unitYd": 0.001,
+    "inside": 3262,
+    "rangeYd": [
+     -16.36,
+     1.045
+    ],
+    "bytes": 20464,
+    "sha1": "53aeab82e5ef4d0b20eba93db190830834a26c53"
+   }
+  },
+  "4": {
+   "file": "h04.bin",
+   "meshId": "fcJP16",
+   "datumY": 0,
+   "datumYd": 0,
+   "bytes": 57020,
+   "sha1": "05070f3f8155b0844e333a134e5d4edf02012feb",
+   "classes": {
+    "1": 1174,
+    "2": 6079,
+    "3": 165,
+    "4": 4179,
+    "6": 144,
+    "7": 7207,
+    "9": 52
+   },
+   "noHeight": 0,
+   "cracks": 141,
+   "deadPx": {
+    "water": 0,
+    "outer": 0,
+    "nearest": 0
+   },
+   "green": {
+    "file": "g04.bin",
+    "w": 88,
+    "h": 75,
+    "box": {
+     "x0": 0.313199,
+     "y0": 0.283631,
+     "x1": 0.475801,
+     "y1": 0.397369
+    },
+    "stepYd": 0.5,
+    "z0Yd": -4.915,
+    "unitYd": 0.001,
+    "inside": 2628,
+    "rangeYd": [
+     -10.122,
+     1.702
+    ],
+    "bytes": 19840,
+    "sha1": "4feef27532a10cb05cdc23ed4f83a2f8e0e8c2ab"
+   }
+  },
+  "5": {
+   "file": "h05.bin",
+   "meshId": "fcJP7",
+   "datumY": 230,
+   "datumYd": 25.1531,
+   "bytes": 57020,
+   "sha1": "5b77a2bb29012ff5da9ea8c019e90f938a78515e",
+   "classes": {
+    "0": 7904,
+    "1": 986,
+    "2": 2572,
+    "3": 143,
+    "4": 4716,
+    "6": 33,
+    "7": 2638,
+    "9": 8
+   },
+   "noHeight": 7904,
+   "cracks": 4,
+   "deadPx": {
+    "water": 0,
+    "outer": 0,
+    "nearest": 0
+   },
+   "green": {
+    "file": "g05.bin",
+    "w": 89,
+    "h": 75,
+    "box": {
+     "x0": 0.554165,
+     "y0": 0.105584,
+     "x1": 0.624635,
+     "y1": 0.154316
+    },
+    "stepYd": 0.5,
+    "z0Yd": -10.9236,
+    "unitYd": 0.001,
+    "inside": 3180,
+    "rangeYd": [
+     -2.206,
+     1.966
+    ],
+    "bytes": 20065,
+    "sha1": "4961bdc48c562b9918c4afccf82bcdf56989eab5"
+   }
+  },
+  "6": {
+   "file": "h06.bin",
+   "meshId": "fcJP10",
+   "datumY": 45,
+   "datumYd": 4.9213,
+   "bytes": 57020,
+   "sha1": "932d40bc8b6368f5ed30e1cfbc1d68e16abe303a",
+   "classes": {
+    "0": 2128,
+    "1": 921,
+    "2": 4838,
+    "3": 275,
+    "4": 10759,
+    "5": 1,
+    "6": 60,
+    "9": 18
+   },
+   "noHeight": 2128,
+   "cracks": 0,
+   "deadPx": {
+    "water": 0,
+    "outer": 119790,
+    "nearest": 8081
+   },
+   "green": {
+    "file": "g06.bin",
+    "w": 93,
+    "h": 83,
+    "box": {
+     "x0": 0.555343,
+     "y0": 0.136778,
+     "x1": 0.648857,
+     "y1": 0.205322
+    },
+    "stepYd": 0.5,
+    "z0Yd": -28.0662,
+    "unitYd": 0.001,
+    "inside": 3741,
+    "rangeYd": [
+     -1.711,
+     2.084
+    ],
+    "bytes": 23197,
+    "sha1": "998851aeea9cf9a0385faacb0ce166d7edb2ad56"
+   }
+  },
+  "7": {
+   "file": "h07.bin",
+   "meshId": "fcJP9",
+   "datumY": 190.6,
+   "datumYd": 20.8443,
+   "bytes": 57020,
+   "sha1": "528eca91f591f2a299337c8e52da421364cc725c",
+   "classes": {
+    "0": 4089,
+    "1": 990,
+    "2": 2857,
+    "3": 72,
+    "4": 4678,
+    "6": 44,
+    "7": 6259,
+    "9": 11
+   },
+   "noHeight": 4104,
+   "cracks": 18,
+   "deadPx": {
+    "water": 0,
+    "outer": 0,
+    "nearest": 0
+   },
+   "green": {
+    "file": "g07.bin",
+    "w": 90,
+    "h": 78,
+    "box": {
+     "x0": 0.422169,
+     "y0": 0.213602,
+     "x1": 0.505231,
+     "y1": 0.272698
+    },
+    "stepYd": 0.5,
+    "z0Yd": -29.456,
+    "unitYd": 0.001,
+    "inside": 3068,
+    "rangeYd": [
+     -2.324,
+     0.443
+    ],
+    "bytes": 21100,
+    "sha1": "684b6ad032981b312318715556d104148a15a1bc"
+   }
+  },
+  "8": {
+   "file": "h08.bin",
+   "meshId": "fcJP13",
+   "datumY": 37.5,
+   "datumYd": 4.101,
+   "bytes": 57020,
+   "sha1": "23c0fb341466226c0c4c0b7525e9f2f64255976d",
+   "classes": {
+    "0": 51,
+    "1": 284,
+    "2": 3244,
+    "4": 3153,
+    "5": 546,
+    "6": 68,
+    "7": 11633,
+    "9": 21
+   },
+   "noHeight": 62,
+   "cracks": 13,
+   "deadPx": {
+    "water": 56738,
+    "outer": 0,
+    "nearest": 16359
+   },
+   "green": {
+    "file": "g08.bin",
+    "w": 90,
+    "h": 80,
+    "box": {
+     "x0": 0.468455,
+     "y0": 0.338545,
+     "x1": 0.572445,
+     "y1": 0.414455
+    },
+    "stepYd": 0.5,
+    "z0Yd": -15.7288,
+    "unitYd": 0.001,
+    "inside": 3203,
+    "rangeYd": [
+     -8.495,
+     0.866
+    ],
+    "bytes": 21640,
+    "sha1": "70902ac187c765e7a087f5edd6967507979a173d"
+   }
+  },
+  "9": {
+   "file": "h09.bin",
+   "meshId": "fcJP3",
+   "datumY": 130,
+   "datumYd": 14.217,
+   "bytes": 57020,
+   "sha1": "8ca47aba77a79b82409b964becd668afe4982f76",
+   "classes": {
+    "0": 5928,
+    "1": 668,
+    "2": 3503,
+    "3": 121,
+    "4": 7982,
+    "6": 36,
+    "7": 758,
+    "9": 4
+   },
+   "noHeight": 5928,
+   "cracks": 2,
+   "deadPx": {
+    "water": 0,
+    "outer": 0,
+    "nearest": 1128
+   },
+   "green": {
+    "file": "g09.bin",
+    "w": 86,
+    "h": 93,
+    "box": {
+     "x0": 0.506149,
+     "y0": 0.102525,
+     "x1": 0.573951,
+     "y1": 0.162875
+    },
+    "stepYd": 0.5,
+    "z0Yd": -21.8255,
+    "unitYd": 0.001,
+    "inside": 3425,
+    "rangeYd": [
+     -2.701,
+     2.346
+    ],
+    "bytes": 24034,
+    "sha1": "ebd403080fb21a1ceb433fc9201a701098047c5e"
+   }
+  },
+  "10": {
+   "file": "h10.bin",
+   "meshId": "fc1",
+   "datumY": 194,
+   "datumYd": 21.2161,
+   "bytes": 57020,
+   "sha1": "42103b46e4a4384f9ff852965034c1bef05708dc",
+   "classes": {
+    "0": 5320,
+    "1": 1393,
+    "2": 3327,
+    "3": 153,
+    "4": 8721,
+    "6": 79,
+    "9": 7
+   },
+   "noHeight": 5320,
+   "cracks": 0,
+   "deadPx": {
+    "water": 0,
+    "outer": 0,
+    "nearest": 5
+   },
+   "green": {
+    "file": "g10.bin",
+    "w": 93,
+    "h": 88,
+    "box": {
+     "x0": 0.441463,
+     "y0": 0.128282,
+     "x1": 0.544637,
+     "y1": 0.208518
+    },
+    "stepYd": 0.5,
+    "z0Yd": -6.1754,
+    "unitYd": 0.001,
+    "inside": 3871,
+    "rangeYd": [
+     -1.594,
+     1.596
+    ],
+    "bytes": 24592,
+    "sha1": "d8f263471df7db155c5a13ab15a866c0450082ba"
+   }
+  },
+  "11": {
+   "file": "h11.bin",
+   "meshId": "fc3",
+   "datumY": 36,
+   "datumYd": 3.937,
+   "bytes": 57020,
+   "sha1": "15fa82c082046fdbdd762f4c631e6721079b5635",
+   "classes": {
+    "1": 888,
+    "2": 4972,
+    "3": 147,
+    "4": 10142,
+    "6": 192,
+    "7": 2627,
+    "9": 32
+   },
+   "noHeight": 0,
+   "cracks": 3,
+   "deadPx": {
+    "water": 0,
+    "outer": 0,
+    "nearest": 7654
+   },
+   "green": {
+    "file": "g11.bin",
+    "w": 78,
+    "h": 72,
+    "box": {
+     "x0": 0.448088,
+     "y0": 0.267463,
+     "x1": 0.620812,
+     "y1": 0.398437
+    },
+    "stepYd": 0.5,
+    "z0Yd": -4.3755,
+    "unitYd": 0.001,
+    "inside": 2432,
+    "rangeYd": [
+     -1.049,
+     1.159
+    ],
+    "bytes": 16888,
+    "sha1": "52aabdbbbf1e04ae885ced25ea242f1b3fe19888"
+   }
+  },
+  "12": {
+   "file": "h12.bin",
+   "meshId": "fc8",
+   "datumY": 17.7,
+   "datumYd": 1.9357,
+   "bytes": 57020,
+   "sha1": "82c2acb1cb336c731944f181dfa974b6359dbc2a",
+   "classes": {
+    "0": 4710,
+    "1": 1086,
+    "2": 2220,
+    "3": 36,
+    "4": 10502,
+    "6": 32,
+    "7": 414
+   },
+   "noHeight": 4712,
+   "cracks": 50,
+   "deadPx": {
+    "water": 36934,
+    "outer": 14954,
+    "nearest": 500
+   },
+   "green": {
+    "file": "g12.bin",
+    "w": 63,
+    "h": 68,
+    "box": {
+     "x0": 0.393419,
+     "y0": 0.133695,
+     "x1": 0.451381,
+     "y1": 0.185205
+    },
+    "stepYd": 0.5,
+    "z0Yd": -6.9374,
+    "unitYd": 0.001,
+    "inside": 2078,
+    "rangeYd": [
+     -1.545,
+     0.868
+    ],
+    "bytes": 12892,
+    "sha1": "b2b1a02252a4267715f03888872fa27866dad6a3"
+   }
+  },
+  "13": {
+   "file": "h13.bin",
+   "meshId": "fc14",
+   "datumY": 50,
+   "datumYd": 5.4681,
+   "bytes": 57020,
+   "sha1": "426adf3580ddb7cde8f8cf392b5c85e082ec1367",
+   "classes": {
+    "1": 522,
+    "2": 2815,
+    "3": 162,
+    "4": 5430,
+    "5": 1652,
+    "6": 207,
+    "7": 8179,
+    "9": 33
+   },
+   "noHeight": 0,
+   "cracks": 0,
+   "deadPx": {
+    "water": 204306,
+    "outer": 0,
+    "nearest": 716
+   },
+   "green": {
+    "file": "g13.bin",
+    "w": 80,
+    "h": 75,
+    "box": {
+     "x0": 0.365871,
+     "y0": 0.233874,
+     "x1": 0.542229,
+     "y1": 0.369726
+    },
+    "stepYd": 0.5,
+    "z0Yd": -5.4997,
+    "unitYd": 0.001,
+    "inside": 2662,
+    "rangeYd": [
+     -1.679,
+     0.612
+    ],
+    "bytes": 18040,
+    "sha1": "6932279530291b71683156213de3c16decf4e911"
+   }
+  },
+  "14": {
+   "file": "h14.bin",
+   "meshId": "fc5",
+   "datumY": -31.7,
+   "datumYd": -3.4668,
+   "bytes": 57020,
+   "sha1": "9d30077b608e8c09e0d5c1b487d035d358bac48e",
+   "classes": {
+    "1": 2012,
+    "2": 4107,
+    "3": 153,
+    "4": 6425,
+    "6": 55,
+    "7": 4522,
+    "9": 3,
+    "16": 1723
+   },
+   "noHeight": 0,
+   "cracks": 40,
+   "deadPx": {
+    "water": 0,
+    "outer": 0,
+    "nearest": 0
+   },
+   "green": {
+    "file": "g14.bin",
+    "w": 80,
+    "h": 67,
+    "box": {
+     "x0": 0.6015,
+     "y0": 0.10516,
+     "x1": 0.7003,
+     "y1": 0.17304
+    },
+    "stepYd": 0.5,
+    "z0Yd": 3.6695,
+    "unitYd": 0.001,
+    "inside": 2139,
+    "rangeYd": [
+     -1.286,
+     0.815
+    ],
+    "bytes": 16120,
+    "sha1": "d943e702a4253aab42663dbc77701dbe380e3db4"
+   }
+  },
+  "15": {
+   "file": "h15.bin",
+   "meshId": "fc16",
+   "datumY": 10,
+   "datumYd": 1.0936,
+   "bytes": 57020,
+   "sha1": "0b23bcc5673d7ca5f63b559102ecf5d3cef7585e",
+   "classes": {
+    "1": 910,
+    "2": 4237,
+    "3": 181,
+    "4": 10568,
+    "5": 30,
+    "6": 59,
+    "7": 3015
+   },
+   "noHeight": 0,
+   "cracks": 18,
+   "deadPx": {
+    "water": 0,
+    "outer": 877,
+    "nearest": 821467
+   },
+   "green": {
+    "file": "g15.bin",
+    "w": 85,
+    "h": 78,
+    "box": {
+     "x0": 0.513986,
+     "y0": 0.173571,
+     "x1": 0.608114,
+     "y1": 0.244529
+    },
+    "stepYd": 0.5,
+    "z0Yd": 11.1194,
+    "unitYd": 0.001,
+    "inside": 2842,
+    "rangeYd": [
+     -2.213,
+     1.44
+    ],
+    "bytes": 19930,
+    "sha1": "01b4f6a8cdbbeb769e2cb5116e304953c7810631"
+   }
+  },
+  "16": {
+   "file": "h16.bin",
+   "meshId": "fc12",
+   "datumY": 0,
+   "datumYd": 0,
+   "bytes": 57020,
+   "sha1": "253081372b5cfcc2a59051bacf41844543063696",
+   "classes": {
+    "0": 1672,
+    "1": 1419,
+    "2": 3704,
+    "3": 196,
+    "4": 11781,
+    "5": 138,
+    "6": 80,
+    "9": 10
+   },
+   "noHeight": 1672,
+   "cracks": 0,
+   "deadPx": {
+    "water": 0,
+    "outer": 0,
+    "nearest": 47197
+   },
+   "green": {
+    "file": "g16.bin",
+    "w": 91,
+    "h": 66,
+    "box": {
+     "x0": 0.647795,
+     "y0": 0.294742,
+     "x1": 0.768205,
+     "y1": 0.366258
+    },
+    "stepYd": 0.5,
+    "z0Yd": 11.2282,
+    "unitYd": 0.001,
+    "inside": 2812,
+    "rangeYd": [
+     -1.76,
+     1.258
+    ],
+    "bytes": 18058,
+    "sha1": "6dba572c14d5246c7951de86e77f22d4ef058c8e"
+   }
+  },
+  "17": {
+   "file": "h17.bin",
+   "meshId": "fc9",
+   "datumY": 0,
+   "datumYd": 0,
+   "bytes": 57020,
+   "sha1": "6e4845c7643a249ac28d9f3eb5e8857a6f3da328",
+   "classes": {
+    "1": 801,
+    "2": 2990,
+    "3": 142,
+    "4": 3019,
+    "6": 169,
+    "7": 11857,
+    "9": 22
+   },
+   "noHeight": 0,
+   "cracks": 33,
+   "deadPx": {
+    "water": 0,
+    "outer": 0,
+    "nearest": 0
+   },
+   "green": {
+    "file": "g17.bin",
+    "w": 95,
+    "h": 90,
+    "box": {
+     "x0": 0.4686,
+     "y0": 0.181364,
+     "x1": 0.6336,
+     "y1": 0.309836
+    },
+    "stepYd": 0.5,
+    "z0Yd": 21.6977,
+    "unitYd": 0.001,
+    "inside": 3390,
+    "rangeYd": [
+     -24.979,
+     1.217
+    ],
+    "bytes": 25690,
+    "sha1": "c6cc0245a1aee34a5abc17fbbd6c958b450b72e5"
+   }
+  },
+  "18": {
+   "file": "h18.bin",
+   "meshId": "fc13",
+   "datumY": -70,
+   "datumYd": -7.6553,
+   "bytes": 57020,
+   "sha1": "d9e04ed3e616b23c8805c684f8ec28c9ce46b50b",
+   "classes": {
+    "0": 3172,
+    "1": 1023,
+    "2": 2089,
+    "3": 78,
+    "4": 2896,
+    "5": 3,
+    "6": 25,
+    "7": 9713,
+    "9": 1
+   },
+   "noHeight": 3177,
+   "cracks": 28,
+   "deadPx": {
+    "water": 0,
+    "outer": 0,
+    "nearest": 0
+   },
+   "green": {
+    "file": "g18.bin",
+    "w": 66,
+    "h": 64,
+    "box": {
+     "x0": 0.441222,
+     "y0": 0.136187,
+     "x1": 0.501978,
+     "y1": 0.184613
+    },
+    "stepYd": 0.5,
+    "z0Yd": 0.4173,
+    "unitYd": 0.001,
+    "inside": 1806,
+    "rangeYd": [
+     -0.406,
+     1.401
+    ],
+    "bytes": 12712,
+    "sha1": "85bed1a38ba3118d01ba6b2e5a57010dc71ad4f8"
+   }
+  },
+  "19": {
+   "file": "h19.bin",
+   "meshId": "fcJP2",
+   "datumY": 260,
+   "datumYd": 28.4339,
+   "bytes": 57020,
+   "sha1": "d465e2db39aa834a28af682e11a4482f7c0396bc",
+   "classes": {
+    "1": 2018,
+    "2": 4809,
+    "3": 250,
+    "4": 8533,
+    "6": 91,
+    "7": 3283,
+    "9": 16
+   },
+   "noHeight": 0,
+   "cracks": 331,
+   "deadPx": {
+    "water": 340722,
+    "outer": 1275,
+    "nearest": 51
+   },
+   "green": {
+    "file": "g19.bin",
+    "w": 103,
+    "h": 87,
+    "box": {
+     "x0": 0.300198,
+     "y0": 0.090731,
+     "x1": 0.427602,
+     "y1": 0.179069
+    },
+    "stepYd": 0.5,
+    "z0Yd": -4.0156,
+    "unitYd": 0.001,
+    "inside": 3696,
+    "rangeYd": [
+     -1.977,
+     1.676
+    ],
+    "bytes": 26923,
+    "sha1": "9926d62ede5bf00bc821c39962b881ee40b2db56"
+   }
+  },
+  "20": {
+   "file": "h20.bin",
+   "meshId": "fcJP19",
+   "datumY": 0,
+   "datumYd": 0,
+   "bytes": 57020,
+   "sha1": "34b1135f020d2843da09f611de0f0f7a3a0848c9",
+   "classes": {
+    "0": 152,
+    "1": 1744,
+    "2": 3728,
+    "3": 206,
+    "4": 13074,
+    "6": 69,
+    "9": 27
+   },
+   "noHeight": 152,
+   "cracks": 1,
+   "deadPx": {
+    "water": 0,
+    "outer": 903962,
+    "nearest": 4
+   },
+   "green": {
+    "file": "g20.bin",
+    "w": 80,
+    "h": 72,
+    "box": {
+     "x0": 0.578185,
+     "y0": 0.129602,
+     "x1": 0.683715,
+     "y1": 0.207598
+    },
+    "stepYd": 0.5,
+    "z0Yd": 15.3815,
+    "unitYd": 0.001,
+    "inside": 2505,
+    "rangeYd": [
+     -2.419,
+     3.157
+    ],
+    "bytes": 17320,
+    "sha1": "328f3bcfe4ae1773eba22066606e6fdc64006bba"
+   }
+  },
+  "21": {
+   "file": "h21.bin",
+   "meshId": "fcJP14",
+   "datumY": 200,
+   "datumYd": 21.8723,
+   "bytes": 57020,
+   "sha1": "2f2c071737f52e661e24ae40a944eda62fde3d6c",
+   "classes": {
+    "0": 7448,
+    "1": 394,
+    "2": 2076,
+    "3": 213,
+    "4": 7237,
+    "6": 45,
+    "7": 1573,
+    "9": 14
+   },
+   "noHeight": 7448,
+   "cracks": 31,
+   "deadPx": {
+    "water": 0,
+    "outer": 0,
+    "nearest": 0
+   },
+   "green": {
+    "file": "g21.bin",
+    "w": 87,
+    "h": 85,
+    "box": {
+     "x0": 0.40016,
+     "y0": 0.131026,
+     "x1": 0.48774,
+     "y1": 0.201374
+    },
+    "stepYd": 0.5,
+    "z0Yd": -55.9003,
+    "unitYd": 0.001,
+    "inside": 2593,
+    "rangeYd": [
+     -3.257,
+     1.345
+    ],
+    "bytes": 22225,
+    "sha1": "24acebb347a00acac757f38ced87fd2a6cf22fd4"
+   }
+  }
+ }
+}
