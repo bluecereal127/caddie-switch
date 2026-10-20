@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useLayoutEffect, useRef, useMemo } from "react";
 import { HOLE_MAPS } from "./maps.js";
 import { GREEN_VIEWS } from "./greens.js";
 import { MAP_XFORM_V5 } from "./mapxform.js";
@@ -7,6 +7,7 @@ import { DEFAULT_CLUBS, GRID_N, emptyGreen, solvePutt, fitClub, solve, stopAt, L
 import { loadTerrain, classAt, lieOf, heightAt } from "./terrain.js";
 import { contourDataUrl } from "./relief.js";
 import { MAP_SCALES, mapScaleOf, mapFileUrl, loadMapIndex, preloadImage } from "./mapScale.js";
+import { scrollFor } from "./mapView.js";
 
 
 /* ============================================================
@@ -453,16 +454,29 @@ function useHoleMapSrc(n, scale) {
 // mapSrc: the map image (useHoleMapSrc; the 2x bundle image when absent) and
 // onMapError its <img>'s fallback. The image is the 250x304 frame at any
 // scale, so the overlays, the taps and the markers, all fractional, are the same.
-function HoleMap({ holeNum, line, onLine, markers, onMarkers, markerMode, aimPreview, cornerMode, onCorner, pins = [], curPinId = null, pinMode = false, onPins, distLabel = null, windBadge = null, teePos = null, teeOnlinePos = null, stopMarker = null, landMarker = null, overlaySrc = null, mapSrc = null, onMapError }) {
+// zoom (the solver's Map chips, mapScale / 2: 3x = 1.5, 4x = 2; 1 = fit, the
+// Holes tab's always): above 1 the map is drawn zoom x the panel's width in a
+// viewport the size of the fitted map, panned by scrolling (a touch natively,
+// a mouse by dragging, a wheel) and placed on the ball by src/mapView.js (the
+// target in view, or else the pin in use: the hole's default line). The
+// marks keep their fitted size on screen (each drawn at 1 / zoom about its
+// spot, so 4x shows more map around a pin, not a pin twice the size) and the
+// wind badge stays in the viewport's corner, where the fitted map has it.
+function HoleMap({ holeNum, line, onLine, markers, onMarkers, markerMode, aimPreview, cornerMode, onCorner, pins = [], curPinId = null, pinMode = false, onPins, distLabel = null, windBadge = null, teePos = null, teeOnlinePos = null, stopMarker = null, landMarker = null, overlaySrc = null, mapSrc = null, onMapError, zoom = 1 }) {
   const imgRef = useRef(null);
   const src = mapSrc ?? HOLE_MAPS[holeNum];
   const pinLabelList = pinLabels(pins);
+  const magnified = zoom > 1;
+  const k = 1 / zoom; // a mark's scale in the magnified map: its fitted size on screen
+  const at = (x, y) => (magnified ? `translate(${x} ${y}) scale(${k})` : `translate(${x} ${y})`);
 
   const dragMoved = useRef(false);
   const [draggingT, setDraggingT] = useState(false);
   // Taps are measured against the map image, not the bordered div around it:
   // the img and the SVG sit inside its 3px border, so the div's rect put every
-  // tap up to 3 CSS px off (over 2 map px on a phone's 330-px map).
+  // tap up to 3 CSS px off (over 2 map px on a phone's 330-px map). The rect
+  // is the image's own wherever the magnified view is scrolled, so a tap
+  // there needs no scroll offset.
   const mapRect = (el) => (imgRef.current ?? el).getBoundingClientRect();
   const fracOf = (e, el) => {
     const r = mapRect(el);
@@ -470,19 +484,35 @@ function HoleMap({ holeNum, line, onLine, markers, onMarkers, markerMode, aimPre
     return { x: Math.min(1, Math.max(0, (pt.clientX - r.left) / r.width)),
              y: Math.min(1, Math.max(0, (pt.clientY - r.top) / r.height)) };
   };
+  // every line the map sets itself (a tap, the target drag) goes through
+  // here, so the magnified view can tell them from a line set elsewhere
+  const ownLine = useRef(null);
+  const setOwnLine = (l) => { ownLine.current = l; onLine(l); };
+  // The press is on the target marker: within 0.07 of the fitted map (24 CSS
+  // px on a phone's 344-px map). Magnified, it is the handle drawn over the
+  // target with the same reach on screen (0.07 / zoom of the map), whose
+  // touch-action: none is what keeps a touch there from panning the view:
+  // the browser reads it when the touch starts, before any script runs.
+  const handleRef = useRef(null);
+  const grabbable = !!line.target && !cornerMode && !pinMode && !markerMode;
+  const reach = 0.07 * k;
+  const onTarget = (e, el) => {
+    if (!grabbable) return false;
+    if (magnified) return !!handleRef.current && handleRef.current.contains(e.target);
+    const f = fracOf(e, el);
+    return Math.hypot(f.x - line.target.x, f.y - line.target.y) < reach;
+  };
   // grab-and-drag the target marker
   const onDown = (e) => {
-    if (cornerMode || pinMode || markerMode || !line.target) return;
+    if (!onTarget(e, e.currentTarget)) return;
     const el = e.currentTarget;
-    const f = fracOf(e, el);
-    if (Math.hypot(f.x - line.target.x, f.y - line.target.y) >= 0.07) return;
     e.preventDefault();
     setDraggingT(true);
     const ball = line.ball;
     const mv = (ev) => {
       if (ev.cancelable) ev.preventDefault();
       dragMoved.current = true;
-      onLine({ ball, target: fracOf(ev, el) });
+      setOwnLine({ ball, target: fracOf(ev, el) });
     };
     const up = () => {
       window.removeEventListener("mousemove", mv); window.removeEventListener("touchmove", mv);
@@ -494,6 +524,89 @@ function HoleMap({ holeNum, line, onLine, markers, onMarkers, markerMode, aimPre
     window.addEventListener("mouseup", up, { once: true });
     window.addEventListener("touchend", up, { once: true });
   };
+
+  // A mouse drags the magnified map (a touch pans it natively). Past 4 CSS px
+  // of movement a press is a pan, captured so it follows the mouse off the
+  // map, and its click is swallowed (dragMoved); under that it stays a tap.
+  // Not on the target (onDown drags that) nor on the viewport's own
+  // scrollbars (the press's target is then the viewport itself). Capturing
+  // only once it moves keeps a plain click on the element it was made on.
+  const viewRef = useRef(null);
+  const pan = useRef(null);
+  const [panning, setPanning] = useState(false);
+  const panDown = (e) => {
+    if (e.pointerType !== "mouse" || e.button !== 0 || e.target === e.currentTarget || onTarget(e, e.currentTarget)) return;
+    const v = e.currentTarget;
+    pan.current = { id: e.pointerId, x: e.clientX, y: e.clientY, left: v.scrollLeft, top: v.scrollTop, moved: false };
+  };
+  const panMove = (e) => {
+    const p = pan.current;
+    if (!p || p.id !== e.pointerId) return;
+    const dx = e.clientX - p.x, dy = e.clientY - p.y;
+    if (!p.moved) {
+      if (Math.hypot(dx, dy) < 4) return;
+      p.moved = true; dragMoved.current = true; setPanning(true);
+      e.currentTarget.setPointerCapture?.(e.pointerId);
+    }
+    e.currentTarget.scrollLeft = p.left - dx;
+    e.currentTarget.scrollTop = p.top - dy;
+  };
+  const panEnd = (e) => {
+    const p = pan.current;
+    if (!p || p.id !== e.pointerId) return;
+    pan.current = null;
+    if (p.moved) { setPanning(false); setTimeout(() => { dragMoved.current = false; }, 0); }
+  };
+
+  // Where the magnified view sits (src/mapView.js scrollFor: on the ball,
+  // the target in view when the two fit; with no target drawn, the hole's
+  // default line, the ball to the pin in use as App's defaultBearing has it,
+  // so a hole opened magnified shows the ball at the bottom margin and the
+  // fairway running up the view): placed when the magnification, the hole or
+  // the ball changes, when the target is set from outside the map (🎯 Target
+  // = pin, the distance field) and when the pin in use changes while no
+  // target is drawn (the pins arriving after the map opened, a pin chip),
+  // never for the map's own target tap or drag, so the user's panning stays
+  // otherwise. A ball the map set itself (a tap) glides to its place, so the
+  // eye can follow it; everything else jumps. Before paint, so a view never
+  // shows a frame at the map's top-left first.
+  const aimPin = pins.find((p) => p.id === curPinId) ?? pins[0] ?? null;
+  const placed = useRef(null); // what the view was last placed for
+  useLayoutEffect(() => {
+    const v = viewRef.current;
+    if (!magnified || !v) { placed.current = null; return; }
+    const { ball, target } = line;
+    const now = { zoom, holeNum, ball: `${ball?.x},${ball?.y}`, target: `${target?.x},${target?.y}`, aim: `${aimPin?.x},${aimPin?.y}` };
+    const prev = placed.current, own = line === ownLine.current;
+    placed.current = now;
+    const sameView = !!prev && prev.zoom === zoom && prev.holeNum === holeNum;
+    const ballMoved = !sameView || prev.ball !== now.ball;
+    if (!ballMoved && (prev.target === now.target || own) && (target || prev.aim === now.aim)) return;
+    const m = v.firstElementChild.getBoundingClientRect();
+    const { left, top } = scrollFor({ viewW: v.clientWidth, viewH: v.clientHeight, mapW: m.width, mapH: m.height, ball, target, aim: aimPin && { x: aimPin.x, y: aimPin.y } });
+    const glide = sameView && own && prev.ball !== now.ball && !window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    v.scrollTo({ left, top, behavior: glide ? "smooth" : "auto" });
+  });
+  // A resize (the phone turned, a desktop window) keeps the view's centre
+  // where it was on the map: the map and the view scale with the panel, the
+  // scroll offsets in px would not (kept, a phone's 344-px panel widened to
+  // a 1280-px window's 406 left H7's tee 16 px below the view). Both axes
+  // scale with the client width, which sets the map's and the view's size.
+  useEffect(() => {
+    const v = viewRef.current;
+    if (!magnified || !v || typeof ResizeObserver === "undefined") return;
+    let w = v.clientWidth, h = v.clientHeight;
+    const ro = new ResizeObserver(() => {
+      const nw = v.clientWidth, nh = v.clientHeight;
+      if (!w || (nw === w && nh === h)) { w = nw; h = nh; return; }
+      const f = nw / w;
+      v.scrollLeft = (v.scrollLeft + w / 2) * f - nw / 2;
+      v.scrollTop = (v.scrollTop + h / 2) * f - nh / 2;
+      w = nw; h = nh;
+    });
+    ro.observe(v);
+    return () => ro.disconnect();
+  }, [magnified]);
 
   const click = (e) => {
     if (dragMoved.current) { dragMoved.current = false; return; }
@@ -510,7 +623,7 @@ function HoleMap({ holeNum, line, onLine, markers, onMarkers, markerMode, aimPre
       // on a spot added a duplicate 72% of the time. Greens hold 1-8 built-in
       // spots, some only 1.5 map px apart, and their flags cover most of a
       // green at phone size, so a new pin mostly fits only around its edge.
-      const r = mapRect(e.currentTarget), ux = r.width / 100, uy = r.height / 100; // CSS px per viewBox unit
+      const r = mapRect(e.currentTarget), ux = r.width / 100 * k, uy = r.height / 100 * k; // CSS px per viewBox unit of a drawn pin (its fitted size when magnified)
       const segDist = (qx, qy, ax, ay, bx, by) => {
         const vx = bx - ax, vy = by - ay;
         const t = Math.max(0, Math.min(1, ((qx - ax) * vx + (qy - ay) * vy) / (vx * vx + vy * vy || 1)));
@@ -525,7 +638,8 @@ function HoleMap({ holeNum, line, onLine, markers, onMarkers, markerMode, aimPre
       return;
     }
     if (markerMode) {
-      // The nearest of your own markers within 0.06 (a finger's reach) goes.
+      // The nearest of your own markers within 0.06 of the fitted map (a
+      // finger's reach; 0.06 / zoom of a magnified one, the same on screen) goes.
       // Failing that, a tap inside the painted canopy of a course tree (auto
       // and on the course) is swallowed: the map shows the tree already, and
       // a marker on it would only cover it. Any other tap adds your marker.
@@ -542,7 +656,7 @@ function HoleMap({ holeNum, line, onLine, markers, onMarkers, markerMode, aimPre
       // marker, with no sign why. The on-course canopies alone are 1-13% of
       // the map (5-36% of the playable ground).
       const own = markers.filter((m) => !m.auto)
-        .map((m) => ({ m, d: Math.hypot(m.x - fx, m.y - fy) })).filter((o) => o.d < 0.06).sort((a, b) => a.d - b.d)[0];
+        .map((m) => ({ m, d: Math.hypot(m.x - fx, m.y - fy) })).filter((o) => o.d < 0.06 * k).sort((a, b) => a.d - b.d)[0];
       if (own) { onMarkers(markers.filter((m) => m.id !== own.m.id)); return; }
       const r = mapRect(e.currentTarget);
       const canopy = markers.some((m) => m.auto && !m.off && m.r > 0
@@ -550,8 +664,8 @@ function HoleMap({ holeNum, line, onLine, markers, onMarkers, markerMode, aimPre
       if (!canopy) onMarkers([...markers, { id: Date.now(), x: fx, y: fy }]);
       return;
     }
-    if (!line.ball || (line.ball && line.target)) onLine({ ball: { x: fx, y: fy }, target: null });
-    else onLine({ ...line, target: { x: fx, y: fy } });
+    if (!line.ball || (line.ball && line.target)) setOwnLine({ ball: { x: fx, y: fy }, target: null });
+    else setOwnLine({ ...line, target: { x: fx, y: fy } });
   };
 
   const px = (p) => ({ x: p.x * 100, y: p.y * 100 });
@@ -562,33 +676,62 @@ function HoleMap({ holeNum, line, onLine, markers, onMarkers, markerMode, aimPre
   const onlineSpots = teeOnlinePos ? (teeOnlinePos.lower && teeOnlinePos.upper ? [teeOnlinePos.lower, teeOnlinePos.upper] : [teeOnlinePos]) : [];
   const onlineTee = onlineSpots.some((p) => ballOn(line.ball, p));
 
+  // the wind badge: in the map's SVG when fitted; magnified, in an SVG of its
+  // own over the viewport, at the same place in the view as on the fitted map
+  // (the viewport is the fitted map's size), so it never scrolls away (no
+  // caller passes one today)
+  const windMark = windBadge && (() => {
+    // the game's own arrow colours, so the badge can be checked against
+    // the minimap at a glance. Measured on the 317 map captures with an
+    // arrow: blue up to 11 mph (median RGB 2,251,228), lime from 13 to
+    // 22 (228,250,0), pink from 24 (253,107,153); 12 and 23 never seen,
+    // so the bands are taken as equal twelfths (floor(mph / 12)).
+    const col = windBadge.speed >= 24 ? "#F06BB8" : windBadge.speed >= 12 ? "#E4FA00" : "#5AC8E8";
+    return (
+      <g transform="translate(86 80)">
+        <circle r="10.5" fill="rgba(10,25,16,0.72)" stroke="rgba(255,255,255,0.7)" strokeWidth="0.7" />
+        {windBadge.speed > 0 ? (
+          <g transform={`rotate(${windBadge.deg})`}>
+            <path d="M0,-6.2 L3.1,-1.6 1.35,-1.6 1.35,5.4 -1.35,5.4 -1.35,-1.6 -3.1,-1.6 Z" fill={col} stroke="rgba(0,0,0,0.45)" strokeWidth="0.4" />
+          </g>
+        ) : (
+          <circle r="1.4" fill={col} />
+        )}
+        <text y="15.6" textAnchor="middle" fontSize="4.6" fontWeight="700" fill="#fff">{windBadge.speed} mph</text>
+      </g>
+    );
+  })();
+
   // aim preview point: rotate the aim offset (yd → map fraction handled by parent via aimPreview.fx/fy)
-  return (
-    <div className="relative rounded-xl overflow-hidden select-none touch-none" style={{ border: `3px solid ${T.turfDeep}`, cursor: draggingT ? "grabbing" : "crosshair" }}
-      onClick={click} onMouseDown={onDown} onTouchStart={onDown}>
+  // The map and its layers, the same fitted or magnified: every position is
+  // a fraction of the image, so the contour overlay, the line, the stop ring
+  // and the landing diamond keep their map spots at any zoom and scroll with it.
+  const layers = (
+    <>
       <img ref={imgRef} src={src} alt={`Hole ${holeNum} map`} className="w-full block" draggable={false} onError={onMapError} />
       {/* a debug layer between the map and the marks: the Holes tab's contour lines (src/relief.js) */}
       {overlaySrc && <img src={overlaySrc} alt="" className="absolute inset-0 w-full h-full pointer-events-none" draggable={false} />}
       <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 100 100" preserveAspectRatio="none">
-        {b && t && <line x1={b.x} y1={b.y} x2={t.x} y2={t.y} stroke="#fff" strokeWidth="1" strokeDasharray="2.5 2" />}
+        {b && t && <line x1={b.x} y1={b.y} x2={t.x} y2={t.y} stroke="#fff" strokeWidth={k} strokeDasharray={`${2.5 * k} ${2 * k}`} />}
         {b && t && distLabel && (
-          <g transform={`translate(${(b.x + t.x) / 2} ${(b.y + t.y) / 2})`}>
+          <g transform={at((b.x + t.x) / 2, (b.y + t.y) / 2)}>
             <rect x="-11" y="-4.5" width="22" height="8" rx="2" fill="rgba(20,48,29,0.85)" />
             <text y="1.8" textAnchor="middle" fontSize="4.6" fontWeight="700" fill="#fff">{distLabel}</text>
           </g>
         )}
         {b && t && aimPreview && (
-          <line x1={b.x} y1={b.y} x2={aimPreview.x * 100} y2={aimPreview.y * 100} stroke={T.sand} strokeWidth="1" strokeDasharray="1.5 1.5" />
+          <line x1={b.x} y1={b.y} x2={aimPreview.x * 100} y2={aimPreview.y * 100} stroke={T.sand} strokeWidth={k} strokeDasharray={`${1.5 * k} ${1.5 * k}`} />
         )}
         {/* Nothing is drawn over the green: the map is WSR's own minimap art,
-            rendered from the game files at 2x (3x / 4x by the Map chips),
+            rendered from the game files at 2x (the 3x / 4x renders for the
+            Map chips' magnified views),
             its green flat and light like the Switch's overview (the renderer holds WSR's height-contour
             bands at one; the zoomed GreenView keeps them, lighter = higher).
             The SVG checker that used to fill the green's outline was drawn
             when the maps were stacked captures whose 28-px greens averaged
             to flat colour. */}
         {teePos && (
-          <g transform={`translate(${teePos.x * 100} ${teePos.y * 100})`}>
+          <g transform={at(teePos.x * 100, teePos.y * 100)}>
             <circle r="3.4" fill="rgba(20,48,29,0.55)" />
             <path d="M0,-2.4 L0.72,-0.74 2.5,-0.74 1.06,0.36 1.6,2.1 0,1.05 -1.6,2.1 -1.06,0.36 -2.5,-0.74 -0.72,-0.74 Z" fill="#FFD447" stroke="#8a6d1a" strokeWidth="0.25" />
           </g>
@@ -602,10 +745,10 @@ function HoleMap({ holeNum, line, onLine, markers, onMarkers, markerMode, aimPre
             shows only while the ball is on a tier (a ⛳ tier chip is
             active). */}
         {onlineTee && (
-          <circle cx={b.x} cy={b.y} r="2.2" fill="none" stroke="#fff" strokeWidth="0.5" />
+          <circle cx={b.x} cy={b.y} r={2.2 * k} fill="none" stroke="#fff" strokeWidth={0.5 * k} />
         )}
         {stopMarker && (
-          <g transform={`translate(${stopMarker.x * 100} ${stopMarker.y * 100})`}>
+          <g transform={at(stopMarker.x * 100, stopMarker.y * 100)}>
             <circle r="3.2" fill="none" stroke="#fff" strokeWidth="0.9" />
             <circle r="1.2" fill="#fff" />
             <circle r="4.6" fill="none" stroke="rgba(255,255,255,0.45)" strokeWidth="0.5" strokeDasharray="1.4 1.2" />
@@ -616,29 +759,9 @@ function HoleMap({ holeNum, line, onLine, markers, onMarkers, markerMode, aimPre
             from the stop (0.89-2.51 yd per map px), so a short roll lands
             inside them */}
         {landMarker && (
-          <path transform={`translate(${landMarker.x * 100} ${landMarker.y * 100})`} d="M0,-2 L1.7,0 0,2 -1.7,0 Z" fill={T.sand} stroke={T.ink} strokeWidth="0.4" />
+          <path transform={at(landMarker.x * 100, landMarker.y * 100)} d="M0,-2 L1.7,0 0,2 -1.7,0 Z" fill={T.sand} stroke={T.ink} strokeWidth="0.4" />
         )}
-        {windBadge && (() => {
-          // the game's own arrow colours, so the badge can be checked against
-          // the minimap at a glance. Measured on the 317 map captures with an
-          // arrow: blue up to 11 mph (median RGB 2,251,228), lime from 13 to
-          // 22 (228,250,0), pink from 24 (253,107,153); 12 and 23 never seen,
-          // so the bands are taken as equal twelfths (floor(mph / 12)).
-          const col = windBadge.speed >= 24 ? "#F06BB8" : windBadge.speed >= 12 ? "#E4FA00" : "#5AC8E8";
-          return (
-            <g transform="translate(86 80)">
-              <circle r="10.5" fill="rgba(10,25,16,0.72)" stroke="rgba(255,255,255,0.7)" strokeWidth="0.7" />
-              {windBadge.speed > 0 ? (
-                <g transform={`rotate(${windBadge.deg})`}>
-                  <path d="M0,-6.2 L3.1,-1.6 1.35,-1.6 1.35,5.4 -1.35,5.4 -1.35,-1.6 -3.1,-1.6 Z" fill={col} stroke="rgba(0,0,0,0.45)" strokeWidth="0.4" />
-                </g>
-              ) : (
-                <circle r="1.4" fill={col} />
-              )}
-              <text y="15.6" textAnchor="middle" fontSize="4.6" fontWeight="700" fill="#fff">{windBadge.speed} mph</text>
-            </g>
-          );
-        })()}
+        {!magnified && windMark}
         {pins.map((p, i) => {
           const cur = p.id === curPinId;
           // during play only the pin in use is drawn; pin-edit mode shows the
@@ -654,7 +777,7 @@ function HoleMap({ holeNum, line, onLine, markers, onMarkers, markerMode, aimPre
           const named = cur || !isPipelinePin(p);
           const dash = p.src === "switch" ? "0.8 0.6" : undefined;
           return (
-            <g key={p.id} transform={`translate(${p.x * 100} ${p.y * 100})`} style={{ pointerEvents: "auto" }}>
+            <g key={p.id} transform={at(p.x * 100, p.y * 100)} style={{ pointerEvents: "auto" }}>
               <title>{pinTitle(p)}</title>
               <circle r="1.4" fill={cur ? T.flag : "#fff"} stroke={T.ink} strokeWidth="0.5" strokeDasharray={dash} />
               <line x1="0" y1="0" x2="0" y2="-6" stroke={cur ? T.flag : "#fff"} strokeWidth="1" />
@@ -670,17 +793,50 @@ function HoleMap({ holeNum, line, onLine, markers, onMarkers, markerMode, aimPre
             only serve the tap rule above; the v13 seeds an install may still
             hold until derived.json loads are auto too, and draw nothing. */}
         {markers.filter((m) => !m.auto).map((m) => (
-          <g key={m.id} transform={`translate(${m.x * 100} ${m.y * 100})`}>
+          <g key={m.id} transform={at(m.x * 100, m.y * 100)}>
             <circle r="3.2" fill="#0B3D1E" stroke="#fff" strokeWidth="0.7" />
             <text y="1.5" textAnchor="middle" fontSize="4.5">🌲</text>
           </g>
         ))}
-        {b && <circle cx={b.x} cy={b.y} r="1.2" fill="#fff" stroke={T.ink} strokeWidth="0.6" />}
-        {t && <g transform={`translate(${t.x} ${t.y})`} style={{ pointerEvents: "auto", cursor: draggingT ? "grabbing" : "grab" }}>
+        {b && <circle cx={b.x} cy={b.y} r={1.2 * k} fill="#fff" stroke={T.ink} strokeWidth={0.6 * k} />}
+        {t && <g transform={at(t.x, t.y)} style={{ pointerEvents: "auto", cursor: draggingT ? "grabbing" : "grab" }}>
           <circle r="2.8" fill="none" stroke={T.flag} strokeWidth="1.1" />
           <circle r="0.9" fill={T.flag} />
         </g>}
       </svg>
+      {/* magnified: the target's grab handle (onTarget), an ellipse of
+          reach (0.07 / zoom of the map) about it, over the marks */}
+      {magnified && grabbable && (
+        <div ref={handleRef} className="absolute rounded-full"
+          style={{ left: `${(line.target.x - reach) * 100}%`, top: `${(line.target.y - reach) * 100}%`, width: `${200 * reach}%`, height: `${200 * reach}%`, touchAction: "none", cursor: draggingT ? "grabbing" : "grab" }} />
+      )}
+    </>
+  );
+  const frame = { border: `3px solid ${T.turfDeep}`, cursor: draggingT || panning ? "grabbing" : "crosshair" };
+  if (!magnified) return (
+    <div className="relative rounded-xl overflow-hidden select-none touch-none" style={frame}
+      onClick={click} onMouseDown={onDown} onTouchStart={onDown}>
+      {layers}
+    </div>
+  );
+  // Magnified: a viewport the fitted map's size (the 250x304 frame's aspect
+  // at the panel's width) scrolls the map, zoom x its width. A touch pans it
+  // natively (pan-x pan-y, which also keeps the page from pinch-zooming
+  // there), and at its edges the page does not scroll on (contain); a mouse
+  // drags it (panDown) or wheels it. Thin scrollbars where the system draws
+  // them (a desktop's; a phone's overlay ones take no room).
+  return (
+    <div className="relative rounded-xl overflow-hidden select-none" style={frame}>
+      <div ref={viewRef} style={{ aspectRatio: "250 / 304", overflow: "auto", overscrollBehavior: "contain", touchAction: "pan-x pan-y", scrollbarWidth: "thin" }}
+        onPointerDown={panDown} onPointerMove={panMove} onPointerUp={panEnd} onPointerCancel={panEnd} onLostPointerCapture={panEnd}>
+        <div className="relative" style={{ width: `${zoom * 100}%`, aspectRatio: "250 / 304" }}
+          onClick={click} onMouseDown={onDown} onTouchStart={onDown}>
+          {layers}
+        </div>
+      </div>
+      {windMark && (
+        <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 100 100" preserveAspectRatio="none">{windMark}</svg>
+      )}
     </div>
   );
 }
@@ -705,9 +861,12 @@ export default function App() {
   });
   const [rounds, setRounds] = useState([]);
   const [activeRound, setActiveRound] = useState(null);
-  // the hole maps' resolution: 2 (the bundle's image), 3 or 4 (public/maps/,
-  // src/mapScale.js); stored at the root of the app state, an additive key (an
-  // install without it reads 2). A toggle for picking one on the phone.
+  // the solver map's magnification (the Map chips): 2 = fit, the whole hole
+  // in the panel from the bundle's 2x image; 3 or 4 = the map 1.5x or 2x the
+  // panel, panned, from the 3x / 4x render (public/maps/, src/mapScale.js;
+  // the names follow the renders). The Holes tab's maps stay fitted and take
+  // the same image. Stored at the root of the app state, an additive key (an
+  // install without it reads 2).
   const [mapScale, setMapScale] = useState(2);
   const [saveState, setSaveState] = useState("");
   const [openHole, setOpenHole] = useState(null);
@@ -1270,19 +1429,28 @@ export default function App() {
 
               {/* --- the map (full width for a bigger canvas) --- */}
               <div className="space-y-2">
-                {/* the map's resolution (mapScale, stored; the Holes tab's
-                    maps follow it, its thumbnails stay 2x): the bundle's 2x,
-                    or the 3x / 4x files, fetched on a hole's first view; the
-                    note says when the larger one is not on screen yet */}
-                <div className="flex items-center justify-end gap-1 text-[10px]">
-                  {mapScale > 2 && solverMap.shown === 2 && (
-                    <span className="opacity-60 mr-1">{solverMap.pending ? `loading ${mapScale}x…` : `no ${mapScale}x map here: 2x`}</span>
+                {/* the map's magnification (mapScale, stored): fit, or 3x /
+                    4x, the map 1.5x / 2x the panel in a pannable view that
+                    opens on the ball (HoleMap's zoom), drawn from the 3x / 4x
+                    render fetched on a hole's first view (the Holes tab's
+                    maps take the same image, fitted; its thumbnails stay
+                    2x); the note says when that render is not on screen yet
+                    and the 2x image is magnified meanwhile */}
+                <div>
+                  <div className="flex items-center justify-end gap-1 text-[10px]">
+                    {mapScale > 2 && solverMap.shown === 2 && (
+                      <span className="opacity-60 mr-1">{solverMap.pending ? `loading ${mapScale}x…` : `no ${mapScale}x render here: 2x`}</span>
+                    )}
+                    <span className="disp font-bold mr-0.5">Map</span>
+                    {MAP_SCALES.map((s) => (
+                      <button key={s} onClick={() => { setMapScale(s); persist({ mapScale: s }); }}
+                        title={s === 2 ? "the whole hole in the panel" : `the map ${s / 2}x the panel, from its ${s}x render; drag or swipe to pan`}
+                        className="font-bold px-2 py-0.5 rounded-full border-2" style={chip(mapScale === s)}>{s === 2 ? "fit" : `${s}x`}</button>
+                    ))}
+                  </div>
+                  {mapScale > 2 && (
+                    <div className="text-[10px] text-right opacity-60 mt-0.5">{mapScale / 2}× the fitted map (the {mapScale}x render) · drag or swipe to pan</div>
                   )}
-                  <span className="disp font-bold mr-0.5">Map</span>
-                  {MAP_SCALES.map((s) => (
-                    <button key={s} onClick={() => { setMapScale(s); persist({ mapScale: s }); }}
-                      className="font-bold px-2 py-0.5 rounded-full border-2" style={chip(mapScale === s)}>{s}x</button>
-                  ))}
                 </div>
                 <div>
                   <HoleMap holeNum={hole} line={line} onLine={setLine}
@@ -1294,7 +1462,8 @@ export default function App() {
                     distLabel={geo ? (scale ? `${Math.round(geo.srcPx * scale)} yd` : "? yd") : null}
                     teePos={holesMeta[hole].tee ?? null}
                     teeOnlinePos={holesMeta[hole].teeOnline ?? null}
-                    stopMarker={stopPoint} landMarker={landPoint} />
+                    stopMarker={stopPoint} landMarker={landPoint}
+                    zoom={mapScale / 2} />
                 </div>
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   <div className="rounded-xl border-2 p-2" style={{ borderColor: T.line, background: "#fff" }}>
