@@ -640,12 +640,10 @@ and none for a green landing; the only smoke-named entry is the texture `ws2n_sm
 has no golf string with "spin" or "smoke" in it (golf effect names are also built with
 `WS2_glf_%s`, so a runtime-built name cannot be excluded from the strings alone).
 
-**The Switch.** A puff that appears only with backspin, on fairway and on the green, is not WSR's
-rule. Two places in WSR's contact routine would fit such a trigger, and a Switch test can tell
-them apart: the branch that applies the backspin factor (`0x804127e0`–`0x8041286c`: a contact
-after at least four ticks in the air with bs > 0, which fires again on later landings from the
-air), and the "first contact this shot" flag ball+0x17f (set at `0x80412ae4`, already used by the
-irons-on-green rule), which fires once. Both are hypotheses about the Switch.
+**The Switch** (player-confirmed 2026-10-19): the puff appears when the ball first contacts a
+surface, on any surface, and is visual only; nothing in the app depends on it. That matches WSR's
+"first contact this shot" flag ball+0x17f (set at `0x80412ae4`) rather than its surface-and-speed
+particle rule above.
 
 Status: decoder only (C13–C16), partly re-checked on 2026-10-19: the four names at 0x8067c0c6 /
 0x8067c0d9 / 0x8067c0ef / 0x8067c103, a block that branches only on the surface attribute (12, 1,
