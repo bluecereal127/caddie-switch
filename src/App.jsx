@@ -3,6 +3,8 @@ import { HOLE_MAPS } from "./maps.js";
 import { GREEN_VIEWS } from "./greens.js";
 import { MAP_XFORM_V5 } from "./mapxform.js";
 import { applyDerivedHole, isPipelinePin } from "./derivedMerge.js";
+import { DEFAULT_CLUBS, GRID_N, emptyGreen, solvePutt, fitClub, solve, stopOf, LANDED, SHAPE_LABEL } from "./model.js";
+import { loadTerrain, classAt, lieOf } from "./terrain.js";
 
 
 /* ============================================================
@@ -14,29 +16,6 @@ import { applyDerivedHole, isPipelinePin } from "./derivedMerge.js";
 
 const STORE_KEY = "sss-golf-solver-v2";
 
-// Defaults from Wii Sports Resort's official club ranges (Driver <250yd, 3W <200,
-// 3i <175, 5i <155, 7i <135, 9i <100, Wedge <80). a = max/4 bars.
-// LIE MECHANIC (player-verified): lies cap the usable BAR, they don't scale distance.
-// Below the cap, every bar flies its normal distance.
-//   rough: cap = 3/4 of the bar for every club (official "reduced by a quarter")
-//   bunker: driver & spoon capped at 1 bar; every other club capped at 2 bars;
-//           putter uncapped but rolls out much less in sand
-// So from sand: driver max ≈ 62yd (1 bar) while 3i reaches ≈ 87yd (2 bars).
-// Drivers and spoons cannot backspin. Trajectory: driver lowest → wedge highest.
-const DEFAULT_CLUBS = [
-  { id: "driver", name: "Driver", a: 62.5,  h: 0.008, c: 0.35, spin: false, traj: "low",      maxPower: 4.0, shots: 0 },
-  { id: "spoon",  name: "Spoon",  a: 50.0,  h: 0.009, c: 0.40, spin: false, traj: "low-mid",  maxPower: 4.0, shots: 0 },
-  { id: "3iron",  name: "3 Iron", a: 43.75, h: 0.009, c: 0.42, spin: true,  traj: "mid",      maxPower: 4.0, shots: 0 },
-  { id: "5iron",  name: "5 Iron", a: 38.75, h: 0.010, c: 0.44, spin: true,  traj: "mid",      maxPower: 4.0, shots: 0 },
-  { id: "7iron",  name: "7 Iron", a: 33.75, h: 0.010, c: 0.47, spin: true,  traj: "mid-high", maxPower: 4.0, shots: 0 },
-  { id: "9iron",  name: "9 Iron", a: 25.0,  h: 0.011, c: 0.50, spin: true,  traj: "high",     maxPower: 4.0, shots: 0 },
-  { id: "wedge",  name: "Wedge",  a: 20.0,  h: 0.012, c: 0.55, spin: true,  traj: "highest",  maxPower: 4.0, shots: 0 },
-];
-// Caps confirmed in-game (fixed; not user-editable): rough = 3 bars for every club;
-// sand: wedge 3, all irons 2, spoon & driver 1; putter uncapped (dead roll in sand).
-const BUNKER_CAPS = { driver: 1, spoon: 1, "3iron": 2, "5iron": 2, "7iron": 2, "9iron": 2, wedge: 3 };
-const capFor = (club, lie) =>
-  lie === "bunker" ? (BUNKER_CAPS[club.id] ?? 2) : lie === "rough" ? 3.0 : club.maxPower;
 const CLUB_MIGRATE = { "3wood": "spoon", pw: "wedge", sw: "wedge" };
 
 const COURSES = [
@@ -139,134 +118,30 @@ function matchWindRules(hole, stroke, speed, relDeg) {
   );
 }
 
-const GRID_N = 9;
-const emptyGreen = () => ({ box: null, grid: Array.from({ length: GRID_N }, () => Array.from({ length: GRID_N }, () => [0, 0])) });
-const MU = 1.35;        // rolling friction, yd/s^2
-const SLOPE_G = 1.1;    // accel per slope unit, yd/s^2
-const CUP_R = 0.22;     // capture radius, yd
-const CUP_V = 2.2;      // max capture speed, yd/s
-
-function simPutt(grid, Wyd, Hyd, ball, cup, angDeg, pw) {
-  const D = Math.hypot((cup.x - ball.x) * Wyd, (cup.y - ball.y) * Hyd);
-  const base = Math.atan2((cup.x - ball.x) * Wyd, -((cup.y - ball.y) * Hyd));
-  const th = base + (angDeg * Math.PI) / 180;
-  const v0 = Math.sqrt(2 * MU * D) * pw;
-  let px = ball.x * Wyd, py = ball.y * Hyd;
-  let vx = Math.sin(th) * v0, vy = -Math.cos(th) * v0;
-  const cx = cup.x * Wyd, cy = cup.y * Hyd;
-  const path = [[px / Wyd, py / Hyd]];
-  const dt = 0.045;
-  let holed = false, best = Infinity;
-  for (let i = 0; i < 400; i++) {
-    const sp = Math.hypot(vx, vy);
-    const d = Math.hypot(px - cx, py - cy);
-    if (d < best) best = d;
-    if (d < CUP_R && sp < CUP_V) { holed = true; path.push([cx / Wyd, cy / Hyd]); break; }
-    if (sp < 0.06) break;
-    const gi = Math.min(GRID_N - 1, Math.max(0, Math.floor((px / Wyd) * GRID_N)));
-    const gj = Math.min(GRID_N - 1, Math.max(0, Math.floor((py / Hyd) * GRID_N)));
-    const [sx, sy] = grid[gj][gi];
-    const ax = sx * SLOPE_G - MU * (vx / sp);
-    const ay = sy * SLOPE_G - MU * (vy / sp);
-    vx += ax * dt; vy += ay * dt; px += vx * dt; py += vy * dt;
-    if (i % 4 === 0) path.push([px / Wyd, py / Hyd]);
-  }
-  path.push([px / Wyd, py / Hyd]);
-  return { holed, best, endSp: Math.hypot(vx, vy), path, D };
-}
-
-function solvePutt(grid, Wyd, Hyd, ball, cup) {
-  const cost = (r, pw) => (r.holed ? -2 + pw * 0.1 : r.best + Math.max(0, r.best - CUP_R) * 0.3);
-  let best = null;
-  const tryOne = (a, p) => {
-    const r = simPutt(grid, Wyd, Hyd, ball, cup, a, p);
-    const c = cost(r, p);
-    if (!best || c < best.c) best = { c, a, p, r };
-  };
-  for (let a = -35; a <= 35; a += 5) for (let p = 0.7; p <= 1.55; p += 0.085) tryOne(a, p);
-  const { a: a0, p: p0 } = best;
-  for (let a = a0 - 4; a <= a0 + 4; a += 1) for (let p = Math.max(0.5, p0 - 0.08); p <= p0 + 0.08; p += 0.02) tryOne(a, p);
-  return best;
-}
-
-
 const T = {
   turf: "#2E7D46", turfDeep: "#1E5631", turfLight: "#3E9A5C",
   sky: "#CBE9F6", sand: "#EAD9A4", flag: "#E5484D",
   ink: "#14301D", cream: "#F7F9F4", line: "#CFE0D2",
 };
 
-/* ---------------- math ---------------- */
-function fitClub(club, shots) {
-  const mine = shots.filter((s) => s.club === club.id);
-  if (mine.length === 0) return { ...club, shots: 0 };
-  const next = { ...club, shots: mine.length };
-  const clean = mine.filter((s) => s.lie === "tee" || s.lie === "fairway");
-  const pool = clean.length ? clean : mine;
-  const xs = [], ys = [];
-  pool.forEach((s) => {
-    const pe = s.power;
-    if (pe > 0 && s.carry > 0) { xs.push(s.wAlong); ys.push(s.carry / pe); }
-  });
-  if (ys.length >= 1) {
-    const n = ys.length;
-    const mx = xs.reduce((u, v) => u + v, 0) / n;
-    const my = ys.reduce((u, v) => u + v, 0) / n;
-    let num = 0, den = 0;
-    xs.forEach((x, i) => { num += (x - mx) * (ys[i] - my); den += (x - mx) ** 2; });
-    if (den > 4 && n >= 3) {
-      const B = num / den, A = my - B * mx;
-      if (A > 0) { next.a = A; next.h = Math.max(-0.03, Math.min(0.03, B / A)); }
-    } else {
-      let sum = 0, cnt = 0;
-      pool.forEach((s) => {
-        const pe = s.power;
-        const f = 1 + club.h * s.wAlong;
-        if (pe > 0 && f > 0.5) { sum += s.carry / (pe * f); cnt++; }
-      });
-      if (cnt) next.a = sum / cnt;
-    }
-  }
-  let nu = 0, de = 0;
-  pool.forEach((s) => {
-    if (s.lateral == null) return;
-    const pe = s.power;
-    const x = s.wCross * pe;
-    if (Math.abs(s.wCross) > 1) { nu += s.lateral * x; de += x * x; }
-  });
-  if (de > 0) next.c = Math.max(0, Math.min(2, nu / de));
-  return next;
-}
-
-function solve(clubs, inputs, blockedRules) {
-  const { dist, windSpeed, relWindDeg, lie, hole, stroke } = inputs;
-  const rad = (relWindDeg * Math.PI) / 180;
-  const wAlong = windSpeed * Math.cos(rad);
-  const wCross = windSpeed * Math.sin(rad);
-  const out = [];
-  let maxReach = null;
-  clubs.forEach((cl) => {
-    const cap = capFor(cl, lie);
-    const denom = cl.a * (1 + cl.h * wAlong);
-    if (denom <= 0 || cap <= 0) return;
-    const reach = denom * cap;
-    if (!maxReach || reach > maxReach.yd) maxReach = { yd: reach, club: cl.name };
-    const p = dist / denom;
-    if (p < 0.4 || p > cap) return;
-    const drift = cl.c * wCross * p;
-    const aim = -drift;
-    const frac = p / cap;
-    const rule = hole ? blockedRules.find(
-      (r) => r.hole === hole && r.club === cl.id && (r.stroke === 0 || r.stroke === stroke) && Math.abs(r.aim - aim) <= 10
-    ) : null;
-    let score = Math.abs(frac - 0.8) + (frac > 0.97 ? 0.5 : 0);
-    if (rule) score += 10;
-    out.push({ club: cl, power: p, drift, aim, frac, cap, score, calibrated: cl.shots, blocked: rule || null });
-  });
-  return { recs: out.sort((x, y) => x.score - y.score).slice(0, 3), wAlong, wCross, maxReach };
-}
-
 const fmtPow = (p) => (Math.round(p * 20) / 20).toFixed(2);
+// A rec card's carry / landing / roll line (src/model.js). The roll is
+// WSR-shaped; a spinning club landing on a green or fairway shows the range
+// from full backspin to none (D4: the spin comes from the swing's stop after
+// impact, which the app cannot know). Where the course map shows water, OB
+// or a bank at the carry, the card says so (the stop beyond assumes fairway).
+const HAZARD_LIE = { water: "water", outer: "out of bounds", wall: "a bank or wall" };
+const LANDS = { fairway: "on fairway", rough: "in rough", green: "on the green", fringe: "on the fringe", bunker: "in a bunker" };
+const fmtRoll = (v) => (Math.round(v) > 0 ? `+${Math.round(v)}` : Math.round(v) < 0 ? `−${-Math.round(v)}` : "0");
+const recRollLine = (r) => {
+  const head = `carry ≈ ${Math.round(r.carry)} yd`;
+  if (HAZARD_LIE[r.landsOn]) return `${head} · ⚠ the course map shows ${HAZARD_LIE[r.landsOn]} there`;
+  const lands = `lands ${LANDS[r.surface] ?? `on ${r.surface}`}${r.landsOn == null ? " (assumed)" : ""}`;
+  const roll = r.rollSpin != null && (r.surface === "green" || r.surface === "fairway")
+    ? `rolls ${fmtRoll(r.rollSpin)} … ${fmtRoll(r.roll)} yd (full spin … none)`
+    : `rolls ≈ ${Math.round(r.roll)} yd`;
+  return `${head} · ${lands} · ${roll}`;
+};
 const holeCourse = (n) => COURSES.find((c) => c.holes.includes(n))?.name ?? "";
 const scoreName = (d) => d <= -3 ? "Albatross" : d === -2 ? "Eagle" : d === -1 ? "Birdie" : d === 0 ? "Par" : d === 1 ? "Bogey" : d === 2 ? "Dbl bogey" : `+${d}`;
 const fmtVs = (d) => (d > 0 ? `+${d}` : d === 0 ? "E" : `${d}`);
@@ -783,7 +658,7 @@ export default function App() {
   const [selRec, setSelRec] = useState(null); // rec card tapped -> stop-marker preview on map
   const [calInput, setCalInput] = useState("");
 
-  const empty = { club: "driver", power: "3.5", lie: "tee", windSpeed: "0", windDeg: 0, carry: "", lateral: "", hole: 0, stroke: 1 };
+  const empty = { club: "driver", power: "3.5", lie: "tee", landed: "fairway", windSpeed: "0", windDeg: 0, carry: "", lateral: "", hole: 0, stroke: 1 };
   const [form, setForm] = useState(empty);
 
   /* ---- load ---- */
@@ -877,6 +752,7 @@ export default function App() {
               const add = der.shots.filter((r) => r.club && !have.has(r.id)).map((r) => {
                 const rad = ((r.windDeg ?? 0) * Math.PI) / 180;
                 return { id: r.id, club: r.club, power: r.power, lie: r.lie,
+                  ...(LANDED.includes(r.landed) ? { landed: r.landed } : {}),
                   wAlong: (r.windSpeed ?? 0) * Math.cos(rad), wCross: (r.windSpeed ?? 0) * Math.sin(rad),
                   carry: r.ended, lateral: null, hole: r.hole ?? 0, stroke: r.stroke ?? 1,
                   raw: { speed: r.windSpeed ?? 0, deg: r.windDeg ?? 0 } };
@@ -913,6 +789,17 @@ export default function App() {
   }, [line]);
 
   const scale = holesMeta[hole]?.scale ?? null;
+
+  // the solver's hole's terrain (src/terrain.js: the KCL surface class and the
+  // ground height from the WSR meshes); null while it loads or when missing,
+  // and the solver then assumes every landing is fairway
+  const [terrain, setTerrain] = useState(null);
+  useEffect(() => {
+    let live = true;
+    setTerrain(null);
+    loadTerrain(hole).then((t) => { if (live) setTerrain(t); });
+    return () => { live = false; };
+  }, [hole]);
 
   // auto-fill distance whenever a calibrated line is drawn
   useEffect(() => {
@@ -959,22 +846,30 @@ export default function App() {
     [hole, stroke, windSpeed, relWindDeg, lie]
   );
   const blockedRules = useMemo(() => Object.values(holesMeta).flatMap((m) => m.blocked ?? []), [holesMeta]);
+  // the lie the course map shows `yd` along the shot line (ball → target, or
+  // the default line to the pin), where the solver reads each club's landing
+  // surface: the same projection as the stop marker below
+  const surfaceAt = useMemo(() => {
+    if (!terrain || !scale || !line.ball || shotBearing == null) return null;
+    const th = (shotBearing * Math.PI) / 180;
+    return (yd) => lieOf(classAt(terrain, line.ball.x + (Math.sin(th) * yd) / scale / MAP_W, line.ball.y - (Math.cos(th) * yd) / scale / MAP_H));
+  }, [terrain, scale, line.ball, shotBearing]);
   const maxReachRef = useRef(null);
   const { recs, maxReach } = useMemo(
-    () => solve(clubs, { dist, windSpeed, relWindDeg, lie, hole, stroke }, blockedRules),
-    [clubs, dist, windSpeed, relWindDeg, lie, hole, stroke, blockedRules]
+    () => solve(clubs, { dist, windSpeed, relWindDeg, lie, hole, stroke }, blockedRules, { surfaceAt }),
+    [clubs, dist, windSpeed, relWindDeg, lie, hole, stroke, blockedRules, surfaceAt]
   );
-  // drag a rec card's power bar -> power -> implied stop distance
+  // drag a rec card's power bar -> power -> implied stop distance (through the
+  // club's stop curve, on the surface the rec lands on)
   const dragBar = (e, r) => {
     e.stopPropagation(); e.preventDefault();
     const el = e.currentTarget;
     const wAlongNow = windSpeed * Math.cos((relWindDeg * Math.PI) / 180);
-    const denom = r.club.a * (1 + r.club.h * wAlongNow);
     const apply = (ev) => {
       const rect = el.getBoundingClientRect();
       const pt = ev.touches ? ev.touches[0] : ev;
       const frac = Math.min(1, Math.max(0.05, (pt.clientX - rect.left) / rect.width));
-      const d = Math.round(frac * r.cap * denom);
+      const d = Math.round(stopOf(r.club, frac * r.cap, r.surface, 0, wAlongNow));
       if (d > 0) setDist(d);
     };
     apply(e);
@@ -1037,6 +932,7 @@ export default function App() {
     const sp = parseFloat(form.windSpeed) || 0;
     const s = {
       id: Date.now(), club: form.club, power: parseFloat(form.power) || 0, lie: form.lie,
+      landed: LANDED.includes(form.landed) ? form.landed : "fairway",
       wAlong: sp * Math.cos(rad), wCross: sp * Math.sin(rad),
       carry: parseFloat(form.carry) || 0, lateral: form.lateral === "" ? null : (parseFloat(form.lateral) || 0),
       hole: Number(form.hole) || 0, stroke: Number(form.stroke) || 1,
@@ -1498,11 +1394,17 @@ export default function App() {
                         ))}
                         <div className="absolute -top-1 h-5 w-0.5 pointer-events-none" style={{ left: `${Math.min(100, r.frac * 100)}%`, background: T.ink }} />
                       </div>
+                      <div className="mt-2 text-[11px] font-semibold" style={{ color: HAZARD_LIE[r.landsOn] ? T.flag : T.ink }}>{recRollLine(r)}</div>
+                      {r.red && (
+                        <div className="mt-1 text-[10px] font-semibold" style={{ color: T.flag }}>
+                          ⚠ needs the full bar — past the cap the bar goes red and the ball curves to a RANDOM side (WSR: up to ~35 yd for the driver, ~22 yd for a 7-iron){(lie === "rough" || lie === "bunker") && " (in WSR the red adds up to one bar of power; untested on the Switch)"}
+                        </div>
+                      )}
                       {(lie === "rough" || lie === "bunker") && (
                         <div className="mt-2 text-[10px] font-semibold" style={{ color: "#8a6d1a" }}>⚠ {lie} lie: shots skew off-line more{lie === "bunker" ? ` — bar capped at ${r.cap} of ${r.club.maxPower}` : " — bar capped at ¾"}</div>
                       )}
                       <div className="mt-2 text-[11px] opacity-60">
-                        {r.calibrated > 0 ? `calibrated (${r.calibrated} shots)` : "default numbers — calibrate this club"}
+                        {r.calibrated > 0 ? `calibrated (${r.calibrated} shots)` : "default numbers — calibrate this club"} · {SHAPE_LABEL}
                       </div>
                     </div>
                   );
@@ -1777,6 +1679,12 @@ export default function App() {
                   <input type="number" className={inputCls} style={inputStyle} value={form.carry} onChange={(e) => setForm({ ...form, carry: e.target.value })} placeholder="where it stopped" />
                 </div>
                 <div>
+                  <label className="text-xs font-bold">Finished on</label>
+                  <select className={inputCls} style={inputStyle} value={form.landed} onChange={(e) => setForm({ ...form, landed: e.target.value })}>
+                    {LANDED.map((l) => <option key={l} value={l}>{l}</option>)}
+                  </select>
+                </div>
+                <div>
                   <label className="text-xs font-bold">Sideways miss (yd, + = right)</label>
                   <input type="number" className={inputCls} style={inputStyle} value={form.lateral} onChange={(e) => setForm({ ...form, lateral: e.target.value })} placeholder="blank = skip" />
                 </div>
@@ -1805,6 +1713,7 @@ export default function App() {
                             if (r.wAlong != null) return r;
                             const sp = r.windSpeed ?? 0, dg = r.windDeg ?? 0, rad = (dg * Math.PI) / 180;
                             return { id: Date.now() + i, club: r.club, power: +r.power, lie: r.lie ?? "fairway",
+                              ...(LANDED.includes(r.landed) ? { landed: r.landed } : {}),
                               wAlong: sp * Math.cos(rad), wCross: sp * Math.sin(rad),
                               carry: +(r.ended ?? r.carry ?? 0), lateral: r.side == null && r.lateral == null ? null : +(r.side ?? r.lateral),
                               hole: r.hole ?? 0, stroke: r.stroke ?? 1, raw: { speed: sp, deg: dg } };
@@ -1815,7 +1724,7 @@ export default function App() {
                         } catch {}
                       }} className="flex-1 py-1 rounded-lg border-2 font-bold" style={chip(false)}>Import (replace box first)</button>
                   </div>
-                  <div className="opacity-60 text-[10px]">Copy the box to back up. To import, paste a JSON array — either exported shots, or simple rows like {"{"}"club":"driver","power":4,"lie":"tee","windSpeed":9,"windDeg":180,"ended":242,"hole":10,"stroke":1{"}"} (side optional). I can generate these from your screenshots in chat.</div>
+                  <div className="opacity-60 text-[10px]">Copy the box to back up. To import, paste a JSON array — either exported shots, or simple rows like {"{"}"club":"driver","power":4,"lie":"tee","windSpeed":9,"windDeg":180,"ended":242,"hole":10,"stroke":1{"}"} (side optional; "landed":"green" etc. says where it finished, fairway when left out). I can generate these from your screenshots in chat.</div>
                 </div>
               )}
             </section>
@@ -1832,7 +1741,7 @@ export default function App() {
                         <span className="mono"> @ {s.power.toFixed(2)}</span>
                         {s.hole > 0 && <span className="disp font-bold" style={{ color: T.turfDeep }}> · H{s.hole}/S{s.stroke}</span>}
                         <span className="opacity-60"> · {s.lie} · {s.raw?.speed ?? 0}mph/{s.raw?.deg ?? 0}°</span>
-                        <div className="mono opacity-80">{s.carry} yd, {s.lateral >= 0 ? "+" : ""}{s.lateral} offline</div>
+                        <div className="mono opacity-80">{s.carry} yd{s.landed ? ` → ${s.landed}` : ""}, {s.lateral >= 0 ? "+" : ""}{s.lateral} offline</div>
                       </div>
                       <button onClick={() => removeShot(s.id)} className="font-bold px-2" style={{ color: T.flag }}>✕</button>
                     </div>
@@ -1942,8 +1851,8 @@ export default function App() {
                   <div>6. Wind arrow colour, measured on the captures: blue through 11 mph, lime from 13 to 22, pink from 24 (12 and 23 mph never came up). The dials here use the same colours, split at 12 and 24.</div>
                   <div>7. Trajectory: driver lowest → spoon → irons rising with number → wedge highest. Low clubs duck under branches; high clubs clear them and feel more wind.</div>
                   <div>8. Wind comes in exactly 8 directions (N/NE/E/SE/S/SW/W/NW) at integer mph, observed 0–31. The dial snaps to the 8 when set "as on minimap".</div>
-                  <div>9. All distances here are STOP distances (carry + roll). The game's minimap dots show flat-ground carry; low clubs roll well past their dots, and backspin-capable clubs can stop near them.</div>
-                  <div>10. You can physically swing past a capped bar — it goes red and the shot wobbles/curves unpredictably. The solver never plans on it.</div>
+                  <div>9. All distances here are STOP distances (carry + roll), and the roll is not a fixed share. In Wii Sports Resort's physics (decoded from the game) the carry grows in step with power but the roll comes from the landing: a flatter, slower landing rolls further, so a driver rolls ~39 yd at 4 bars and ~54 at 1 bar; it rolls ~69 on a green, ~29 in rough and next to nothing in a bunker, and an iron's first bounce on a green is damped. Backspin (irons and wedge, from stopping the swing after impact) can pull a full 9-iron back ~10 yd where it would roll ~10 on without, so the cards show that range. The solver uses WSR's stop-vs-power curve for each club, scaled to your logged distances (WSR-shaped until Switch sweeps calibrate it), and reads where each shot lands from the course map. The minimap dots show flat-ground carry.</div>
+                  <div>10. You can physically swing past a capped bar — it goes red and the ball curves to a RANDOM side, more the deeper into the red (WSR: up to ~35 yd for the driver, ~22 yd for a 7-iron). On tee and fairway the red adds no distance; from rough or sand WSR adds up to one more bar (untested on the Switch). The solver never plans on it and flags the recs that need the full bar.</div>
                   <div>11. Putter roll depends on surface: green rolls best, fairway noticeably slower, sand slowest. No source in 20 years reports any per-bar flight penalty from rough/sand — caps are the whole mechanic until your logs say otherwise.</div>
                   <div>12. Backspin strength scales with swing power ("the harder you swing, the stronger the backspin" — official). Capped lies therefore also cap max spin; that alone explains weaker spin from rough/sand.</div>
                   <div>13. Pins are fixed spots, read straight from Wii Sports Resort's course files: H1 has 3, H2–H17 have 6 (B = the easier three, A = the harder three), H18 has 1, the Specials 6 each. In WSR your score picks the set — A once you're more than k/2 under par going into the round's k-th hole (−3 or better before the 4th), never in 3-hole rounds — and a random draw picks the spot within it. Switch Sports reuses these spots (your captures show both sets) and adds a few of its own, labelled S1, S2… Local play tees off from WSR's own tee spot unless you move it (Shot Position). Online Survival Golf tees off from the same two-tier platform on every hole: four slots on the lower tier, four on the upper, which is 4 yd further back and a few feet up. The lower tier is the local tee spot on some holes and up to 8 yd behind it on others (the ⛳ Lower tier / Upper tier chips put the ball on either), and your slot can put you up to ~5 yd to either side. Online captures exist on 12 holes; holes 1, 2, 3, 6, 7, 12, 13, 17 and 21 have none yet, so only the local tee is offered there. The "yd to go" badge is the authority.</div>
@@ -1963,7 +1872,7 @@ export default function App() {
               <table className="w-full text-xs">
                 <thead>
                   <tr className="disp text-left" style={{ background: T.sky }}>
-                    {["Club", "yd / power (a)", "wind % / mph (h)", "drift yd / mph·pow (c)", "traj", "spin", "shots"].map((hd) => (
+                    {["Club", "full stop ÷ 4 (a)", "wind % / mph (h)", "drift yd / mph·pow (c)", "traj", "spin", "shots"].map((hd) => (
                       <th key={hd} className="px-3 py-2 font-semibold">{hd}</th>
                     ))}
                   </tr>
@@ -1994,7 +1903,7 @@ export default function App() {
               </table>
             </div>
             <p className="text-[11px] opacity-60 mt-3">
-              carry = a × power × (1 + h × tailwind-mph) · sidedrift = c × crosswind-mph × power. Gauge is 4 bars for every club. Lies cap the usable bar (distance per bar is unchanged below the cap) — fixed values baked in: rough = 3 bars for every club; sand = wedge 3, irons 2, spoon/driver 1; putter uncapped in sand but rolls far less. Distance fits use tee/fairway shots when available; blank sideways entries are skipped by the drift fit.
+              stop = 4a × S(power ÷ 4, landing) × (1 + h × tailwind-mph) · sidedrift = c × crosswind-mph × power. S is the club's stop-vs-power curve from Wii Sports Resort's physics (decoded from the game; {SHAPE_LABEL} until Switch sweeps calibrate it): S = 1 at 4 bars landing on fairway, so a is the full-power fairway stop ÷ 4; the carry comes off the same curve, and a landing on green, fringe, rough or sand changes the roll. Gauge is 4 bars for every club. Lies cap the usable bar (distance per bar is unchanged below the cap) — fixed values baked in: rough = 3 bars for every club; sand = wedge 3, irons 2, spoon/driver 1; putter uncapped in sand but rolls far less. Distance fits use tee/fairway shots when available, each read through the curve at its power and where it finished; blank sideways entries are skipped by the drift fit.
             </p>
           </section>
         )}

@@ -54,7 +54,8 @@ It describes the **Wii** game; Switch Sports keeps the structure at best. Units:
   bs = 0.9.
 - **Validation**: the tick-exact port (`wsr-groundsim.py`, section 8) launched at full power on
   a flat fairway stops at **278.8 / 252.6 / 211.7 / 175.6 / 145.8 / 109.5 / 60.0 yd** against
-  the club blocks' P08 column **279 / 253 / 212 / 176 / 146 / 110 / 60** (max error 0.4 yd),
+  the club blocks' P08 column **279 / 253 / 212 / 176 / 146 / 110 / 60** (max error 0.5 yd, the
+  9-iron's 109.503; the others within 0.4),
   and a power-1.0 putt rolls 20.5 yd against the putter's P0c = P08 = 20. P08 is therefore
   WSR's own full-power stop distance on flat fairway, and the whole ground model is pinned the
   same way P0c pinned the air phase.
@@ -531,9 +532,11 @@ and wedge +0.0.
 Power 0.75 (3 bars), fairway: DR 183.2 → 233.0 (roll 49.8), SP 167.4 → 210.4 (43.0), 3I
 143.9 → 171.1 (27.2), 5I 121.1 → 140.8 (19.7), 7I 98.0 → 116.5 (18.5), 9I 75.4 → 86.8 (11.4),
 SW 41.0 → 45.8 (4.9). Power 0.5: DR 120.6 → 178.8 (58.2), 9I 49.7 → 61.5. Power 0.25: DR
-57.4 → 111.6 (54.2), 9I 23.5 → 32.8. Driver stop vs power: 69 / 112 / 149 / 179 / 208 / 233 /
-257 / 279 yd at 1/8 steps — the roll-out **grows** as power drops (flatter descent, smaller
-friction impulse), so stop distance is far from proportional to power even though carry is.
+57.4 → 111.6 (54.2), 9I 23.5 → 32.8. Driver stop vs power: 69 / 112 / 147 / 179 / 207 / 233 /
+257 / 279 yd at 1/8 steps (68.5 / 111.6 / 147.3 / 178.8 / 207.1 / 233.0 / 256.8 / 278.8; the
+3/8 and 5/8 entries once read 149 / 208, corrected 2026-10-20 against the simulator) — the
+roll-out **grows** as power drops (flatter descent, smaller friction impulse), so stop distance
+is far from proportional to power even though carry is.
 
 Slope 3° down along the shot (fairway, full power): DR 290.9, 9I 115.0, SW 63.5; 3° up: DR
 266.7, 9I 104.5, SW 57.2 (carry moves with the ground height, roll 34 vs 48 yd for the driver).

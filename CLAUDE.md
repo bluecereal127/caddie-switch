@@ -6,7 +6,11 @@ React app (Vite). No backend; all state in localStorage via `src/storage.js`
 v13 and now diverges (v14: capture catalog); the web repo is the source of truth.
 
 ## Files
-- `src/App.jsx` — entire app (~1970 lines): solver, hole maps, greens, rounds, log, clubs, guide (per-hole setup steps with an auto-tracked progress table, and shot-data coverage; the manual capture catalog is gone).
+- `src/App.jsx` — the app (~1910 lines): solver tab, hole maps, greens, rounds, log, clubs, guide (per-hole setup steps with an auto-tracked progress table, and shot-data coverage; the manual capture catalog is gone). The shot model itself is `src/model.js`.
+- `src/model.js` — the shot model, pure so the tools run it: DEFAULT_CLUBS, the lie caps (BUNKER_CAPS, capFor), `stopOf` / `carryOf` (the WSR shape × the fitted club, "Model" below), `solve` (per club: landing surface, power, carry, roll, the spin range, `red`), `fitClub`, and the putt solver (simPutt, solvePutt and their constants), all moved out of App.jsx on 2026-10-20.
+- `src/wsrsim.js` — WSR's ball, tick for tick: the port of tools/research/wsr-groundsim.py (lift, side spin, the backspin pull-back, gravity along the bisector, drag, the contact impulse with the A / B tables, the iron-on-green first contact, the four-tick ring, the stop rule) on a flat or tilted plane of one surface, plus wsr-flightsim.py's in-air wind as an option; `run({ club, q, surface, back, side, slopeDeg, wind, spinStart })` → `{ carry, stop, apex, roll, lateral, bounces, ticks, path }` in yd. Pure (no Node or DOM); `tools/lib/wsrsim.mjs` re-exports it for the tools. No cup, trees or water.
+- `tools/build-wsr-shape.mjs` → `src/wsrShape.js` (AUTO-GENERATED, committed) — WSR's stop and carry against launch power per club, landing surface (fairway, rough, green, fringe, bunker) and spin (none; full = bs = the club's P1c × q, irons and wedge) on q = 0.05 … 1.00, normalised by the club's full-power fairway stop (1,347 simulations, 0.8 s, deterministic; every stop row monotone in q, none needed the running-maximum fix). Rerun after any change to src/wsrsim.js.
+- `tools/test-solver.mjs` — acceptance for the three files above: the port against the reference simulator's tables (stops, carries, surfaces, power sweep, spin, slopes, putter, red curve, wind), the shape, solve's round trip, surfaces, caps and `red`, fitClub on synthetic rows, the putt solver unchanged by the move, and the generator's determinism.
 - `src/main.jsx` — mount point + client-side password gate (SHA-256 vs PASS_HASH; casual deterrence only — change via `node tools/hash-password.mjs <pw>`; deliberately kept out of App.jsx).
 - `src/maps.js` — AUTO-GENERATED (tools/build-derived.mjs): 21 hole minimaps as base64 JPEG (q78), since 2026-10-18 the renders of WSR's own minimap from `captures/derived/render/hNN.png` (tools/render-maps.mjs): the 250×304 map frame at 2× (500×608), flat backdrop, no compass, flag, avatar or aim line, WSR's tree sprites painted at their placement positions. The frame is the mapV5 frame (which replaced the 219×270 rufusmccoot/chart set), so no migration; fractional coordinates everywhere. A hole with no render falls back to its median-stacked captures (250×304) with the zoom texture transplanted into the green, as before, and the build log says so.
 - `src/greens.js` — AUTO-GENERATED (tools/build-derived.mjs): the zoomed green view per hole, the renderer's `hNN-green.png` (the WSR green box plus 0.12 of it on every side, at the box's true aspect, q82; derived.json `greenView` = `{ aspect, margin: 0.12, source: "render" }`), falling back to the capture-fused 256×256 texture (`source: "captures"`, with `covered` and `sessions`, which the app's caption shows).
@@ -33,7 +37,7 @@ v13 and now diverges (v14: capture catalog); the web repo is the source of truth
 - `tools/wsr-pins.mjs` → `tools/wsr-pins.json` — every WSR pin (slot, set, label, yardage), player start, tee marker and tree (`trees`: kind = PMP id 2/3/6, size = the object's x scale, `sy` = its y scale, `meshY` = its height in KCL units, the trunk base its collision shapes stand on, `lie` = the KCL surface under the trunk — fairway, rough, sand, green, fringe, outer, water, other — in and out of the frame; the KCL meshes hold no trees), decoded from the course archives' PMP files (Yaz0 + U8 + PMP readers) into the map frame; committed. Rerun only with the archives extracted from the disc image (`DATA/files/Stage/Shared2/glf_course_<id>.carc`); it also reads `tools/mesh-holes.json`, `tools/mesh-registration.json`, `tools/wsr-truth.json` and, for the lies, the gitignored class rasters in `captures/meshes/heightmaps-res4/` (without them each tree keeps the lie the committed file has for its spot, and the log says how many came from where). The selection logic read from main.dol, the per-hole spot table and what NSS does differently are in `tools/PINS.md`.
 - `tools/wsr-truth.mjs` → `tools/wsr-truth.json` — per-hole WSR truth in the app's map frame (scale, green box/outline, tee pad hull, slope grid) from the meshes + registration; committed so build-derived runs without the meshes.
 - `tools/build-terrain.mjs` → `public/terrain/` (committed, since the rasters are gitignored; 1,169 + 415 KB raw, 230 + 208 KB gzipped) — per hole `hNN.bin`: the ground height (int16, 0.1 yd above the hole's datum, the WSR player start's height; `datumY` in KCL units in index.json) and the KCL class on a 125×152 grid over the map frame (one sample per 2 map px; no height and class 0 past the raster's crop), and `gNN.bin`: the green's heights every 0.5 yd over the WSR green box + 0.12 (int16, 0.001 yd above the green's mean) with the outline as a mask; `index.json` the layouts, datums, sizes and SHA-1s. Read from the class and height rasters (`captures/meshes/heightmaps-res4`) through the registration; the raster's nodata takes what map-style.json says the minimap draws there and its 1–2 px rasterising cracks are closed, but the KCL class stays where WSR's own minimap model draws another (tools/test-terrain.mjs lists the spots). Rerun when the meshes, the registration or map-style.json's `regions` change (wsr-truth's triggers plus the style: the nodata designations are capture-sampled, so a map-style.mjs rerun after new stacks needs a terrain rebuild, or tools/test-terrain.mjs's determinism step fails); `tools/test-terrain.mjs` checks the files (and rebuilds twice, byte-identical, when the rasters are there).
-- `src/terrain.js` — the app's reader for public/terrain: `loadTerrain(hole)` (one fetch per hole, cached; null when missing), `heightAt(t, x, y)` (yd above the datum, bilinear), `classAt(t, x, y)`, `lieOf(class)` (fairway, rough, bunker, green, fringe, water, outer, wall, else null), `loadGreenHeights(hole)` → `{ w, h, stepYd, box, z0Yd, unitYd, data, mask }` and `greenHeightAt(g, x, y)`. Parsing and sampling are pure; App.jsx does not use it yet (the stop-distance, tree and putt builds will).
+- `src/terrain.js` — the app's reader for public/terrain: `loadTerrain(hole)` (one fetch per hole, cached; null when missing), `heightAt(t, x, y)` (yd above the datum, bilinear), `classAt(t, x, y)`, `lieOf(class)` (fairway, rough, bunker, green, fringe, water, outer, wall, else null), `loadGreenHeights(hole)` → `{ w, h, stepYd, box, z0Yd, unitYd, data, mask }` and `greenHeightAt(g, x, y)`. Parsing and sampling are pure; App.jsx loads the solver's hole and reads each shot's landing surface with `classAt` / `lieOf` along the shot line (the tree and putt builds will use the heights).
 - `tools/test-terrain.mjs`, `tools/test-merge-tree-fields.mjs` — acceptance for the terrain files and for the tree fields' merge (kind, size, sy, z on every auto marker; idempotent).
 - `tools/online-rounds.json` — which tier of the online Survival Golf tee platform the player stood on in each of the 13 online rounds (a round = hole + wind; judged by eye from the frames, two judges agreed on all 13) and the tier offset, 4.0 yd (H11, the one hole captured from both tiers). build-derived reads it to ship both tiers as `teeOnline`; without it only the observed median ships. Hand-written: a new online round needs its tier added here.
 - `src/storage.js` — window.storage shim (async get/set/delete/list over localStorage, key prefix `caddie:`; app data lives under `caddie:sss-golf-solver-v2`).
@@ -55,10 +59,57 @@ v13 and now diverges (v14: capture catalog); the web repo is the source of truth
 - Capture platform: user plays on a Switch 2, but NSS is a backward-compat Switch 1 title, so album captures are 1280×720 (Switch 2 games capture 1920×1080; no setting changes this — Nintendo support a_id 68408). All measured ROIs assume 720p frames; rects are fractional anyway.
 
 ## Model
-carry = a · power · (1 + h · tailwind_mph); sidedrift = c · crosswind_mph · power.
-Distances are STOP distances (carry + roll). Fits prefer tee/fairway shots; null
-sideways entries are skipped. Putt solver: Euler sim over a 9×9 painted slope
-grid per green (MU=1.35, SLOPE_G=1.1, capture radius 0.22 yd, max capture speed 2.2).
+stop = 4a · (1 + h · tailwind_mph) · S(bars/4, landing surface, spin);
+carry = 4a · (1 + h · tailwind_mph) · C(bars/4); sidedrift = c · crosswind_mph · bars
+(src/model.js `stopOf`, `carryOf`). Distances are STOP distances (carry + roll).
+- The shape S, C is WSR's (decision D2, 2026-10-20): src/wsrsim.js ports
+  tools/research/wsr-groundsim.py tick for tick (identical to it on all 93
+  reference runs), and tools/build-wsr-shape.mjs runs it per club, landing
+  surface (fairway, rough, green, fringe, bunker) and spin (none, full) into
+  src/wsrShape.js, normalised by the club's full-power fairway stop: S(1,
+  fairway, none) = 1, so `a` keeps its meaning (the 4-bar fairway stop ÷ 4) and
+  the stored clubs needed no migration. Carry is linear in power, the stop is
+  not: the roll comes from the landing (a Coulomb friction impulse and a
+  restitution per surface), and a flatter, slower landing rolls further. WSR's
+  driver stops at 112 / 179 / 233 / 279 yd on 1 / 2 / 3 / 4 bars (roll 54 / 58 /
+  50 / 39); full-power roll DR→SW 39 / 33 / 22 / 16 / 16 / 10 / 5 yd; the driver
+  rolls 39 on fairway, 29 in rough, 69 on a green; an iron's first contact on a
+  green uses A = 0.48 (3i / 7i / 9i roll 25 / 18 / 10); a bunker landing does not
+  bounce and at full power rolls ≤ 3 yd (a flatter part-power landing slides
+  further: the driver up to 17 yd at 1.2 bars, irons ≤ 4). The table's choices:
+  flat ground, one plane per shot with the landing's surface, launch angle and
+  lift unchanged by the lie cap (true in WSR), pin homing h = 1, no wind.
+- Fitted (Switch): a, h and c per club from the logged shots, each row read
+  through the shape at its power and its optional `landed` (the lie it
+  finished on; fairway when absent). WSR's: the shape only, labelled "WSR-shaped
+  roll" on the rec cards until Switch sweeps (driver at 1–4 bars; one iron onto
+  fairway, rough and green) calibrate it. Wind stays a multiplier on the whole
+  stop: WSR's wind acts only in the air, but the logs cannot separate carry
+  from roll yet (the sim's wind is ported, the solver does not use it).
+- Landing surface: the App reads the KCL class at the carry along the shot line
+  from public/terrain (`ctx.surfaceAt`) in two passes (solve as fairway and
+  read where that carry lands; solve on that surface and read again; when the
+  reads disagree the second wins, unread). Water, OB, walls and a missing
+  terrain roll as fairway; the card names water, OB or a bank at the carry.
+- Backspin (D4) is a motion input the app cannot know: irons and wedge show the
+  roll on green and fairway landings as a range from full spin to none. Full
+  spin is bs = P1c × q (lead's amendment, 2026-10-20): WSR gives the swing's
+  spin at any power, but on the Switch spin strength scales with swing power
+  (Confirmed game mechanics, which override WSR), and scaling it linearly with
+  the bar is an assumption (Switch-shaped) until a sweep measures it; at q = 1
+  the column is WSR's own. In WSR's yards a full-spin 9-iron onto a green
+  stops at 89.7 on 4 bars (WSR's own), 73.5 on 3 (WSR's constant spin: 69.4)
+  and 43.1 on 1.6 (35.2).
+- The solver inverts the monotone stop curve by bisection to 0.005 bar inside
+  [0.4, cap]; caps stay hard, and `red` (power ≥ cap − 0.1) warns that past the
+  cap the bar goes red and the ball curves to a random side. Fits prefer
+  tee/fairway shots; null sideways entries are skipped. WSR's hidden pin-power
+  assist on PARTIAL swings (wsr-swing-redzone-spin.md §3.5) may bias part-power
+  approach rows near the pin (the data-entry caution below); full swings never.
+- Not in the model yet: elevation (Phase 3; `ctx` is where the landing's height
+  goes), trees, over-swing power, Shot Assist.
+Putt solver (src/model.js): Euler sim over a 9×9 painted slope grid per green
+(MU=1.35, SLOPE_G=1.1, capture radius 0.22 yd, max capture speed 2.2).
 
 ## Confirmed game mechanics (do not regress these)
 - Gauge = 4 bars, linear (a = max/4). The seed defaults (driver 250, spoon 200, 3i 175, 5i 155, 7i 135, 9i 100, wedge 80) are Switch guide numbers. WSR's own binary (decoded 2026-10-18, tools/research/wsr-club-physics.md) carries 240/220/190/160/130/100/55 yd at full power on a flat lie, launch angles 10/11/19/23/24/30/43°, carry linear in power to ±2%, rough = ×0.75 power for every club, bunker ×0.25 woods / ×0.5 irons / ×0.75 wedge (the Switch's 3 and 1-2-3 bars), woods cannot backspin; the flight code is ported in tools/research/wsr-flightsim.py and reproduces those carries to 0.3 yd. The structure carries over to the Switch; the numbers must be fitted from logged shots.
@@ -155,7 +206,7 @@ power; backspin switches it off; tools/research/wsr-swing-redzone-spin.md §3.5)
 Whether the Switch kept it is an open test (that document's §12 item 10), so
 until it is ruled out, partial-power calibration sweeps should land well clear
 of the pin (> 33 yd); full swings are never affected.
-Import/Export in Log tab takes JSON rows: {club,power,lie,windSpeed,windDeg,ended,side?,hole?,stroke?}.
+Import/Export in Log tab takes JSON rows: {club,power,lie,windSpeed,windDeg,ended,side?,hole?,stroke?,landed?} (landed: fairway / rough / green / fringe / bunker, where the ball finished; the form's "Finished on").
 
 ## Roadmap (agreed phases — user wants everything derived silently from uploads)
 **Phase 1 — cataloging sweep (done, and superseded by the WSR data on 2026-10-16/17):** the capture pipeline still does what it was built for — glyph templates from real frames → frame classifier (address / popup / tee-map / green-plain / green-heightmap, hole ID from the "Hole N Par N" banner; the capture catalog it once ticked is gone, and the Guide tracks each hole from derived.json) → median-stack tee frames → the capture stacks under captures/derived/maps (the comparison art: since 2026-10-18 the shipped hole maps and green views are rendered from WSR's own minimap model, tools/render-maps.mjs) — but the geometry no longer comes from the captures: scale, green box/outline and the 9×9 slope grid come from the WSR collision meshes (tools/wsr-truth.json), pins, the tee and the trees from WSR's placement files (tools/wsr-pins.json). The captures confirm them (zoomed green outlines match the mesh greens; tee "yd to go" badges match the registration's yd/px and WSR's start-to-pin yardages) and supply what WSR cannot: the Switch-only pin spots, the online tee platform's tiers (a tee frame serves its badge, cup and avatar, no longer the map image), and the shot logs (Phase 2).
