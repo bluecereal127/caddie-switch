@@ -16,8 +16,12 @@
 //  c. solve inverts stopOf: p = 1.0 .. 4.0 back within 0.01 bar for every club,
 //     the driver at 250 yd at 4.00
 //  d. the landing surface moves the power the right way (green < fairway <
-//     rough < bunker for the driver); rollSpin only for the clubs that spin
+//     rough < bunker for the driver); rollSpin only for the clubs that spin;
+//     the two-pass read's out-of-reach rules (a rec found through a clamp
+//     end's read lands on its surface at its own carry; a chain that ends out
+//     of reach falls back to the cap read's surface, kept only if it lands there)
 //  e. caps: rough 3 bars, bunker per BUNKER_CAPS; `red` from cap - 0.1 up only
+//     (probed 0.001 bar either side of the threshold)
 //  f. fitClub recovers a and h from rows made by stopOf at 2-4 bars and
 //     -10..10 mph tailwind, with and without `landed`; a green row fits the
 //     fairway rows' a once it says where it finished
@@ -40,6 +44,9 @@ const { DEFAULT_CLUBS, BUNKER_CAPS, stopOf, carryOf, solve, fitClub, simPutt, so
 let fails = 0; const ok = (c, msg) => { if (!c) { fails++; console.log("FAIL:", msg); } };
 const near = (got, want, tol, what) => ok(Math.abs(got - want) <= tol, `${what}: ${got.toFixed(3)}, expected ${want} ± ${tol}`);
 const IDS = ["driver", "spoon", "3iron", "5iron", "7iron", "9iron", "wedge"];
+// which clubs backspin, stated apart from the code under test: the irons and
+// the wedge; the driver and spoon never (CLAUDE.md), WSR's P1c = 0 for the woods
+const SPINS = new Set(["3iron", "5iron", "7iron", "9iron", "wedge"]);
 const byId = Object.fromEntries(DEFAULT_CLUBS.map((c) => [c.id, c]));
 const full = (club, surface = "fairway", extra = {}) => run({ club, q: 1, surface, ...extra });
 
@@ -123,7 +130,9 @@ for (const id of IDS) {
     ok(row.every((v, k) => k === 0 || v >= row[k - 1]), `${id} ${s} ${spin}: stop not monotone in q`);
     ok(row.length === SHAPE_Q.length, `${id} ${s} ${spin}: ${row.length} entries`);
   }
-  ok(!!t.S.fairway.full === CLUBS[id].spin > 0, `${id}: a full-spin column exactly when the club can backspin`);
+  ok(!!t.S.fairway.full === SPINS.has(id), `${id}: a full-spin column exactly when the club can backspin`);
+  ok((CLUBS[id].spin > 0) === SPINS.has(id), `${id}: CLUBS.spin ${CLUBS[id].spin} disagrees with which clubs can backspin`);
+  ok(!!byId[id].spin === SPINS.has(id), `${id}: DEFAULT_CLUBS.spin ${byId[id].spin} disagrees with which clubs can backspin`);
 }
 const dS = WSR_SHAPE.driver, qi = (q) => SHAPE_Q.indexOf(q);
 near(dS.S.fairway.none[qi(0.25)] * 278.8, 112, 1, "driver S(0.25) x 278.8");
@@ -138,7 +147,7 @@ ok(nine.S.green.full[qi(1)] < nine.C[qi(1)], `9-iron full spin onto a green stop
 // changes (the pull-back caps bs at 0.9), and the wedge's livelier landing
 // then ends up to 0.04 yd short of the constant-spin stop, hence the 0.05.
 let between = 0;
-for (const id of IDS.filter((id) => CLUBS[id].spin > 0)) {
+for (const id of IDS.filter((id) => SPINS.has(id))) {
   const t = WSR_SHAPE[id];
   for (const s of SHAPE_SURFACES) SHAPE_Q.forEach((q, k) => {
     const yd = (col) => t.S[s][col][k] * t.stopYd;
@@ -210,13 +219,46 @@ console.log(`round trip: 7 clubs x 13 powers, worst ${worstTrip.toExponential(2)
   ok(Math.abs(ask([dr], 200).recs[0].power - f.power) < 1e-12, "no surfaceAt does not solve as fairway");
   for (const cl of DEFAULT_CLUBS) {
     const x = ask([cl], stopOf(cl, 3), "fairway", { surfaceAt: () => "green" }).recs[0];
-    ok(x && (x.rollSpin != null) === (CLUBS[cl.id].spin > 0), `${cl.id}: rollSpin ${x?.rollSpin} for a club that ${CLUBS[cl.id].spin > 0 ? "spins" : "cannot spin"}`);
+    ok(x && (x.rollSpin != null) === SPINS.has(cl.id), `${cl.id}: rollSpin ${x?.rollSpin} for a club that ${SPINS.has(cl.id) ? "spins" : "cannot spin"}`);
     if (x && x.rollSpin != null) ok(x.rollSpin < x.roll, `${cl.id}: full spin does not shorten the roll`);
   }
   // the second read wins: fairway's carry lands on green, the green solve's carry back on fairway
   const edge = carryOf(byId["9iron"], 3.6);
   const x = ask([byId["9iron"]], stopOf(byId["9iron"], 3.6), "fairway", { surfaceAt: (yd) => (yd >= edge - 0.5 ? "green" : "fairway") }).recs[0];
   ok(!x || x.surface === "fairway", `two reads that disagree: the second should win (got ${x?.surface})`);
+  // a pass out of reach reads at the clamp end, which is no solution: a rec
+  // found through that read must land on its surface at its OWN carry. The
+  // 7-iron to its 3.9-bar fairway stop with rough under that carry: the rough
+  // solve falls past the cap and reads fairway at the cap's carry, but the
+  // fairway solution (3.9 bars) carries into the rough, where it stops 5 yd
+  // short, so no rec. The driver over a bunker onto rough: the bunker solve
+  // falls past the cap and reads rough there, and the rough solution's own
+  // carry lands on rough, so it is kept
+  {
+    const c7 = byId["7iron"], d7 = stopOf(c7, 3.9), lo = carryOf(c7, 3.9) - 1, hi = (carryOf(c7, 3.9) + carryOf(c7, 4)) / 2;
+    const strip = ask([c7], d7, "fairway", { surfaceAt: (yd) => (yd >= lo && yd < hi ? "rough" : "fairway") }).recs[0];
+    ok(!strip, `a rec found through the clamp end's read whose own carry lands elsewhere is shipped (${strip?.power.toFixed(2)} bars on ${strip?.surface})`);
+    const dr = byId.driver, pr = 3.57, dR = stopOf(dr, pr, "rough"), cf = carryOf(dr, ask([dr], dR).recs[0].power);
+    ok(stopOf(dr, 4, "bunker") < dR, "the driver-over-a-bunker case: the bunker solve should fall past the cap");
+    const past = ask([dr], dR, "tee", { surfaceAt: (yd) => (yd <= cf + 0.5 ? "bunker" : "rough") }).recs[0];
+    ok(past && past.surface === "rough" && Math.abs(past.power - pr) < 0.01, `the driver over a bunker onto rough: ${past ? `${past.power.toFixed(3)} bars on ${past.surface}` : "no rec"}, expected ${pr} on rough`);
+  }
+  // a chain that ends on a surface that cannot reach the distance falls back
+  // to the surface read at the cap's carry (the one maxReach is built from),
+  // kept only when that solution's own carry lands there: the driver from
+  // rough to 1 yd under its reach, with green under the fairway pass's carry,
+  // bunker under the green pass's and rough under the cap's
+  {
+    const dr = byId.driver, d = stopOf(dr, 3, "rough") - 1;
+    const cF = carryOf(dr, ask([dr], d, "rough").recs[0].power), cG = carryOf(dr, ask([dr], d, "rough", { surfaceAt: () => "green" }).recs[0].power), cCap = carryOf(dr, 3);
+    const bands = (yd) => (yd < (cG + cF) / 2 ? "bunker" : yd < (cF + cCap) / 2 ? "green" : "rough");
+    const r = ask([dr], d, "rough", { surfaceAt: bands }).recs[0];
+    ok(r && r.surface === "rough" && Math.abs(stopOf(dr, r.power, "rough") - d) < 0.01 && bands(r.carry) === "rough", `the driver from rough at 1 yd under its reach: ${r ? `${r.power.toFixed(3)} bars on ${r.surface}` : "no rec"}, expected the cap read's rough`);
+    // the same with green up to the cap's carry, so the rough solution's own
+    // carry reads green: a true jump of the stop curve, no rec
+    const gap = ask([dr], d, "rough", { surfaceAt: (yd) => (yd >= cCap - 0.1 ? "rough" : yd < (cG + cF) / 2 ? "bunker" : "green") }).recs[0];
+    ok(!gap, `the fallback kept a rec whose carry does not land on the cap read's surface (${gap?.power.toFixed(3)} bars on ${gap?.surface})`);
+  }
 }
 
 // ---- e. caps and red ----
@@ -225,9 +267,11 @@ for (const cl of DEFAULT_CLUBS) {
     let maxP = 0;
     for (let d = 10; d <= 320; d += 5) for (const r of ask([cl], d, lie).recs) maxP = Math.max(maxP, r.power);
     ok(maxP <= cap + 1e-9, `${cl.id} from ${lie}: power ${maxP.toFixed(3)} above the ${cap}-bar cap`);
-    const hi = ask([cl], stopOf(cl, cap - 0.05), lie).recs[0], lo = ask([cl], stopOf(cl, cap - 0.2), lie).recs[0];
-    ok(hi && hi.red === true, `${cl.id} from ${lie}: ${cap - 0.05} bars not flagged red`);
-    ok(lo && lo.red === false, `${cl.id} from ${lie}: ${cap - 0.2} bars flagged red`);
+    // the threshold itself, a hair either side: the round trip lands within
+    // 5.5e-5 bar of the asked power, so 0.001 clears it on both sides
+    const hi = ask([cl], stopOf(cl, cap - 0.1 + 0.001), lie).recs[0], lo = ask([cl], stopOf(cl, cap - 0.1 - 0.001), lie).recs[0];
+    ok(hi && hi.red === true, `${cl.id} from ${lie}: ${cap - 0.099} bars not flagged red`);
+    ok(lo && lo.red === false, `${cl.id} from ${lie}: ${cap - 0.101} bars flagged red`);
     ok(ask([cl], stopOf(cl, cap) + 1, lie).recs.length === 0, `${cl.id} from ${lie}: a distance past the cap still gets a rec`);
   }
 }

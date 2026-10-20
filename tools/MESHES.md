@@ -687,9 +687,10 @@ up to 4.5 yd below on H7), and 184 stand beyond the rasters' crops.
    heights under `public/terrain/` ("The terrain shipped to the app"),
    `tools/build-terrain.mjs`, which runs when the meshes, the registration or
    map-style.json's `regions` change (`wsr-truth.mjs`'s triggers plus the
-   style, which decides the nodata classes). Next: the solver reads them (the landing
-   surface for the stop distance, the ball's height for the tree check, the
-   green heights for the putts).
+   style, which decides the nodata classes); (done 2026-10-20) the solver reads
+   the landing surface for the stop distance (src/model.js `solve`,
+   `ctx.surfaceAt` built in App.jsx along the shot line, read in two passes).
+   Next: the ball's height for the tree check, the green heights for the putts.
 2. Calibrate the putt model to absolute slopes: `gridPct`, and now the green
    heights every 0.5 yd (`gNN.bin`); the 9×9 levels are still per-green
    relative, so a level-3 cell means "this green's steepest", not a fixed

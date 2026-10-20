@@ -10,7 +10,7 @@ v13 and now diverges (v14: capture catalog); the web repo is the source of truth
 - `src/model.js` — the shot model, pure so the tools run it: DEFAULT_CLUBS, the lie caps (BUNKER_CAPS, capFor), `stopOf` / `carryOf` (the WSR shape × the fitted club, "Model" below), `solve` (per club: landing surface, power, carry, roll, the spin range, `red`), `fitClub`, and the putt solver (simPutt, solvePutt and their constants), all moved out of App.jsx on 2026-10-20.
 - `src/wsrsim.js` — WSR's ball, tick for tick: the port of tools/research/wsr-groundsim.py (lift, side spin, the backspin pull-back, gravity along the bisector, drag, the contact impulse with the A / B tables, the iron-on-green first contact, the four-tick ring, the stop rule) on a flat or tilted plane of one surface, plus wsr-flightsim.py's in-air wind as an option; `run({ club, q, surface, back, side, slopeDeg, wind, spinStart })` → `{ carry, stop, apex, roll, lateral, bounces, ticks, path }` in yd. Pure (no Node or DOM); `tools/lib/wsrsim.mjs` re-exports it for the tools. No cup, trees or water.
 - `tools/build-wsr-shape.mjs` → `src/wsrShape.js` (AUTO-GENERATED, committed) — WSR's stop and carry against launch power per club, landing surface (fairway, rough, green, fringe, bunker) and spin (none; full = bs = the club's P1c × q, irons and wedge) on q = 0.05 … 1.00, normalised by the club's full-power fairway stop (1,347 simulations, 0.8 s, deterministic; every stop row monotone in q, none needed the running-maximum fix). Rerun after any change to src/wsrsim.js.
-- `tools/test-solver.mjs` — acceptance for the three files above: the port against the reference simulator's tables (stops, carries, surfaces, power sweep, spin, slopes, putter, red curve, wind), the shape, solve's round trip, surfaces, caps and `red`, fitClub on synthetic rows, the putt solver unchanged by the move, and the generator's determinism.
+- `tools/test-solver.mjs` — acceptance for the three files above: the port against the reference simulator's tables (stops, carries, surfaces, power sweep, spin, slopes, putter, red curve, wind), the shape, solve's round trip, surfaces (with the two-pass read's out-of-reach rules), caps and `red` (probed either side of cap − 0.1), fitClub on synthetic rows, the putt solver unchanged by the move, and the generator's determinism.
 - `src/main.jsx` — mount point + client-side password gate (SHA-256 vs PASS_HASH; casual deterrence only — change via `node tools/hash-password.mjs <pw>`; deliberately kept out of App.jsx).
 - `src/maps.js` — AUTO-GENERATED (tools/build-derived.mjs): 21 hole minimaps as base64 JPEG (q78), since 2026-10-18 the renders of WSR's own minimap from `captures/derived/render/hNN.png` (tools/render-maps.mjs): the 250×304 map frame at 2× (500×608), flat backdrop, no compass, flag, avatar or aim line, WSR's tree sprites painted at their placement positions. The frame is the mapV5 frame (which replaced the 219×270 rufusmccoot/chart set), so no migration; fractional coordinates everywhere. A hole with no render falls back to its median-stacked captures (250×304) with the zoom texture transplanted into the green, as before, and the build log says so.
 - `src/greens.js` — AUTO-GENERATED (tools/build-derived.mjs): the zoomed green view per hole, the renderer's `hNN-green.png` (the WSR green box plus 0.12 of it on every side, at the box's true aspect, q82; derived.json `greenView` = `{ aspect, margin: 0.12, source: "render" }`), falling back to the capture-fused 256×256 texture (`source: "captures"`, with `covered` and `sessions`, which the app's caption shows).
@@ -89,8 +89,16 @@ carry = 4a · (1 + h · tailwind_mph) · C(bars/4); sidedrift = c · crosswind_m
 - Landing surface: the App reads the KCL class at the carry along the shot line
   from public/terrain (`ctx.surfaceAt`) in two passes (solve as fairway and
   read where that carry lands; solve on that surface and read again; when the
-  reads disagree the second wins, unread). Water, OB, walls and a missing
-  terrain roll as fairway; the card names water, OB or a bank at the carry.
+  reads disagree the second wins, unread). A pass that falls past the floor or
+  the cap reads there, which is no solution, so a rec found through that read
+  ships only if the read at its own carry agrees; and when the chain ends on a
+  surface that cannot reach the distance although the surface read at the
+  cap's carry (the one `maxReach` is built from) can, the solver solves on
+  that surface and keeps the result only if its carry lands there, so a
+  distance at or below maxReach has the club that set it while a true jump of
+  the stop curve at a surface edge still returns nothing. Water, OB, walls and
+  a missing terrain roll as fairway; the card names water, OB or a bank at the
+  carry.
 - Backspin (D4) is a motion input the app cannot know: irons and wedge show the
   roll on green and fairway landings as a range from full spin to none. Full
   spin is bs = P1c × q (lead's amendment, 2026-10-20): WSR gives the swing's

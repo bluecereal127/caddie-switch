@@ -229,26 +229,50 @@ function solve(clubs, inputs, blockedRules, ctx = {}) {
     const cap = capFor(cl, lie);
     const denom = cl.a * (1 + cl.h * wAlong);
     if (denom <= 0 || cap <= 0) return;
-    const reach = stopOf(cl, cap, landingSurface(readLie(carryOf(cl, cap, wAlong))), 0, wAlong);
+    const reachSurface = landingSurface(readLie(carryOf(cl, cap, wAlong)));
+    const reach = stopOf(cl, cap, reachSurface, 0, wAlong);
     if (!maxReach || reach > maxReach.yd) maxReach = { yd: reach, club: cl.name };
     // The landing surface in two passes: solve for fairway and read where that
     // carry lands, then solve on that surface and read once more at the new
     // carry. If the two reads disagree the second wins (solved on, not read
     // again): a carry that moves onto a third surface is not chased. A pass
-    // out of reach reads at the power it fell beyond (the floor or the cap).
+    // out of reach reads at the power it fell beyond (the floor or the cap),
+    // which is no solution, so a rec found through that read is kept only if
+    // the read at its own carry agrees; a chain that ends out of reach falls
+    // back to the cap read's surface below.
     const onFairway = powerFor(cl, dist, "fairway", wAlong, MIN_BARS, cap);
     let landsOn = readLie(carryOf(cl, onFairway.p, wAlong));
     let surface = landingSurface(landsOn), sol = onFairway;
     if (surface !== "fairway") {
       sol = powerFor(cl, dist, surface, wAlong, MIN_BARS, cap);
-      const second = readLie(carryOf(cl, sol.p, wAlong));
+      let second = readLie(carryOf(cl, sol.p, wAlong));
       if (landingSurface(second) !== surface) {
+        const clamped = !sol.ok;
         surface = landingSurface(second);
         sol = surface === "fairway" ? onFairway : powerFor(cl, dist, surface, wAlong, MIN_BARS, cap);
+        // the clamp end is no solution, so its read only names a surface to try:
+        // a rec solved on it must land on it (read at its own carry) or the club
+        // is dropped, never shipped with a landing its carry contradicts
+        if (clamped && sol.ok) {
+          second = readLie(carryOf(cl, sol.p, wAlong));
+          if (landingSurface(second) !== surface) return;
+        }
       }
       landsOn = second;
     }
-    if (!sol.ok) return;
+    if (!sol.ok) {
+      // the chain ended on a surface that cannot reach dist although the cap
+      // read (the surface maxReach is built from) can: solve on that one and
+      // keep it only when that power really lands there, so a distance at or
+      // below maxReach has the club that set it, and a true jump of the stop
+      // curve at a surface edge still returns nothing
+      if (dist > reach) return;
+      sol = powerFor(cl, dist, reachSurface, wAlong, MIN_BARS, cap);
+      if (!sol.ok) return;
+      landsOn = readLie(carryOf(cl, sol.p, wAlong));
+      if (landingSurface(landsOn) !== reachSurface) return;
+      surface = reachSurface;
+    }
     const p = sol.p;
     const drift = cl.c * wCross * p;
     const aim = -drift;
