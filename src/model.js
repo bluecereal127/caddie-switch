@@ -109,6 +109,60 @@ function powerFor(club, dist, surface, wAlong, lo, hi) {
   return { p: lo * (1 - f) + hi * f, ok: true };
 }
 
+// The stop a shot of `bars` really has: the stop curve of the surface its own
+// carry lands on (surfaceAt read at carryOf(bars), a missing or other read
+// rolling as fairway). solve scans it; the rec card's power bar maps through
+// it (App.jsx dragBar).
+function landedStop(club, bars, wAlong = 0, surfaceAt = null) {
+  const lie = surfaceAt ? surfaceAt(carryOf(club, bars, wAlong)) ?? null : null;
+  return stopOf(club, bars, landingSurface(lie), 0, wAlong);
+}
+
+// The power scan's step and the surface-edge tolerance, bars. A 0.02-bar step
+// moves the seed clubs' carry 0.34-0.39 yd (wedge) to 0.98-1.15 yd (driver),
+// under the terrain's cells (one sample per 2 map px, 1.8-5 yd), so a strip of
+// another surface shows in a sample unless the line only clips a cell's
+// corner; a solution whose carry lands on such a sliver is caught by the read
+// at its own carry (solve).
+const SCAN_STEP = 0.02, EDGE_TOL = 0.001;
+
+// f(p) = landedStop over [MIN_BARS, cap], cut into runs of one landing surface:
+// sampled every SCAN_STEP, each change of surface between two samples bisected
+// to EDGE_TOL. Within a run f is the monotone stop curve of its surface; at an
+// edge it jumps (up onto a green, down into a bunker), so a distance has a
+// solution on a run whose ends straddle it and none inside a jump. -> { runs:
+// [{ a, b, s }] (power from a to b lands on s), split } (split cuts any [a, b]
+// whose ends read sa and sb the same way).
+function landingRuns(club, cap, wAlong, readLie) {
+  const sOf = (p) => landingSurface(readLie(carryOf(club, p, wAlong)));
+  const split = (a, sa, b, sb) => {
+    const parts = [];
+    for (let guard = 0; sa !== sb && guard < 16; guard++) {
+      let lo = a, hi = b;
+      while (hi - lo > EDGE_TOL) { const mid = (lo + hi) / 2; if (sOf(mid) === sa) lo = mid; else hi = mid; }
+      parts.push({ a, b: lo, s: sa });
+      a = hi; sa = sOf(hi);
+    }
+    parts.push({ a, b, s: sa });
+    return parts;
+  };
+  const n = Math.max(1, Math.round((cap - MIN_BARS) / SCAN_STEP));
+  const at = (k) => (k === n ? cap : MIN_BARS + k * SCAN_STEP);
+  const runs = [];
+  let a = at(0), s = sOf(a), prev = a;
+  for (let k = 1; k <= n; k++) {
+    const p = at(k), sp = sOf(p);
+    if (sp !== s) {
+      const parts = split(prev, s, p, sp), last = parts[parts.length - 1];
+      runs.push({ a, b: parts[0].b, s }, ...parts.slice(1, -1));
+      a = last.a; s = last.s;
+    }
+    prev = p;
+  }
+  runs.push({ a, b: cap, s });
+  return { runs, split };
+}
+
 /* ---------------- putting ---------------- */
 const GRID_N = 9;
 const emptyGreen = () => ({ box: null, grid: Array.from({ length: GRID_N }, () => Array.from({ length: GRID_N }, () => [0, 0])) });
@@ -228,73 +282,59 @@ function solve(clubs, inputs, blockedRules, ctx = {}) {
   clubs.forEach((cl) => {
     const cap = capFor(cl, lie);
     const denom = cl.a * (1 + cl.h * wAlong);
-    if (denom <= 0 || cap <= 0) return;
-    const reachSurface = landingSurface(readLie(carryOf(cl, cap, wAlong)));
-    const reach = stopOf(cl, cap, reachSurface, 0, wAlong);
-    if (!maxReach || reach > maxReach.yd) maxReach = { yd: reach, club: cl.name };
-    // The landing surface in two passes: solve for fairway and read where that
-    // carry lands, then solve on that surface and read once more at the new
-    // carry. If the two reads disagree the second wins (solved on, not read
-    // again): a carry that moves onto a third surface is not chased. A pass
-    // out of reach reads at the power it fell beyond (the floor or the cap),
-    // which is no solution, so a rec found through that read is kept only if
-    // the read at its own carry agrees; a chain that ends out of reach falls
-    // back to the cap read's surface below.
-    const onFairway = powerFor(cl, dist, "fairway", wAlong, MIN_BARS, cap);
-    let landsOn = readLie(carryOf(cl, onFairway.p, wAlong));
-    let surface = landingSurface(landsOn), sol = onFairway;
-    if (surface !== "fairway") {
-      sol = powerFor(cl, dist, surface, wAlong, MIN_BARS, cap);
-      let second = readLie(carryOf(cl, sol.p, wAlong));
-      if (landingSurface(second) !== surface) {
-        const clamped = !sol.ok;
-        surface = landingSurface(second);
-        sol = surface === "fairway" ? onFairway : powerFor(cl, dist, surface, wAlong, MIN_BARS, cap);
-        // the clamp end is no solution, so its read only names a surface to try:
-        // a rec solved on it must land on it (read at its own carry) or the club
-        // is dropped, never shipped with a landing its carry contradicts
-        if (clamped && sol.ok) {
-          second = readLie(carryOf(cl, sol.p, wAlong));
-          if (landingSurface(second) !== surface) return;
-        }
-      }
-      landsOn = second;
+    if (denom <= 0 || cap < MIN_BARS) return;
+    // The landing surface by a power scan (landingRuns): every power from the
+    // floor to the cap with the surface its own carry lands on. maxReach is the
+    // top of f, at the end of a run (f need not rise overall: a bunker under a
+    // long carry stops it short of a shorter one's roll).
+    const { runs, split } = landingRuns(cl, cap, wAlong, readLie);
+    const f = (p, s) => stopOf(cl, p, s, 0, wAlong);
+    for (const r of runs) {
+      const yd = f(r.b, r.s);
+      if (!maxReach || yd > maxReach.yd) maxReach = { yd, club: cl.name };
     }
-    if (!sol.ok) {
-      // the chain ended on a surface that cannot reach dist although the cap
-      // read (the surface maxReach is built from) can: solve on that one and
-      // keep it only when that power really lands there, so a distance at or
-      // below maxReach has the club that set it, and a true jump of the stop
-      // curve at a surface edge still returns nothing
-      if (dist > reach) return;
-      sol = powerFor(cl, dist, reachSurface, wAlong, MIN_BARS, cap);
-      if (!sol.ok) return;
-      landsOn = readLie(carryOf(cl, sol.p, wAlong));
-      if (landingSurface(landsOn) !== reachSurface) return;
-      surface = reachSurface;
+    // The solutions: each run whose ends straddle dist, bisected on its surface
+    // and kept when the read at its own carry agrees. A strip narrower than a
+    // step that the solution's carry lands in cuts the run again around it.
+    const sols = [];
+    const tryRun = (r, depth) => {
+      if (!(f(r.a, r.s) <= dist && dist <= f(r.b, r.s))) return;
+      const { p } = powerFor(cl, dist, r.s, wAlong, r.a, r.b);
+      const landsOn = readLie(carryOf(cl, p, wAlong)), s = landingSurface(landsOn);
+      if (s === r.s) sols.push({ p, surface: s, landsOn });
+      else if (depth < 4) [...split(r.a, r.s, p, s), ...split(p, s, r.b, r.s)].forEach((q) => tryRun(q, depth + 1));
+    };
+    runs.forEach((r) => tryRun(r, 0));
+    // several solutions (a carry onto a green and a shorter one rolling up to
+    // it): the best score as before, ties to the lower power
+    let best = null;
+    for (const sol of sols) {
+      const p = sol.p;
+      const drift = cl.c * wCross * p;
+      const aim = -drift;
+      const frac = p / cap;
+      const rule = hole ? blockedRules.find(
+        (r) => r.hole === hole && r.club === cl.id && (r.stroke === 0 || r.stroke === stroke) && Math.abs(r.aim - aim) <= 10
+      ) : null;
+      let score = Math.abs(frac - 0.8) + (frac > 0.97 ? 0.5 : 0);
+      if (rule) score += 10;
+      if (!best || score < best.score || (score === best.score && p < best.p)) best = { ...sol, drift, aim, frac, score, rule };
     }
-    const p = sol.p;
-    const drift = cl.c * wCross * p;
-    const aim = -drift;
-    const frac = p / cap;
-    const rule = hole ? blockedRules.find(
-      (r) => r.hole === hole && r.club === cl.id && (r.stroke === 0 || r.stroke === stroke) && Math.abs(r.aim - aim) <= 10
-    ) : null;
-    let score = Math.abs(frac - 0.8) + (frac > 0.97 ? 0.5 : 0);
-    if (rule) score += 10;
+    if (!best) return;
+    const { p, surface, landsOn } = best;
     // carry and roll at the solved power; rollSpin = the same with the full
     // backspin of that bar (irons and wedge): the range the card shows,
     // because the spin is a motion input the app cannot know (D4)
     const carry = carryOf(cl, p, wAlong);
     const roll = stopOf(cl, p, surface, 0, wAlong) - carry;
     const rollSpin = spinsBack(cl) ? stopOf(cl, p, surface, 1, wAlong) - carry : null;
-    out.push({ club: cl, power: p, drift, aim, frac, cap, score, calibrated: cl.shots, blocked: rule || null,
+    out.push({ club: cl, power: p, drift: best.drift, aim: best.aim, frac: best.frac, cap, score: best.score, calibrated: cl.shots, blocked: best.rule || null,
       carry, roll, surface, landsOn, rollSpin, red: p >= cap - RED_MARGIN });
   });
   return { recs: out.sort((x, y) => x.score - y.score).slice(0, 3), wAlong, wCross, maxReach };
 }
 
 export {
-  DEFAULT_CLUBS, BUNKER_CAPS, capFor, SHAPE_LABEL, LANDED, landingSurface, shapeAt, stopOf, carryOf,
+  DEFAULT_CLUBS, BUNKER_CAPS, capFor, SHAPE_LABEL, LANDED, MIN_BARS, landingSurface, shapeAt, stopOf, carryOf, landedStop,
   GRID_N, emptyGreen, MU, SLOPE_G, CUP_R, CUP_V, simPutt, solvePutt, fitClub, solve,
 };

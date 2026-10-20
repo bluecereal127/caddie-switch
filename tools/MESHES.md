@@ -689,7 +689,9 @@ up to 4.5 yd below on H7), and 184 stand beyond the rasters' crops.
    map-style.json's `regions` change (`wsr-truth.mjs`'s triggers plus the
    style, which decides the nodata classes); (done 2026-10-20) the solver reads
    the landing surface for the stop distance (src/model.js `solve`,
-   `ctx.surfaceAt` built in App.jsx along the shot line, read in two passes).
+   `ctx.surfaceAt` built in App.jsx along the shot line; per club the solver
+   scans every power from 0.4 bars to the cap for the stop on the surface its
+   own carry lands on, bisecting the surface edges, and solves each run).
    Next: the ball's height for the tree check, the green heights for the putts.
 2. Calibrate the putt model to absolute slopes: `gridPct`, and now the green
    heights every 0.5 yd (`gNN.bin`); the 9×9 levels are still per-green

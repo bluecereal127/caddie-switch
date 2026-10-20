@@ -16,10 +16,22 @@
 //  c. solve inverts stopOf: p = 1.0 .. 4.0 back within 0.01 bar for every club,
 //     the driver at 250 yd at 4.00
 //  d. the landing surface moves the power the right way (green < fairway <
-//     rough < bunker for the driver); rollSpin only for the clubs that spin;
-//     the two-pass read's out-of-reach rules (a rec found through a clamp
-//     end's read lands on its surface at its own carry; a chain that ends out
-//     of reach falls back to the cap read's surface, kept only if it lands there)
+//     rough < bunker for the driver); rollSpin only for the clubs that spin.
+//     The power scan: a distance inside the jump at a surface edge gets no rec
+//     (the 9-iron onto a green edge, the 7-iron's rough strip, the driver into
+//     a green short of a rough sliver); one beyond a bunker is found on the
+//     rough past it; a solution whose carry lands on a strip narrower than a
+//     scan step is not shipped on the surface around it. Real holes on the
+//     App's default line over the committed terrain: H4 from rough at 210 /
+//     211 yd (the driver's carry onto the fringe), H11 / H13 from rough at
+//     199 yd (the driver on rough). Synthetic holes of random surface strips,
+//     1,000 distances over ten with strips 2-25 yd wide and 300 over three with
+//     strips down to 0.2 yd: every rec stops within 0.01 yd of the distance on
+//     the surface read at its own carry, and only for a club whose 0.001-bar
+//     trace reaches the distance; on the wide-strip holes every club whose
+//     trace reaches it gets a rec with the best score of the trace's
+//     solutions, and maxReach is the traces' top. The time of one solve with
+//     7 clubs (under 10 ms)
 //  e. caps: rough 3 bars, bunker per BUNKER_CAPS; `red` from cap - 0.1 up only
 //     (probed 0.001 bar either side of the threshold)
 //  f. fitClub recovers a and h from rows made by stopOf at 2-4 bars and
@@ -40,7 +52,7 @@ const imp = (p) => import(pathToFileURL(join(root, p)).href);
 const { run, CLUBS } = await imp("tools/lib/wsrsim.mjs");
 const { WSR_SHAPE, SHAPE_Q, SHAPE_SURFACES } = await imp("src/wsrShape.js");
 const M = await imp("src/model.js");
-const { DEFAULT_CLUBS, BUNKER_CAPS, stopOf, carryOf, solve, fitClub, simPutt, solvePutt } = M;
+const { DEFAULT_CLUBS, BUNKER_CAPS, capFor, landingSurface, stopOf, carryOf, landedStop, solve, fitClub, simPutt, solvePutt } = M;
 let fails = 0; const ok = (c, msg) => { if (!c) { fails++; console.log("FAIL:", msg); } };
 const near = (got, want, tol, what) => ok(Math.abs(got - want) <= tol, `${what}: ${got.toFixed(3)}, expected ${want} ± ${tol}`);
 const IDS = ["driver", "spoon", "3iron", "5iron", "7iron", "9iron", "wedge"];
@@ -222,43 +234,181 @@ console.log(`round trip: 7 clubs x 13 powers, worst ${worstTrip.toExponential(2)
     ok(x && (x.rollSpin != null) === SPINS.has(cl.id), `${cl.id}: rollSpin ${x?.rollSpin} for a club that ${SPINS.has(cl.id) ? "spins" : "cannot spin"}`);
     if (x && x.rollSpin != null) ok(x.rollSpin < x.roll, `${cl.id}: full spin does not shorten the roll`);
   }
-  // the second read wins: fairway's carry lands on green, the green solve's carry back on fairway
-  const edge = carryOf(byId["9iron"], 3.6);
-  const x = ask([byId["9iron"]], stopOf(byId["9iron"], 3.6), "fairway", { surfaceAt: (yd) => (yd >= edge - 0.5 ? "green" : "fairway") }).recs[0];
-  ok(!x || x.surface === "fairway", `two reads that disagree: the second should win (got ${x?.surface})`);
-  // a pass out of reach reads at the clamp end, which is no solution: a rec
-  // found through that read must land on its surface at its OWN carry. The
-  // 7-iron to its 3.9-bar fairway stop with rough under that carry: the rough
-  // solve falls past the cap and reads fairway at the cap's carry, but the
-  // fairway solution (3.9 bars) carries into the rough, where it stops 5 yd
-  // short, so no rec. The driver over a bunker onto rough: the bunker solve
-  // falls past the cap and reads rough there, and the rough solution's own
-  // carry lands on rough, so it is kept
+  // The power scan cuts each club's f(p) = stop on the surface p's own carry
+  // lands on into runs of one surface; a distance inside the jump at an edge
+  // has no solution. The 9-iron to its 3.6-bar fairway stop with green from
+  // 0.5 yd short of that carry: the fairway run ends short of the distance and
+  // the green run starts past it, so no rec
+  {
+    const c9 = byId["9iron"], edge = carryOf(c9, 3.6), d9 = stopOf(c9, 3.6);
+    const x = ask([c9], d9, "fairway", { surfaceAt: (yd) => (yd >= edge - 0.5 ? "green" : "fairway") }).recs[0];
+    ok(!x, `a distance inside the jump onto a green got a rec (${x?.power.toFixed(3)} bars on ${x?.surface})`);
+  }
+  // the 7-iron to its 3.9-bar fairway stop with rough under that carry: the
+  // fairway run ends short, the rough strip stops 5 yd short and the fairway
+  // beyond it starts past the distance, so no rec. The driver over a bunker
+  // onto rough: the bunker run stops short and the rough run past it reaches
+  // the distance at 3.57 bars, landing on rough, so it is found
   {
     const c7 = byId["7iron"], d7 = stopOf(c7, 3.9), lo = carryOf(c7, 3.9) - 1, hi = (carryOf(c7, 3.9) + carryOf(c7, 4)) / 2;
     const strip = ask([c7], d7, "fairway", { surfaceAt: (yd) => (yd >= lo && yd < hi ? "rough" : "fairway") }).recs[0];
-    ok(!strip, `a rec found through the clamp end's read whose own carry lands elsewhere is shipped (${strip?.power.toFixed(2)} bars on ${strip?.surface})`);
+    ok(!strip, `the 7-iron's rough strip: a rec inside the jump (${strip?.power.toFixed(2)} bars on ${strip?.surface})`);
     const dr = byId.driver, pr = 3.57, dR = stopOf(dr, pr, "rough"), cf = carryOf(dr, ask([dr], dR).recs[0].power);
-    ok(stopOf(dr, 4, "bunker") < dR, "the driver-over-a-bunker case: the bunker solve should fall past the cap");
+    ok(stopOf(dr, 4, "bunker") < dR, "the driver-over-a-bunker case: the bunker run should stop short of the distance");
     const past = ask([dr], dR, "tee", { surfaceAt: (yd) => (yd <= cf + 0.5 ? "bunker" : "rough") }).recs[0];
     ok(past && past.surface === "rough" && Math.abs(past.power - pr) < 0.01, `the driver over a bunker onto rough: ${past ? `${past.power.toFixed(3)} bars on ${past.surface}` : "no rec"}, expected ${pr} on rough`);
   }
-  // a chain that ends on a surface that cannot reach the distance falls back
-  // to the surface read at the cap's carry (the one maxReach is built from),
-  // kept only when that solution's own carry lands there: the driver from
-  // rough to 1 yd under its reach, with green under the fairway pass's carry,
-  // bunker under the green pass's and rough under the cap's
+  // a green strip 0.3 yd wide, narrower than one 0.02-bar step of the
+  // driver's carry (1.1 yd), between two fairway samples and under the carry
+  // of the fairway solution (2.51 bars, off the scan's grid): that solution
+  // lands on the green, where it would roll long, so it must not ship as a
+  // fairway rec; cut around it, no run reaches the distance: no rec
+  {
+    const dr = byId.driver, c0 = carryOf(dr, 2.51), d0 = stopOf(dr, 2.51);
+    const hidden = (yd) => (Math.abs(yd - c0) <= 0.15 ? "green" : "fairway");
+    ok(hidden(carryOf(dr, 2.5)) === "fairway" && hidden(carryOf(dr, 2.52)) === "fairway", "the hidden-strip case: the scan's samples either side should read fairway");
+    const x = ask([dr], d0, "tee", { surfaceAt: hidden }).recs[0];
+    ok(!x, `a fairway solution whose carry lands on a hidden green strip shipped (${x?.power.toFixed(3)} bars on ${x?.surface}, carry reads ${x ? hidden(x.carry) : ""})`);
+  }
+  // the driver from rough to 1 yd under its cap's rough stop, with bunker,
+  // green and rough under rising carries: the rough run up to the cap holds
+  // the solution. With green up to 0.1 yd short of the cap's carry, the rough
+  // sliver there starts past the distance and the green run before it too: a
+  // true jump, no rec
   {
     const dr = byId.driver, d = stopOf(dr, 3, "rough") - 1;
     const cF = carryOf(dr, ask([dr], d, "rough").recs[0].power), cG = carryOf(dr, ask([dr], d, "rough", { surfaceAt: () => "green" }).recs[0].power), cCap = carryOf(dr, 3);
     const bands = (yd) => (yd < (cG + cF) / 2 ? "bunker" : yd < (cF + cCap) / 2 ? "green" : "rough");
     const r = ask([dr], d, "rough", { surfaceAt: bands }).recs[0];
-    ok(r && r.surface === "rough" && Math.abs(stopOf(dr, r.power, "rough") - d) < 0.01 && bands(r.carry) === "rough", `the driver from rough at 1 yd under its reach: ${r ? `${r.power.toFixed(3)} bars on ${r.surface}` : "no rec"}, expected the cap read's rough`);
-    // the same with green up to the cap's carry, so the rough solution's own
-    // carry reads green: a true jump of the stop curve, no rec
+    ok(r && r.surface === "rough" && Math.abs(stopOf(dr, r.power, "rough") - d) < 0.01 && bands(r.carry) === "rough", `the driver from rough at 1 yd under its reach: ${r ? `${r.power.toFixed(3)} bars on ${r.surface}` : "no rec"}, expected the rough run's`);
     const gap = ask([dr], d, "rough", { surfaceAt: (yd) => (yd >= cCap - 0.1 ? "rough" : yd < (cG + cF) / 2 ? "bunker" : "green") }).recs[0];
-    ok(!gap, `the fallback kept a rec whose carry does not land on the cap read's surface (${gap?.power.toFixed(3)} bars on ${gap?.surface})`);
+    ok(!gap, `the green-then-rough-sliver jump got a rec (${gap?.power.toFixed(3)} bars on ${gap?.surface})`);
   }
+}
+
+// ---- d, real holes: the App's default line (the derived tee to the
+// pipeline pin seen most, as src/derivedMerge.js picks curPin) over the
+// committed terrain, read through src/terrain.js, no wind ----
+const { parseTerrain, classAt, lieOf } = await imp("src/terrain.js");
+const DERIVED = JSON.parse(readFileSync(join(root, "public/derived.json"), "utf8")).holes;
+const MAP_W = 250, MAP_H = 304;
+const lineOf = (n) => {
+  const d = DERIVED[n], t = parseTerrain(readFileSync(join(root, `public/terrain/h${String(n).padStart(2, "0")}.bin`)));
+  const pin = d.pins.reduce((b, p) => ((p.seen ?? 0) > (b ? b.seen ?? 0 : -1) ? p : b), null) ?? d.pins[0];
+  const ball = d.tee, scale = d.scale, dx = (pin.x - ball.x) * MAP_W, dy = (pin.y - ball.y) * MAP_H;
+  const th = ((((Math.atan2(dx, -dy) * 180) / Math.PI + 360) % 360) * Math.PI) / 180;
+  return (yd) => lieOf(classAt(t, ball.x + (Math.sin(th) * yd) / scale / MAP_W, ball.y - (Math.cos(th) * yd) / scale / MAP_H));
+};
+{
+  const onHole = (n, lie, d) => { const surfaceAt = lineOf(n); return { surfaceAt, o: ask(DEFAULT_CLUBS, d, lie, { surfaceAt }) }; };
+  const list = (o) => o.recs.map((r) => `${r.club.name} ${r.power.toFixed(3)} on ${r.surface}`).join("; ") || "no rec";
+  // H4 from rough at 210 / 211 yd: the driver's carry lands on the fringe at
+  // 2.82-2.85 bars, a crossing the two-pass read never looked at
+  for (const d of [210, 211]) {
+    const { surfaceAt, o } = onHole(4, "rough", d);
+    const fr = o.recs.find((r) => r.surface === "fringe");
+    ok(fr && fr.club.id === "driver" && Math.abs(landedStop(fr.club, fr.power, 0, surfaceAt) - d) <= 0.01 && landingSurface(surfaceAt(fr.carry)) === "fringe", `H4 from rough at ${d} yd: ${list(o)}, expected the driver on the fringe`);
+  }
+  // H11 and H13 from rough at 199 yd: the driver on rough (the review's
+  // cases, where the old chain ended on a surface that could not reach)
+  for (const n of [11, 13]) {
+    const { surfaceAt, o } = onHole(n, "rough", 199);
+    const dr = o.recs.find((r) => r.club.id === "driver");
+    ok(dr && dr.surface === "rough" && landingSurface(surfaceAt(dr.carry)) === "rough" && Math.abs(landedStop(dr.club, dr.power, 0, surfaceAt) - 199) <= 0.01, `H${n} from rough at 199 yd: ${list(o)}, expected the driver on rough`);
+  }
+  const h4 = onHole(4, "rough", 210).o.recs.find((r) => r.surface === "fringe"), h11 = onHole(11, "rough", 199).o.recs.find((r) => r.club.id === "driver");
+  console.log(`holes: H4 from rough at 210 yd ${h4 ? `driver ${h4.power.toFixed(3)} bars, carry ${h4.carry.toFixed(1)} onto the fringe` : "no rec"}; H11 from rough at 199 yd ${h11 ? `driver ${h11.power.toFixed(3)} bars, carry ${h11.carry.toFixed(1)} on ${h11.surface}` : "no rec"}`);
+}
+
+// ---- d, synthetic holes: random strips of every surface (and water / OB /
+// no read, which roll as fairway) along the line, 1,000 random distances from
+// random lies over ten holes whose strips are 2-25 yd wide (wider than a
+// 0.02-bar step of any club's carry, 0.3-1.2 yd) and 300 more over three
+// holes with strips down to 0.2 yd, which a step can jump. Each club's f is
+// traced apart from the solver on a 0.001-bar grid, in runs of one surface.
+// Every rec, on every hole: within 0.01 yd of the distance, on the surface
+// read at its own carry, on a club whose trace reaches the distance. On the
+// wide-strip holes also: every club whose trace reaches the distance (by
+// 0.1 yd inside a run; the solver cuts its runs within 0.001 bar of an edge,
+// up to 0.05 yd of the driver's stop) gets a rec, and that rec's score is the
+// best of the trace's solutions (the scan misses none); maxReach is the
+// traces' top. ----
+{
+  let seed = 4242;
+  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;   // Park-Miller: exact in doubles
+  const KINDS = ["fairway", "rough", "green", "fringe", "bunker", "water", "outer", null];
+  const LIES = ["tee", "rough", "bunker"];
+  const scoreOf = (p, cap) => Math.abs(p / cap - 0.8) + (p / cap > 0.97 ? 0.5 : 0);
+  const tally = { wide: { recs: 0, found: 0, empty: 0 }, narrow: { recs: 0, found: 0, missed: 0, empty: 0 } };
+  let worst = 0, ms = 0, calls = 0;
+  const hole = (minW, nDist, kind) => {
+    const strips = [];
+    for (let yd = 0; yd < 360; ) {
+      const w = minW < 1 && rnd() < 0.4 ? minW + (1 - minW) * rnd() : 2 + 23 * rnd();
+      strips.push({ from: yd, to: yd + w, s: KINDS[Math.floor(rnd() * KINDS.length)] }); yd += w;
+    }
+    const surfaceAt = (yd) => (strips.find((x) => yd >= x.from && yd < x.to) ?? { s: null }).s;
+    // per lie and club, the trace's runs: { pa, pb, fa, fb, pts } with f rising from fa to fb
+    const trace = {};
+    for (const lie of LIES) {
+      trace[lie] = {};
+      for (const cl of DEFAULT_CLUBS) {
+        const cap = capFor(cl, lie), runs = [];
+        for (let k = 0; ; k++) {
+          const p = Math.min(cap, 0.4 + k * 0.001), s = landingSurface(surfaceAt(carryOf(cl, p))), f = landedStop(cl, p, 0, surfaceAt);
+          const last = runs[runs.length - 1];
+          if (last && last.s === s) { last.pb = p; last.fb = f; last.pts.push([p, f]); } else runs.push({ s, pa: p, pb: p, fa: f, fb: f, pts: [[p, f]] });
+          if (p >= cap) break;
+        }
+        trace[lie][cl.id] = { cap, runs };
+      }
+    }
+    const reaching = (t, d, margin) => t.runs.filter((r) => r.fa + margin <= d && d <= r.fb - margin);
+    // a trace run's power for d, linear between its samples
+    const powerIn = (r, d) => {
+      const i = r.pts.findIndex(([, f]) => f >= d);
+      if (i <= 0) return r.pts[Math.max(0, i)][0];
+      const [p0, f0] = r.pts[i - 1], [p1, f1] = r.pts[i];
+      return f1 > f0 ? p0 + ((d - f0) / (f1 - f0)) * (p1 - p0) : p1;
+    };
+    const T = tally[kind];
+    for (let k = 0; k < nDist; k++) {
+      const lie = LIES[Math.floor(rnd() * LIES.length)], d = 15 + 285 * rnd();
+      const t0 = performance.now();
+      const o = ask(DEFAULT_CLUBS, d, lie, { surfaceAt });
+      ms += performance.now() - t0; calls++;
+      if (!o.recs.length) T.empty++;
+      for (const r of o.recs) {
+        T.recs++;
+        const err = Math.abs(landedStop(r.club, r.power, 0, surfaceAt) - d);
+        worst = Math.max(worst, err);
+        ok(err <= 0.01, `strips (${kind}): ${r.club.id} from ${lie} at ${d.toFixed(2)} yd stops ${err.toFixed(4)} yd off`);
+        ok(landingSurface(surfaceAt(r.carry)) === r.surface && landingSurface(r.landsOn) === r.surface, `strips (${kind}): ${r.club.id} from ${lie} at ${d.toFixed(2)} yd solved on ${r.surface}, its carry reads ${surfaceAt(r.carry)}`);
+        ok(reaching(trace[lie][r.club.id], d, -0.05).length > 0, `strips (${kind}): ${r.club.id} from ${lie} at ${d.toFixed(2)} yd has a rec where its curve never reaches the distance`);
+      }
+      for (const cl of DEFAULT_CLUBS) {
+        const t = trace[lie][cl.id], sols = reaching(t, d, 0.1);
+        if (!sols.length) continue;
+        const best = Math.min(...sols.map((r) => scoreOf(powerIn(r, d), t.cap)));
+        const one = ask([cl], d, lie, { surfaceAt }).recs[0];
+        if (kind === "wide") {
+          ok(one && Math.abs(landedStop(cl, one.power, 0, surfaceAt) - d) <= 0.01, `strips (wide): ${cl.id} from ${lie} at ${d.toFixed(2)} yd reaches the distance on its curve but gets no rec`);
+          ok(one && one.score <= best + 0.005, `strips (wide): ${cl.id} from ${lie} at ${d.toFixed(2)} yd: rec score ${one?.score.toFixed(4)}, the trace has a solution scoring ${best.toFixed(4)}`);
+        }
+        if (one && one.score <= best + 0.005) T.found++; else if (kind === "narrow") T.missed++;
+      }
+    }
+    if (kind === "wide") for (const lie of LIES) {
+      const top = Math.max(...DEFAULT_CLUBS.flatMap((cl) => trace[lie][cl.id].runs.map((r) => r.fb)));
+      const mr = ask(DEFAULT_CLUBS, 100, lie, { surfaceAt }).maxReach.yd;
+      ok(Math.abs(mr - top) <= 0.2, `strips (wide): maxReach from ${lie} ${mr.toFixed(2)} yd, the traced curves top at ${top.toFixed(2)}`);
+    }
+  };
+  for (let h = 0; h < 10; h++) hole(2, 100, "wide");
+  for (let h = 0; h < 3; h++) hole(0.2, 100, "narrow");
+  ok(ms / calls < 10, `solve with 7 clubs takes ${(ms / calls).toFixed(2)} ms`);
+  const { wide: A, narrow: B } = tally;
+  console.log(`strips: 10 holes x 100 distances (strips 2-25 yd): ${A.recs} recs, ${A.found} single-club bests found, ${A.empty} empty panels; 3 x 100 with strips down to 0.2 yd: ${B.recs} recs, ${B.found} bests found, ${B.missed} missed (a strip inside one step), ${B.empty} empty; every rec within ${worst.toExponential(2)} yd on its own carry's surface; solve with 7 clubs ${(ms / calls).toFixed(3)} ms per call`);
 }
 
 // ---- e. caps and red ----

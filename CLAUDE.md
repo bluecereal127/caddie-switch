@@ -7,10 +7,10 @@ v13 and now diverges (v14: capture catalog); the web repo is the source of truth
 
 ## Files
 - `src/App.jsx` — the app (~1910 lines): solver tab, hole maps, greens, rounds, log, clubs, guide (per-hole setup steps with an auto-tracked progress table, and shot-data coverage; the manual capture catalog is gone). The shot model itself is `src/model.js`.
-- `src/model.js` — the shot model, pure so the tools run it: DEFAULT_CLUBS, the lie caps (BUNKER_CAPS, capFor), `stopOf` / `carryOf` (the WSR shape × the fitted club, "Model" below), `solve` (per club: landing surface, power, carry, roll, the spin range, `red`), `fitClub`, and the putt solver (simPutt, solvePutt and their constants), all moved out of App.jsx on 2026-10-20.
+- `src/model.js` — the shot model, pure so the tools run it: DEFAULT_CLUBS, the lie caps (BUNKER_CAPS, capFor), `stopOf` / `carryOf` (the WSR shape × the fitted club, "Model" below), `landedStop` (the stop on the surface a power's own carry lands on), `solve` (a power scan per club: landing surface, power, carry, roll, the spin range, `red`), `fitClub`, and the putt solver (simPutt, solvePutt and their constants), all moved out of App.jsx on 2026-10-20.
 - `src/wsrsim.js` — WSR's ball, tick for tick: the port of tools/research/wsr-groundsim.py (lift, side spin, the backspin pull-back, gravity along the bisector, drag, the contact impulse with the A / B tables, the iron-on-green first contact, the four-tick ring, the stop rule) on a flat or tilted plane of one surface, plus wsr-flightsim.py's in-air wind as an option; `run({ club, q, surface, back, side, slopeDeg, wind, spinStart })` → `{ carry, stop, apex, roll, lateral, bounces, ticks, path }` in yd. Pure (no Node or DOM); `tools/lib/wsrsim.mjs` re-exports it for the tools. No cup, trees or water.
 - `tools/build-wsr-shape.mjs` → `src/wsrShape.js` (AUTO-GENERATED, committed) — WSR's stop and carry against launch power per club, landing surface (fairway, rough, green, fringe, bunker) and spin (none; full = bs = the club's P1c × q, irons and wedge) on q = 0.05 … 1.00, normalised by the club's full-power fairway stop (1,347 simulations, 0.8 s, deterministic; every stop row monotone in q, none needed the running-maximum fix). Rerun after any change to src/wsrsim.js.
-- `tools/test-solver.mjs` — acceptance for the three files above: the port against the reference simulator's tables (stops, carries, surfaces, power sweep, spin, slopes, putter, red curve, wind), the shape, solve's round trip, surfaces (with the two-pass read's out-of-reach rules), caps and `red` (probed either side of cap − 0.1), fitClub on synthetic rows, the putt solver unchanged by the move, and the generator's determinism.
+- `tools/test-solver.mjs` — acceptance for the three files above: the port against the reference simulator's tables (stops, carries, surfaces, power sweep, spin, slopes, putter, red curve, wind), the shape, solve's round trip, surfaces (the power scan's jumps and hidden strips, H4 / H11 / H13 from rough, random-strip holes against a 0.001-bar trace, the solve time), caps and `red` (probed either side of cap − 0.1), fitClub on synthetic rows, the putt solver unchanged by the move, and the generator's determinism.
 - `src/main.jsx` — mount point + client-side password gate (SHA-256 vs PASS_HASH; casual deterrence only — change via `node tools/hash-password.mjs <pw>`; deliberately kept out of App.jsx).
 - `src/maps.js` — AUTO-GENERATED (tools/build-derived.mjs): 21 hole minimaps as base64 JPEG (q78), since 2026-10-18 the renders of WSR's own minimap from `captures/derived/render/hNN.png` (tools/render-maps.mjs): the 250×304 map frame at 2× (500×608), flat backdrop, no compass, flag, avatar or aim line, WSR's tree sprites painted at their placement positions. The frame is the mapV5 frame (which replaced the 219×270 rufusmccoot/chart set), so no migration; fractional coordinates everywhere. A hole with no render falls back to its median-stacked captures (250×304) with the zoom texture transplanted into the green, as before, and the build log says so.
 - `src/greens.js` — AUTO-GENERATED (tools/build-derived.mjs): the zoomed green view per hole, the renderer's `hNN-green.png` (the WSR green box plus 0.12 of it on every side, at the box's true aspect, q82; derived.json `greenView` = `{ aspect, margin: 0.12, source: "render" }`), falling back to the capture-fused 256×256 texture (`source: "captures"`, with `covered` and `sessions`, which the app's caption shows).
@@ -86,19 +86,27 @@ carry = 4a · (1 + h · tailwind_mph) · C(bars/4); sidedrift = c · crosswind_m
   fairway, rough and green) calibrate it. Wind stays a multiplier on the whole
   stop: WSR's wind acts only in the air, but the logs cannot separate carry
   from roll yet (the sim's wind is ported, the solver does not use it).
-- Landing surface: the App reads the KCL class at the carry along the shot line
-  from public/terrain (`ctx.surfaceAt`) in two passes (solve as fairway and
-  read where that carry lands; solve on that surface and read again; when the
-  reads disagree the second wins, unread). A pass that falls past the floor or
-  the cap reads there, which is no solution, so a rec found through that read
-  ships only if the read at its own carry agrees; and when the chain ends on a
-  surface that cannot reach the distance although the surface read at the
-  cap's carry (the one `maxReach` is built from) can, the solver solves on
-  that surface and keeps the result only if its carry lands there, so a
-  distance at or below maxReach has the club that set it while a true jump of
-  the stop curve at a surface edge still returns nothing. Water, OB, walls and
-  a missing terrain roll as fairway; the card names water, OB or a bank at the
-  carry.
+- Landing surface (Amendment 2, 2026-10-20, replacing a two-pass read): the App
+  reads the KCL class along the shot line from public/terrain
+  (`ctx.surfaceAt`), and per club the solver scans f(p) = the stop of power p
+  on the surface its own carry lands on (`landedStop`) from 0.4 bars to the
+  cap every 0.02 bar, each change of surface between two samples bisected to
+  0.001 bar. f rises within a run of one surface and jumps at an edge (up onto
+  a green, down into a bunker): a distance has a solution on each run whose
+  ends straddle it (bisected on that surface to 0.005 bar), the best score
+  winning (ties to the lower power), and none inside a jump (no rec: the panel
+  says "No club stops there"). A rec's surface and `landsOn` are the read at
+  its own carry; a solution whose carry lands on a strip narrower than a step
+  cuts its run again around it. `maxReach` is the top of f with its club, not
+  the cap's stop (a carry onto a green from a lower power can roll further).
+  The rec card's power bar maps through the same f, from the 0.4-bar floor to
+  the cap (a rounded distance inside a jump leaves the club without a rec,
+  so its card unmounts until the next move; the drag keeps the bar's last
+  mounted rect). Water, OB, walls and a missing terrain roll as fairway; the card names water, OB or a bank at the
+  carry. Measured on every hole's default line from tee and rough (9,295
+  distances, 21,650 recs): every rec on the surface its carry reads and within
+  0.003 yd of its distance, no distance the model's own f reaches left empty,
+  0.1 ms per solve.
 - Backspin (D4) is a motion input the app cannot know: irons and wedge show the
   roll on green and fairway landings as a range from full spin to none. Full
   spin is bs = P1c × q (lead's amendment, 2026-10-20): WSR gives the swing's
@@ -108,12 +116,12 @@ carry = 4a · (1 + h · tailwind_mph) · C(bars/4); sidedrift = c · crosswind_m
   the column is WSR's own. In WSR's yards a full-spin 9-iron onto a green
   stops at 89.7 on 4 bars (WSR's own), 73.5 on 3 (WSR's constant spin: 69.4)
   and 43.1 on 1.6 (35.2).
-- The solver inverts the monotone stop curve by bisection to 0.005 bar inside
-  [0.4, cap]; caps stay hard, and `red` (power ≥ cap − 0.1) warns that past the
-  cap the bar goes red and the ball curves to a random side. Fits prefer
-  tee/fairway shots; null sideways entries are skipped. WSR's hidden pin-power
-  assist on PARTIAL swings (wsr-swing-redzone-spin.md §3.5) may bias part-power
-  approach rows near the pin (the data-entry caution below); full swings never.
+- Powers stay inside [0.4, cap]: caps stay hard, and `red` (power ≥ cap − 0.1)
+  warns that past the cap the bar goes red and the ball curves to a random
+  side. Fits prefer tee/fairway shots; null sideways entries are skipped.
+  WSR's hidden pin-power assist on PARTIAL swings (wsr-swing-redzone-spin.md
+  §3.5) may bias part-power approach rows near the pin (the data-entry caution
+  below); full swings never.
 - Not in the model yet: elevation (Phase 3; `ctx` is where the landing's height
   goes), trees, over-swing power, Shot Assist.
 Putt solver (src/model.js): Euler sim over a 9×9 painted slope grid per green

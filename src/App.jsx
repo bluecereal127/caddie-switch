@@ -3,7 +3,7 @@ import { HOLE_MAPS } from "./maps.js";
 import { GREEN_VIEWS } from "./greens.js";
 import { MAP_XFORM_V5 } from "./mapxform.js";
 import { applyDerivedHole, isPipelinePin } from "./derivedMerge.js";
-import { DEFAULT_CLUBS, GRID_N, emptyGreen, solvePutt, fitClub, solve, stopOf, LANDED, SHAPE_LABEL } from "./model.js";
+import { DEFAULT_CLUBS, GRID_N, emptyGreen, solvePutt, fitClub, solve, landedStop, LANDED, MIN_BARS, SHAPE_LABEL } from "./model.js";
 import { loadTerrain, classAt, lieOf } from "./terrain.js";
 
 
@@ -859,17 +859,26 @@ export default function App() {
     () => solve(clubs, { dist, windSpeed, relWindDeg, lie, hole, stroke }, blockedRules, { surfaceAt }),
     [clubs, dist, windSpeed, relWindDeg, lie, hole, stroke, blockedRules, surfaceAt]
   );
-  // drag a rec card's power bar -> power -> implied stop distance (through the
-  // club's stop curve, on the surface the rec lands on)
+  // drag a rec card's power bar -> power -> implied stop distance (the solver's
+  // own f: the club's stop curve on the surface that power's carry lands on).
+  // The bar's left end is the solver's floor (MIN_BARS of the cap), where its
+  // recs start. The rounded distance can still fall where the club has no rec
+  // (half the time at the floor's own stop, a hair past the club's top, or
+  // inside a jump of f at a surface edge: 280 of 88,494 bar positions on the
+  // holes' default lines), and the card then unmounts until the next move: a
+  // detached element's rect is all zeros, which would pin frac at 1 and the
+  // distance at the cap's stop for the rest of the drag, so the rect is kept
+  // from the last move it was mounted
   const dragBar = (e, r) => {
     e.stopPropagation(); e.preventDefault();
     const el = e.currentTarget;
     const wAlongNow = windSpeed * Math.cos((relWindDeg * Math.PI) / 180);
+    let rect = el.getBoundingClientRect();
     const apply = (ev) => {
-      const rect = el.getBoundingClientRect();
+      if (el.isConnected) rect = el.getBoundingClientRect();
       const pt = ev.touches ? ev.touches[0] : ev;
-      const frac = Math.min(1, Math.max(0.05, (pt.clientX - rect.left) / rect.width));
-      const d = Math.round(stopOf(r.club, frac * r.cap, r.surface, 0, wAlongNow));
+      const frac = Math.min(1, Math.max(MIN_BARS / r.cap, (pt.clientX - rect.left) / rect.width));
+      const d = Math.round(landedStop(r.club, frac * r.cap, wAlongNow, surfaceAt));
       if (d > 0) setDist(d);
     };
     apply(e);
@@ -1346,7 +1355,7 @@ export default function App() {
               <h2 className="disp text-lg font-bold mb-2">Recommended shots</h2>
               {recs.length === 0 && (
                 <div className="rounded-2xl border-2 p-4 text-sm" style={{ borderColor: T.line, background: "#fff" }}>
-                  No club reaches that distance from this lie{maxReach ? ` — max ≈ ${Math.round(maxReach.yd)} yd (${maxReach.club}${lie === "bunker" ? ", capped bar" : ""})` : ""}. Shorten the target and plan the extra shot.
+                  No club stops there from this lie{maxReach ? ` — max ≈ ${Math.round(maxReach.yd)} yd (${maxReach.club}${lie === "bunker" ? ", capped bar" : ""})` : ""}. Shorten the target and plan the extra shot.
                 </div>
               )}
               <div className="space-y-3">
