@@ -3,8 +3,9 @@ import { HOLE_MAPS } from "./maps.js";
 import { GREEN_VIEWS } from "./greens.js";
 import { MAP_XFORM_V5 } from "./mapxform.js";
 import { applyDerivedHole, isPipelinePin } from "./derivedMerge.js";
-import { DEFAULT_CLUBS, GRID_N, emptyGreen, solvePutt, fitClub, solve, stopAt, LANDED, MIN_BARS, SHAPE_LABEL } from "./model.js";
-import { loadTerrain, classAt, lieOf, heightAt } from "./terrain.js";
+import { DEFAULT_CLUBS, GRID_N, emptyGreen, puttField, solvePutt, fitClub, solve, stopAt, LANDED, MIN_BARS, SHAPE_LABEL } from "./model.js";
+import { gaugeBars, fitGreenSpeed } from "./putt.js";
+import { loadTerrain, loadGreenHeights, classAt, lieOf, heightAt } from "./terrain.js";
 import { treesAlong } from "./trees.js";
 import { contourDataUrl } from "./relief.js";
 import { MAP_SCALES, mapScaleOf, mapFileUrl, loadMapIndex, preloadImage } from "./mapScale.js";
@@ -21,6 +22,13 @@ import { scrollFor } from "./mapView.js";
 const STORE_KEY = "sss-golf-solver-v2";
 
 const CLUB_MIGRATE = { "3wood": "spoon", pw: "wedge", sw: "wedge" };
+
+// The putt log's rows as stored or imported ({ id, hole, bars, rolled, flat }):
+// bars 0-4 (the gauge), yards rolled over 0, flat unless a row says otherwise;
+// anything else is dropped.
+const puttRows = (rows, now = Date.now()) => (Array.isArray(rows) ? rows : [])
+  .map((r, i) => ({ id: r?.id ?? now + i, hole: Number(r?.hole) || 0, bars: Number(r?.bars), rolled: Number(r?.rolled), flat: r?.flat !== false }))
+  .filter((r) => r.bars > 0 && r.bars <= 4 && r.rolled > 0);
 
 const COURSES = [
   { name: "Resort", holes: [1, 2, 3, 4, 5, 6, 7, 8, 9] },
@@ -203,9 +211,10 @@ function WindDial({ deg, setDeg, speed, topLabel = "PIN", bottomLabel = "YOU", s
 }
 
 /* ---------------- green canvas (grid painter + putt view) ---------------- */
-// Slope grids hold PHYSICAL downhill vectors (yards: tools/wsr-truth.mjs, and
-// simPutt integrates them in yards). Views that stretch the green's box to a
-// different shape must convert directions, or arrows skew on non-square greens.
+// Slope grids hold PHYSICAL downhill vectors (yards: tools/wsr-truth.mjs; the
+// putt model reads an edited one in yards, src/putt.js gridField). Views that
+// stretch the green's box to a different shape must convert directions, or
+// arrows skew on non-square greens.
 // boxAspect = the green box's true width/height (map px are isotropic).
 const MAP_PX_W = 250, MAP_PX_H = 304;
 const boxAspect = (b) => (b && b.y1 > b.y0 ? ((b.x1 - b.x0) * MAP_PX_W) / ((b.y1 - b.y0) * MAP_PX_H) : 1);
@@ -903,6 +912,16 @@ export default function App() {
   const [ioText, setIoText] = useState("");
   const [solverPinMode, setSolverPinMode] = useState(false);
   const [putt, setPutt] = useState({ ball: null, cup: null });
+  // the putt log (the putting panel's "Log a flat putt"): { id, hole, bars,
+  // rolled, flat } rows that fit greenSpeed, the flat roll of a full-gauge
+  // putt (src/putt.js fitGreenSpeed: WSR's 20.5 yd under 2 flat rows). Both at
+  // the store root, additive keys (an install without them reads [] / 20.5);
+  // the stored greenSpeed is for a reader of the store, the app refits it
+  // from the rows on load.
+  const [putts, setPutts] = useState([]);
+  const [puttForm, setPuttForm] = useState({ bars: "", rolled: "", flat: true });
+  const greenFit = useMemo(() => fitGreenSpeed(putts), [putts]);
+  const greenSpeed = greenFit.greenSpeed;
 
   // solver state
   const [hole, setHole] = useState(1);
@@ -928,6 +947,7 @@ export default function App() {
       if (d) {
         const loadedShots = (d.shots ?? []).map((s) => ({ ...s, club: CLUB_MIGRATE[s.club] ?? s.club, hole: s.hole ?? 0, stroke: s.stroke ?? 1 }));
         setShots(loadedShots);
+        setPutts(puttRows(d.putts));
         {
           const stored = d.clubs ?? [];
           const merged = DEFAULT_CLUBS.map((def) => { const s0 = stored.find((c) => c.id === def.id); return s0 ? { ...def, ...s0 } : def; });
@@ -1029,7 +1049,7 @@ export default function App() {
   }, []);
 
   const persist = async (patch = {}) => {
-    const data = { clubs, shots, holesMeta, rounds, activeRound, mapScale, parFixV3: true, mapV4: true, treesV9: true, mapV5: true, derivedV1: true, ...patch };
+    const data = { clubs, shots, putts, greenSpeed, holesMeta, rounds, activeRound, mapScale, parFixV3: true, mapV4: true, treesV9: true, mapV5: true, derivedV1: true, ...patch };
     try {
       await window.storage.set(STORE_KEY, JSON.stringify(data));
       setSaveState("saved"); setTimeout(() => setSaveState(""), 1500);
@@ -1066,6 +1086,19 @@ export default function App() {
     loadTerrain(hole).then((t) => { if (live) setTerrain(t); });
     return () => { live = false; };
   }, [hole]);
+  // and its green's heights (src/terrain.js loadGreenHeights: 0.5 yd over the
+  // WSR green box) for the putt model while the lie is green: { hole, g } once
+  // the load settles, g null when the file is missing; while they load or when
+  // missing the putt reads the painted grid. Keyed by hole, so the render
+  // between a hole change and the load never reads the last hole's green.
+  const [greenH, setGreenH] = useState(null);
+  useEffect(() => {
+    if (lie !== "green") return;
+    let live = true;
+    loadGreenHeights(hole).then((g) => { if (live) setGreenH({ hole, g }); });
+    return () => { live = false; };
+  }, [hole, lie]);
+  const greenHeights = greenH?.hole === hole ? greenH.g : null;
   useEffect(() => {
     if (!contours || openHole == null) return;
     const n = openHole;
@@ -1265,16 +1298,29 @@ export default function App() {
     if (scale) return { W: (x1 - x0) * MAP_W * scale, H: (y1 - y0) * MAP_H * scale, assumed: false };
     const W = 18; return { W, H: W * ((y1 - y0) * MAP_H) / ((x1 - x0) * MAP_W), assumed: true };
   }, [greenNow, scale]);
-  const puttSol = useMemo(() => {
-    if (lie !== "green" || !greenNow?.box || !putt.ball || !putt.cup || !greenYd) return null;
-    const s = solvePutt(greenNow.grid, greenYd.W, greenYd.H, putt.ball, putt.cup);
+  // the putt's ground (src/putt.js puttField): the mesh heights unless the
+  // player edited the painted grid (green.gridEdited), which then replaces them
+  const puttGround = useMemo(() => {
+    if (lie !== "green" || !greenNow?.box || !greenYd) return null;
+    return puttField({ green: greenNow, heights: greenHeights, W: greenYd.W, H: greenYd.H });
+  }, [lie, greenNow, greenYd, greenHeights]);
+  const puttSolved = useMemo(() => {
+    if (!puttGround || !putt.ball || !putt.cup) return null;
+    const s = solvePutt(puttGround, putt.ball, putt.cup);
     const D = s.r.D;
     const lateral = D * Math.sin((s.a * Math.PI) / 180);
     const base = Math.atan2((putt.cup.x - putt.ball.x) * greenYd.W, -((putt.cup.y - putt.ball.y) * greenYd.H));
     const th = base + (s.a * Math.PI) / 180;
     const aimPt = { x: putt.ball.x + (Math.sin(th) * D) / greenYd.W, y: putt.ball.y - (Math.cos(th) * D) / greenYd.H };
     return { ...s, D, lateral, aimPt };
-  }, [lie, greenNow, putt, greenYd]);
+  }, [puttGround, putt, greenYd]);
+  // the gauge: the solved launch's flat roll (Dflat) in bars at greenSpeed, and
+  // the power against a flat putt of the same length (bars over bars)
+  const puttSol = useMemo(() => {
+    if (!puttSolved) return null;
+    const bars = gaugeBars(puttSolved.r.Dflat, greenSpeed);
+    return { ...puttSolved, bars, power: bars / gaugeBars(puttSolved.D, greenSpeed) };
+  }, [puttSolved, greenSpeed]);
   const setScaleFromInput = () => {
     const yd = parseFloat(calInput);
     if (!geo || !yd || yd <= 0) return;
@@ -1313,6 +1359,19 @@ export default function App() {
     setShots(nextShots); setClubs(nextClubs);
     persist({ shots: nextShots, clubs: nextClubs });
   };
+  // the putt log: a row refits greenSpeed (stored beside the rows, an
+  // additive key); the form refuses what the gauge cannot give
+  const addPutt = () => {
+    const row = puttRows([{ id: Date.now(), hole, bars: parseFloat(puttForm.bars), rolled: parseFloat(puttForm.rolled), flat: puttForm.flat }])[0];
+    if (!row) return;
+    const next = [row, ...putts];
+    setPutts(next); setPuttForm({ ...puttForm, bars: "", rolled: "" });
+    persist({ putts: next, greenSpeed: fitGreenSpeed(next).greenSpeed });
+  };
+  const removePutt = (id) => {
+    const next = putts.filter((r) => r.id !== id);
+    setPutts(next); persist({ putts: next, greenSpeed: fitGreenSpeed(next).greenSpeed });
+  };
   const markBlocked = (rec) => {
     if (!hole) return;
     const rule = { id: Date.now(), hole, stroke, club: rec.club.id, aim: Math.round(rec.aim), note: "trees / obstruction on this line" };
@@ -1344,6 +1403,15 @@ export default function App() {
   const setGreen = (h, green) => {
     const next = { ...holesMeta, [h]: { ...holesMeta[h], green } };
     setHolesMeta(next); persist({ holesMeta: next });
+  };
+  // the paint UI marks the grid the player's (green.gridEdited, additive): the
+  // putt model then reads it instead of the mesh heights, until "use mesh
+  // heights" clears the mark (the grid stays as painted, unread)
+  const paintGrid = (h, grid) => setGreen(h, { ...holesMeta[h].green, grid, gridEdited: true });
+  const backToMesh = (h) => {
+    const green = { ...(holesMeta[h].green ?? emptyGreen()) };
+    delete green.gridEdited;
+    setGreen(h, green);
   };
   const handleCorner = (h, fx, fy) => {
     if (!cornerTmp) { setCornerTmp({ x: fx, y: fy }); return; }
@@ -1669,8 +1737,46 @@ export default function App() {
                       <div className="text-xs opacity-70">
                         {!putt.ball ? "Tap your ball position on the green." : !putt.cup ? "Now tap the cup." : greenYd?.assumed ? "Note: hole not distance-calibrated — assuming an 18 yd green width." : null}
                       </div>
+                      <div className="flex items-center justify-between gap-2 text-[11px]">
+                        <span className="opacity-70">
+                          Slopes: {puttGround?.src === "heights" ? "mesh heights (Wii Sports Resort's green)"
+                            : puttGround?.src === "edited" ? "painted grid (edited)"
+                            : greenH?.hole !== hole ? "painted grid (loading the mesh heights…)" : "painted grid (no mesh heights for this hole)"}
+                        </span>
+                        {greenNow.gridEdited && <button onClick={() => backToMesh(hole)} className="shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full border-2" style={chip(false)}>use mesh heights</button>}
+                      </div>
                     </>
                   )}
+                  <div className="rounded-lg border p-2 space-y-1.5" style={{ borderColor: T.line }}>
+                    <div className="flex items-baseline justify-between gap-2">
+                      <span className="disp text-xs font-bold">Log a flat putt</span>
+                      <span className="text-[10px] opacity-60 text-right">greenSpeed {greenSpeed.toFixed(1)} yd per full gauge · {greenFit.n >= 2 ? `fitted from ${greenFit.n} flat putts` : "WSR's, until 2 flat putts are logged"}</span>
+                    </div>
+                    <div className="flex items-end gap-2">
+                      <label className="flex-1 text-[10px] font-bold">bars (0–4)
+                        <input type="number" min="0" max="4" step="0.1" className={inputCls} style={inputStyle} value={puttForm.bars} onChange={(e) => setPuttForm({ ...puttForm, bars: e.target.value })} />
+                      </label>
+                      <label className="flex-1 text-[10px] font-bold">yd rolled
+                        <input type="number" min="0" step="0.1" className={inputCls} style={inputStyle} value={puttForm.rolled} onChange={(e) => setPuttForm({ ...puttForm, rolled: e.target.value })} />
+                      </label>
+                      <label className="text-[10px] font-bold flex items-center gap-1 pb-2">
+                        <input type="checkbox" checked={puttForm.flat} onChange={(e) => setPuttForm({ ...puttForm, flat: e.target.checked })} /> flat
+                      </label>
+                      <button onClick={addPutt} className="shrink-0 mb-1 px-3 py-1.5 rounded-xl text-white text-xs font-bold" style={{ background: T.turf }}>Save</button>
+                    </div>
+                    <div className="text-[10px] opacity-60">On a flat stretch of green, putt with a known gauge fill (it shows once the putt is made) and log how far it rolled ("yd to go" before minus after). Only flat putts fit greenSpeed; untick "flat" to keep a sloped one out of the fit.</div>
+                    {putts.length > 0 && (
+                      <div className="flex flex-wrap gap-1">
+                        {putts.slice(0, 12).map((r) => (
+                          <span key={r.id} className="mono text-[10px] rounded-full border px-2 py-0.5 flex items-center gap-1" style={{ borderColor: T.line, opacity: r.flat ? 1 : 0.6 }}>
+                            {r.hole ? `H${r.hole} · ` : ""}{r.bars} bars → {r.rolled} yd{r.flat ? "" : " (sloped)"}
+                            <button onClick={() => removePutt(r.id)} className="font-bold" style={{ color: T.flag }}>✕</button>
+                          </span>
+                        ))}
+                        {putts.length > 12 && <span className="text-[10px] opacity-60">+{putts.length - 12} more</span>}
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
               {lie !== "green" && <div>
@@ -1714,8 +1820,8 @@ export default function App() {
                           <div className="text-[10px] uppercase tracking-wide opacity-60">yd aim off cup</div>
                         </div>
                         <div>
-                          <div className="mono text-xl font-semibold">{Math.round(puttSol.p * 100)}%</div>
-                          <div className="text-[10px] uppercase tracking-wide opacity-60">of flat-putt power</div>
+                          <div className="mono text-xl font-semibold">≈{puttSol.bars.toFixed(1)}</div>
+                          <div className="text-[10px] uppercase tracking-wide opacity-60">gauge bars</div>
                         </div>
                         <div>
                           <div className="mono text-xl font-semibold">{puttSol.D.toFixed(1)}</div>
@@ -1723,7 +1829,7 @@ export default function App() {
                         </div>
                       </div>
                       <div className="text-[11px] opacity-60 mt-2">
-                        Aim at the gold ✛ on the green view — the dashed line is the simulated roll. {!puttSol.r.holed && `Stops ${puttSol.r.best.toFixed(1)} yd from the cup at best.`} Power is relative to a flat putt of the same length.
+                        Aim at the gold ✛ on the green view — the dashed line is the simulated roll. {!puttSol.r.holed && `Comes ${puttSol.r.best.toFixed(1)} yd from the cup at best.`} Power {puttSol.power.toFixed(2)} of a flat putt of this length · gauge ≈ {puttSol.bars.toFixed(1)} bars{puttSol.bars > 4 ? ", past a full gauge" : ""} (WSR-shaped; greenSpeed {greenSpeed.toFixed(1)} yd per full gauge).
                       </div>
                     </div>
                   )}
@@ -1871,13 +1977,14 @@ export default function App() {
                                   <div className="flex items-center justify-between">
                                     <div className="disp text-xs font-bold">Green slopes</div>
                                     <div className="flex gap-1">
+                                      {m.green.gridEdited && <button onClick={() => backToMesh(n)} className="text-[10px] font-bold px-2 py-0.5 rounded-full border-2" style={chip(false)}>use mesh heights</button>}
                                       <button onClick={() => setGreenPaint(!greenPaint)} className="text-[10px] font-bold px-2 py-0.5 rounded-full border-2" style={chip(greenPaint)}>{greenPaint ? "painting" : "paint"}</button>
-                                      <button onClick={() => setGreen(n, { ...m.green, grid: emptyGreen().grid })} className="text-[10px] font-bold px-2 py-0.5 rounded-full border-2" style={chip(false)}>clear</button>
+                                      <button onClick={() => paintGrid(n, emptyGreen().grid)} className="text-[10px] font-bold px-2 py-0.5 rounded-full border-2" style={chip(false)}>clear</button>
                                     </div>
                                   </div>
                                   <GreenCanvas mapSrc={openMap.src} green={m.green} mode={greenPaint ? "paint" : "view"}
-                                    onGrid={(grid) => setGreen(n, { ...m.green, grid })} />
-                                  <div className="text-[10px] opacity-60">Open the in-game elevation grid (B on the green) and copy it: drag in a cell in the downhill direction — short drag = gentle, long drag = steep. Tap a cell to clear it.</div>
+                                    onGrid={(grid) => paintGrid(n, grid)} />
+                                  <div className="text-[10px] opacity-60">The putt read takes this green's slopes from Wii Sports Resort's course meshes; the arrows are the same slopes in 3 levels. Open the in-game elevation grid (B on the green) and copy it if it differs: drag in a cell in the downhill direction — short drag = gentle, long drag = steep. Tap a cell to clear it. {m.green.gridEdited ? "Your painted grid now replaces the mesh heights in the putt read; \"use mesh heights\" goes back." : "Painting makes the putt read use your grid instead."}</div>
                                 </div>
                               )}
                             </div>
@@ -2098,7 +2205,7 @@ export default function App() {
                 Save shot & recalibrate
               </button>
               <div className="flex gap-2">
-                <button onClick={() => { setIoOpen(!ioOpen); setIoText(JSON.stringify(shots)); }} className="flex-1 py-1.5 rounded-xl border-2 text-xs font-bold" style={chip(ioOpen)}>⇅ Import / Export</button>
+                <button onClick={() => { setIoOpen(!ioOpen); setIoText(JSON.stringify(putts.length ? { shots, putts, greenSpeed } : shots)); }} className="flex-1 py-1.5 rounded-xl border-2 text-xs font-bold" style={chip(ioOpen)}>⇅ Import / Export</button>
               </div>
               {ioOpen && (
                 <div className="space-y-1">
@@ -2107,8 +2214,13 @@ export default function App() {
                   <div className="flex gap-2 text-[11px]">
                     <button onClick={() => {
                         try {
-                          const arr = JSON.parse(ioText);
-                          if (!Array.isArray(arr)) return;
+                          // a bare array of shot rows, or { shots, putts, greenSpeed }
+                          // (the export once putts are logged; greenSpeed is refitted
+                          // from the putt rows, so it travels for reference only)
+                          const got = JSON.parse(ioText);
+                          if (!got || typeof got !== "object") return;
+                          const arr = Array.isArray(got) ? got : Array.isArray(got.shots) ? got.shots : [];
+                          const inPutts = Array.isArray(got) ? [] : puttRows(got.putts);
                           const conv = arr.map((r, i) => {
                             if (r.wAlong != null) return r;
                             const sp = r.windSpeed ?? 0, dg = r.windDeg ?? 0, rad = (dg * Math.PI) / 180;
@@ -2120,11 +2232,13 @@ export default function App() {
                           }).filter((r) => r.club && r.power > 0 && r.carry > 0);
                           const nextShots = [...conv, ...shots.filter((s) => !conv.some((c) => c.id === s.id))];
                           const nextClubs = clubs.map((c) => fitClub(c, nextShots));
-                          setShots(nextShots); setClubs(nextClubs); persist({ shots: nextShots, clubs: nextClubs }); setIoOpen(false);
+                          const nextPutts = [...inPutts, ...putts.filter((r) => !inPutts.some((c) => c.id === r.id))];
+                          setShots(nextShots); setClubs(nextClubs); setPutts(nextPutts);
+                          persist({ shots: nextShots, clubs: nextClubs, putts: nextPutts, greenSpeed: fitGreenSpeed(nextPutts).greenSpeed }); setIoOpen(false);
                         } catch {}
                       }} className="flex-1 py-1 rounded-lg border-2 font-bold" style={chip(false)}>Import (replace box first)</button>
                   </div>
-                  <div className="opacity-60 text-[10px]">Copy the box to back up. To import, paste a JSON array — either exported shots, or simple rows like {"{"}"club":"driver","power":4,"lie":"tee","windSpeed":9,"windDeg":180,"ended":242,"hole":10,"stroke":1{"}"} (side optional; "landed":"green" etc. says where it finished, fairway when left out). I can generate these from your screenshots in chat.</div>
+                  <div className="opacity-60 text-[10px]">Copy the box to back up. To import, paste a JSON array — either exported shots, or simple rows like {"{"}"club":"driver","power":4,"lie":"tee","windSpeed":9,"windDeg":180,"ended":242,"hole":10,"stroke":1{"}"} (side optional; "landed":"green" etc. says where it finished, fairway when left out). I can generate these from your screenshots in chat. With putts logged the box holds {"{"}"shots":[…],"putts":[…],"greenSpeed":…{"}"}; putt rows are {"{"}"bars":2,"rolled":10.1,"flat":true,"hole":4{"}"}, and greenSpeed is refitted from them.</div>
                 </div>
               )}
             </section>
@@ -2253,7 +2367,7 @@ export default function App() {
                   <div>8. Wind comes in exactly 8 directions (N/NE/E/SE/S/SW/W/NW) at integer mph, observed 0–31. The dial snaps to the 8 when set "as on minimap".</div>
                   <div>9. All distances here are STOP distances (carry + roll), and the roll is not a fixed share. In Wii Sports Resort's physics (decoded from the game) the carry grows in step with power but the roll comes from the landing: a flatter, slower landing rolls further, so a driver rolls ~39 yd at 4 bars and ~54 at 1 bar; it rolls ~69 on a green, ~29 in rough and next to nothing in a bunker, and an iron's first bounce on a green is damped. Backspin (irons and wedge, from stopping the swing after impact) can pull a full 9-iron back ~10 yd where it would roll ~10 on without, so the cards show that range. The solver uses WSR's stop-vs-power curve for each club, scaled to your logged distances (WSR-shaped until Switch sweeps calibrate it), and reads where each shot lands from the course map. The minimap dots show flat-ground carry.</div>
                   <div>10. You can physically swing past a capped bar — it goes red and the ball curves to a RANDOM side, more the deeper into the red (WSR: up to ~35 yd for the driver, ~22 yd for a 7-iron). On tee and fairway the red adds no distance; from rough or sand WSR adds up to one more bar (untested on the Switch). The solver never plans on it and flags the recs that need the full bar.</div>
-                  <div>11. Putter roll depends on surface: green rolls best, fairway noticeably slower, sand slowest. No source in 20 years reports any per-bar flight penalty from rough/sand — caps are the whole mechanic until your logs say otherwise.</div>
+                  <div>11. Putts follow Wii Sports Resort's roll on a green (decoded from the game): a steady friction plus a drag that grows with speed, and a slope pulls the ball at about 0.11 yd/s² per degree (some 60 % of a real ball's: WSR tilts its gravity only half way with the slope), so a 20 yd putt runs about 4.5 % further per degree downhill and that much shorter uphill. The putter launches level, so on a slope the ball hops for a moment before it rolls, and the read includes that. The slopes come from the course meshes (heights every half yard), or from your painted grid once you edit it (Holes → the green; "use mesh heights" goes back). The cup takes a ball that passes within ~0.15 yd of its centre slowly enough that it would have stopped within ~4.4 yd past; faster ones lip out. The gauge hint is WSR-shaped: greenSpeed is how far a full-gauge putt rolls on a flat green (20.5 yd in WSR); log a few flat putts in the putting panel and it fits the Switch's. Off the green the putter rolls slower: fairway noticeably, sand slowest. No source in 20 years reports any per-bar flight penalty from rough/sand — caps are the whole mechanic until your logs say otherwise.</div>
                   <div>12. Backspin strength scales with swing power ("the harder you swing, the stronger the backspin" — official). Capped lies therefore also cap max spin; that alone explains weaker spin from rough/sand.</div>
                   <div>13. Pins are fixed spots, read straight from Wii Sports Resort's course files: H1 has 3, H2–H17 have 6 (B = the easier three, A = the harder three), H18 has 1, the Specials 6 each. In WSR your score picks the set — A once you're more than k/2 under par going into the round's k-th hole (−3 or better before the 4th), never in 3-hole rounds — and a random draw picks the spot within it. Switch Sports reuses these spots (your captures show both sets) and adds a few of its own, labelled S1, S2… Local play tees off from WSR's own tee spot unless you move it (Shot Position). Online Survival Golf tees off from the same two-tier platform on every hole: four slots on the lower tier, four on the upper, which is 4 yd further back and a few feet up. The lower tier is the local tee spot on some holes and up to 8 yd behind it on others (the ⛳ Lower tier / Upper tier chips put the ball on either), and your slot can put you up to ~5 yd to either side. Online captures exist on 12 holes; holes 1, 2, 3, 6, 7, 12, 13, 17 and 21 have none yet, so only the local tee is offered there. The "yd to go" badge is the authority.</div>
                   <div>14. At 0 mph the wind still HAS a direction — read it off the flag cloth on the pin.</div>
@@ -2303,7 +2417,7 @@ export default function App() {
               </table>
             </div>
             <p className="text-[11px] opacity-60 mt-3">
-              stop = 4a × S(power ÷ 4, landing) × (1 + h × tailwind-mph) · sidedrift = c × crosswind-mph × power. S is the club's stop-vs-power curve from Wii Sports Resort's physics (decoded from the game; {SHAPE_LABEL} until Switch sweeps calibrate it): S = 1 at 4 bars landing on fairway, so a is the full-power fairway stop ÷ 4; the carry comes off the same curve, and a landing on green, fringe, rough or sand changes the roll. Gauge is 4 bars for every club. Lies cap the usable bar (distance per bar is unchanged below the cap) — fixed values baked in: rough = 3 bars for every club; sand = wedge 3, irons 2, spoon/driver 1; putter uncapped in sand but rolls far less. Distance fits use tee/fairway shots when available, each read through the curve at its power and where it finished; blank sideways entries are skipped by the drift fit.
+              stop = 4a × S(power ÷ 4, landing) × (1 + h × tailwind-mph) · sidedrift = c × crosswind-mph × power. S is the club's stop-vs-power curve from Wii Sports Resort's physics (decoded from the game; {SHAPE_LABEL} until Switch sweeps calibrate it): S = 1 at 4 bars landing on fairway, so a is the full-power fairway stop ÷ 4; the carry comes off the same curve, and a landing on green, fringe, rough or sand changes the roll. Gauge is 4 bars for every club. Lies cap the usable bar (distance per bar is unchanged below the cap) — fixed values baked in: rough = 3 bars for every club; sand = wedge 3, irons 2, spoon/driver 1; putter uncapped in sand but rolls far less. Distance fits use tee/fairway shots when available, each read through the curve at its power and where it finished; blank sideways entries are skipped by the drift fit. The putter has no row here: its roll is WSR's green physics, and its gauge maps through greenSpeed ({greenSpeed.toFixed(1)} yd per full gauge, {greenFit.n >= 2 ? `fitted from ${greenFit.n} flat putts` : "WSR's"}), which the flat putts you log in the putting panel fit.
             </p>
           </section>
         )}

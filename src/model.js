@@ -1,6 +1,7 @@
 // The shot model, out of App.jsx so the tools can run it (tools/test-solver.mjs):
 // the clubs' seed numbers, the lie caps, the stop / carry curves, the club fit,
-// the shot solver and the putt solver. Pure (no React, DOM or Node API).
+// the shot solver, and the putt solver re-exported from src/putt.js. Pure (no
+// React, DOM or Node API).
 //
 // Shot model (CLAUDE.md "Model"):
 //   stop  = 4a (1 + h wAlong) S(bars / 4, landing surface, spin)
@@ -20,6 +21,7 @@
 import { WSR_SHAPE, SHAPE_Q } from "./wsrShape.js";
 import { run, CLUBS } from "./wsrsim.js";
 import { treeCheck, TREE_SHAPES } from "./trees.js";
+import { CUP_R, V_CAP, puttField, simPutt, solvePutt } from "./putt.js";
 
 // The seed clubs: a = full-power (4-bar) stop on fairway / 4, from the Switch
 // guide's maxes (driver 250, spoon 200, 3i 175, 5i 155, 7i 135, 9i 100, wedge
@@ -369,55 +371,11 @@ function checkTrees(recs, trees, wAlong, ctx) {
 }
 
 /* ---------------- putting ---------------- */
+// The putt model is src/putt.js (WSR's roll on a green over the mesh heights,
+// decision D3); the solver's callers take it from here. GRID_N / emptyGreen
+// are the painted slope grid the hole state carries (App.jsx).
 const GRID_N = 9;
 const emptyGreen = () => ({ box: null, grid: Array.from({ length: GRID_N }, () => Array.from({ length: GRID_N }, () => [0, 0])) });
-const MU = 1.35;        // rolling friction, yd/s^2
-const SLOPE_G = 1.1;    // accel per slope unit, yd/s^2
-const CUP_R = 0.22;     // capture radius, yd
-const CUP_V = 2.2;      // max capture speed, yd/s
-
-function simPutt(grid, Wyd, Hyd, ball, cup, angDeg, pw) {
-  const D = Math.hypot((cup.x - ball.x) * Wyd, (cup.y - ball.y) * Hyd);
-  const base = Math.atan2((cup.x - ball.x) * Wyd, -((cup.y - ball.y) * Hyd));
-  const th = base + (angDeg * Math.PI) / 180;
-  const v0 = Math.sqrt(2 * MU * D) * pw;
-  let px = ball.x * Wyd, py = ball.y * Hyd;
-  let vx = Math.sin(th) * v0, vy = -Math.cos(th) * v0;
-  const cx = cup.x * Wyd, cy = cup.y * Hyd;
-  const path = [[px / Wyd, py / Hyd]];
-  const dt = 0.045;
-  let holed = false, best = Infinity;
-  for (let i = 0; i < 400; i++) {
-    const sp = Math.hypot(vx, vy);
-    const d = Math.hypot(px - cx, py - cy);
-    if (d < best) best = d;
-    if (d < CUP_R && sp < CUP_V) { holed = true; path.push([cx / Wyd, cy / Hyd]); break; }
-    if (sp < 0.06) break;
-    const gi = Math.min(GRID_N - 1, Math.max(0, Math.floor((px / Wyd) * GRID_N)));
-    const gj = Math.min(GRID_N - 1, Math.max(0, Math.floor((py / Hyd) * GRID_N)));
-    const [sx, sy] = grid[gj][gi];
-    const ax = sx * SLOPE_G - MU * (vx / sp);
-    const ay = sy * SLOPE_G - MU * (vy / sp);
-    vx += ax * dt; vy += ay * dt; px += vx * dt; py += vy * dt;
-    if (i % 4 === 0) path.push([px / Wyd, py / Hyd]);
-  }
-  path.push([px / Wyd, py / Hyd]);
-  return { holed, best, endSp: Math.hypot(vx, vy), path, D };
-}
-
-function solvePutt(grid, Wyd, Hyd, ball, cup) {
-  const cost = (r, pw) => (r.holed ? -2 + pw * 0.1 : r.best + Math.max(0, r.best - CUP_R) * 0.3);
-  let best = null;
-  const tryOne = (a, p) => {
-    const r = simPutt(grid, Wyd, Hyd, ball, cup, a, p);
-    const c = cost(r, p);
-    if (!best || c < best.c) best = { c, a, p, r };
-  };
-  for (let a = -35; a <= 35; a += 5) for (let p = 0.7; p <= 1.55; p += 0.085) tryOne(a, p);
-  const { a: a0, p: p0 } = best;
-  for (let a = a0 - 4; a <= a0 + 4; a += 1) for (let p = Math.max(0.5, p0 - 0.08); p <= p0 + 0.08; p += 0.02) tryOne(a, p);
-  return best;
-}
 
 /* ---------------- math ---------------- */
 function fitClub(club, shots) {
@@ -596,5 +554,5 @@ function solve(clubs, inputs, blockedRules, ctx = {}) {
 export {
   DEFAULT_CLUBS, BUNKER_CAPS, capFor, SHAPE_LABEL, LANDED, MIN_BARS, landingSurface, shapeAt, stopOf, carryOf, landedStop, stopAt, STOP_TOL,
   flightOf, TREE_PENALTY,
-  GRID_N, emptyGreen, MU, SLOPE_G, CUP_R, CUP_V, simPutt, solvePutt, fitClub, solve,
+  GRID_N, emptyGreen, CUP_R, V_CAP, puttField, simPutt, solvePutt, fitClub, solve,
 };

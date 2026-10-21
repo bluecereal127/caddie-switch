@@ -1154,7 +1154,12 @@ for (let hole = 1; hole <= 21; hole++) {
     console.log(`H${hole}: trees = ${trees.length} on the map of ${wp.trees.length} in the PMP (${[2, 3, 6].map((k) => `${trees.filter((t) => t.kind === k).length} of kind ${k}`).join(", ")}), ${trees.length - off} on the course, ${off} off (outer ground or water under the trunk), canopy r ${Math.min(...trees.map((t) => t.r * W)).toFixed(1)}-${Math.max(...trees.map((t) => t.r * W)).toFixed(1)} px, centred ${Math.min(...trees.map((t) => -t.dy * H)).toFixed(1)}-${Math.max(...trees.map((t) => -t.dy * H)).toFixed(1)} px north of the trunk${zNote}${quadNote}`);
   }
   derived.holes[hole] = { scale: wt ? wt.scale : meta.scaleYdPerPx, yards: meta.yards, greenBox, greenPoly,
-    grid: quantizeGrid(wt ? wt.grid : g.grid), pins, pinCandidates, pinAmbiguous, pinZones, pinObservations: greenPins,
+    // slopeMaxPct: the steepest 9x9 cell's slope in percent (wsr-truth.json),
+    // the scale of the quantized grid's levels, which the app's putt model
+    // needs to read a painted grid as absolute slopes (src/putt.js gridField);
+    // a capture-built grid has no absolute scale and ships none
+    grid: quantizeGrid(wt ? wt.grid : g.grid), ...(wt?.slopeMaxPct != null ? { slopeMaxPct: wt.slopeMaxPct } : {}),
+    pins, pinCandidates, pinAmbiguous, pinZones, pinObservations: greenPins,
     greenView: greenMeta[hole] ?? null, tee, teeOnline, trees,
     ...(wt ? { source: "wsr", wsrRev: wsrRev(wt), captureGreenBox: captureBox ? { x0: +(captureBox.x0 / W).toFixed(4), y0: +(captureBox.y0 / H).toFixed(4),
       x1: +(captureBox.x1 / W).toFixed(4), y1: +(captureBox.y1 / H).toFixed(4) } : null } : {}) };

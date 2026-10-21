@@ -15,6 +15,11 @@
 //   that raced the merge (old values written back) simply gets migrated again on
 //   the next load; once it is stored, later manual edits survive (every edit
 //   spreads the existing green object, keeping the marker).
+// - green.gridEdited (set by the app's paint UI: the putt model then reads the
+//   painted grid instead of the mesh heights) says the grid is the player's;
+//   wherever the merge writes derived.json's grid into the hole (a WSR hole
+//   whose marker is behind, a fresh application, an empty grid refilled) it
+//   drops the flag, since the grid is the pipeline's again.
 // - Everything else keeps the original fill-empty behaviour, except the tees:
 //   tee (the WSR player start, where local play tees off) and teeOnline (the
 //   two-tiered Survival Golf platform: its lower and upper tier, or only the
@@ -63,7 +68,7 @@ export function applyDerivedHole(cur, n, dh, { fresh }) {
       if (dh.scale != null) out.scale = dh.scale;
       if (dh.greenBox) out.green.box = dh.greenBox;
       if (dh.greenPoly) out.green.poly = dh.greenPoly;
-      if (dh.grid) out.green.grid = dh.grid;
+      if (dh.grid) { out.green.grid = dh.grid; delete out.green.gridEdited; }
     }
     out.green.src = rev;
   }
@@ -75,8 +80,12 @@ export function applyDerivedHole(cur, n, dh, { fresh }) {
   // aspect + provenance for the zoomed green view; always take the derived
   // value, it describes the shipped image not user edits
   if (dh.greenView) out.green.view = dh.greenView;
+  // the steepest slope of the hole's green in percent (the WSR mesh's, the
+  // level-3 cells of the painted grid), which turns a painted grid into
+  // absolute slopes for the putt model; always the derived value, like the view
+  if (dh.slopeMaxPct != null) out.green.slopeMaxPct = dh.slopeMaxPct;
   const gridEmpty = !(out.green.grid ?? []).some((r) => r.some(([x, y]) => x || y));
-  if (dh.grid && (fresh || gridEmpty)) out.green.grid = dh.grid;
+  if (dh.grid && (fresh || gridEmpty)) { out.green.grid = dh.grid; delete out.green.gridEdited; }
 
   const stored = out.pins ?? [];
   const oldCur = stored.find((p) => p.id === out.curPin) ?? null;

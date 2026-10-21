@@ -38,8 +38,10 @@
 //  f. fitClub recovers a and h from rows made by stopOf at 2-4 bars and
 //     -10..10 mph tailwind, with and without `landed`; a green row fits the
 //     fairway rows' a once it says where it finished
-//  g. simPutt / solvePutt moved out of App.jsx unchanged: a fixed grid of putts
-//     gives the outputs recorded from App.jsx before the move
+//  g. simPutt / solvePutt (src/putt.js, WSR's roll on a green, re-exported by
+//     src/model.js): a fixed grid of putts over painted grids gives the
+//     outputs recorded when the model was written (tools/test-putt.mjs is its
+//     acceptance; this pins the numbers so a change to them is seen)
 //  h. elevation: the port's profile ground (a level profile flies plane(attr,
 //     0) to 1e-9 yd for 7 clubs on 5 surfaces, and so does one with a 10 yd
 //     drop 0.5 yd behind the ball; a uniform 3-degree one the section 8
@@ -53,7 +55,7 @@
 //     the top cap flight, ballLift, no terrain heights solve flat (elev
 //     false), a distance under a bank gets the closest flight flagged approx;
 //     a 7-club solve on H21's line within the 15 ms budget (mean and p90)
-//  i. App.jsx and src/model.js parse with @babel/parser (skipped without it)
+//  i. App.jsx, src/model.js and src/putt.js parse with @babel/parser (skipped without it)
 import { readFileSync, mkdtempSync, rmSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -67,6 +69,7 @@ const { run, CLUBS } = await imp("tools/lib/wsrsim.mjs");
 const { WSR_SHAPE, SHAPE_Q, SHAPE_SURFACES } = await imp("src/wsrShape.js");
 const M = await imp("src/model.js");
 const { DEFAULT_CLUBS, BUNKER_CAPS, capFor, landingSurface, stopOf, carryOf, landedStop, stopAt, STOP_TOL, solve, fitClub, simPutt, solvePutt } = M;
+const { gridField } = await imp("src/putt.js");
 let fails = 0; const ok = (c, msg) => { if (!c) { fails++; console.log("FAIL:", msg); } };
 const near = (got, want, tol, what) => ok(Math.abs(got - want) <= tol, `${what}: ${got.toFixed(3)}, expected ${want} ± ${tol}`);
 const IDS = ["driver", "spoon", "3iron", "5iron", "7iron", "9iron", "wedge"];
@@ -468,10 +471,10 @@ for (const cl of DEFAULT_CLUBS) {
   console.log(`fit: a ${f1.a.toFixed(4)} / ${f2.a.toFixed(4)} / ${f3.a.toFixed(4)}, h ${f1.h.toFixed(5)} / ${f2.h.toFixed(5)} / ${f3.h.toFixed(5)} (truth ${truth.a}, ${truth.h}); a green row fits ${g1.a.toFixed(4)} with \`landed\`, ${g0.a.toFixed(4)} without`);
 }
 
-// ---- g. the putt solver moved unchanged ----
-// The grid and the digest were recorded with the GRID_N .. solvePutt block of
-// App.jsx at c8d3257, before the move (B2 replaces the putt physics and
-// retires this comparison).
+// ---- g. the putt solver's recorded numbers ----
+// The grids, sizes and spots of the comparison that checked the move out of
+// App.jsx (c8d3257), read as painted grids at a steepest slope of 10 %; the
+// digest and the spot values were recorded from src/putt.js as B2 wrote it.
 {
   const N = 9;
   const cells = (f) => Array.from({ length: N }, (_, j) => Array.from({ length: N }, (_, i) => f(i, j)));
@@ -482,18 +485,19 @@ for (const cl of DEFAULT_CLUBS) {
   const spots = [[{ x: 0.2, y: 0.8 }, { x: 0.7, y: 0.3 }], [{ x: 0.5, y: 0.9 }, { x: 0.5, y: 0.2 }], [{ x: 0.85, y: 0.15 }, { x: 0.3, y: 0.6 }]];
   const sims = [], solves = [];
   for (const [gname, grid] of Object.entries(grids)) for (const [W, H] of dims) for (const [ball, cup] of spots) {
-    for (const ang of [-20, 0, 12]) for (const pw of [0.8, 1.0, 1.3]) sims.push({ gname, W, H, ang, pw, r: simPutt(grid, W, H, ball, cup, ang, pw) });
-    solves.push({ gname, W, H, r: solvePutt(grid, W, H, ball, cup) });
+    const field = gridField(grid, W, H, 10);
+    for (const ang of [-20, 0, 12]) for (const pw of [0.8, 1.0, 1.3]) sims.push({ gname, W, H, ang, pw, r: simPutt(field, ball, cup, ang, pw) });
+    solves.push({ gname, W, H, r: solvePutt(field, ball, cup) });
   }
   const json = JSON.stringify({ sims, solves });
   const sha = createHash("sha256").update(json).digest("hex");
-  ok(sha === "3b7cf90ae1704923ef01e629832f3dfee925ab1bc43fee250928dc32c5660cf9" && json.length === 351937, `putts differ from App.jsx before the move (sha256 ${sha}, ${json.length} bytes)`);
+  ok(sha === "38e476d5b03a3649e30bed4609df01a1006c00f51ef2aa31de8ad8057c7f5bbc" && json.length === 454586, `putts differ from the recorded ones (sha256 ${sha}, ${json.length} bytes)`);
   // a few of the recorded numbers, to say which moved if the digest does not match
   const r0 = sims[0].r, r215 = sims[215].r, v7 = solves[7].r;
-  ok(r0.best === 5.251195960870796 && r0.endSp === 0.0039695615079207245 && r0.path.length === 21, "simPutt case 0 (flat, 18x14, -20 deg, 0.8) differs");
-  ok(r215.best === 3.654559369936762 && r215.path.length === 72, "simPutt case 215 (noisy, 25x30, 12 deg, 1.3) differs");
-  ok(v7.c === -1.9105 && v7.a === -19 && v7.p === 0.8949999999999999 && v7.r.holed, "solvePutt case 7 (tilt, 18x14) differs");
-  console.log(`putts: ${sims.length} simPutt + ${solves.length} solvePutt runs (${sims.filter((x) => x.r.holed).length} + ${solves.filter((x) => x.r.r.holed).length} holed) ${sha.slice(0, 12)}…, as recorded before the move`);
+  ok(r0.best === 4.745372147105579 && r0.endSp === 0.039512072878080305 && r0.path.length === 32, "simPutt case 0 (flat, 18x14, -20 deg, 0.8) differs");
+  ok(r215.best === 6.793524673895154 && r215.path.length === 53, "simPutt case 215 (noisy, 25x30, 12 deg, 1.3) differs");
+  ok(v7.c === -1.887 && v7.a === -1 && v7.p === 1.1299999999999997 && v7.r.holed, "solvePutt case 7 (tilt, 18x14) differs");
+  console.log(`putts: ${sims.length} simPutt + ${solves.length} solvePutt runs (${sims.filter((x) => x.r.holed).length} + ${solves.filter((x) => x.r.r.holed).length} holed) ${sha.slice(0, 12)}…, as recorded`);
 }
 
 // ---- h. elevation: the solver flies the terrain along the line ----
@@ -662,11 +666,11 @@ for (const cl of DEFAULT_CLUBS) {
 // ---- i. the parser ----
 try {
   const { parse } = createRequire(join(root, "package.json"))("@babel/parser");
-  for (const f of ["src/App.jsx", "src/model.js", "src/wsrsim.js", "src/wsrShape.js"]) {
+  for (const f of ["src/App.jsx", "src/model.js", "src/putt.js", "src/wsrsim.js", "src/wsrShape.js"]) {
     try { parse(readFileSync(join(root, f), "utf8"), { sourceType: "module", plugins: ["jsx"] }); }
     catch (e) { ok(false, `${f} does not parse: ${e.message}`); }
   }
-  console.log("parse: App.jsx, model.js, wsrsim.js, wsrShape.js");
+  console.log("parse: App.jsx, model.js, putt.js, wsrsim.js, wsrShape.js");
 } catch { console.log("parse: skipped (no @babel/parser here)"); }
 
 console.log(fails ? `${fails} FAILURES` : "all solver checks passed");
