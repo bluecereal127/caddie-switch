@@ -196,6 +196,57 @@ what a putt capture can give the model is a flat putt's gauge fill and yards
 rolled ("yd to go" before minus after), logged by hand in the putting panel's
 "Log a flat putt", which fits greenSpeed.)
 
+## Shot rows (assemble-shots → build-derived → the app's Log)
+
+`node tools/assemble-shots.mjs` walks the classified frames in time order and
+writes `captures/derived/shots.json`: one row per result pop-up, paired with
+the last address frame before it. Fields:
+
+- `id` (the pop-up's ULID), `popupFile`, `addrFile`, `hole`, `stroke`,
+  `club` (the app's ids: driver, spoon, 3iron … 9iron, wedge), `power` (the
+  pop-up's gauge, bars), `lie` (the previous pop-up's title; stroke 1 = tee),
+  `landed` (this pop-up's title: fairway / rough / bunker / green, when read),
+  `ended` (yd to go before − after), `windSpeed`;
+- `pos` — the ball on the address frame's minimap, map fractions
+  (`tools/lib/addressmap.mjs`). The panel shows the whole hole from the tee
+  and from far out, but zooms and pans closer in (1.2–2.9× on the frames so
+  far, 5.6× once with the ball below the panel), so each address frame is
+  registered against the hole's capture stack (`captures/derived/maps/hNN.png`
+  and its `.var.png`, from extract-maps): zoom from the "yd to go" badge, the
+  cup's spot searched over the green, both refined on the map art. An
+  overview read whose pointer stands more than 12 yd off the badge's distance
+  from the cup gives no position (a misread badge, or another pointer on the
+  map). `spot` records how (`how`, `zoom`, `offset`, `fit`, the cup in map
+  px); a row without a position has `posWhy` instead;
+- `bearing` (deg N-up) and `bearingFrom`: the aim line (pointer triangle →
+  landing dot) when it can be the swing's, else the line to the frame's cup.
+  An aim line that passes the cup further than the ball finished from it
+  (plus 0.6 yd per mph per bar of wind drift and 5 yd) was not the swing's;
+  the row is flagged `aimNotTheSwing`;
+- `windDeg`, relative to the shot (0 = tail, 90 = toward the right): the
+  minimap dial's north-up arrow (exactly 8 directions) less `bearing`, so to
+  the degree; the aim-relative puck arrow (read to 45°, and it can flip end
+  for end: flagged `windArrowsDisagree`) only when the dial has no arrow or
+  there is no bearing.
+
+`tools/shot-exclusions.json` (hand-kept, `rows`: id → reason) lists rows that
+must not reach the app; assemble-shots drops them (the reason goes to the
+skip log). Add a row there, not by deleting it in the app: a deleted pipeline
+row comes back from derived.json on the next load.
+
+`node tools/build-derived.mjs` ships the importable rows in derived.json's
+`shots` (less `flags`, `spot`, `importable`) and, for each row with a
+position, flies it with WSR's ball (src/wsrsim.js) over the hole's terrain
+(public/terrain) along `bearing`, as the solver flies a club
+(src/model.js `lineProfile` / `simProfile` at k = 1), at the row's power and
+wind: `elevFactor` = that stop over the same shot's on level fairway, and
+`flatEnded` = ended / elevFactor, the level-fairway stop the app's club fit
+reads. A row whose frame gave neither an aim nor a cup takes the line to the
+hole's most-seen pin (`bearingFrom: "pin"`); a row without an elevFactor says
+why (`elevWhy`). The exclusions ship as `excludedShots`, and the app deletes
+stored rows with those ids. `node tools/test-rows.mjs` checks all of it on
+the committed files.
+
 ## One-time setup order
 
 ```

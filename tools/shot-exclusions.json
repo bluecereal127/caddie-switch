@@ -1,0 +1,8 @@
+{
+  "_note": "Hand-kept. Shot rows (tools/assemble-shots.mjs ids: the result pop-up's ULID) that must not reach the app, each with the reason. assemble-shots drops them, build-derived ships the ids as derived.json `excludedShots`, and the app deletes a stored row with one of them on load. Add a row here rather than deleting it in the app: a deleted pipeline row comes back from derived.json on the next load.",
+  "rows": {
+    "01M0HA2XKZSYD3CFQEYFSWSA6V": "H10 stroke 14, driver at 3.01 bars from the fairway, 151 yd: impossible stop for a 3–4 bar driver from the fairway, 109–170 yd; tree or water, replay from the same spot",
+    "01M0HAZMS6FGBBFQ4CN3KWQC7J": "H10 stroke 24, driver at 4 bars, 109 yd: impossible stop for a 3–4 bar driver from the fairway, 109–170 yd; tree or water, replay from the same spot",
+    "01M0HB1B9QK7BSZQJ4J6T1Z464": "H10 stroke 25, driver at 4 bars, 170 yd: impossible stop for a 3–4 bar driver from the fairway, 109–170 yd; tree or water, replay from the same spot"
+  }
+}

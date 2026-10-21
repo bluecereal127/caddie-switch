@@ -14,8 +14,10 @@
 //     spin column (bs = P1c x q) WSR's own at q = 1 and below it between the
 //     no-spin stop and WSR's constant spin (bs = P1c); and the generator
 //     writing the committed file byte for byte, twice
-//  c. solve inverts stopOf: p = 1.0 .. 4.0 back within 0.01 bar for every club,
-//     the driver at 250 yd at 4.00
+//  c. solve inverts stopOf: p = 1.0 .. 4.0 back within 0.01 bar for every club;
+//     the seed clubs are WSR's own (a = stopYd / 4, so k = 1 to the bit): the
+//     driver at WSR's 278.798 yd at 4.00, flat and over a level profile; h and
+//     c rederived from WSR's wind at full power (src/model.js DEFAULT_CLUBS)
 //  d. the landing surface moves the power the right way (green < fairway <
 //     rough < bunker for the driver); rollSpin only for the clubs that spin.
 //     The power scan: a distance inside the jump at a surface edge gets no rec
@@ -23,9 +25,10 @@
 //     a green short of a rough sliver); one beyond a bunker is found on the
 //     rough past it; a solution whose carry lands on a strip narrower than a
 //     scan step is not shipped on the surface around it. Real holes on the
-//     App's default line over the committed terrain: H4 from rough at 210 /
-//     211 yd (the driver's carry onto the fringe), H11 / H13 from rough at
-//     199 yd (the driver on rough). Synthetic holes of random surface strips,
+//     App's default line over the committed terrain, with the guide's club
+//     numbers the cases were found with: H4 from rough at 210 / 211 yd (the
+//     driver's carry onto the fringe), H11 / H13 from rough at 199 yd (the
+//     driver on rough). Synthetic holes of random surface strips,
 //     1,000 distances over ten with strips 2-25 yd wide and 300 over three with
 //     strips down to 0.2 yd: every rec stops within 0.01 yd of the distance on
 //     the surface read at its own carry, and only for a club whose 0.001-bar
@@ -37,7 +40,8 @@
 //     (probed 0.001 bar either side of the threshold)
 //  f. fitClub recovers a and h from rows made by stopOf at 2-4 bars and
 //     -10..10 mph tailwind, with and without `landed`; a green row fits the
-//     fairway rows' a once it says where it finished
+//     fairway rows' a once it says where it finished; a row with flatEnded
+//     is read as that level-fairway stop
 //  g. simPutt / solvePutt (src/putt.js, WSR's roll on a green, re-exported by
 //     src/model.js): a fixed grid of putts over painted grids gives the
 //     outputs recorded when the model was written (tools/test-putt.mjs is its
@@ -224,11 +228,33 @@ for (const cl of DEFAULT_CLUBS) for (let p = 1; p <= 4; p += 0.25) {
   if (recs[0]) { worstTrip = Math.max(worstTrip, Math.abs(recs[0].power - p)); near(recs[0].power, p, 0.01, `${cl.id} round trip at ${p} bars`); }
 }
 {
-  const r = ask([byId.driver], 250).recs[0];
-  ok(r && Math.abs(r.power - 4) < 1e-9, `driver at 250 yd: ${r?.power}, expected 4.00`);
-  ok(r && Math.abs(r.carry + r.roll - 250) < 1e-9, "driver at 250 yd: carry + roll is not the distance");
+  // the seed clubs are WSR's own (2026-10-21): a = stopYd / 4, so the
+  // solver's k = 4a / stopYd is 1 to the bit and the driver at WSR's
+  // full-power stop solves to exactly 4 bars, flat and over a level profile
+  for (const cl of DEFAULT_CLUBS) ok((4 * cl.a) / WSR_SHAPE[cl.id].stopYd === 1, `${cl.id}: k = 4a / stopYd = ${(4 * cl.a) / WSR_SHAPE[cl.id].stopYd}, not 1`);
+  const sd = WSR_SHAPE.driver.stopYd;
+  const r = ask([byId.driver], sd).recs[0];
+  ok(r && Math.abs(r.power - 4) < 1e-9, `driver at ${sd} yd: ${r?.power}, expected 4.00`);
+  ok(r && Math.abs(r.carry + r.roll - sd) < 1e-9, `driver at ${sd} yd: carry + roll is not the distance`);
+  const rl = ask([byId.driver], sd, "fairway", { heightAt: () => 0, surfaceAt: () => "fairway" }).recs[0];
+  ok(rl && rl.elev && Math.abs(rl.power - 4) < 0.01 && Math.abs(rl.stop - sd) <= STOP_TOL, `driver at ${sd} yd over a level profile: ${rl ? `${rl.power.toFixed(4)} bars, stop ${rl.stop.toFixed(3)}` : "no rec"}, expected 4.00`);
+  console.log(`k = 1: the driver to WSR's ${sd} yd needs ${r?.power.toFixed(4)} bars flat, ${rl?.power.toFixed(4)} over a level profile (stop ${rl?.stop.toFixed(3)})`);
 }
 console.log(`round trip: 7 clubs x 13 powers, worst ${worstTrip.toExponential(2)} bar`);
+// h and c as src/model.js derives them from WSR's own wind at full power on
+// level fairway: h = (stop at 10 mph tail - at 10 mph head) / (2 x 10 x calm
+// stop), c = drift at 10 mph across / (10 x 4), stored to 5 and 3 decimals
+{
+  const rows = [];
+  for (const cl of DEFAULT_CLUBS) {
+    const at = (wind) => run({ club: cl.id, q: 1, wind, trace: false });
+    const calm = at(null).stop, h = (at({ mph: 10, deg: 0 }).stop - at({ mph: 10, deg: 180 }).stop) / (2 * 10 * calm), c = at({ mph: 10, deg: 90 }).lateral / (10 * 4);
+    ok(Math.abs(cl.h - h) <= 5e-6, `${cl.id}: DEFAULT_CLUBS h ${cl.h}, WSR's wind gives ${h.toFixed(7)}`);
+    ok(Math.abs(cl.c - c) <= 5e-4, `${cl.id}: DEFAULT_CLUBS c ${cl.c}, WSR's wind gives ${c.toFixed(5)}`);
+    rows.push(`${cl.id} ${h.toFixed(5)} / ${c.toFixed(3)}`);
+  }
+  console.log(`h / c from WSR's wind: ${rows.join(", ")}`);
+}
 
 // ---- d. surfaces ----
 {
@@ -319,7 +345,12 @@ const lineGeo = (n) => {
 };
 const lineOf = (n) => { const { t, at } = lineGeo(n); return (yd) => lieOf(classAt(t, ...at(yd))); };
 {
-  const onHole = (n, lie, d) => { const surfaceAt = lineOf(n); return { surfaceAt, o: ask(DEFAULT_CLUBS, d, lie, { surfaceAt }) }; };
+  // The cases were found with the seed clubs of their day, the guide's
+  // (driver 250 ... wedge 80 yd); they pin the power scan's surface edges, not
+  // the clubs, so they keep those a (no wind here, so h and c do not enter)
+  const GUIDE_A = { driver: 62.5, spoon: 50, "3iron": 43.75, "5iron": 38.75, "7iron": 33.75, "9iron": 25, wedge: 20 };
+  const guideClubs = DEFAULT_CLUBS.map((c) => ({ ...c, a: GUIDE_A[c.id] }));
+  const onHole = (n, lie, d) => { const surfaceAt = lineOf(n); return { surfaceAt, o: ask(guideClubs, d, lie, { surfaceAt }) }; };
   const list = (o) => o.recs.map((r) => `${r.club.name} ${r.power.toFixed(3)} on ${r.surface}`).join("; ") || "no rec";
   // H4 from rough at 210 / 211 yd: the driver's carry lands on the fringe at
   // 2.82-2.85 bars, a crossing the two-pass read never looked at
@@ -468,7 +499,15 @@ for (const cl of DEFAULT_CLUBS) {
   ok(Math.abs(g1.a - truth.a) < 1e-9, `a green row with \`landed\` fits a ${g1.a}, not the fairway rows' ${truth.a}`);
   const g0 = fitClub({ ...byId["7iron"], h: truth.h }, [{ ...one, landed: undefined }]);
   ok(g0.a > truth.a * 1.01, "the same green row without `landed` should fit a longer a (it rolled further than fairway)");
-  console.log(`fit: a ${f1.a.toFixed(4)} / ${f2.a.toFixed(4)} / ${f3.a.toFixed(4)}, h ${f1.h.toFixed(5)} / ${f2.h.toFixed(5)} / ${f3.h.toFixed(5)} (truth ${truth.a}, ${truth.h}); a green row fits ${g1.a.toFixed(4)} with \`landed\`, ${g0.a.toFixed(4)} without`);
+  // a pipeline row's flatEnded (its stop over its elevFactor: the level-
+  // fairway stop of the same shot) is what the fit reads, on fairway whatever
+  // `landed` says; the logged stop (carry), here as if over a slope that
+  // carried it 7 % further onto a green, is then ignored
+  const flatRows = rows("fairway").map((r) => ({ ...r, flatEnded: r.carry, carry: r.carry * 1.07, landed: "green", elevFactor: 1.07 }));
+  const f4 = check(flatRows, "rows with flatEnded (logged stop 7 % long, `landed` green)");
+  const g2 = fitClub({ ...byId["7iron"], h: truth.h }, [flatRows[12]]);
+  ok(Math.abs(g2.a - truth.a) < 1e-9, `a row with flatEnded fits a ${g2.a}, not ${truth.a}`);
+  console.log(`fit: a ${f1.a.toFixed(4)} / ${f2.a.toFixed(4)} / ${f3.a.toFixed(4)}, h ${f1.h.toFixed(5)} / ${f2.h.toFixed(5)} / ${f3.h.toFixed(5)} (truth ${truth.a}, ${truth.h}); a green row fits ${g1.a.toFixed(4)} with \`landed\`, ${g0.a.toFixed(4)} without; rows read through flatEnded a ${f4.a.toFixed(4)}, h ${f4.h.toFixed(5)}`);
 }
 
 // ---- g. the putt solver's recorded numbers ----

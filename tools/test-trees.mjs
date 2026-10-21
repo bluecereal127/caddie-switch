@@ -5,7 +5,7 @@
 //  a. the shape table against tools/research/wsr-tree-shapes.json (the
 //     broadleaf and conifer constants; the palm's approximation from its mesh
 //     extents)
-//  b. synthetic, flat ground (z = 0), DEFAULT_CLUBS, no wind; every class
+//  b. synthetic, flat ground (z = 0), the guide's clubs (below), no wind; every class
 //     asserted with the margin it is expected to have (yd):
 //     1. a broadleaf sx = sy = 1 at 60 yd on the line (canopy 5.6-16.2 yd up):
 //        the full 7-iron passes over it, the full driver through the canopy,
@@ -59,7 +59,14 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { createRequire } from "node:module";
 const root = process.argv[2] ?? join(dirname(fileURLToPath(import.meta.url)), "..");
 const imp = (p) => import(pathToFileURL(join(root, p)).href);
-const { DEFAULT_CLUBS, solve, stopAt, flightOf, TREE_PENALTY } = await imp("src/model.js");
+const { DEFAULT_CLUBS: SEED_CLUBS, solve, stopAt, flightOf, TREE_PENALTY } = await imp("src/model.js");
+// The cases were set with the seed clubs of their day, the guide's (driver 250
+// ... wedge 80 yd, so the wedge flew 1.33 times WSR's distance at WSR's
+// heights); src/model.js seeds WSR's own since 2026-10-21 (k = 1). They pin
+// the tree check's geometry, not the clubs, so they keep those a (no wind
+// here, so h and c do not enter).
+const GUIDE_A = { driver: 62.5, spoon: 50, "3iron": 43.75, "5iron": 38.75, "7iron": 33.75, "9iron": 25, wedge: 20 };
+const DEFAULT_CLUBS = SEED_CLUBS.map((c) => ({ ...c, a: GUIDE_A[c.id] }));
 const { treeCheck, treesAlong, TREE_SHAPES, OWN_TREE } = await imp("src/trees.js");
 const { YD } = await imp("src/wsrsim.js");
 const { parseTerrain, classAt, lieOf, heightAt } = await imp("src/terrain.js");

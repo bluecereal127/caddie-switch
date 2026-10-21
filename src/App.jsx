@@ -21,7 +21,32 @@ import { scrollFor } from "./mapView.js";
 
 const STORE_KEY = "sss-golf-solver-v2";
 
-const CLUB_MIGRATE = { "3wood": "spoon", pw: "wedge", sw: "wedge" };
+// old club ids -> the clubs' ids; the capture pipeline shipped the irons as
+// "3i" .. "9i" until 2026-10-21, which no club's fit matched
+const CLUB_MIGRATE = { "3wood": "spoon", pw: "wedge", sw: "wedge", "3i": "3iron", "5i": "5iron", "7i": "7iron", "9i": "9iron" };
+// The third-party guide's h and c the clubs were seeded with until
+// clubsWsrV1 (src/model.js DEFAULT_CLUBS is WSR's own since 2026-10-21): a
+// stored value still equal to one was never fitted nor edited.
+const GUIDE_SEEDS = {
+  driver: { h: 0.008, c: 0.35 }, spoon: { h: 0.009, c: 0.4 }, "3iron": { h: 0.009, c: 0.42 }, "5iron": { h: 0.01, c: 0.44 },
+  "7iron": { h: 0.01, c: 0.47 }, "9iron": { h: 0.011, c: 0.5 }, wedge: { h: 0.012, c: 0.55 },
+};
+// A derived.json shot row (tools/assemble-shots.mjs, tools/build-derived.mjs)
+// as the Log stores it: wind aim-relative (deg 0 = tail), the stop as carry,
+// and the pipeline's pos / bearing (the ball on its address frame's minimap
+// and the shot's direction) and elevFactor / flatEnded (the stop over the
+// hole's terrain against level fairway, and the level-fairway stop fitClub
+// reads).
+const pipelineRow = (r) => {
+  const rad = ((r.windDeg ?? 0) * Math.PI) / 180;
+  return { id: r.id, club: CLUB_MIGRATE[r.club] ?? r.club, power: r.power, lie: r.lie,
+    ...(LANDED.includes(r.landed) ? { landed: r.landed } : {}),
+    wAlong: (r.windSpeed ?? 0) * Math.cos(rad), wCross: (r.windSpeed ?? 0) * Math.sin(rad),
+    carry: r.ended, lateral: null, hole: r.hole ?? 0, stroke: r.stroke ?? 1,
+    raw: { speed: r.windSpeed ?? 0, deg: r.windDeg ?? 0 },
+    ...(r.pos ? { pos: r.pos } : {}), ...(r.bearing != null ? { bearing: r.bearing } : {}),
+    ...(r.elevFactor > 0 && r.flatEnded > 0 ? { elevFactor: r.elevFactor, flatEnded: r.flatEnded } : {}) };
+};
 
 // The putt log's rows as stored or imported ({ id, hole, bars, rolled, flat }):
 // bars 0-4 (the gauge), yards rolled over 0, flat unless a row says otherwise;
@@ -949,8 +974,22 @@ export default function App() {
         setShots(loadedShots);
         setPutts(puttRows(d.putts));
         {
+          // clubsWsrV1: the seed numbers became WSR's own (src/model.js
+          // DEFAULT_CLUBS, 2026-10-21). Once, a stored club with no logged
+          // shots takes them, and a calibrated club's h or c still at the
+          // guide's seed takes WSR's (h is fitted only from rows across the
+          // wind and c only from rows with a sideways miss, so those were
+          // never data); every club is then refit from its rows as before.
           const stored = d.clubs ?? [];
-          const merged = DEFAULT_CLUBS.map((def) => { const s0 = stored.find((c) => c.id === def.id); return s0 ? { ...def, ...s0 } : def; });
+          const merged = DEFAULT_CLUBS.map((def) => {
+            const s0 = stored.find((c) => c.id === def.id);
+            if (!s0) return def;
+            const cl = { ...def, ...s0 };
+            if (d.clubsWsrV1) return cl;
+            if (!loadedShots.some((s) => s.club === def.id)) return { ...cl, a: def.a, h: def.h, c: def.c };
+            const old = GUIDE_SEEDS[def.id];
+            return { ...cl, h: cl.h === old?.h ? def.h : cl.h, c: cl.c === old?.c ? def.c : cl.c };
+          });
           setClubs(merged.map((c) => fitClub(c, loadedShots)));
         }
         setHolesMeta((prev) => {
@@ -1024,21 +1063,24 @@ export default function App() {
             }
             return m;
           });
-          // assembled shot rows from the capture pipeline -> auto-Log
-          // (deduped by pop-up-frame id; wind is aim-relative, deg 0 = tail)
-          if (Array.isArray(der.shots) && der.shots.length) {
+          // assembled shot rows from the capture pipeline -> auto-Log, keyed
+          // by pop-up-frame id (pipelineRow). A stored row whose id derived.json
+          // lists in excludedShots (tools/shot-exclusions.json) is deleted; a
+          // stored row the pipeline still ships takes its current copy, so a
+          // row logged before gains pos, bearing, elevFactor / flatEnded and
+          // landed, and the pipeline's corrections (the irons' club ids, a
+          // wind re-read) reach it (the Log cannot edit a row; a sideways miss
+          // given through the import box stays); the rest are added.
+          const excluded = new Set(Array.isArray(der.excludedShots) ? der.excludedShots : []);
+          const piped = new Map((Array.isArray(der.shots) ? der.shots : []).filter((r) => r.club && !excluded.has(r.id)).map((r) => [r.id, pipelineRow(r)]));
+          if (excluded.size || piped.size) {
             setShots((prevShots) => {
-              const have = new Set(prevShots.map((s) => s.id));
-              const add = der.shots.filter((r) => r.club && !have.has(r.id)).map((r) => {
-                const rad = ((r.windDeg ?? 0) * Math.PI) / 180;
-                return { id: r.id, club: r.club, power: r.power, lie: r.lie,
-                  ...(LANDED.includes(r.landed) ? { landed: r.landed } : {}),
-                  wAlong: (r.windSpeed ?? 0) * Math.cos(rad), wCross: (r.windSpeed ?? 0) * Math.sin(rad),
-                  carry: r.ended, lateral: null, hole: r.hole ?? 0, stroke: r.stroke ?? 1,
-                  raw: { speed: r.windSpeed ?? 0, deg: r.windDeg ?? 0 } };
-              });
-              if (!add.length) return prevShots;
-              const next = [...add, ...prevShots];
+              const kept = prevShots.filter((s) => !excluded.has(s.id))
+                .map((s) => (piped.has(s.id) ? { ...piped.get(s.id), ...(s.lateral != null ? { lateral: s.lateral } : {}) } : s));
+              const have = new Set(kept.map((s) => s.id));
+              const add = [...piped.values()].filter((r) => !have.has(r.id));
+              if (!add.length && kept.length === prevShots.length && kept.every((s, i) => JSON.stringify(s) === JSON.stringify(prevShots[i]))) return prevShots;
+              const next = [...add, ...kept];
               setClubs((prevClubs) => prevClubs.map((c) => fitClub(c, next)));
               return next;
             });
@@ -1049,7 +1091,7 @@ export default function App() {
   }, []);
 
   const persist = async (patch = {}) => {
-    const data = { clubs, shots, putts, greenSpeed, holesMeta, rounds, activeRound, mapScale, parFixV3: true, mapV4: true, treesV9: true, mapV5: true, derivedV1: true, ...patch };
+    const data = { clubs, shots, putts, greenSpeed, holesMeta, rounds, activeRound, mapScale, parFixV3: true, mapV4: true, treesV9: true, mapV5: true, derivedV1: true, clubsWsrV1: true, ...patch };
     try {
       await window.storage.set(STORE_KEY, JSON.stringify(data));
       setSaveState("saved"); setTimeout(() => setSaveState(""), 1500);
@@ -1905,7 +1947,7 @@ export default function App() {
                         <div className="mt-2 text-[10px] font-semibold" style={{ color: "#8a6d1a" }}>⚠ {lie} lie: shots skew off-line more{lie === "bunker" ? ` — bar capped at ${r.cap} of ${r.club.maxPower}` : " — bar capped at ¾"}</div>
                       )}
                       <div className="mt-2 text-[11px] opacity-60">
-                        {r.calibrated > 0 ? `calibrated (${r.calibrated} shots)` : "default numbers — calibrate this club"} · {SHAPE_LABEL}
+                        {r.calibrated > 0 ? `calibrated (${r.calibrated} shots)` : "Wii Sports Resort's numbers — calibrate this club"} · {SHAPE_LABEL}
                       </div>
                     </div>
                   );
@@ -2229,7 +2271,9 @@ export default function App() {
                               ...(LANDED.includes(r.landed) ? { landed: r.landed } : {}),
                               wAlong: sp * Math.cos(rad), wCross: sp * Math.sin(rad),
                               carry: +(r.ended ?? r.carry ?? 0), lateral: r.side == null && r.lateral == null ? null : +(r.side ?? r.lateral),
-                              hole: r.hole ?? 0, stroke: r.stroke ?? 1, raw: { speed: sp, deg: dg } };
+                              hole: r.hole ?? 0, stroke: r.stroke ?? 1, raw: { speed: sp, deg: dg },
+                              ...(r.pos ? { pos: r.pos } : {}), ...(r.bearing != null ? { bearing: r.bearing } : {}),
+                              ...(r.elevFactor > 0 && r.flatEnded > 0 ? { elevFactor: r.elevFactor, flatEnded: r.flatEnded } : {}) };
                           }).filter((r) => r.club && r.power > 0 && r.carry > 0);
                           const nextShots = [...conv, ...shots.filter((s) => !conv.some((c) => c.id === s.id))];
                           const nextClubs = clubs.map((c) => fitClub(c, nextShots));
@@ -2281,7 +2325,7 @@ export default function App() {
             <div className="space-y-5">
               <section className="rounded-2xl border-2 p-4" style={{ borderColor: T.turf, background: "#fff" }}>
                 <h2 className="disp text-lg font-bold mb-1">One-time first: calibrate your clubs</h2>
-                <p className="text-xs opacity-80">Find a hole with 0–2 mph wind. Hit each club at full power (4.0) from the tee or fairway, aimed dead straight, and log every shot. Then a few full drivers into a strong headwind and a strong crosswind. ~15 shots pins the whole model.</p>
+                <p className="text-xs opacity-80">Until a club has logged shots it plays Wii Sports Resort's own numbers, decoded from the game: 279 / 253 / 212 / 176 / 146 / 110 / 60 yd at full power on level fairway, driver to wedge. They replace a guide's (driver 250) that hole 10's logged full drives disproved: flown with WSR's ball over the hole's slope in their own wind, they stop within 4 yd of what was logged. The irons logged so far go further than WSR's, so log yours. Find a hole with 0–2 mph wind. Hit each club at full power (4.0) from the tee or fairway, aimed dead straight, and log every shot. Then a few full drivers into a strong headwind and a strong crosswind. ~15 shots pins the whole model.</p>
               </section>
               <section>
                 <h2 className="disp text-lg font-bold mb-2">Per-hole setup, in order</h2>
@@ -2382,7 +2426,7 @@ export default function App() {
         {tab === "clubs" && (
           <section>
             <h2 className="disp text-lg font-bold mb-1">Club model</h2>
-            <p className="text-xs opacity-70 mb-3">Fitted coefficients — edit directly if you know better values. Logging shots refits automatically.</p>
+            <p className="text-xs opacity-70 mb-3">Fitted coefficients — edit directly if you know better values. Logging shots refits automatically; a club with no shots logged keeps Wii Sports Resort's own numbers (decoded from the game: a its full-power stop on level fairway ÷ 4, h and c from its wind at full power), which hole 10's logged drives match.</p>
             <div className="overflow-x-auto rounded-2xl border-2" style={{ borderColor: T.line, background: "#fff" }}>
               <table className="w-full text-xs">
                 <thead>
@@ -2418,7 +2462,7 @@ export default function App() {
               </table>
             </div>
             <p className="text-[11px] opacity-60 mt-3">
-              stop = 4a × S(power ÷ 4, landing) × (1 + h × tailwind-mph) · sidedrift = c × crosswind-mph × power. S is the club's stop-vs-power curve from Wii Sports Resort's physics (decoded from the game; {SHAPE_LABEL} until Switch sweeps calibrate it): S = 1 at 4 bars landing on fairway, so a is the full-power fairway stop ÷ 4; the carry comes off the same curve, and a landing on green, fringe, rough or sand changes the roll. Gauge is 4 bars for every club. Lies cap the usable bar (distance per bar is unchanged below the cap) — fixed values baked in: rough = 3 bars for every club; sand = wedge 3, irons 2, spoon/driver 1; putter uncapped in sand but rolls far less. Distance fits use tee/fairway shots when available, each read through the curve at its power and where it finished; blank sideways entries are skipped by the drift fit. The putter has no row here: its roll is WSR's green physics, and its gauge maps through greenSpeed ({greenSpeed.toFixed(1)} yd per full gauge, {greenFit.n >= 2 ? `fitted from ${greenFit.n} flat putts` : "WSR's"}), which the flat putts you log in the putting panel fit.
+              stop = 4a × S(power ÷ 4, landing) × (1 + h × tailwind-mph) · sidedrift = c × crosswind-mph × power. S is the club's stop-vs-power curve from Wii Sports Resort's physics (decoded from the game; {SHAPE_LABEL} until Switch sweeps calibrate it): S = 1 at 4 bars landing on fairway, so a is the full-power fairway stop ÷ 4; the carry comes off the same curve, and a landing on green, fringe, rough or sand changes the roll. Gauge is 4 bars for every club. Lies cap the usable bar (distance per bar is unchanged below the cap) — fixed values baked in: rough = 3 bars for every club; sand = wedge 3, irons 2, spoon/driver 1; putter uncapped in sand but rolls far less. Distance fits use tee/fairway shots when available, each read through the curve at its power and where it finished; a row from the capture pipeline is read as the stop the same shot would have had on level fairway (its logged stop over its elevFactor: WSR's ball flown over the hole's terrain along the shot, against level ground); blank sideways entries are skipped by the drift fit. The putter has no row here: its roll is WSR's green physics, and its gauge maps through greenSpeed ({greenSpeed.toFixed(1)} yd per full gauge, {greenFit.n >= 2 ? `fitted from ${greenFit.n} flat putts` : "WSR's"}), which the flat putts you log in the putting panel fit.
             </p>
           </section>
         )}

@@ -9,13 +9,14 @@
 // S and C are WSR's own stop and carry against launch power per club, from
 // the port of its ball physics (src/wsrsim.js -> tools/build-wsr-shape.mjs ->
 // src/wsrShape.js), normalised so S(1, fairway, no spin) = 1: `a` stays the
-// full-power fairway stop / 4 (driver 62.5 -> 250 yd), fitted from logged
-// shots, so the Switch's distances come from the logs and only the SHAPE is
-// WSR's (decision D2) until Switch sweeps calibrate it. The shape is why stop
-// is not linear in power: carry is (to 2 %), but the roll comes from the
-// landing (a Coulomb friction impulse and a restitution per surface), and a
-// flatter, slower landing rolls further: WSR's driver stops at 112 / 179 /
-// 233 / 279 yd on 1 / 2 / 3 / 4 bars, rolling 54 / 58 / 50 / 39 of it.
+// full-power fairway stop / 4 (WSR's own until logged shots refit it: the
+// driver's 69.70 -> 278.8 yd, DEFAULT_CLUBS), so the Switch's distances come
+// from the logs and the SHAPE is WSR's (decision D2) until Switch sweeps
+// calibrate it. The shape is why stop is not linear in power: carry is (to
+// 2 %), but the roll comes from the landing (a Coulomb friction impulse and a
+// restitution per surface), and a flatter, slower landing rolls further:
+// WSR's driver stops at 112 / 179 / 233 / 279 yd on 1 / 2 / 3 / 4 bars,
+// rolling 54 / 58 / 50 / 39 of it.
 // The shape is level ground; with the course's terrain along the shot line
 // the solver flies WSR's ball over it instead ("elevation" below).
 import { WSR_SHAPE, SHAPE_Q } from "./wsrShape.js";
@@ -23,11 +24,33 @@ import { run, CLUBS } from "./wsrsim.js";
 import { treeCheck, TREE_SHAPES } from "./trees.js";
 import { CUP_R, V_CAP, puttField, simPutt, solvePutt } from "./putt.js";
 
-// The seed clubs: a = full-power (4-bar) stop on fairway / 4, from the Switch
-// guide's maxes (driver 250, spoon 200, 3i 175, 5i 155, 7i 135, 9i 100, wedge
-// 80 yd; WSR's own are 279 / 253 / 212 / 176 / 146 / 110 / 60). h = wind
-// fraction per mph of tailwind, c = sideways drift yd per crosswind mph per
-// bar; logged shots refit all three (fitClub).
+// The seed clubs are WSR's own (2026-10-21), so an uncalibrated club flies
+// exactly WSR's ball: a = WSR_SHAPE[id].stopYd / 4, its full-power stop on
+// level fairway (278.8 / 252.6 / 211.7 / 175.6 / 145.8 / 109.5 / 60.0 yd,
+// driver to wedge), which makes the solver's k = 4a / stopYd exactly 1. The
+// third-party guide's maxes they replace (driver 250, spoon 200, 3i 175, 5i
+// 155, 7i 135, 9i 100, wedge 80) were 30 yd short on the driver: the four
+// clean full-power driver tee shots logged on hole 10 (2026-08-21; 4 mph
+// head, calm, 2 mph tail, 11 mph tail-left), flown with src/wsrsim.js from
+// where their frames put the ball, over the hole's terrain in their wind,
+// stop at 276.8 / 280.4 / 285.5 / 296.0 yd against 274 / 281 / 284 / 292
+// logged (tools/test-rows.mjs). The irons logged so far stop further than
+// WSR's (by 6-15 yd on average at full power, the terrain flown); their rows
+// refit them.
+// h = stop change per mph of tailwind, as a fraction of the calm stop, and
+// c = sideways drift in yd per mph of crosswind per bar, both from
+// src/wsrsim.js's in-air wind at full power on level fairway:
+//   h = (stop at 10 mph tail - stop at 10 mph head) / (2 x 10 x calm stop)
+//   c = drift at 10 mph across (wind deg 90) / (10 x 4)
+// driver 296.76 / 261.87 / 278.80 yd -> h 0.00626, drift 22.05 -> c 0.551;
+// spoon 270.30 / 236.04 / 252.61, 21.53; 3 iron 232.12 / 193.01 / 211.70,
+// 24.70; 5 iron 194.96 / 158.04 / 175.60, 23.23; 7 iron 160.11 / 132.74 /
+// 145.79, 16.92; 9 iron 121.93 / 98.40 / 109.50, 14.54; wedge 66.61 /
+// 54.32 / 60.03, 7.42. WSR's wind is not linear in mph (its speed index
+// enters as index^0.74): per mph the driver's tail gains 0.97 % at 2 mph and
+// 0.50 % at 30, so h and c are the 10 mph secants. Logged shots refit a and
+// h, and c from rows with a sideways miss (fitClub); tools/test-solver.mjs
+// reruns this derivation.
 // LIE MECHANIC (player-verified): lies cap the usable BAR, they don't scale distance.
 // Below the cap, every bar flies its normal distance.
 //   rough: cap = 3 of the 4 bars for every club (official "reduced by a quarter")
@@ -35,14 +58,15 @@ import { CUP_R, V_CAP, puttField, simPutt, solvePutt } from "./putt.js";
 //           putter uncapped but rolls out much less in sand
 // So from sand: driver max ≈ 1 bar's stop while a 3i gets 2 bars.
 // Drivers and spoons cannot backspin. Trajectory: driver lowest → wedge highest.
+const wsrA = (id) => WSR_SHAPE[id].stopYd / 4;
 const DEFAULT_CLUBS = [
-  { id: "driver", name: "Driver", a: 62.5,  h: 0.008, c: 0.35, spin: false, traj: "low",      maxPower: 4.0, shots: 0 },
-  { id: "spoon",  name: "Spoon",  a: 50.0,  h: 0.009, c: 0.40, spin: false, traj: "low-mid",  maxPower: 4.0, shots: 0 },
-  { id: "3iron",  name: "3 Iron", a: 43.75, h: 0.009, c: 0.42, spin: true,  traj: "mid",      maxPower: 4.0, shots: 0 },
-  { id: "5iron",  name: "5 Iron", a: 38.75, h: 0.010, c: 0.44, spin: true,  traj: "mid",      maxPower: 4.0, shots: 0 },
-  { id: "7iron",  name: "7 Iron", a: 33.75, h: 0.010, c: 0.47, spin: true,  traj: "mid-high", maxPower: 4.0, shots: 0 },
-  { id: "9iron",  name: "9 Iron", a: 25.0,  h: 0.011, c: 0.50, spin: true,  traj: "high",     maxPower: 4.0, shots: 0 },
-  { id: "wedge",  name: "Wedge",  a: 20.0,  h: 0.012, c: 0.55, spin: true,  traj: "highest",  maxPower: 4.0, shots: 0 },
+  { id: "driver", name: "Driver", a: wsrA("driver"), h: 0.00626, c: 0.551, spin: false, traj: "low",      maxPower: 4.0, shots: 0 },
+  { id: "spoon",  name: "Spoon",  a: wsrA("spoon"),  h: 0.00678, c: 0.538, spin: false, traj: "low-mid",  maxPower: 4.0, shots: 0 },
+  { id: "3iron",  name: "3 Iron", a: wsrA("3iron"),  h: 0.00924, c: 0.617, spin: true,  traj: "mid",      maxPower: 4.0, shots: 0 },
+  { id: "5iron",  name: "5 Iron", a: wsrA("5iron"),  h: 0.01051, c: 0.581, spin: true,  traj: "mid",      maxPower: 4.0, shots: 0 },
+  { id: "7iron",  name: "7 Iron", a: wsrA("7iron"),  h: 0.00939, c: 0.423, spin: true,  traj: "mid-high", maxPower: 4.0, shots: 0 },
+  { id: "9iron",  name: "9 Iron", a: wsrA("9iron"),  h: 0.01075, c: 0.364, spin: true,  traj: "high",     maxPower: 4.0, shots: 0 },
+  { id: "wedge",  name: "Wedge",  a: wsrA("wedge"),  h: 0.01024, c: 0.185, spin: true,  traj: "highest",  maxPower: 4.0, shots: 0 },
 ];
 // Caps confirmed in-game (fixed; not user-editable): rough = 3 bars for every club;
 // sand: wedge 3, all irons 2, spoon & driver 1; putter uncapped (dead roll in sand).
@@ -232,16 +256,24 @@ function profHeight(prof, yd) {
   return h[i] + (h[i + 1] - h[i]) * (u - i);
 }
 
+// The ground src/wsrsim.js's run flies over (its `profile`) from a line's
+// profile, at k of the Switch's yd per WSR yd: the sim's ground at x is the
+// profile's at k x. tools/build-derived.mjs flies the logged shots over it at
+// k = 1 (their elevFactor).
+function simProfile(prof, k = 1) {
+  const { lies, n } = prof;
+  return {
+    heightAt: (x) => profHeight(prof, k * x),
+    surfaceAt: (x) => { const i = Math.round((k * x) / PROF_STEP) + prof.i0; return lies[i < 0 ? 0 : i >= n ? n - 1 : i]; },
+  };
+}
+
 // One club over the profile: bars -> { p, carry, stop } in the Switch's yd,
 // and with trace also the run's path (WSR's yd) and k, for the tree check.
 // The ball sits ballLift yd above the profile's origin at launch.
 function flyer(cl, wAlong, prof, ballLift) {
   const k = (4 * cl.a * (1 + cl.h * wAlong)) / WSR_SHAPE[cl.id].stopYd;
-  const { lies, n } = prof;
-  const profile = {
-    heightAt: (x) => profHeight(prof, k * x),
-    surfaceAt: (x) => { const i = Math.round((k * x) / PROF_STEP) + prof.i0; return lies[i < 0 ? 0 : i >= n ? n - 1 : i]; },
-  };
+  const profile = simProfile(prof, k);
   return (bars, trace = false) => {
     const o = run({ club: cl.id, q: bars / 4, profile, ballLift, trace });
     return { p: bars, carry: k * o.carry, stop: k * o.stop, ...(trace ? { path: o.path, k } : {}) };
@@ -396,10 +428,16 @@ function fitClub(club, shots) {
   // (that document's section 12, item 10), so partial-power approach rows near
   // the pin may be biased; full swings, the anchors the Guide asks for first,
   // are never touched. The pool rules stay as they are.
-  const shaped = (s) => 4 * shapeAt(club.id, s.power / 4, "S", s.landed, 0);
+  // A row with flatEnded (tools/build-derived.mjs: its logged stop over its
+  // elevFactor, WSR's stop over the hole's terrain along the shot against the
+  // same shot on level fairway) is read as that level-fairway stop, so its
+  // landing is fairway; any other row as its logged stop (carry) where it
+  // finished.
+  const stop = (s) => (s.flatEnded > 0 ? s.flatEnded : s.carry);
+  const shaped = (s) => 4 * shapeAt(club.id, s.power / 4, "S", s.flatEnded > 0 ? "fairway" : s.landed, 0);
   const xs = [], ys = [];
   pool.forEach((s) => {
-    if (s.power > 0 && s.carry > 0) { xs.push(s.wAlong); ys.push(s.carry / shaped(s)); }
+    if (s.power > 0 && stop(s) > 0) { xs.push(s.wAlong); ys.push(stop(s) / shaped(s)); }
   });
   if (ys.length >= 1) {
     const n = ys.length;
@@ -414,7 +452,7 @@ function fitClub(club, shots) {
       let sum = 0, cnt = 0;
       pool.forEach((s) => {
         const f = 1 + club.h * s.wAlong;
-        if (s.power > 0 && f > 0.5) { sum += s.carry / (shaped(s) * f); cnt++; }
+        if (s.power > 0 && f > 0.5) { sum += stop(s) / (shaped(s) * f); cnt++; }
       });
       if (cnt) next.a = sum / cnt;
     }
@@ -553,6 +591,6 @@ function solve(clubs, inputs, blockedRules, ctx = {}) {
 
 export {
   DEFAULT_CLUBS, BUNKER_CAPS, capFor, SHAPE_LABEL, LANDED, MIN_BARS, landingSurface, shapeAt, stopOf, carryOf, landedStop, stopAt, STOP_TOL,
-  flightOf, TREE_PENALTY,
+  flightOf, TREE_PENALTY, lineProfile, simProfile,
   GRID_N, emptyGreen, CUP_R, V_CAP, puttField, simPutt, solvePutt, fitClub, solve,
 };
