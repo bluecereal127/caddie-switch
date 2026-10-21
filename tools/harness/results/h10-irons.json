@@ -1,0 +1,487 @@
+{
+ "hole": 10,
+ "save": "h10-tee-w10.sav",
+ "tee": [
+  12.8,
+  194.95,
+  1968.5
+ ],
+ "aim": [
+  0.0375,
+  -0.9992
+ ],
+ "line": {
+  "pos": [
+   0.4905,
+   0.8633
+  ],
+  "bearing": 2.1499
+ },
+ "shots": [
+  {
+   "club": "3iron",
+   "wind": "calm",
+   "windWsr": {
+    "dir": 0,
+    "speedIdx": 0
+   },
+   "ms": 67038,
+   "launch": {
+    "speed": 2.7896,
+    "angle": 19.0013
+   },
+   "wsr": {
+    "carry": 198.8682,
+    "carryAcross": -0.0002,
+    "landDy": -10.1272,
+    "landVy": 0.476,
+    "landSpeed": 0.5875,
+    "bounce1": {
+     "len": 13.3774,
+     "height": 5.34,
+     "upVy": 0.4735
+    },
+    "contacts": 6,
+    "rest": 212.9964,
+    "restAcross": -1.4001,
+    "restDy": -10.031,
+    "roll": 14.1281,
+    "apex": 28.1716,
+    "ticks": 2090
+   },
+   "portApp": {
+    "carry": 198.9291,
+    "stop": 212.2305,
+    "roll": 13.3014,
+    "apex": 28.2466,
+    "bounces": 7,
+    "ticks": 2097
+   },
+   "portKcl": {
+    "carry": 198.9291,
+    "stop": 212.9155,
+    "roll": 13.9864,
+    "apex": 28.2466,
+    "bounces": 7,
+    "ticks": 2089
+   },
+   "portFlat": {
+    "carry": 189.8494,
+    "stop": 211.7011,
+    "roll": 21.8517,
+    "apex": 28.2466,
+    "bounces": 7,
+    "ticks": 1925
+   },
+   "simMatchesReal": true
+  },
+  {
+   "club": "3iron",
+   "wind": "head4",
+   "windWsr": {
+    "dir": 0,
+    "speedIdx": 2
+   },
+   "ms": 67222,
+   "launch": {
+    "speed": 2.7896,
+    "angle": 19.0013
+   },
+   "wsr": {
+    "carry": 192.8408,
+    "carryAcross": 0.3813,
+    "landDy": -10.3945,
+    "landVy": 0.4987,
+    "landSpeed": 0.5417,
+    "bounce1": {
+     "len": 8.2735,
+     "height": 5.8268,
+     "upVy": 0.4962
+    },
+    "contacts": 6,
+    "rest": 200.9455,
+    "restAcross": -0.5881,
+    "restDy": -10.1039,
+    "roll": 8.1047,
+    "apex": 28.1101,
+    "ticks": 2108
+   },
+   "portApp": {
+    "carry": 192.7968,
+    "stop": 201.1531,
+    "roll": 8.3563,
+    "apex": 28.1846,
+    "bounces": 7,
+    "ticks": 2106
+   },
+   "portKcl": {
+    "carry": 192.7968,
+    "stop": 200.8893,
+    "roll": 8.0925,
+    "apex": 28.1846,
+    "bounces": 7,
+    "ticks": 2108
+   },
+   "portFlat": {
+    "carry": 184.2696,
+    "stop": 201.9885,
+    "roll": 17.7189,
+    "apex": 28.1846,
+    "bounces": 7,
+    "ticks": 1881
+   },
+   "simMatchesReal": true
+  },
+  {
+   "club": "5iron",
+   "wind": "calm",
+   "windWsr": {
+    "dir": 0,
+    "speedIdx": 0
+   },
+   "ms": 67393,
+   "launch": {
+    "speed": 2.4497,
+    "angle": 23.0015
+   },
+   "wsr": {
+    "carry": 168.9592,
+    "carryAcross": -0.0002,
+    "landDy": -11.8949,
+    "landVy": 0.5042,
+    "landSpeed": 0.5264,
+    "bounce1": {
+     "len": 6.1035,
+     "height": 5.9458,
+     "upVy": 0.5017
+    },
+    "contacts": 6,
+    "rest": 174.712,
+    "restAcross": -0.1163,
+    "restDy": -11.5303,
+    "roll": 5.7528,
+    "apex": 28.3568,
+    "ticks": 2120
+   },
+   "portApp": {
+    "carry": 168.9376,
+    "stop": 174.0555,
+    "roll": 5.1179,
+    "apex": 28.4196,
+    "bounces": 7,
+    "ticks": 2127
+   },
+   "portKcl": {
+    "carry": 168.9376,
+    "stop": 174.7204,
+    "roll": 5.7828,
+    "apex": 28.4196,
+    "bounces": 7,
+    "ticks": 2120
+   },
+   "portFlat": {
+    "carry": 159.9376,
+    "stop": 175.6,
+    "roll": 15.6623,
+    "apex": 28.4196,
+    "bounces": 7,
+    "ticks": 1864
+   },
+   "simMatchesReal": true
+  },
+  {
+   "club": "5iron",
+   "wind": "head4",
+   "windWsr": {
+    "dir": 0,
+    "speedIdx": 2
+   },
+   "ms": 67622,
+   "launch": {
+    "speed": 2.4497,
+    "angle": 23.0015
+   },
+   "wsr": {
+    "carry": 162.9161,
+    "carryAcross": 0.389,
+    "landDy": -12.271,
+    "landVy": 0.5009,
+    "landSpeed": 0.5095,
+    "bounce1": {
+     "len": 3.5928,
+     "height": 5.8744,
+     "upVy": 0.4984
+    },
+    "contacts": 7,
+    "rest": 166.1149,
+    "restAcross": 0.6466,
+    "restDy": -12.0718,
+    "roll": 3.1988,
+    "apex": 28.2979,
+    "ticks": 2126
+   },
+   "portApp": {
+    "carry": 162.8669,
+    "stop": 166.454,
+    "roll": 3.587,
+    "apex": 28.3602,
+    "bounces": 7,
+    "ticks": 2118
+   },
+   "portKcl": {
+    "carry": 162.8669,
+    "stop": 166.0473,
+    "roll": 3.1804,
+    "apex": 28.3602,
+    "bounces": 8,
+    "ticks": 2126
+   },
+   "portFlat": {
+    "carry": 154.4839,
+    "stop": 166.5016,
+    "roll": 12.0177,
+    "apex": 28.3602,
+    "bounces": 7,
+    "ticks": 1869
+   },
+   "simMatchesReal": true
+  },
+  {
+   "club": "7iron",
+   "wind": "calm",
+   "windWsr": {
+    "dir": 0,
+    "speedIdx": 0
+   },
+   "ms": 62391,
+   "launch": {
+    "speed": 2.1298,
+    "angle": 24.0016
+   },
+   "wsr": {
+    "carry": 140.164,
+    "carryAcross": 0.0014,
+    "landDy": -12.8801,
+    "landVy": 0.4248,
+    "landSpeed": 0.5321,
+    "bounce1": {
+     "len": 11.5314,
+     "height": 4.3133,
+     "upVy": 0.4224
+    },
+    "contacts": 6,
+    "rest": 152.1519,
+    "restAcross": 0.891,
+    "restDy": -12.9203,
+    "roll": 11.9878,
+    "apex": 22.8797,
+    "ticks": 1931
+   },
+   "portApp": {
+    "carry": 140.1307,
+    "stop": 152.4542,
+    "roll": 12.3234,
+    "apex": 22.9274,
+    "bounces": 7,
+    "ticks": 1924
+   },
+   "portKcl": {
+    "carry": 140.1307,
+    "stop": 151.6914,
+    "roll": 11.5606,
+    "apex": 22.9274,
+    "bounces": 7,
+    "ticks": 1935
+   },
+   "portFlat": {
+    "carry": 130.0626,
+    "stop": 145.7907,
+    "roll": 15.7281,
+    "apex": 22.9274,
+    "bounces": 7,
+    "ticks": 1692
+   },
+   "simMatchesReal": true
+  },
+  {
+   "club": "7iron",
+   "wind": "head4",
+   "windWsr": {
+    "dir": 0,
+    "speedIdx": 2
+   },
+   "ms": 62775,
+   "launch": {
+    "speed": 2.1298,
+    "angle": 24.0016
+   },
+   "wsr": {
+    "carry": 135.4624,
+    "carryAcross": 0.279,
+    "landDy": -12.6417,
+    "landVy": 0.4182,
+    "landSpeed": 0.5131,
+    "bounce1": {
+     "len": 10.6591,
+     "height": 4.187,
+     "upVy": 0.4158
+    },
+    "contacts": 6,
+    "rest": 147.2651,
+    "restAcross": 0.6911,
+    "restDy": -13.1455,
+    "roll": 11.8028,
+    "apex": 22.8406,
+    "ticks": 1917
+   },
+   "portApp": {
+    "carry": 135.4092,
+    "stop": 146.7943,
+    "roll": 11.3851,
+    "apex": 22.8881,
+    "bounces": 7,
+    "ticks": 1925
+   },
+   "portKcl": {
+    "carry": 135.4092,
+    "stop": 147.1934,
+    "roll": 11.7842,
+    "apex": 22.8881,
+    "bounces": 7,
+    "ticks": 1920
+   },
+   "portFlat": {
+    "carry": 126.1993,
+    "stop": 138.9711,
+    "roll": 12.7718,
+    "apex": 22.8881,
+    "bounces": 7,
+    "ticks": 1688
+   },
+   "simMatchesReal": true
+  },
+  {
+   "club": "9iron",
+   "wind": "calm",
+   "windWsr": {
+    "dir": 0,
+    "speedIdx": 0
+   },
+   "ms": 60378,
+   "launch": {
+    "speed": 1.7798,
+    "angle": 30.0019
+   },
+   "wsr": {
+    "carry": 107.4162,
+    "carryAcross": -0.0012,
+    "landDy": -11.5635,
+    "landVy": 0.3972,
+    "landSpeed": 0.4878,
+    "bounce1": {
+     "len": 9.9329,
+     "height": 3.8001,
+     "upVy": 0.3948
+    },
+    "contacts": 6,
+    "rest": 118.257,
+    "restAcross": -1.4084,
+    "restDy": -12.2409,
+    "roll": 10.8408,
+    "apex": 22.0871,
+    "ticks": 1859
+   },
+   "portApp": {
+    "carry": 107.3866,
+    "stop": 118.2335,
+    "roll": 10.8469,
+    "apex": 22.1253,
+    "bounces": 7,
+    "ticks": 1859
+   },
+   "portKcl": {
+    "carry": 107.3866,
+    "stop": 118.1608,
+    "roll": 10.7743,
+    "apex": 22.1253,
+    "bounces": 7,
+    "ticks": 1857
+   },
+   "portFlat": {
+    "carry": 99.7752,
+    "stop": 109.5028,
+    "roll": 9.7276,
+    "apex": 22.1253,
+    "bounces": 7,
+    "ticks": 1648
+   },
+   "simMatchesReal": true
+  },
+  {
+   "club": "9iron",
+   "wind": "head4",
+   "windWsr": {
+    "dir": 0,
+    "speedIdx": 2
+   },
+   "ms": 60095,
+   "launch": {
+    "speed": 1.7798,
+    "angle": 30.0019
+   },
+   "wsr": {
+    "carry": 103.1899,
+    "carryAcross": 0.249,
+    "landDy": -11.2381,
+    "landVy": 0.4117,
+    "landSpeed": 0.4644,
+    "bounce1": {
+     "len": 7.4731,
+     "height": 4.0657,
+     "upVy": 0.4093
+    },
+    "contacts": 6,
+    "rest": 111.0382,
+    "restAcross": -1.598,
+    "restDy": -11.8803,
+    "roll": 7.8483,
+    "apex": 22.0528,
+    "ticks": 1865
+   },
+   "portApp": {
+    "carry": 103.1403,
+    "stop": 111.8663,
+    "roll": 8.7259,
+    "apex": 22.0907,
+    "bounces": 7,
+    "ticks": 1858
+   },
+   "portKcl": {
+    "carry": 103.1403,
+    "stop": 110.7878,
+    "roll": 7.6475,
+    "apex": 22.0907,
+    "bounces": 7,
+    "ticks": 1870
+   },
+   "portFlat": {
+    "carry": 96.3363,
+    "stop": 103.6203,
+    "roll": 7.284,
+    "apex": 22.0907,
+    "bounces": 7,
+    "ticks": 1648
+   },
+   "simMatchesReal": true
+  }
+ ],
+ "determinism": {
+  "club": "3iron",
+  "wind": {
+   "dir": 0,
+   "speedIdx": 0
+  },
+  "ticks": 2042,
+  "identical": true
+ }
+}

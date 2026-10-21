@@ -9,3 +9,5 @@ captures/
 # Netlify API token for tools/autosync.ps1 — never commit
 tools/netlify.json
 __pycache__/
+# Dolphin harness: savestates, generated Dolphin user dir, logs, screenshots
+tools/harness/state/
