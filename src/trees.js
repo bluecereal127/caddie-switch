@@ -129,21 +129,36 @@ function band(g, d) {
   return [g.y0, g.y1];
 }
 
-// The flight's samples, every STEP yd from the ball to the carry (the last
-// one at the carry itself): s, l, y flat (y = the ball centre's rise above
-// where it sat at launch, interpolated between the run's frames, which are
-// 1-1.5 yd apart at a full driver's launch).
+// The path's samples, flat as s, l, y: every STEP yd from the ball to the
+// carry (the last one at the carry itself), then every STEP yd on through the
+// first BOUNCE_YD of the bounce, or to the furthest point the ball reaches if
+// that is nearer (y = the ball centre's rise above where it sat at launch,
+// interpolated between the run's frames, which are 1-1.5 yd apart at a full
+// driver's launch; l = the aim's lateral offset in the air, the line itself
+// after the carry). WSR checks the trees on every tick, the bounce's and the
+// roll's too: in the Dolphin harness (tools/harness/REPORT.md section 4) hole
+// 7's full 3-iron straight at t7-18 lands 1.9 yd short of the trunk's capsule
+// and bounces into it, and the full 5-iron at t7-23 2.7 yd past its carry.
+// The roll is not checked further: on a level-across line the port's roll
+// leaves the ball where WSR's would be along the line but not across it, and
+// a trunk is 1.3-1.5 yd wide; WSR's rolling ball passed 1.8-2.7 yd from three
+// trunks the line ran into 16-29 yd past the carry, and stopped short of two
+// on the outer ground the port rolls as fairway.
+const BOUNCE_YD = 5;
 function samplesOf(path, k, carry, aim) {
   const out = [];
   if (!(carry > 0) || !path || path.length < 2) return [0, 0, 0];
+  let xEnd = 0;
+  for (const p of path) if (p[0] > xEnd) xEnd = p[0];
+  const end = Math.min(Math.max(carry, xEnd * k), carry + BOUNCE_YD);
   let i = 1;
-  for (let s = 0; ; s = Math.min(carry, s + STEP)) {
+  for (let s = 0; ; s = s < carry ? Math.min(carry, s + STEP) : Math.min(end, s + STEP)) {
     const x = s / k;
     while (i < path.length - 1 && path[i][0] < x) i++;
     const a = path[i - 1], b = path[i], f = b[0] > a[0] ? Math.min(1, Math.max(0, (x - a[0]) / (b[0] - a[0]))) : 1;
-    const u = s / carry;
+    const u = Math.min(1, s / carry);
     out.push(s, aim * u * (1 - u), a[1] + f * (b[1] - a[1]));
-    if (s >= carry) break;
+    if (s >= end) break;
   }
   return out;
 }
@@ -151,15 +166,16 @@ function samplesOf(path, k, carry, aim) {
 // treeCheck(path, trees, ctx) -> { kind, at, tree, margin }
 //   path   src/wsrsim.js run()'s path ([x, y, z] in WSR's yd every frame:
 //          x along the shot, y the rise above the launch spot), the profile
-//          run's over the terrain or the flat one; only up to the carry
+//          run's over the terrain or the flat one, launch to rest
 //   trees  treesAlong's list (s, l, z on the line's frame)
 //   ctx    { k, carry, aim, ballZ }: k = the Switch's yd per WSR yd along
 //          the shot (src/model.js scales the flight so it lands at the rec's
 //          carry; the heights stay WSR's, so the check is WSR-shaped until
 //          logged shots calibrate the trajectories), carry = the rec's (yd;
-//          the path is cut there: the bounce and the roll are not checked),
-//          aim = the rec's aim offset (yd, + right), ballZ = the ball's
-//          height at launch above the ground under the ball (its lift)
+//          in the BOUNCE_YD past it only a hit counts: over, under and clear
+//          are the flight's), aim = the rec's aim offset (yd, + right),
+//          ballZ = the ball's height at launch above the ground under the
+//          ball (its lift)
 // The horizontal path is the line with the lateral offset
 // lat(s) = aim (s / carry)(1 - s / carry): the ball leaves toward the aim
 // point and the crosswind brings it back to the line at the carry. Per tree,
@@ -185,31 +201,38 @@ function samplesOf(path, k, carry, aim) {
 // tick or two at most, which WSR's damping leaves at full speed: it counts
 // as the side with the smaller clearance.
 export function treeCheck(path, trees, { k = 1, carry = 0, aim = 0, ballZ = 0 } = {}) {
-  const P = samplesOf(path, k, carry, aim), n = P.length / 3;
+  const P = samplesOf(path, k, carry, aim), n = P.length / 3, sEnd = P[3 * (n - 1)];
   const latMax = Math.abs(aim) / 4, lift = ballZ + BALL_R / YD;
   let hit = null, close = null, near = null;
   for (const t of trees ?? []) {
     if (!TREE_SHAPES[t.kind]) continue;
     const g = shapeOf(t), reach = g.foot + NEAR;
-    if (t.s < -reach || t.s > carry + reach || Math.abs(t.l) > latMax + reach) continue;
-    const j0 = Math.max(0, Math.ceil((t.s - reach) / STEP)), j1 = Math.min(n - 1, Math.floor((t.s + reach) / STEP) + 1);
-    let mine = null, clear = Infinity, clearAt = null, side = null, gap = Infinity, gapAt = null;
-    for (let j = j0; j <= j1; j++) {
+    if (t.s < -reach || t.s > sEnd + reach || Math.abs(t.l) > latMax + reach) continue;
+    // the samples from the first at or past t.s - reach to the first past
+    // t.s + reach (s rises along them; STEP apart, but for the carry's own)
+    let j0 = 0, hiJ = n;
+    while (j0 < hiJ) { const m = (j0 + hiJ) >> 1; if (P[3 * m] < t.s - reach) j0 = m + 1; else hiJ = m; }
+    let mine = null, clear = Infinity, clearAt = null, side = null, gap = Infinity, gapAt = null, rollDeep = 0;
+    for (let j = j0; j < n; j++) {
       const s = P[3 * j], d = Math.hypot(s - t.s, P[3 * j + 1] - t.l), h = lift + P[3 * j + 2] - t.z;
       const hc = Math.max(-g.trunkTop, Math.min(g.trunkTop, h));
       if (d * d + (h - hc) * (h - hc) < g.trunkR * g.trunkR) {
         if (!mine) mine = { kind: "trunk", at: s, margin: h - (g.trunkTop + Math.sqrt(g.trunkR * g.trunkR - d * d)) };
         break;
       }
-      if (d - g.foot < gap) { gap = d - g.foot; gapAt = s; }
-      if (d >= g.foot) continue;
-      const [lo, hi] = band(g, d);
-      const c = h > lo && h < hi ? -Math.min(h - lo, hi - h) : h >= hi ? h - hi : lo - h;
-      if (c < 0 && !mine) mine = { kind: "canopy", at: s, margin: c };
-      if (c < clear) { clear = c; clearAt = s; side = c < 0 ? "canopy" : h >= hi ? "over" : "under"; }
+      const air = s <= carry;
+      if (air && d - g.foot < gap) { gap = d - g.foot; gapAt = s; }
+      if (d < g.foot) {
+        const [lo, hi] = band(g, d);
+        const c = h > lo && h < hi ? -Math.min(h - lo, hi - h) : h >= hi ? h - hi : lo - h;
+        if (c < 0 && !mine) mine = { kind: "canopy", at: s, margin: c };
+        if (air && c < clear) { clear = c; clearAt = s; side = c < 0 ? "canopy" : h >= hi ? "over" : "under"; }
+        if (!air && c < rollDeep) rollDeep = c;
+      }
+      if (s > t.s + reach) break;
     }
     if (mine) {
-      if (mine.kind === "canopy") mine.margin = clear;
+      if (mine.kind === "canopy") mine.margin = mine.at <= carry ? clear : rollDeep;
       if (!hit || mine.at < hit.at) hit = { ...mine, tree: t.id };
     } else if (side) {
       if (!close || clear < close.margin) close = { kind: side, at: clearAt, tree: t.id, margin: clear };

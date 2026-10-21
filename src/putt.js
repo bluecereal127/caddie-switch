@@ -77,21 +77,33 @@ export function vFlat(D) {
 }
 
 // ---- the cup ----
-// WSR's cup is a pit of radius 1.5 u (0.164 yd) and depth 3 u; its simulator
-// holes a ball at ~1 m/s up to 1.25 u (0.137 yd) off the centre line and misses
-// at 1.5 u, so the effective capture half-width is 0.14-0.16 yd: a ball whose
-// path comes within CUP_R of the centre is holed if it is slow enough there.
-export const CUP_R = 0.15;
-// Slow enough: WSR drops a centred putt that would have rolled on ≤ ~4.4 yd
-// past the cup and lips out one that would roll ≥ ~6 yd past. With this
-// physics a ball that rolls 4.4 yd more is doing vFlat(4.4) = 4.07 yd/s
-// (0.155 u/tick), so that is the cap; faster balls run on and the ragged 4.4-6
-// yd band counts as a miss. The decode's "4.7 yd/s at the rim" (0.18 u/tick,
-// the middle of its 0.17-0.20 boundary) is the same curve further out: at
-// 4.7 yd/s this physics rolls 5.6 yd more, inside that band. Without the drag
-// 4.4 yd past would take only 3.33 yd/s and 4.7 yd/s would run 8.8 yd: the
-// 0.24/s drag is what puts the decode's two numbers on one curve.
-export const V_CAP = vFlat(4.4);
+// WSR's cup is a pit of radius 1.5 u (0.164 yd) and depth 3 u. How far off
+// its centre a ball can pass and still drop depends on how fast it is going
+// there: measured in WSR itself (the Dolphin harness, tools/harness/REPORT.md
+// 5.2: the holed / missed edge bisected on both sides of the cup at speeds of
+// 0.9-4.5 yd/s, and traced putts in the game's own frame), 0.146 yd at 0.9
+// yd/s, 0.12 at 1.8, 0.10 at 2.7, 0.03 at 4.0 and nothing past ~4.45, the
+// same on cups of 1.2, 3.95 and 8.1 deg and on one cup from four sides (down,
+// up and across its slope both ways) to the 6 mm the bisection resolves.
+// CUP_WINDOW is that curve, [speed yd/s, half-width yd], linear between the
+// points; a ball whose path comes within cupWindow(its speed there) of the
+// centre is holed. (Before 2026-10-21 the rule was 0.15 yd at up to 4.07
+// yd/s, from the decode's simulator at ~1 m/s: right at 0.9 yd/s and 0.04-
+// 0.12 yd too generous at 2.4-4 yd/s.)
+export const CUP_WINDOW = [[0, 0.150], [0.9, 0.146], [1.0, 0.138], [1.3, 0.131], [1.8, 0.122], [2.4, 0.109], [2.7, 0.104],
+  [3.0, 0.091], [3.4, 0.078], [3.55, 0.066], [4.0, 0.032], [4.25, 0.020], [4.45, 0]];
+export function cupWindow(v) {
+  if (!(v > 0)) return CUP_WINDOW[0][1];
+  for (let i = 1; i < CUP_WINDOW.length; i++) {
+    const [v1, w1] = CUP_WINDOW[i];
+    if (v <= v1) { const [v0, w0] = CUP_WINDOW[i - 1]; return w0 + ((w1 - w0) * (v - v0)) / (v1 - v0); }
+  }
+  return 0;
+}
+// the widest the window gets (a ball at rest on the cup's edge) and the speed
+// past which nothing drops
+export const CUP_R = CUP_WINDOW[0][1];
+export const V_CAP = CUP_WINDOW[CUP_WINDOW.length - 1][0];
 
 // ---- the launch ----
 // WSR launches the putt horizontally, so on a slope the ball does not start
@@ -239,16 +251,17 @@ export function puttField({ green, heights = null, W, H, slopeMaxPct = null }) {
 // The forces: the friction DECEL·cos(θ/2) against the motion (never past a
 // stop), the drag DRAG·v, the pull G·sin(θ/2) down the fall line, the slope
 // read at the start of each step. Holed when a step's segment comes within
-// CUP_R of the cup at no more than V_CAP, or when the ball is at rest within
-// CUP_R before it steps (ball and cup put down on one spot: D = 0 launches
-// it at 0; a ball that rolls to rest that close was holed by a segment).
-// -> { holed, best, pass, endSp, path (box fractions, every 0.1 s; null with
-// trace false), D (ball to cup, yd), v0 (the launch speed the gauge sets,
-// yd/s), Dflat (its flat roll), stop (box fractions), t (s) }. best is the
-// closest the ball comes to the cup while slow enough to drop (≤ V_CAP; the
-// stop distance of a putt that dies short), pass the closest at any speed: a
-// putt that runs over the cup at 6 yd/s passes at 0 but is no near miss, it
-// stops 6 yd past.
+// cupWindow(the ball's speed there) of the cup, or when the ball is at rest
+// within CUP_R before it steps (ball and cup put down on one spot: D = 0
+// launches it at 0; a ball that rolls to rest that close was holed by a segment).
+// -> { holed, best, margin, pass, endSp, path (box fractions, every 0.1 s;
+// null with trace false), D (ball to cup, yd), v0 (the launch speed the gauge
+// sets, yd/s), Dflat (its flat roll), stop (box fractions), t (s) }. best is
+// the closest the ball comes to the cup while slow enough to drop (< V_CAP;
+// the stop distance of a putt that dies short), margin the closest it comes
+// to the window's edge (best less the window at its speed there; < 0 holed),
+// pass the closest at any speed: a putt that runs over the cup at 6 yd/s
+// passes at 0 but is no near miss, it stops 6 yd past.
 const scratch = new Float64Array(2);
 export function simPutt(field, ball, cup, angDeg, pw, { trace = true } = {}) {
   const { W, H } = field, gr = scratch;
@@ -263,11 +276,16 @@ export function simPutt(field, ball, cup, angDeg, pw, { trace = true } = {}) {
   let vx = ux * vL, vy = uy * vL, sp = vL;
   const path = trace ? [[ball.x, ball.y]] : null;
   const creep = Math.tan(CREEP_DEG * DEG);
-  let holed = false, best = vL <= V_CAP ? D : Infinity, pass = D, step = 0;
+  let holed = false, best = vL < V_CAP ? D : Infinity, margin = vL < V_CAP ? D - cupWindow(vL) : Infinity, pass = D, step = 0;
   for (; step < STEP_CAP; step++) {
     field.grad(x, y, gr);
     const s = Math.hypot(gr[0], gr[1]);
-    if (sp < STOP_V && s <= creep) { if (Math.hypot(x - cx, y - cy) <= CUP_R) { holed = true; x = cx; y = cy; sp = 0; } break; }
+    if (sp < STOP_V && s <= creep) {
+      const dr = Math.hypot(x - cx, y - cy);
+      if (dr - CUP_R < margin) margin = dr - CUP_R;
+      if (dr <= CUP_R) { holed = true; x = cx; y = cy; sp = 0; }
+      break;
+    }
     // the pull and the friction, held over the step (the friction never more
     // than stops the ball within it)
     const half = Math.atan(s) / 2;
@@ -282,31 +300,55 @@ export function simPutt(field, ball, cup, angDeg, pw, { trace = true } = {}) {
     const f = L2 > 0 ? Math.min(1, Math.max(0, ((cx - x) * dx + (cy - y) * dy) / L2)) : 0;
     const dc = Math.hypot(x + f * dx - cx, y + f * dy - cy), spc = sp + f * (nsp - sp);
     if (dc < pass) pass = dc;
-    if (spc <= V_CAP && dc < best) best = dc;
     x = nx; y = ny; vx = nvx; vy = nvy;
-    if (dc <= CUP_R && spc <= V_CAP) { holed = true; x = cx; y = cy; vx = 0; vy = 0; sp = 0; step++; break; }
+    if (spc < V_CAP) {
+      if (dc < best) best = dc;
+      const m = dc - cupWindow(spc);
+      if (m < margin) margin = m;
+      if (m <= 0) { holed = true; x = cx; y = cy; vx = 0; vy = 0; sp = 0; step++; break; }
+    }
     sp = nsp;
     if (trace && (step + 1) % PATH_EVERY === 0) path.push([x / W, y / H]);
   }
   if (trace) path.push([x / W, y / H]);
   // a ball still fast at the 20 s cap (running away down a slope past CREEP_DEG)
   if (!(best < Infinity)) best = Math.hypot(x - cx, y - cy);
-  return { holed, best, pass, endSp: sp, path, D, v0, Dflat: flatStop(v0), stop: [x / W, y / H], t: step * DT };
+  if (!(margin < Infinity)) margin = best - CUP_R;
+  return { holed, best, margin, pass, endSp: sp, path, D, v0, Dflat: flatStop(v0), stop: [x / W, y / H], t: step * DT };
 }
 
-// The read: the angle scan ±35° (5°), then ±4° (1°) round the best, then ±1°
-// (0.25°) round that; the power scan 0.7-1.55 (0.085), then ±0.08 (0.02), then
-// ±0.04 (0.01), relative to the flat-green speed for the distance; a holed
-// putt scores below any miss and the softer the better, a miss by its closest
-// approach while slow enough to drop (best: a putt racing over the cup is no
+// The read, in two parts. First a holing line: the angle scan ±35° (5°), then
+// ±4° (1°) round the best, then ±1° (0.25°) round that; the power scan
+// 0.7-1.55 (0.085), then ±0.08 (0.02), then ±0.04 (0.01), relative to the
+// flat-green speed for the distance; a holed putt scores below any miss and
+// the softer the better, a miss by its margin to the cup's window (the
+// closest it comes to holing at its speed there: a soft near miss steers the
+// finer stages toward the line that drops, a putt racing over the cup is no
 // near miss). The 0.25° stage is there because 1° of aim is 0.35-0.52 yd
-// across at 20-30 yd, wider than the cup's 0.3 yd window: without it 7 of
-// 1,877 putts of 15-30 yd through every pin of the 21 mesh greens came back
-// as lag lines at 0.15-0.19 yd that 0.25° holes (a 30 yd solve on H7 is 328
-// sims and 28 ms in Node against 247 and 22). The winner is run again for its
-// path.
+// across at 20-30 yd, wider than the cup's window: without it 7 of 1,877
+// putts of 15-30 yd through every pin of the 21 mesh greens came back as lag
+// lines at 0.15-0.19 yd that 0.25° holes.
+//
+// Then, for a holing line, the one that forgives the strength most: the
+// player sets the aim to the line but swings the strength by feel, so of the
+// aims round it (0.1° steps out to where nothing holes, then 0.025° round the
+// best) the read takes the one whose holing strengths span the widest range
+// of WSR putter power (the gauge fills linearly in it), and the middle of
+// that range. -> { c, a (aim, deg right of the cup), p (the launch as a
+// fraction of the flat-green speed for the distance), r (that putt, traced),
+// range: { lo, hi } (the holing launches at that aim, as p), power: { lo, hi,
+// mid } (the same in WSR putter power) and Dflat: { lo, hi } (their flat
+// rolls, for the gauge) } for a holing line; a lag line has no range. Over
+// 1,358 putts of 5-20 yd through every pin of the 21 mesh greens the softest
+// holing putt (the read before 2026-10-21) sat 0.0003-0.004 of putter power
+// from its soft edge, and 237 of them missed by WSR's window; this read holed
+// all of them with 0.137-0.173 of power holing (2-3 times as wide), its power
+// 0.05-0.10 inside the nearer edge (0.2-0.4 bars), in 74 ms a solve against
+// 19. tools/harness/REPORT.md section 5.3 flies both reads in WSR.
+const PUTT_E = Math.log2(1 / 0.63);
+const powerOfV0 = (v) => { const u = v / YD_S; return u > 0.004 ? Math.pow((u - 0.004) / 0.406, 1 / PUTT_E) : 0; };
 export function solvePutt(field, ball, cup) {
-  const cost = (r, pw) => (r.holed ? -2 + pw * 0.1 : r.best + Math.max(0, r.best - CUP_R) * 0.3);
+  const cost = (r, pw) => (r.holed ? -2 + pw * 0.1 : r.margin + Math.max(0, r.margin) * 0.3);
   let best = null;
   const tryOne = (a, p) => {
     const r = simPutt(field, ball, cup, a, p, { trace: false });
@@ -318,6 +360,49 @@ export function solvePutt(field, ball, cup) {
   for (let a = a0 - 4; a <= a0 + 4; a += 1) for (let p = Math.max(0.5, p0 - 0.08); p <= p0 + 0.08; p += 0.02) tryOne(a, p);
   const { a: a1, p: p1 } = best;
   for (let a = a1 - 1; a <= a1 + 1 + 1e-9; a += 0.25) for (let p = Math.max(0.5, p1 - 0.04); p <= p1 + 0.04 + 1e-9; p += 0.01) tryOne(a, p);
+  const vD = vFlat(best.r.D);
+  if (best.r.holed && vD > 0) {
+    // the holing strengths at aim a, as WSR putter power: the run through a
+    // holed seed, each edge stepped out by 0.02 and bisected to 0.001
+    const pwOf = (q) => wsrPuttV0(q) / vD;
+    const holes = (a, q) => simPutt(field, ball, cup, a, pwOf(q), { trace: false }).holed;
+    const edge = (a, qIn, dir) => {
+      let qOut = qIn + 0.02 * dir;
+      while (qOut > 0.001 && qOut < 2.5 && holes(a, qOut)) { qIn = qOut; qOut += 0.02 * dir; }
+      if (!(qOut > 0.001 && qOut < 2.5)) return qIn;
+      for (let k = 0; k < 5; k++) { const m = (qIn + qOut) / 2; if (holes(a, m)) qIn = m; else qOut = m; }
+      return qIn;
+    };
+    const runAt = (a, seeds) => {
+      const q = seeds.find((s) => s > 0 && holes(a, s));
+      if (q == null) return null;
+      const lo = edge(a, q, -1), hi = edge(a, q, 1);
+      return { a, lo, hi, w: hi - lo, mid: (lo + hi) / 2 };
+    };
+    const q1 = powerOfV0(best.p * vD);
+    const seedsAt = (prev) => (prev ? [prev.mid, prev.lo + 0.25 * prev.w, prev.hi - 0.25 * prev.w, q1] : [q1]);
+    let top = runAt(best.a, [q1]);
+    // out to either side in 0.1° steps while some strength still holes
+    for (const dir of [-1, 1]) {
+      let prev = top;
+      for (let k = 1; k <= 40 && prev; k++) {
+        const run = runAt(best.a + dir * 0.1 * k, seedsAt(prev));
+        if (run && (run.w > top.w || (run.w === top.w && run.mid < top.mid))) top = run;
+        prev = run;
+      }
+    }
+    // then 0.025° round the widest
+    const a2 = top.a;
+    for (let k = -3; k <= 3; k++) {
+      if (k === 0) continue;
+      const run = runAt(a2 + 0.025 * k, seedsAt(top));
+      if (run && run.w > top.w) top = run;
+    }
+    const pw = pwOf(top.mid);
+    best = { c: best.c, a: top.a, p: pw, r: null, range: { lo: pwOf(top.lo), hi: pwOf(top.hi) }, power: { lo: top.lo, hi: top.hi, mid: top.mid },
+      // the range's ends as flat rolls, which gaugeBars turns into bars at the Switch's greenSpeed
+      Dflat: { lo: flatStop(wsrPuttV0(top.lo)), hi: flatStop(wsrPuttV0(top.hi)) } };
+  }
   best.r = simPutt(field, ball, cup, best.a, best.p);
   return best;
 }

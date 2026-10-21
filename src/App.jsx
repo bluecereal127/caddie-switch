@@ -1358,11 +1358,13 @@ export default function App() {
   }, [puttGround, putt, greenYd]);
   // the gauge: the solved launch's flat roll (Dflat) in bars at greenSpeed, and
   // the power against a flat putt of the same length (bars over bars; 0 with
-  // the ball on the cup, where both are 0)
+  // the ball on the cup, where both are 0); for a holing line also the range of
+  // strengths that still drop at its aim (solvePutt reads the middle of it)
   const puttSol = useMemo(() => {
     if (!puttSolved) return null;
     const bars = gaugeBars(puttSolved.r.Dflat, greenSpeed);
-    return { ...puttSolved, bars, power: puttSolved.D > 0 ? bars / gaugeBars(puttSolved.D, greenSpeed) : 0 };
+    const holeBars = puttSolved.Dflat ? { lo: gaugeBars(puttSolved.Dflat.lo, greenSpeed), hi: gaugeBars(puttSolved.Dflat.hi, greenSpeed) } : null;
+    return { ...puttSolved, bars, holeBars, power: puttSolved.D > 0 ? bars / gaugeBars(puttSolved.D, greenSpeed) : 0 };
   }, [puttSolved, greenSpeed]);
   const setScaleFromInput = () => {
     const yd = parseFloat(calInput);
@@ -1865,6 +1867,7 @@ export default function App() {
                         <div>
                           <div className="mono text-xl font-semibold">≈{puttSol.bars.toFixed(1)}</div>
                           <div className="text-[10px] uppercase tracking-wide opacity-60">gauge bars</div>
+                          {puttSol.holeBars && <div className="mono text-[10px] opacity-60">drops {puttSol.holeBars.lo.toFixed(2)}–{puttSol.holeBars.hi.toFixed(2)}</div>}
                         </div>
                         <div>
                           <div className="mono text-xl font-semibold">{puttSol.D.toFixed(1)}</div>
@@ -1872,7 +1875,7 @@ export default function App() {
                         </div>
                       </div>
                       <div className="text-[11px] opacity-60 mt-2">
-                        Aim at the gold ✛ on the green view — the dashed line is the simulated roll. {!puttSol.r.holed && `Comes ${puttSol.r.best.toFixed(1)} yd from the cup at best.`} Power {puttSol.power.toFixed(2)} of a flat putt of this length · gauge ≈ {puttSol.bars.toFixed(1)} bars{puttSol.bars > 4 ? ", past a full gauge" : ""} (WSR-shaped; greenSpeed {greenSpeed.toFixed(1)} yd per full gauge).
+                        Aim at the gold ✛ on the green view — the dashed line is the simulated roll. {!puttSol.r.holed && `Comes ${puttSol.r.best.toFixed(1)} yd from the cup at best.`}{puttSol.holeBars && `Of the lines that drop, this aim forgives the strength most: anything from ${puttSol.holeBars.lo.toFixed(2)} to ${puttSol.holeBars.hi.toFixed(2)} bars curls in, and the read is the middle of that. `} Power {puttSol.power.toFixed(2)} of a flat putt of this length · gauge ≈ {puttSol.bars.toFixed(1)} bars{puttSol.bars > 4 ? ", past a full gauge" : ""} (WSR-shaped; greenSpeed {greenSpeed.toFixed(1)} yd per full gauge).
                       </div>
                     </div>
                   )}

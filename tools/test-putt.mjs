@@ -13,10 +13,15 @@
 //     against the port at powers 0.2-2.5 on -10..+10° within 0.1 yd (the
 //     launch hop); a 20 yd putt across a 2° side slope breaks, by the same
 //     amount either way
-//  c. the cup from 10 yd: putts that would stop at 12 and 14 yd are holed,
-//     16.4 and 18 run past; at dying speed (to stop 1 yd past) 0.10 and 0.137
-//     yd off the centre line holed, 0.17 and 0.22 missed; V_CAP = vFlat(4.4);
-//     ball and cup on one spot: holed, the gauge hint finite
+//  c. the cup, WSR's window as the Dolphin harness measured it (CUP_WINDOW,
+//     tools/harness/REPORT.md 5.2): the table's ends (0.150 yd at rest, 0 from
+//     4.45 yd/s) and its middle (0.104 at 2.7 yd/s); from 10 yd, putts that
+//     would stop at 12 and 14 yd are holed, 16.4 and 18 run past; at dying
+//     speed (to stop 1 yd past: 1.75 yd/s at the cup, window 0.123) 0.10 and
+//     0.115 yd off the centre line holed, 0.137 and 0.17 missed (the decode's
+//     simulator held 0.137 in at ~1.1 yd/s, as the table does there); to stop
+//     3 yd past (3.25 yd/s, window 0.083) 0.07 holed and 0.10 missed; ball and
+//     cup on one spot: holed, the gauge hint finite
 //  d. vFlat round trip (D -> v -> D) to 0.01 yd over 1-40 yd, and the sim's
 //     flat stop for that launch within 0.02 yd
 //  e. solvePutt on a 2° side-slope plane holes a 10 yd putt aimed off the cup
@@ -115,7 +120,11 @@ const DECODE = [1.8, 3.8, 6.0, 8.1, 10.2, 12.3, 14.4, 16.4, 18.5, 20.5, 25.4, 30
 
 // ---- c. the cup ----
 {
-  near(V_CAP, 4.07, 0.01, "V_CAP = vFlat(4.4), yd/s");
+  near(V_CAP, 4.45, 1e-9, "V_CAP, the speed past which nothing drops, yd/s");
+  near(CUP_R, 0.15, 1e-9, "CUP_R, the window at rest, yd");
+  near(P.cupWindow(2.7), 0.104, 1e-9, "the window at 2.7 yd/s");
+  ok(P.cupWindow(4.45) === 0 && P.cupWindow(6) === 0 && P.cupWindow(0) === CUP_R, "the window: CUP_R at rest, nothing from V_CAP on");
+  ok(P.CUP_WINDOW.every(([v, w], i, a) => i === 0 || (v > a[i - 1][0] && w <= a[i - 1][1])), "CUP_WINDOW: rising speeds, a narrowing window");
   ok(flatStop(4.7) > 4.4 && flatStop(4.7) < 6, `the decode's 4.7 yd/s rim speed rolls ${flatStop(4.7).toFixed(2)} yd, inside its 4.4-6 yd band`);
   const box = { W: 20, H: 20, src: "flat", grad(x, y, o) { o[0] = 0; o[1] = 0; } };
   const ball = { x: 0.5, y: 0.9 };
@@ -126,12 +135,12 @@ const DECODE = [1.8, 3.8, 6.0, 8.1, 10.2, 12.3, 14.4, 16.4, 18.5, 20.5, 25.4, 30
     ok(r.holed === holed, `from 10 yd, a putt that would stop at ${stop} yd: ${r.holed ? "holed" : "ran past"}`);
     line.push(`${stop}:${r.holed ? "in" : "past"}`);
   }
-  for (const [d, holed] of [[0.10, true], [0.137, true], [0.17, false], [0.22, false]]) {
+  for (const [past, d, holed] of [[1, 0.10, true], [1, 0.115, true], [1, 0.137, false], [1, 0.17, false], [3, 0.07, true], [3, 0.10, false]]) {
     const cup = cupAt(d), D = Math.hypot(10, d);
-    // launched straight up the box (the cup d off the line), to stop 1 yd past
-    const r = simPutt(box, ball, cup, -Math.atan2(d, 10) / DEG, vFlat(11) / vFlat(D));
-    ok(r.holed === holed, `${d} yd off the line at dying speed: ${r.holed ? "holed" : "missed"} (closest ${r.best.toFixed(3)})`);
-    line.push(`${d}:${r.holed ? "in" : "out"}`);
+    // launched straight up the box (the cup d off the line), to stop `past` yd past
+    const r = simPutt(box, ball, cup, -Math.atan2(d, 10) / DEG, vFlat(10 + past) / vFlat(D));
+    ok(r.holed === holed, `${d} yd off the line, to stop ${past} yd past: ${r.holed ? "holed" : "missed"} (closest ${r.best.toFixed(3)})`);
+    line.push(`${past}:${d}:${r.holed ? "in" : "out"}`);
   }
   // ball and cup put down on one spot (D = 0 launches at 0): at rest within CUP_R is in, and the gauge hint stays finite
   const onCup = solvePutt(box, { x: 0.5, y: 0.5 }, { x: 0.5, y: 0.5 });

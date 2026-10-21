@@ -8,7 +8,7 @@ v13 and now diverges (v14: capture catalog); the web repo is the source of truth
 ## Files
 - `src/App.jsx` — the app (~2470 lines): solver tab (under the distance, the ball's height against the tee and the target's against the ball, from the terrain; a tapped rec card marks its landing ◆ beside its stop ● on the map, and a rec whose flight goes into a tree, badged 🌲 TREE, rings its trunk; on the green lie the putting panel: the putt read with its gauge bars, the slope source with "use mesh heights" after an edit, and "Log a flat putt", which fits greenSpeed), hole maps, greens, rounds, log, clubs, guide (per-hole setup steps with an auto-tracked progress table, and shot-data coverage; the manual capture catalog is gone); the Holes tab's ⚙ has a "Contours (debug)" chip that lays src/relief.js's contour lines over the hole map (component state, not stored). The solver's map header has "Map fit / 3x / 4x" chips, the map's magnification: the setting `mapScale` (2, 3 or 4, default 2) is stored at the root of the saved state. 2 = fit, the whole hole in the panel from src/maps.js's 2x image. 3 and 4 draw the map 1.5× and 2× the panel's width (the names follow the render scales; the help line under the chips says so) in a viewport of the fitted map's size (HoleMap's `zoom` = mapScale / 2): a touch pans it natively (`touch-action: pan-x pan-y`, `overscroll-behavior: contain`), a mouse drags it (captured past 4 CSS px, so a click stays a tap) or wheels it. It opens on the ball with the target in view (src/mapView.js `scrollFor`), or, with no target drawn, on the hole's default line to the pin in use (as `defaultBearing` has it), so a hole opened magnified shows the ball at the bottom margin and the fairway running up the view; placed again on a new magnification, hole or ball, on a target set outside the map (🎯 Target = pin, the distance field) and on a change of the pin in use while no target is drawn, never on the map's own target tap or drag, so the user's panning stays; a ball the map set itself glides there. A resize (the phone turned) keeps the view's centre where it was on the map (a ResizeObserver scales the scroll offsets), since the map and the view scale with the panel. Taps are measured on the image's own rect, so they need no scroll offset; the marks keep their fitted size on screen (drawn at 1 / zoom about their spots), the tap rules' reaches (the target grab, 0.07 of the map; own-marker removal, 0.06) shrink with zoom to stay the same on screen and the pin hit test follows the drawn pin, and a grab handle with `touch-action: none` over the target keeps the target drag on a touch. The image is the public/maps/ file at that scale (`useHoleMapSrc`, through src/mapScale.js), shown once a preload of it has loaded, so the 2x image shows (magnified) first and stays when a file is missing or fails (the header then says so). The Holes tab's ⚙ map stays fitted (whole hole, for editing) but takes the same image, as do both green canvases; the hole thumbnails stay 2x. At fit the map's DOM is what it was before the magnified view. The shot model itself is `src/model.js`.
 - `src/model.js` — the shot model, pure so the tools run it: DEFAULT_CLUBS (WSR's own numbers since 2026-10-21: a = WSR_SHAPE[club].stopYd / 4, so k = 1, and h, c from src/wsrsim.js's wind at full power; "Fitted" in Model below), the lie caps (BUNKER_CAPS, capFor), `stopOf` / `carryOf` (the WSR shape × the fitted club, "Model" below), `landedStop` (the stop on the surface a power's own carry lands on), `solve` (a power scan per club: landing surface, power, carry, roll, the spin range, `red`; with the terrain's heights each club's power refined by flying the line's profile, "Elevation" in Model below), `stopAt` (a power's stop by the solver's own f, flown or flat: the rec card's power bar), `flightOf` (a rec's traced flight for the tree check; with `ctx.trees` solve checks every club's rec against the trees, "Trees" in Model below), `fitClub` (a row's `flatEnded` when it has one, else its logged stop), `lineProfile` / `simProfile` (a line's profile and the ground src/wsrsim.js flies over it at k; tools/build-derived.mjs flies the logged shots with them), all moved out of App.jsx on 2026-10-20, and the putt solver re-exported from src/putt.js.
-- `src/putt.js` — the putt model, pure (decision D3, 2026-10-20; "Model" below): WSR's roll on a green in yd and s (`DECEL`, `DRAG`, `G`), `flatStop(v)` / `vFlat(D)` (the flat-green stop distance and its inverse), the cup (`CUP_R`, `V_CAP`), `launchHop` (the level launch's hop on a slope), the slope fields (`heightField` over a green height grid, `gridField` over the painted grid, `puttField` choosing between them), `simPutt(field, ball, cup, angDeg, pw)` and `solvePutt(field, ball, cup)` (ball and cup in fractions of the green box), and the gauge (`PUTT_POWER_TABLE`, `puttRoll` / `puttPower`, `gaugeBars`, `GREEN_SPEED`, `fitGreenSpeed`). `tools/test-putt.mjs` is its acceptance: the flat stops and the slope rows against wsr-ground-phase.md section 6 and src/wsrsim.js's putter (power 0.2–2.5 on ±10° within 0.1 yd), the cup from 10 yd (and the ball on the cup), vFlat's round trip, a side-slope solve, the source switch (mesh heights / edited grid, the mask; H3's shipped grid at the nodes beside its water holes), H7 from its most-seen pin, a 30 yd solve's time and H6's 20 yd putt that only the 0.25° aim stage holes, the gauge and the greenSpeed fit.
+- `src/putt.js` — the putt model, pure (decision D3, 2026-10-20; "Model" below): WSR's roll on a green in yd and s (`DECEL`, `DRAG`, `G`), `flatStop(v)` / `vFlat(D)` (the flat-green stop distance and its inverse), the cup (`CUP_WINDOW` / `cupWindow(v)`, WSR's measured window against the ball's speed, its widest `CUP_R` and `V_CAP` past which nothing drops), `launchHop` (the level launch's hop on a slope), the slope fields (`heightField` over a green height grid, `gridField` over the painted grid, `puttField` choosing between them), `simPutt(field, ball, cup, angDeg, pw)` and `solvePutt(field, ball, cup)` (ball and cup in fractions of the green box; the read whose aim forgives the strength most, with its holing range), and the gauge (`PUTT_POWER_TABLE`, `puttRoll` / `puttPower`, `gaugeBars`, `GREEN_SPEED`, `fitGreenSpeed`). `tools/test-putt.mjs` is its acceptance: the flat stops and the slope rows against wsr-ground-phase.md section 6 and src/wsrsim.js's putter (power 0.2–2.5 on ±10° within 0.1 yd), the cup from 10 yd (and the ball on the cup), vFlat's round trip, a side-slope solve, the source switch (mesh heights / edited grid, the mask; H3's shipped grid at the nodes beside its water holes), H7 from its most-seen pin, a 30 yd solve's time and H6's 20 yd putt that only the 0.25° aim stage holes, the gauge and the greenSpeed fit.
 - `src/wsrsim.js` — WSR's ball, tick for tick: the port of tools/research/wsr-groundsim.py (lift, side spin, the backspin pull-back, gravity along the bisector, drag, the contact impulse with the A / B tables, the iron-on-green first contact, the four-tick ring, the stop rule) on a flat or tilted plane of one surface, or on a shot line's terrain profile (`profile = { heightAt(x), surfaceAt(x) }`: contact against the local tangent plane at the ball's x), plus wsr-flightsim.py's in-air wind as an option; `run({ club, q, surface, back, side, slopeDeg, wind, spinStart, profile, ballLift, trace })` → `{ carry, stop, apex, roll, lateral, bounces, ticks, path }` in yd. The tick is one loop over scalars (no allocation: 0.09 ms a flight, 5× the vector form it replaced on 2026-10-20 and bit-identical to it on 4,000 random runs; tools/test-solver.mjs keeps a digest of 160). Pure (no Node or DOM); `tools/lib/wsrsim.mjs` re-exports it for the tools. No cup, trees or water.
 - `src/trees.js` — the flight checked against the course's trees, pure: `TREE_SHAPES` (WSR's tree collision shapes per PMP kind in KCL units at scale 1, from tools/research/wsr-tree-collision.md: broadleaf, conifer, and the palm's approximation), `OWN_TREE` (a player's marker: a median broadleaf, sx = sy = 1.7), `treesAlong(markers, { ball, bearing, scale, groundAt })` (the hole's tree markers on the shot line's frame: s along and l right in yd, z = the base against the ball's ground; markers without a kind skipped; `off` trees included, since WSR collides with every tree it places and 61 of the 814 reach over course ground with their collision canopy; null without a height at the ball) and `treeCheck(path, trees, { k, carry, aim, ballZ })` → `{ kind: clear | over | under | canopy | trunk, at, tree, margin }` ("Trees" in Model below). `tools/test-trees.mjs` checks it: the table against wsr-tree-shapes.json, six synthetic flat cases with their margins (the lofted iron over a canopy, driver under the branches, a trunk at 10 yd, a tree beside the line with and without aim, the cone's narrowing top, the palm's frond band), treesAlong's frame, H7 over the committed terrain (the default line under the off tree t7-25 by 12.4 yd, the line through t7-18 into its canopy, the smallest shift right that clears it), H19's corner cut (printed), solve's contract and determinism, and the 15 ms budget on H7 and H19.
 - `tools/build-wsr-shape.mjs` → `src/wsrShape.js` (AUTO-GENERATED, committed) — WSR's stop and carry against launch power per club, landing surface (fairway, rough, green, fringe, bunker) and spin (none; full = bs = the club's P1c × q, irons and wedge) on q = 0.05 … 1.00, normalised by the club's full-power fairway stop (1,347 simulations, 0.8 s, deterministic; every stop row monotone in q, none needed the running-maximum fix). Rerun after any change to src/wsrsim.js.
@@ -116,7 +116,16 @@ carry = 4a · (1 + h · tailwind_mph) · C(bars/4); sidedrift = c · crosswind_m
   roll" on the rec cards until Switch sweeps (driver at 1–4 bars; one iron onto
   fairway, rough and green) calibrate it. Wind stays a multiplier on the whole
   stop: WSR's wind acts only in the air, but the logs cannot separate carry
-  from roll yet (the sim's wind is ported, the solver does not use it).
+  from roll yet (the sim's wind is ported, the solver does not use it). The
+  Dolphin harness measured WSR's wind for every club at 1-4 bars in 10 and 30
+  mph across, behind and ahead (tools/harness/REPORT.md 3.2): the port is
+  WSR's to 0.3 yd of drift at the carry, and both terms scale far from
+  linearly: the drift goes as mph^0.737 (30 mph = 2.25 x 10 mph) and with air
+  time, 7-8 % of the full-power drift at 1 bar, 24-29 % at 2, 51-59 % at 3 (so
+  `c x mph x bars` over-aims part-power shots 2-4 times and 30 mph full-power
+  ones by a third), and the stop's wind change likewise (the driver at 1 bar
+  in a 30 mph tail: +5.9 yd in WSR, +23.7 by `h`). The fix it recommends:
+  fly the port with the wind and keep c and h as per-club Switch factors.
 - Landing surface (Amendment 2, 2026-10-20, replacing a two-pass read): the App
   reads the KCL class along the shot line from public/terrain
   (`ctx.surfaceAt`), and per club the solver scans f(p) = the stop of power p
@@ -214,7 +223,15 @@ carry = 4a · (1 + h · tailwind_mph) · C(bars/4); sidedrift = c · crosswind_m
   22.9 / 22.1 / 16.2 yd; without terrain the flat run scaled to carryOf). Its
   path bends off the line by lat(s) = aim · (s / carry)(1 − s / carry) (the
   ball leaves toward the aim point, the crosswind brings it back) and is
-  sampled every 0.5 yd to the carry (the bounce and roll are not checked)
+  sampled every 0.5 yd to the carry, then along the line for the first 5 yd
+  of the bounce (since 2026-10-21, `BOUNCE_YD`: WSR checks its trees on every
+  tick, and in the Dolphin harness hole 7's full 3-iron straight at t7-18
+  bounces into the trunk 1.9 yd past its carry and the full 5-iron into t7-23
+  2.7 yd past it, tools/harness/REPORT.md section 4; only a hit counts there,
+  over / under / clear stay the flight's; the roll beyond is not checked:
+  WSR's rolling ball passed 1.8-2.7 yd from three trunks a level-across line
+  ran into 16-29 yd past the carry, and a trunk is 1.3-1.5 yd wide; 2 of 1,260
+  flights from 12 tees, 3 powers and 5 lines each changed, both to trunk hits)
   against WSR's tree collision shapes (tools/research/wsr-tree-collision.md,
   decoded from main.dol; radii × sx, heights × sy, KCL units): broadleaf trunk
   capsule 6 to 60 with a rounded cap, canopy sphere 48 centred 100 up;
@@ -280,14 +297,29 @@ nodes build-terrain leaves out as `pits`, whose reads bled into its 16 yd
 water holes, and the nearest masked node's outside it), or the painted 9×9
 grid once the player edits it
 (`green.gridEdited`; levels 1/2/3 = 0.304/0.595/0.856 × the hole's
-`slopeMaxPct`). Cup: holed when the path comes within 0.15 yd of the centre
-at ≤ vFlat(4.4) = 4.07 yd/s (the speed that rolls 4.4 yd more). solvePutt
-scans aim ±35° (5°), ±4° (1°), then ±1° (0.25°) and the launch speed
-0.7–1.55 × vFlat(D), ±0.08 (0.02), then ±0.04 (0.01); the 0.25° stage because
-1° is 0.35–0.52 yd across at 20–30 yd against the cup's 0.3 yd window
-(without it 7 of 1,877 putts of 15–30 yd through every pin on the 21 greens
-read as lag lines at 0.15–0.19 yd); a miss scores by its closest approach
-while slow enough to drop.
+`slopeMaxPct`). Cup (since 2026-10-21, measured in WSR itself by the Dolphin
+harness, tools/harness/REPORT.md 5.2): holed when the path comes within
+`cupWindow(v)` of the centre, v the ball's speed there: `CUP_WINDOW`, 0.146
+yd at 0.9 yd/s, 0.122 at 1.8, 0.104 at 2.7, 0.032 at 4.0, nothing from 4.45
+(`V_CAP`), linear between its points, the same on cups of 1.2, 3.95 and 8.1°
+and on one cup approached down, up and across its slope (before: 0.15 yd at ≤
+4.07 yd/s, right only at 0.9 yd/s). solvePutt first finds a holing line: aim
+±35° (5°), ±4° (1°), then ±1° (0.25°) and the launch speed 0.7–1.55 ×
+vFlat(D), ±0.08 (0.02), then ±0.04 (0.01), a miss scored by its margin to the
+window at its speed (`margin`); the 0.25° stage because 1° is 0.35–0.52 yd
+across at 20–30 yd against the cup's window (without it 7 of 1,877 putts of
+15–30 yd through every pin on the 21 greens read as lag lines at 0.15–0.19
+yd). Then, because the player sets the aim to the line but feels the
+strength, it takes of the aims round that line (0.1° steps while some
+strength still holes, then 0.025°) the one whose holing strengths span the
+widest range of WSR putter power, and reads the middle of it; the result
+carries the range (`range`, `power`, `Dflat` lo / hi; the putt card shows it
+in bars). Over 1,358 putts of 5–20 yd through every pin of the 21 greens:
+every one holes by WSR's window (the softest-putt read before it: 1,121), the
+holing span 0.137–0.173 of putter power against 0.048–0.071, the read 0.05–
+0.10 inside the nearer edge (0.2–0.4 bars) against 0.0003–0.004, 74 ms a
+solve against 19 (tools/test-putt.mjs keeps a 30 yd solve under 100 ms); the
+harness flies both reads in WSR (REPORT.md 5.3).
 Fitted: only `greenSpeed` (root of the saved state with the `putts` log),
 the flat roll of a full-gauge putt, WSR's 20.5 yd until two flat putts are
 logged (their median of rolled × T(1) / T(bars / 4)); it maps a solved
