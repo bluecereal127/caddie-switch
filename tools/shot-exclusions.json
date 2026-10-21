@@ -3,6 +3,8 @@
   "rows": {
     "01M0HA2XKZSYD3CFQEYFSWSA6V": "H10 stroke 14, driver at 3.01 bars from the fairway, 151 yd: impossible stop for a 3–4 bar driver from the fairway, 109–170 yd; tree or water, replay from the same spot",
     "01M0HAZMS6FGBBFQ4CN3KWQC7J": "H10 stroke 24, driver at 4 bars, 109 yd: impossible stop for a 3–4 bar driver from the fairway, 109–170 yd; tree or water, replay from the same spot",
-    "01M0HB1B9QK7BSZQJ4J6T1Z464": "H10 stroke 25, driver at 4 bars, 170 yd: impossible stop for a 3–4 bar driver from the fairway, 109–170 yd; tree or water, replay from the same spot"
+    "01M0HB1B9QK7BSZQJ4J6T1Z464": "H10 stroke 25, driver at 4 bars, 170 yd: impossible stop for a 3–4 bar driver from the fairway, 109–170 yd; tree or water, replay from the same spot",
+    "01M0HBB38CEXEEF4NC8A8Q41VM": "H1 stroke 1, driver, gauge read 3.57 bars, 304 yd: 25 yd past WSR at that power, the gauge read is wrong (user, 2026-10-21)",
+    "01M0HBMF2A8XRMAMK6H4P58N4C": "H1 stroke 8, driver at 4 bars from 302 yd out, 282 yd: 28 yd short of WSR over the terrain with nothing on the line (user, 2026-10-21)"
   }
 }
