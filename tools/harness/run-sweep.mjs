@@ -11,7 +11,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { Session, SAVES } from "./lib/session.mjs";
-import { HARNESS, portsFor } from "./lib/dolphin.mjs";
+import { HARNESS } from "./lib/dolphin.mjs";
 import { YD, appProfile, kclProfile, simOf, kcl, groundAt, ATTR_LIE } from "./lib/course.mjs";
 import { run } from "../lib/wsrsim.mjs";
 
@@ -27,7 +27,7 @@ const outFile = path.join(HARNESS, arg("--out", `results/sweep-h${holes.join("-"
 const only = arg("--only", null)?.split(",").map((x) => { const [c, q] = x.split(":"); return `${c}:${Number(q)}`; });
 const allReal = !!only || process.argv.includes("--real");
 
-const s = new Session({ gdbPort: portsFor(inst).gdb, dsuPort: portsFor(inst).dsu });
+const s = new Session({ instance: inst });
 const results = { kind: "sweep-2a", clubs, powers, holes: {} };
 let n = 0;
 for (const hole of holes) {

@@ -14,11 +14,16 @@
 //      one more bar (power = 0.75 + 0.25 (raw - 1) / 0.3, m = 0.2 + 0.8
 //      (raw - 1) / 0.3), and the rough's launch yaw (2 deg for a straight
 //      swing, 4.1), measured from the launch velocity.
+// B and C hold the state-1 window open to its timer (lib/shot.mjs
+// holdWindow), as a follow-through does: the red curve's side spin attaches
+// when the window closes, at tick 4 ceil(n), n = clamp(18 + 28 (1.25 - raw),
+// 18, 25) (swing-redzone-spin 4.3), and the port is flown with that tick.
 //   node tools/harness/run-spin.mjs [--save h10-tee-w10.sav] [--hole 10] [--parts A,B,C] [--instance 0]
+//        [--out results/spin-h10.json]
 import fs from "node:fs";
 import path from "node:path";
 import { Session, SAVES } from "./lib/session.mjs";
-import { HARNESS, portsFor } from "./lib/dolphin.mjs";
+import { HARNESS } from "./lib/dolphin.mjs";
 import { YD, kclProfile, simOf } from "./lib/course.mjs";
 import { PLAYER } from "./lib/wsr.mjs";
 import { run, CLUBS } from "../lib/wsrsim.mjs";
@@ -30,7 +35,7 @@ const parts = arg("--parts", "A,B,C").split(",");
 const inst = Number(arg("--instance", process.env.HARNESS_INSTANCE || 0));
 const outFile = path.join(HARNESS, arg("--out", `results/spin-h${hole}.json`));
 
-const s = new Session({ gdbPort: portsFor(inst).gdb, dsuPort: portsFor(inst).dsu });
+const s = new Session({ instance: inst });
 await s.start(save);
 const st = await s.state();
 const tee = st.ball.pos;
@@ -74,15 +79,17 @@ for (const [part, lie, raws] of [["B", null, [1.12, 1.15, 1.2, 1.25, 1.3]], ["C"
     for (const raw of raws) {
       await s.load(save, { pos: tee });
       if (lie != null) await s.paused(async (gdb) => { const p = await (await import("./lib/wsr.mjs")).pointers(gdb); const b = Buffer.alloc(2); b.writeUInt16BE(lie); await gdb.writeMem(p.player + PLAYER.lie, b); });
-      const shot = await s.shoot({ power: 1, raw, club, wind: calm, trace: false, untilRest: "real", powerMode: "game", keepGameSpin: true });
+      const shot = await s.shoot({ power: 1, raw, club, wind: calm, trace: false, untilRest: "real", powerMode: "game", keepGameSpin: true, holdWindow: true });
       const sw = shot.swingAtHandoff, h = shot.handoff;
+      if (h.spinStart !== 4 * shot.state1Frames) console.log(`  the spin tick ${h.spinStart} is not 4 x the ${shot.state1Frames} window frames`);
       const port = await portFor(shot, club, sw.power, { side: h.gameSide });
       const yaw = (Math.atan2(h.launchVel[0], h.launchVel[2]) - Math.atan2(st.player.aim[0], st.player.aim[1])) * 180 / Math.PI;
       const capped = lie === 2;
       const expect = capped
         ? { power: raw <= 1 ? null : 0.75 + (0.25 * Math.min(raw - 1, 0.3)) / 0.3, m: raw > 1 ? 0.2 + 0.8 * Math.min(1, (raw - 1) / 0.3) : 0 }
         : { power: 1, m: raw > 1.1 ? 0.2 + 0.8 * Math.min(1, (raw - 1.1) / 0.2) : 0 };
-      const row = { club, raw, lie: lie ?? "tee", game: { p1: sw.p1, p2: sw.p2, p3: sw.p3, power: sw.power, m: sw.m, coin: sw.coin, side: h.gameSide, back: h.gameBack, spinStart: h.spinStart, yawDeg: yaw }, expect, wsr: wsrOf(shot, port.dir), port };
+      const nWin = Math.ceil(Math.min(Math.max(18 + 28 * (1.25 - raw), 18), 25));
+      const row = { club, raw, lie: lie ?? "tee", game: { p1: sw.p1, p2: sw.p2, p3: sw.p3, power: sw.power, m: sw.m, coin: sw.coin, side: h.gameSide, back: h.gameBack, spinStart: h.spinStart, frames: shot.state1Frames, yawDeg: yaw }, expect: { ...expect, frames: nWin }, wsr: wsrOf(shot, port.dir), port };
       results[part].push(row); write();
       console.log(`${part} ${club} raw ${raw}: game power ${sw.power.toFixed(4)} (expect ${expect.power?.toFixed(4) ?? "curve"}) m ${sw.m.toFixed(3)} (${expect.m.toFixed(3)}) coin ${sw.coin} side ${h.gameSide.toFixed(4)} yaw ${yaw.toFixed(2)} deg | WSR ${row.wsr.carry.toFixed(1)} / ${row.wsr.stop.toFixed(1)} across ${row.wsr.carryAcross.toFixed(1)} / ${row.wsr.stopAcross.toFixed(1)} | port ${port.carry.toFixed(1)} / ${port.stop.toFixed(1)} across ${port.carryLateral.toFixed(1)} / ${port.lateral.toFixed(1)}`);
     }

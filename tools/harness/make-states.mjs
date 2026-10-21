@@ -30,7 +30,8 @@ const COURSES = {
   // choose Resort A, and when the golf scene's setup reads the course
   // selection (0x80406954 lwz r31,0x1c(r3), r3 = Sp2::StaticMem [0x806f4e98];
   // fresh rounds only) make it 6, Special: mode 18, holes 19-21, its own
-  // wind draw (decoded 2026-10-21, tables 0x806d4e54 / 0x806d4e2c).
+  // wind draw (tools/research/wsr-harness-decodes.md section 4, recipe A;
+  // tables 0x806d4e54 / 0x806d4e2c).
   Special: { tile: [-0.264, 0.237], first: 19, special: true },
 };
 const SETUP_READS_SEL = 0x80406954;
@@ -75,7 +76,7 @@ async function walkTo(hole, maxSteps = 60) {
 }
 
 async function saveAs(name) {
-  const slot = stateSlotPath(3);
+  const slot = stateSlotPath(3, s.instance);
   const before = fs.existsSync(slot) ? fs.statSync(slot).mtimeMs : 0;
   for (let a = 0; a < 4; a++) {
     await s.dsu.tap(1, hk("Save State Slot 3"), 200);
@@ -108,7 +109,7 @@ for (const name of (fromSave ? ["(from save)"] : want)) {
   // the session booted into the menu; for later courses load it again (a
   // menu state has no ball to check, so the load is given time instead)
   if (!firstCourse) {
-    fs.copyFileSync(path.join(SAVES, "menu-course.sav"), stateSlotPath(4));
+    fs.copyFileSync(path.join(SAVES, "menu-course.sav"), stateSlotPath(4, s.instance));
     await s.dsu.tap(1, hk("Load State Slot 4"), 200);
     await sleep(6000);
   }

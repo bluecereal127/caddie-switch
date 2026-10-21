@@ -7,7 +7,6 @@
 //   node tools/harness/make-spot.mjs --hole 19 --save h19-tee.sav --target 0.6,0.43 --out h19-corner.sav [--instance 0]
 import path from "node:path";
 import { Session, SAVES } from "./lib/session.mjs";
-import { portsFor } from "./lib/dolphin.mjs";
 import { YD, mapToMesh, meshToMap } from "./lib/course.mjs";
 import { planStroke, waitStroke } from "./lib/play.mjs";
 
@@ -18,7 +17,7 @@ const [tx, ty] = arg("--target", "0.6,0.43").split(",").map(Number);
 const out = arg("--out", `h${String(hole).padStart(2, "0")}-spot.sav`);
 const inst = Number(arg("--instance", process.env.HARNESS_INSTANCE || 0));
 
-const s = new Session({ gdbPort: portsFor(inst).gdb, dsuPort: portsFor(inst).dsu, log: (m) => console.log(m) });
+const s = new Session({ instance: inst, log: (m) => console.log(m) });
 await s.start(path.join(SAVES, save));
 const st = await s.state();
 const [TX, TZ] = mapToMesh(hole, tx, ty);

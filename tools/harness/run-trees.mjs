@@ -12,7 +12,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { Session, SAVES } from "./lib/session.mjs";
-import { HARNESS, portsFor } from "./lib/dolphin.mjs";
+import { HARNESS } from "./lib/dolphin.mjs";
 import { YD, DERIVED, mapToMesh, kclProfile, simOf, kcl, groundAt, ROOT } from "./lib/course.mjs";
 import { run } from "../lib/wsrsim.mjs";
 import { pathToFileURL } from "node:url";
@@ -35,7 +35,7 @@ const W = JSON.parse(fs.readFileSync(path.join(ROOT, "tools/wsr-pins.json"), "ut
 const pmp = W.reduce((b, t) => { const d = Math.hypot(t.x - tree.x, t.y - tree.y); return !b || d < b.d ? { t, d } : b; }, null).t;
 const TY = pmp.meshY;   // the trunk base, KCL units (WSR stands its shapes there)
 
-const s = new Session({ gdbPort: portsFor(inst).gdb, dsuPort: portsFor(inst).dsu });
+const s = new Session({ instance: inst });
 await s.start(save);
 const st = await s.state();
 const B = st.ball.pos;
@@ -43,6 +43,17 @@ const mesh = await kcl(hole);
 const g0 = groundAt(mesh, B[0], B[2]);
 const S = Math.hypot(TX - B[0], TZ - B[2]) / YD;
 const h0 = Math.atan2(TX - B[0], TZ - B[2]);
+// --toward x,y (map fractions, or "pin" for the round's pin): one more line,
+// the one a player would take to that point, as the offset it passes the trunk at
+const toward = arg("--toward", null);
+if (toward) {
+  const [AX, AZ] = toward === "pin" ? [st.pin[0], st.pin[2]] : mapToMesh(hole, ...toward.split(",").map(Number));
+  // headings near north sit at +-pi in atan2(x, z), so the difference is wrapped
+  const dh = Math.atan2(Math.sin(h0 - Math.atan2(AX - B[0], AZ - B[2])), Math.cos(h0 - Math.atan2(AX - B[0], AZ - B[2])));
+  const off = +(dh * S).toFixed(2);
+  console.log(`the line toward ${toward} passes ${off} yd right of the trunk`);
+  if (!offsets.includes(off)) offsets.push(off);
+}
 console.log(`hole ${hole} tree ${treeIdx} (kind ${tree.kind}, sx ${tree.size}, sy ${tree.sy}${tree.off ? ", off" : ""}): ${S.toFixed(1)} yd from the ball, base ${((TY - g0.y) / YD).toFixed(1)} yd vs the ball's ground`);
 const results = { kind: "trees-2c", hole, save: path.basename(save), tree: { idx: treeIdx, ...tree, mesh: [TX, TY, TZ] }, ball: B, distance: S, shots: [] };
 

@@ -25,10 +25,15 @@ import { fileURLToPath } from "node:url";
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 export const HARNESS = path.resolve(HERE, "..");
 export const STATE = path.join(HARNESS, "state");
-// one user dir per instance (HARNESS_INSTANCE = 0, 1, ...), so several
-// Dolphins can run side by side, each with its own GDB and DSU ports
+// one user dir per instance (0, 1, ...), so several Dolphins can run side by
+// side, each with its own GDB and DSU ports. The instance is passed down
+// (Session({ instance }), the scripts' --instance), not read from the
+// environment alone: two runs started with --instance 1 and 2 but no
+// HARNESS_INSTANCE both wrote state/user's config, and one Dolphin never
+// opened its GDB port. HARNESS_INSTANCE stays the default.
 export const INSTANCE = Number(process.env.HARNESS_INSTANCE || 0);
-export const USER = path.join(STATE, INSTANCE ? `user${INSTANCE}` : "user");
+export const userDir = (i = INSTANCE) => path.join(STATE, i ? `user${i}` : "user");
+export const USER = userDir();
 // Ports below Windows' ephemeral range (49152-65535): fixed ports inside it
 // collide with client sockets other programs hold (measured: 55022 and
 // 55028 taken by another process's local connections, so Dolphin's GDB stub
@@ -74,10 +79,11 @@ function ini(sections) {
 }
 
 export function writeUserDir({
-  gdbPort = portsFor().gdb, dsuPort = portsFor().dsu, backend = "D3D", speed = 1.0, cheats = false,
+  instance = INSTANCE, gdbPort = portsFor(instance).gdb, dsuPort = portsFor(instance).dsu, backend = "D3D", speed = 1.0, cheats = false,
   cpuCore = 1, logTypes = ["GDB_STUB", "CI", "OSREPORT"], window = { x: 40, y: 40, w: 640, h: 480 },
 } = {}) {
-  const cfg = path.join(USER, "Config");
+  const dir = userDir(instance);
+  const cfg = path.join(dir, "Config");
   fs.mkdirSync(cfg, { recursive: true });
   fs.writeFileSync(path.join(cfg, "Dolphin.ini"), ini({
     // HotkeysRequireFocus defaults to true: a click into another window
@@ -138,15 +144,15 @@ export function writeUserDir({
   fs.writeFileSync(path.join(cfg, "Logger.ini"), ini({
     Logs: logs, Options: { Verbosity: 4, WriteToFile: "True", WriteToConsole: "False", WriteToWindow: "False" },
   }));
-  return USER;
+  return dir;
 }
 
-export const stateSlotPath = (slot) => path.join(USER, "StateSaves", `${GAME_ID}.s${String(slot).padStart(2, "0")}`);
-export const screenshotDir = () => path.join(USER, "ScreenShots", GAME_ID);
-export const logPath = () => path.join(USER, "Logs", "dolphin.log");
+export const stateSlotPath = (slot, instance = INSTANCE) => path.join(userDir(instance), "StateSaves", `${GAME_ID}.s${String(slot).padStart(2, "0")}`);
+export const screenshotDir = (instance = INSTANCE) => path.join(userDir(instance), "ScreenShots", GAME_ID);
+export const logPath = (instance = INSTANCE) => path.join(userDir(instance), "Logs", "dolphin.log");
 
-export function launch({ saveState = null, batch = true, videoBackend = null, extraArgs = [] } = {}) {
-  const args = ["-u", USER, "-e", DISC];
+export function launch({ instance = INSTANCE, saveState = null, batch = true, videoBackend = null, extraArgs = [] } = {}) {
+  const args = ["-u", userDir(instance), "-e", DISC];
   if (batch) args.push("-b");
   if (saveState) args.push("-s", saveState);
   if (videoBackend) args.push("-v", videoBackend);

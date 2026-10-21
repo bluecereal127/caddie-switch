@@ -7,7 +7,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { DsuServer, sleep } from "./dsu.mjs";
 import { Gdb } from "./gdb.mjs";
-import { writeUserDir, launch, kill, stateSlotPath, HOTKEY_MAP, STATE, portsFor } from "./dolphin.mjs";
+import { writeUserDir, launch, kill, stateSlotPath, HOTKEY_MAP, STATE, portsFor, INSTANCE } from "./dolphin.mjs";
 import { pointers, readBall, state as readState } from "./wsr.mjs";
 import { shoot } from "./shot.mjs";
 
@@ -20,15 +20,21 @@ const hotkey = (name) => {
 };
 
 export class Session {
-  constructor({ gdbPort = portsFor().gdb, dsuPort = portsFor().dsu, speed = 1.0, log = console.log } = {}) {
-    Object.assign(this, { gdbPort, dsuPort, speed, log });
+  // instance: the Dolphin user dir (lib/dolphin.mjs userDir) and, unless
+  // given, the ports; a caller that passes only a GDB port gets the instance
+  // that port belongs to (portsFor), so the user dir always follows the ports
+  constructor({ instance, gdbPort, dsuPort, speed = 1.0, log = console.log } = {}) {
+    if (instance == null) instance = gdbPort != null ? gdbPort - portsFor(0).gdb : INSTANCE;
+    gdbPort ??= portsFor(instance).gdb;
+    dsuPort ??= portsFor(instance).dsu;
+    Object.assign(this, { instance, gdbPort, dsuPort, speed, log });
   }
 
   // waitBall: wait until the save's golf ball is at rest (false for a menu state)
   async start(saveFile, { waitBall = true } = {}) {
     this.dsu = await new DsuServer({ port: this.dsuPort }).start();
-    writeUserDir({ gdbPort: this.gdbPort, dsuPort: this.dsuPort, speed: this.speed });
-    this.child = launch({ batch: true, saveState: saveFile });
+    writeUserDir({ instance: this.instance, gdbPort: this.gdbPort, dsuPort: this.dsuPort, speed: this.speed });
+    this.child = launch({ instance: this.instance, batch: true, saveState: saveFile });
     this.gdb = new Gdb({ port: this.gdbPort });
     await this.gdb.connect({ timeoutMs: 120000 });
     await this.gdb.go();
@@ -83,7 +89,7 @@ export class Session {
   // (retried if Dolphin missed it), done when the ball sits at the file's
   // start; `expect` = { pos } of that start (default: the session's first)
   async load(file = this.saveFile, expect = this.start0) {
-    fs.copyFileSync(file, stateSlotPath(4));
+    fs.copyFileSync(file, stateSlotPath(4, this.instance));
     for (let attempt = 0; attempt < 4; attempt++) {
       await this.gdb.halt(); await this.gdb.clearBreaks(); await this.gdb.go();
       // make the current state differ from the target, so a missed load shows
@@ -95,7 +101,7 @@ export class Session {
 
   // save the running state as SAVES/<name> (slot 3 + its hotkey, retried)
   async saveState(name) {
-    const slot = stateSlotPath(3);
+    const slot = stateSlotPath(3, this.instance);
     const before = fs.existsSync(slot) ? fs.statSync(slot).mtimeMs : 0;
     for (let a = 0; a < 4; a++) {
       await this.dsu.tap(1, hotkey("Save State Slot 3"), 200);

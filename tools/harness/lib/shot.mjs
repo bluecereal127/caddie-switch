@@ -15,8 +15,9 @@
 //   0x8041490c read it, so it is rewritten right after that store
 //   (0x80421368) on every state-1 frame.
 // - spins: the hand-off 0x80414854 stores ball+0x9c (side) and +0xa0
-//   (backspin) and the spin tick ball+0x58, then copies the ball into the
-//   look-ahead balls; they are rewritten at 0x8041489c, before the copy.
+//   (backspin) and the spin tick ball+0x58 (0x804148a0, from the lifetime),
+//   then copies the ball into the look-ahead balls; the spins are rewritten
+//   at 0x8041489c, before the tick's store and the copy.
 // - aim: the launch rotates player+0x84 (x, z) = (sin h, cos h) by the lie
 //   yaw (0 on tee and fairway); h = player+0x80 (pi = north, -z).
 // - wind: field manager+0x78 -> wind object; physics reads +0x10 (speed
@@ -36,6 +37,18 @@ export const TRACE_PC = 0x80410cfc;
 // (0x8041e664), power = min(p3, lie factor) at 0x80421364
 export const RAW_STORE = 0x80421314;
 export const TREE_QUERY = 0x804138d4;   // after bl 0x80401ac0 in the tree check
+// The state-1 window (tools/research/wsr-harness-decodes.md section 3): it
+// ends after ceil(n) frames, n = clamp(18 + 28 (1.25 - raw), 18, 25), or as
+// soon as the follower's velocity (follower+8, this frame's spring output) is
+// negative (0x8042144c). The injected trigger leaves the follower settling
+// down onto the rested remote, so without help the window closes after one
+// frame: the shot fires on that frame (p3 = p2 there) and the pin assist,
+// which acts only on the later frames (swing+0xe4 set), never runs. A human
+// follow-through keeps the velocity up. 0x80421338 is after the p2 store
+// (0x80421334) and before p3 (0x8041e664 reads p2 and s7c from memory),
+// after this frame's spring: holding the velocity at >= 0 there keeps the
+// window open to its timer, and s7c written there is what p3 reads.
+export const WINDOW_HOLD = 0x80421338;
 const f32 = (v) => { const b = Buffer.alloc(4); b.writeFloatBE(v); return b; };
 const vec3 = (b, o) => [b.readFloatBE(o), b.readFloatBE(o + 4), b.readFloatBE(o + 8)];
 
@@ -92,7 +105,11 @@ async function rawFor(gdb, p, power) {
  *           gauge show the power, and the result held so the pin assist cannot move it)
  *           or "game" (the raw value only: the game computes p1..p3 itself, its hidden
  *           pin-power assist included, as for a human swing),
- *         side (ball+0x9c), back (ball+0xa0), trace (bool), maxTicks, timeoutMs }
+ *         side (ball+0x9c), back (ball+0xa0), trace (bool), maxTicks, timeoutMs,
+ *         holdWindow (keep the state-1 window open to its timer, WINDOW_HOLD above; the
+ *           per-frame p2, p3 and power are recorded in out.window),
+ *         s7c (with holdWindow: the swing's backspin input swing+0x7c, 0..1, written on
+ *           every state-1 frame before p3 reads it) }
  * The CPU must be stopped. Returns the launch, the hand-off, the trace and the rest.
  */
 export async function shoot(gdb, opts) {
@@ -134,6 +151,9 @@ async function shoot1(gdb, opts) {
   await gdb.setU8(p.player + PLAYER.swingOff, 0);
   if (!opts.dsu) throw new Error("shoot needs opts.dsu to hold the A and B buttons");
   const motion = await gdb.u32(p.swing + 0xc);
+  const follower = await gdb.u32(p.swing + SWING.follower);
+  const hold = !!opts.holdWindow;
+  if (opts.s7c != null && !hold) throw new Error("s7c needs holdWindow (it is written on the state-1 frames)");
   await gdb.addBreak(CODE.swingState0);
   // B until the address reference is taken
   opts.dsu.setButtons(0, B_BUTTON, true);
@@ -162,8 +182,8 @@ async function shoot1(gdb, opts) {
     if (st !== 0 && st !== 3) { if (i > 600) throw new Error(`swing state ${st}, not 0 or 3`); continue; }
     out.stateAtTrigger = st;
     if (st === 3) await gdb.setU32(p.swing + SWING.state, 0);
-    const follower = await gdb.u32(p.swing + SWING.follower);
     await gdb.writeMem(follower + 4, f32(0.5));                   // g >= 0.5
+    if (hold) await gdb.writeMem(follower + 8, f32(0));           // velocity: not negative on frame 1
     await gdb.writeMem(p.swing + SWING.gPrev, f32(0.45));         // previous g < 0.5
     await gdb.writeMem(p.swing + SWING.speed, Buffer.concat([f32(1), f32(0.5)])); // +0x28 > +0x2c
     break;
@@ -180,31 +200,49 @@ async function shoot1(gdb, opts) {
   const rf = opts.raw != null ? { raw: opts.raw, cap: null } : await rawFor(gdb, p, power);
   out.raw = rf.raw; out.cap = rf.cap; out.powerMode = mode;
   await gdb.addBreak(RAW_STORE);
-  if (mode === "hold") await gdb.addBreak(CODE.powerStored);
+  // the power store: written in "hold" mode, only read with holdWindow
+  if (mode === "hold" || hold) await gdb.addBreak(CODE.powerStored);
+  if (hold) await gdb.addBreak(WINDOW_HOLD);
   await gdb.addBreak(CODE.realShot);
   await gdb.addBreak(CODE.spinStored);
   let frames1 = 0;
   out.gamePower = [];
+  if (hold) out.window = [];
   for (;;) {
     const pc = await runTo(gdb, 20000);
     if (pc === RAW_STORE) {
       if ((await gdb.reg(27)) !== p.swing) continue;
       await gdb.setReg(F(1), Math.fround(rf.raw));
       if (mode !== "hold") frames1++;
+    } else if (pc === WINDOW_HOLD) {
+      if ((await gdb.reg(27)) !== p.swing) continue;
+      const vel = (await gdb.readMem(follower + 8, 4)).readFloatBE(0);
+      if (vel < 0) await gdb.writeMem(follower + 8, f32(0));
+      if (opts.s7c != null) await gdb.writeMem(p.swing + SWING.backspin, f32(opts.s7c));
+      const sb = await gdb.readMem(p.swing + SWING.timer, 4);
+      out.window.push({ timer: sb.readInt32BE(0), vel, p2: (await gdb.readMem(p.swing + SWING.p2, 4)).readFloatBE(0), fired: (await gdb.readMem(p.swing + SWING.fired, 1))[0] });
     } else if (pc === CODE.powerStored) {
       if ((await gdb.reg(27)) !== p.swing) continue;
       const sb = await gdb.readMem(p.swing + SWING.p3, 8);
       out.gamePower.push([sb.readFloatBE(0), sb.readFloatBE(4)]);   // the game's own p3 and power
-      await gdb.writeMem(p.swing + SWING.p3, Buffer.concat([f32(power), f32(power)]));
-      frames1++;
+      if (hold && out.window.length) Object.assign(out.window[out.window.length - 1], { p3: sb.readFloatBE(0), power: sb.readFloatBE(4) });
+      if (mode === "hold") {
+        await gdb.writeMem(p.swing + SWING.p3, Buffer.concat([f32(power), f32(power)]));
+        frames1++;
+      }
     } else if (pc === CODE.realShot) {
       out.launchBall = (await gdb.reg(3)).toString(16);
       out.launchFrame = frames1;
     } else if (pc === CODE.spinStored) {
       if ((await gdb.reg(31)) !== p.ball) continue;
       const b = await gdb.readMem(p.ball, 0xa4);
+      // the spin tick: 0x80414890 loads the lifetime ball+0x54 into r0 and
+      // 0x804148a0, one instruction after this stop, stores it to ball+0x58,
+      // so +0x58 still holds the previous value here (0 on every shot of the
+      // first 2f run, whose red-zone rows the port then curved from launch);
+      // the spins act from the tick after it (Calc: lifetime > ball+0x58)
       out.handoff = {
-        life: b.readInt32BE(BALL.life), spinStart: b.readInt32BE(BALL.spinStart),
+        life: b.readInt32BE(BALL.life), spinStart: b.readInt32BE(BALL.life), staleSpinStart: b.readInt32BE(BALL.spinStart),
         gameSide: b.readFloatBE(BALL.side), gameBack: b.readFloatBE(BALL.back),
         pos: vec3(b, BALL.pos), vel: vec3(b, BALL.vel), lift: b.readFloatBE(BALL.lift),
         launchVel: vec3(b, BALL.vContact),
@@ -222,7 +260,8 @@ async function shoot1(gdb, opts) {
   out.swingAtHandoff = { raw: sw.readFloatBE(SWING.raw), p1: sw.readFloatBE(SWING.p1), p2: sw.readFloatBE(SWING.p2), p3: sw.readFloatBE(SWING.p3), power: sw.readFloatBE(SWING.power), s7c: sw.readFloatBE(SWING.backspin),
     m: sw.readFloatBE(0xc0), coin: sw.readUInt32BE(0xd8) };
   await gdb.removeBreak(RAW_STORE);
-  if (mode === "hold") await gdb.removeBreak(CODE.powerStored);
+  if (mode === "hold" || hold) await gdb.removeBreak(CODE.powerStored);
+  if (hold) await gdb.removeBreak(WINDOW_HOLD);
   await gdb.removeBreak(CODE.realShot);
   await gdb.removeBreak(CODE.spinStored);
 

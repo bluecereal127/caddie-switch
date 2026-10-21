@@ -3,13 +3,13 @@
 import fs from "node:fs";
 import path from "node:path";
 import { Session, SAVES } from "./lib/session.mjs";
-import { portsFor, STATE } from "./lib/dolphin.mjs";
+import { STATE } from "./lib/dolphin.mjs";
 import { YD, kcl, groundAt, ATTR_LIE } from "./lib/course.mjs";
 const arg = (n, d) => { const i = process.argv.indexOf(n); return i >= 0 ? process.argv[i + 1] : d; };
 const inst = Number(arg("--instance", process.env.HARNESS_INSTANCE || 0));
 const save = path.join(SAVES, arg("--save", "h01-tee.sav"));
 const hole = Number(arg("--hole", path.basename(save).slice(1, 3)));
-const s = new Session({ gdbPort: portsFor(inst).gdb, dsuPort: portsFor(inst).dsu });
+const s = new Session({ instance: inst });
 await s.start(save);
 const st = await s.state();
 const tee = st.ball.pos, [dx, dz] = st.player.aim;

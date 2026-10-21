@@ -128,6 +128,7 @@ export async function readBall(gdb, addr) {
     holeFrame: b.readInt32BE(BALL.holeFrame), restAttr: b.readUInt16BE(BALL.restAttr),
     restWater: b.readInt32BE(BALL.restWater), dropSpot: vec3(b, 0xd0), waterTicks: b.readInt32BE(0xc0),
     wallFrame: b.readInt32BE(BALL.wallFrame), wall: vec3(b, BALL.wallPos),
+    close: vec3(b, BALL.closePos), closeFrame: b.readInt32BE(BALL.closeFrame),
     touched: b[BALL.touched],
   };
 }
