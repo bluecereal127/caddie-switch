@@ -1430,8 +1430,20 @@ tick; wsr-harness-decodes.md 1), each to its real rest (`run-plan.mjs`,
 | 18 | 5 | driver 3.00 bars | rough | 220.6 | 220.6 (water) | – | – | – | – | – | – |
 | 18 | 6 | driver 3.00 bars | rough | 220.6 | 220.6 (water) | – | – | – | – | – | – |
 | 18 | 7 | driver 3.00 bars | rough | 220.6 | 220.6 (water) | – | – | – | – | – | – |
+| 19 | 1 | driver 4.00 bars | tee | 384.1 | 108.5 rough | 108.0 rough | 110.2 rough | 109.7 rough | 109.2 rough | 108.0 rough | 111.2 rough |
+| 19 | 2 | 5iron 2.52 bars | rough | 108.5 | 12.3 | 13.0 | 9.6 | 12.6 | 12.5 | 13.1 | 11.5 |
+| 19 | 3 | putter 2.89 bars | fringe | 12.3 | 0.9 | – | – | – | – | – | – |
+| 19 | 4 | putter 0.29 bars | green | 0.9 | **holed** | – | – | – | – | – | – |
+| 20 | 1 | driver 4.00 bars | tee | 340.1 | 173.6 rough | 173.1 rough | 173.6 rough | 171.9 rough | 174.8 rough | 167.8 rough | 178.8 rough |
+| 20 | 2 | driver 2.24 bars | rough | 173.6 | 14.0 rough | 15.7 rough | 22.9 | 13.6 rough | 12.7 rough | 15.4 rough | 23.1 |
+| 20 | 3 | wedge 0.72 bars | rough | 14.0 | 7.0 | – | – | – | – | – | – |
+| 20 | 4 | putter 2.16 bars | green | 7.0 | **holed** | – | – | – | – | – | – |
+| 21 | 1 | driver 4.00 bars | tee | 422.3 | 95.6 | 93.7 | 96.4 | 96.1 | 95.3 | 102.1 | 91.7 |
+| 21 | 2 | 3iron 1.44 bars | fairway | 95.6 | 14.7 | 18.4 bunker | 17.4 bunker | 14.5 | 15.3 | 14.3 | 16.2 |
+| 21 | 3 | wedge 0.40 bars | fairway | 14.7 | 3.6 | – | – | – | – | – | – |
+| 21 | 4 | putter 1.17 bars | fringe | 3.6 | **holed** | – | – | – | – | – | – |
 
-Strokes to hole out, holes 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18: 3, 2, 3, 3, 5, 5, 4, 3, 6, 3, 3, 4, 2, 3, 4, 4, 4, 7 (total 68).
+Strokes to hole out: hole 1 3, hole 2 2, hole 3 3, hole 4 3, hole 5 5, hole 6 5, hole 7 4, hole 8 3, hole 9 6, hole 10 3, hole 11 3, hole 12 4, hole 13 2, hole 14 3, hole 15 4, hole 16 4, hole 17 4, hole 18 7 (not holed), hole 19 4, hole 20 4, hole 21 4; 73 over the 20 holed.
 <!-- end:plan -->
 
 Tables only; nothing in the app reads them. The planner is the harness's,

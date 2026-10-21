@@ -359,8 +359,9 @@ function plan() {
       out.push(`| ${h} | ${s.k} | ${s.plan.club} ${(s.plan.power * 4).toFixed(2)} bars | ${s.lie} | ${f1(s.toPinBefore)} | ${cell(s.base)} | ${vc("+0.05 bar")} | ${vc("-0.05 bar")} | ${vc("0.3 deg right")} | ${vc("0.3 deg left")} | ${vc("1.1 deg right")} | ${vc("1.1 deg left")} |`);
     }
   }
-  const n = Object.values(holes).map((H) => H.strokes.length);
-  out.push("", `Strokes to hole out, holes ${Object.keys(holes).join(", ")}: ${n.join(", ")} (total ${n.reduce((a, b) => a + b, 0)}).`);
+  const done = Object.entries(holes).map(([h, H]) => ({ h, n: H.strokes.length, holed: !!H.strokes[H.strokes.length - 1]?.base?.holed }));
+  const holedOnes = done.filter((x) => x.holed);
+  out.push("", `Strokes to hole out: ${done.map((x) => `hole ${x.h} ${x.n}${x.holed ? "" : " (not holed)"}`).join(", ")}; ${holedOnes.reduce((a, x) => a + x.n, 0)} over the ${holedOnes.length} holed.`);
   return out.join("\n");
 }
 
