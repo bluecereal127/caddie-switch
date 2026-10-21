@@ -189,8 +189,12 @@ Keep strict A,B,A,B order; the pipeline pairs address→result by gauge fill and
 warns on anything unpaired. Putts included: the putter bar shows no fill
 during the stroke but displays the final fill once the putt is made
 (player-confirmed), so a result frame taken after the putt classifies
-correctly. (Putt data mainly serves the putt solver via painted greens, but
-the frames don't break pairing.)
+correctly. (The pipeline makes no row from a putt: assemble-shots skips a
+result on the green as "putt", so the frames don't break pairing. The putt
+read runs on the mesh green heights, the painted grid only once you edit it;
+what a putt capture can give the model is a flat putt's gauge fill and yards
+rolled ("yd to go" before minus after), logged by hand in the putting panel's
+"Log a flat putt", which fits greenSpeed.)
 
 ## One-time setup order
 

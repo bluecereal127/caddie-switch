@@ -474,7 +474,10 @@ for (const cl of DEFAULT_CLUBS) {
 // ---- g. the putt solver's recorded numbers ----
 // The grids, sizes and spots of the comparison that checked the move out of
 // App.jsx (c8d3257), read as painted grids at a steepest slope of 10 %; the
-// digest and the spot values were recorded from src/putt.js as B2 wrote it.
+// digest and the spot values were recorded from src/putt.js as B2 wrote it and
+// re-recorded when the review's fix pass gave solvePutt its 0.25° aim stage
+// (the 216 sims are bit-identical to B2's; 14 of the 24 winners moved onto
+// the finer grid, none to a worse cost).
 {
   const N = 9;
   const cells = (f) => Array.from({ length: N }, (_, j) => Array.from({ length: N }, (_, i) => f(i, j)));
@@ -491,12 +494,12 @@ for (const cl of DEFAULT_CLUBS) {
   }
   const json = JSON.stringify({ sims, solves });
   const sha = createHash("sha256").update(json).digest("hex");
-  ok(sha === "38e476d5b03a3649e30bed4609df01a1006c00f51ef2aa31de8ad8057c7f5bbc" && json.length === 454586, `putts differ from the recorded ones (sha256 ${sha}, ${json.length} bytes)`);
+  ok(sha === "86b43237bb914456325ec8546710eec60276ff049db7c739f55a8c306b0c822f" && json.length === 457338, `putts differ from the recorded ones (sha256 ${sha}, ${json.length} bytes)`);
   // a few of the recorded numbers, to say which moved if the digest does not match
   const r0 = sims[0].r, r215 = sims[215].r, v7 = solves[7].r;
   ok(r0.best === 4.745372147105579 && r0.endSp === 0.039512072878080305 && r0.path.length === 32, "simPutt case 0 (flat, 18x14, -20 deg, 0.8) differs");
   ok(r215.best === 6.793524673895154 && r215.path.length === 53, "simPutt case 215 (noisy, 25x30, 12 deg, 1.3) differs");
-  ok(v7.c === -1.887 && v7.a === -1 && v7.p === 1.1299999999999997 && v7.r.holed, "solvePutt case 7 (tilt, 18x14) differs");
+  ok(v7.c === -1.891 && v7.a === -1.75 && v7.p === 1.0899999999999996 && v7.r.holed, "solvePutt case 7 (tilt, 18x14) differs");
   console.log(`putts: ${sims.length} simPutt + ${solves.length} solvePutt runs (${sims.filter((x) => x.r.holed).length} + ${solves.filter((x) => x.r.r.holed).length} holed) ${sha.slice(0, 12)}…, as recorded`);
 }
 

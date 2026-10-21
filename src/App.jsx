@@ -1315,11 +1315,12 @@ export default function App() {
     return { ...s, D, lateral, aimPt };
   }, [puttGround, putt, greenYd]);
   // the gauge: the solved launch's flat roll (Dflat) in bars at greenSpeed, and
-  // the power against a flat putt of the same length (bars over bars)
+  // the power against a flat putt of the same length (bars over bars; 0 with
+  // the ball on the cup, where both are 0)
   const puttSol = useMemo(() => {
     if (!puttSolved) return null;
     const bars = gaugeBars(puttSolved.r.Dflat, greenSpeed);
-    return { ...puttSolved, bars, power: bars / gaugeBars(puttSolved.D, greenSpeed) };
+    return { ...puttSolved, bars, power: puttSolved.D > 0 ? bars / gaugeBars(puttSolved.D, greenSpeed) : 0 };
   }, [puttSolved, greenSpeed]);
   const setScaleFromInput = () => {
     const yd = parseFloat(calInput);

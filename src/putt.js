@@ -36,7 +36,7 @@ export const DECEL = ((0.15 * 0.999 * 0.002) / (1 + 0.999 * 0.5)) * YD_S2;
 export const DRAG = -Math.log(0.999) * TICK_HZ;
 // gravity, 0.002 u/tick² = 12.6 yd/s²; along the bisector its pull down a
 // slope of θ is G·sin(θ/2), 0.110 yd/s² per degree near 0 (a real ball's
-// g·sin θ would be 0.171), 0.087 of the flat deceleration per degree
+// g·sin θ would be 0.187), 0.087 of the flat deceleration per degree
 export const G = 0.002 * YD_S2;
 // the putter's launch speed at WSR power p (0.05-2.5 on the green), yd/s
 export const wsrPuttV0 = (p) => (0.004 + 0.406 * Math.pow(p, Math.log2(1 / 0.63))) * YD_S;
@@ -55,8 +55,8 @@ export const DT = 1 / 120, STEP_CAP = 2400, STOP_V = 0.05, CREEP_DEG = 12;
 const PATH_EVERY = 12;
 // A step solves dv/dt = a - DRAG·v exactly for an a held over it: v' = v·E +
 // a·C1, x' = x + v·C1 + a·C2 (E = e^(-DRAG·DT) = 0.999², WSR's drag over its
-// two ticks). An Euler step's (1 - DRAG·DT) instead loses 0.2 % of the speed
-// over a 20 yd putt's 9 s and stops it 0.03 yd short.
+// two ticks). An Euler step's (1 - DRAG·DT) instead loses 0.11 % of the speed
+// over a 20 yd putt's 4.6 s (548 steps) and stops it 0.01 yd short.
 const DRAG_E = Math.exp(-DRAG * DT), DRAG_C1 = (1 - DRAG_E) / DRAG, DRAG_C2 = (DT - DRAG_C1) / DRAG;
 
 // The stop distance of a ball rolling at v on a flat green: dv/dt = -DECEL -
@@ -67,7 +67,7 @@ export function flatStop(v) {
   return v > 0 ? v / DRAG - (DECEL / (DRAG * DRAG)) * Math.log(1 + (DRAG * v) / DECEL) : 0;
 }
 // its inverse, the speed that stops at exactly D yd on a flat green (bisection;
-// D(v) rises with v and D(60 yd/s) is 189 yd, far past any green)
+// D(v) rises with v and D(60 yd/s) is 195 yd, far past any green)
 export function vFlat(D) {
   if (!(D > 0)) return 0;
   let lo = 0, hi = 60;
@@ -245,7 +245,9 @@ export function puttField({ green, heights = null, W, H, slopeMaxPct = null }) {
 // The forces: the friction DECEL·cos(θ/2) against the motion (never past a
 // stop), the drag DRAG·v, the pull G·sin(θ/2) down the fall line, the slope
 // read at the start of each step. Holed when a step's segment comes within
-// CUP_R of the cup at no more than V_CAP.
+// CUP_R of the cup at no more than V_CAP, or when the ball is at rest within
+// CUP_R before it steps (ball and cup put down on one spot: D = 0 launches
+// it at 0; a ball that rolls to rest that close was holed by a segment).
 // -> { holed, best, pass, endSp, path (box fractions, every 0.1 s; null with
 // trace false), D (ball to cup, yd), v0 (the launch speed the gauge sets,
 // yd/s), Dflat (its flat roll), stop (box fractions), t (s) }. best is the
@@ -271,7 +273,7 @@ export function simPutt(field, ball, cup, angDeg, pw, { trace = true } = {}) {
   for (; step < STEP_CAP; step++) {
     field.grad(x, y, gr);
     const s = Math.hypot(gr[0], gr[1]);
-    if (sp < STOP_V && s <= creep) break;
+    if (sp < STOP_V && s <= creep) { if (Math.hypot(x - cx, y - cy) <= CUP_R) { holed = true; x = cx; y = cy; sp = 0; } break; }
     // the pull and the friction, held over the step (the friction never more
     // than stops the ball within it)
     const half = Math.atan(s) / 2;
@@ -298,11 +300,16 @@ export function simPutt(field, ball, cup, angDeg, pw, { trace = true } = {}) {
   return { holed, best, pass, endSp: sp, path, D, v0, Dflat: flatStop(v0), stop: [x / W, y / H], t: step * DT };
 }
 
-// The read: the angle scan ±35° (5°) then ±4° (1°) round the best, the power
-// scan 0.7-1.55 (0.085) then ±0.08 (0.02), relative to the flat-green speed
-// for the distance; a holed putt scores below any miss and the softer the
-// better, a miss by its closest approach while slow enough to drop (best: a
-// putt racing over the cup is no near miss). The winner is run again for its
+// The read: the angle scan ±35° (5°), then ±4° (1°) round the best, then ±1°
+// (0.25°) round that; the power scan 0.7-1.55 (0.085), then ±0.08 (0.02), then
+// ±0.04 (0.01), relative to the flat-green speed for the distance; a holed
+// putt scores below any miss and the softer the better, a miss by its closest
+// approach while slow enough to drop (best: a putt racing over the cup is no
+// near miss). The 0.25° stage is there because 1° of aim is 0.35-0.52 yd
+// across at 20-30 yd, wider than the cup's 0.3 yd window: without it 7 of
+// 1,877 putts of 15-30 yd through every pin of the 21 mesh greens came back
+// as lag lines at 0.15-0.19 yd that 0.25° holes (a 30 yd solve on H7 is 328
+// sims and 28 ms in Node against 247 and 22). The winner is run again for its
 // path.
 export function solvePutt(field, ball, cup) {
   const cost = (r, pw) => (r.holed ? -2 + pw * 0.1 : r.best + Math.max(0, r.best - CUP_R) * 0.3);
@@ -315,6 +322,8 @@ export function solvePutt(field, ball, cup) {
   for (let a = -35; a <= 35; a += 5) for (let p = 0.7; p <= 1.55; p += 0.085) tryOne(a, p);
   const { a: a0, p: p0 } = best;
   for (let a = a0 - 4; a <= a0 + 4; a += 1) for (let p = Math.max(0.5, p0 - 0.08); p <= p0 + 0.08; p += 0.02) tryOne(a, p);
+  const { a: a1, p: p1 } = best;
+  for (let a = a1 - 1; a <= a1 + 1 + 1e-9; a += 0.25) for (let p = Math.max(0.5, p1 - 0.04); p <= p1 + 0.04 + 1e-9; p += 0.01) tryOne(a, p);
   best.r = simPutt(field, ball, cup, best.a, best.p);
   return best;
 }

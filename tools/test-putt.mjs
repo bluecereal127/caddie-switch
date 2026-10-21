@@ -15,7 +15,8 @@
 //     amount either way
 //  c. the cup from 10 yd: putts that would stop at 12 and 14 yd are holed,
 //     16.4 and 18 run past; at dying speed (to stop 1 yd past) 0.10 and 0.137
-//     yd off the centre line holed, 0.17 and 0.22 missed; V_CAP = vFlat(4.4)
+//     yd off the centre line holed, 0.17 and 0.22 missed; V_CAP = vFlat(4.4);
+//     ball and cup on one spot: holed, the gauge hint finite
 //  d. vFlat round trip (D -> v -> D) to 0.01 yd over 1-40 yd, and the sim's
 //     flat stop for that launch within 0.02 yd
 //  e. solvePutt on a 2° side-slope plane holes a 10 yd putt aimed off the cup
@@ -25,7 +26,9 @@
 //     outside the mask not read; the putts differ by source as their fields do
 //  g. H7 (derived.json + public/terrain/g07.bin): a 10 yd putt from the
 //     most-seen pin's downhill side, solved and run straight (no assertion
-//     beyond "runs and stops"); a 30 yd putt's solve time (well under 100 ms)
+//     beyond "runs and stops"); a 30 yd putt's solve time (well under 100 ms);
+//     H6 pin BL from 20 yd at bearing 255°, holed: one of the 7 of 1,877 putts
+//     of 15-30 yd through every pin that the 1° aim stage read as a lag line
 //  h. the gauge: T and its inverse, gaugeBars, fitGreenSpeed (the default
 //     under 2 flat rows, a fitted speed recovered, non-flat rows ignored);
 //     src/model.js re-exports the putt solver
@@ -127,6 +130,10 @@ const DECODE = [1.8, 3.8, 6.0, 8.1, 10.2, 12.3, 14.4, 16.4, 18.5, 20.5, 25.4, 30
     ok(r.holed === holed, `${d} yd off the line at dying speed: ${r.holed ? "holed" : "missed"} (closest ${r.best.toFixed(3)})`);
     line.push(`${d}:${r.holed ? "in" : "out"}`);
   }
+  // ball and cup put down on one spot (D = 0 launches at 0): at rest within CUP_R is in, and the gauge hint stays finite
+  const onCup = solvePutt(box, { x: 0.5, y: 0.5 }, { x: 0.5, y: 0.5 });
+  ok(onCup.r.holed && onCup.r.D === 0 && Number.isFinite(P.gaugeBars(onCup.r.Dflat)), `ball on the cup: ${onCup.r.holed ? "holed" : "missed"}, D ${onCup.r.D}, bars ${P.gaugeBars(onCup.r.Dflat)}`);
+  line.push(`on-cup:${onCup.r.holed ? "in" : "out"}`);
   console.log(`c. V_CAP ${V_CAP.toFixed(3)} yd/s (4.7 yd/s would roll ${flatStop(4.7).toFixed(2)} yd); from 10 yd ${line.join(" ")}`);
 }
 
@@ -261,6 +268,19 @@ const DECODE = [1.8, 3.8, 6.0, 8.1, 10.2, 12.3, 14.4, 16.4, 18.5, 20.5, 25.4, 30
     times.sort((a, b) => a - b);
     ok(times[2] < 100, `a 30 yd solve takes ${times[2].toFixed(1)} ms (median of 5)`);
     console.log(`   a 30 yd putt on H7: solve ${times[2].toFixed(1)} ms median of 5 (${times.map((t) => t.toFixed(0)).join(" / ")}), aim ${s30.a}° at ${s30.p.toFixed(3)}, ${s30.r.holed ? "holed" : `best ${s30.r.best.toFixed(2)} yd`}`);
+  }
+  // the 0.25° aim stage: H6 pin BL, the ball 20 yd from the cup at bearing 255° (the putt runs at 255°), on the
+  // mesh heights; the 1° stage alone read it as a lag line at 0.165 yd (aim 0°, 1.275), 0.25° holes it
+  {
+    const d6 = JSON.parse(readFileSync(join(root, "public/derived.json"), "utf8")).holes[6], g6 = parseGreenHeights(readFileSync(join(root, "public/terrain/g06.bin")));
+    const b6 = d6.greenBox, W6 = (b6.x1 - b6.x0) * MAP_W * d6.scale, H6 = (b6.y1 - b6.y0) * MAP_H * d6.scale;
+    const f6 = puttField({ green: { box: b6, grid: d6.grid, slopeMaxPct: d6.slopeMaxPct }, heights: g6, W: W6, H: H6 });
+    const p6 = d6.pins.find((p) => p.label === "BL");
+    const c6 = { x: (p6.x - b6.x0) / (b6.x1 - b6.x0), y: (p6.y - b6.y0) / (b6.y1 - b6.y0) };
+    const ux = Math.sin(255 * DEG), uy = -Math.cos(255 * DEG);
+    const s6 = solvePutt(f6, { x: c6.x - (ux * 20) / W6, y: c6.y - (uy * 20) / H6 }, c6);
+    ok(f6.src === "heights" && s6.r.holed && s6.a % 1 !== 0, `H6 BL from 20 yd at 255°: ${s6.r.holed ? "holed" : `best ${s6.r.best.toFixed(3)} yd`} at aim ${s6.a}°, ${s6.p.toFixed(3)}`);
+    console.log(`   H6 pin BL from 20 yd at 255°: aim ${s6.a}° at ${s6.p.toFixed(3)} of the flat speed, ${s6.r.holed ? "holed" : `best ${s6.r.best.toFixed(3)} yd`}`);
   }
 }
 

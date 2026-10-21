@@ -19,7 +19,8 @@
 //              steepest cell) but with physical spacing, so directions are
 //              true on non-square greens
 //   gridPct    the same vectors unnormalized, in percent slope (rise/run),
-//              for calibrating the putt model later; slopeMaxPct, reliefYd
+//              checked by tools/test-terrain.mjs; the putt model takes only
+//              its steepest cell, slopeMaxPct (src/putt.js gridField); reliefYd
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { parseObj, groupBoundaryLoops, groupComponents, rasterizeHeight, triVerts } from "./lib/obj.mjs";

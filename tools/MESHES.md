@@ -281,10 +281,12 @@ adjusts to it. `node tools/wsr-truth.mjs` writes `tools/wsr-truth.json`
   only count toward them (tools/PINS.md).
 - **Slope grid**: built from the mesh green's heights with the capture
   convention (downhill, normalized to the green's own steepest cell, levels
-  1–3) but true physical spacing; `gridPct` keeps absolute percent slopes for
-  calibrating the putt model later. Direction agreement with the capture grids
-  is 0.85–0.97 on 9 holes, weaker on the flattest greens (holes 1/10/12, where
-  relative shading is noise), and opposite on holes 2 and 14.
+  1–3) but true physical spacing; `gridPct` is the same in percent slope,
+  checked by tools/test-terrain.mjs against the terrain's green; the putt model
+  takes only its steepest cell, `slopeMaxPct` (src/putt.js gridField). Direction
+  agreement with the capture grids is 0.85–0.97 on 9 holes, weaker on the
+  flattest greens (holes 1/10/12, where relative shading is noise), and
+  opposite on holes 2 and 14.
 - **Transplanted green** in src/maps.js: painted at the WSR box on all 21 holes
   (holes 5, 6 and 8 never had a confident enough projection before).
   Superseded 2026-10-18: the shipped maps are rendered from WSR's minimap
@@ -692,11 +694,16 @@ up to 4.5 yd below on H7), and 184 stand beyond the rasters' crops.
    `ctx.surfaceAt` built in App.jsx along the shot line; per club the solver
    scans every power from 0.4 bars to the cap for the stop on the surface its
    own carry lands on, bisecting the surface edges, and solves each run).
-   Next: the ball's height for the tree check, the green heights for the putts.
-2. Calibrate the putt model to absolute slopes: `gridPct`, and now the green
-   heights every 0.5 yd (`gNN.bin`); the 9×9 levels are still per-green
-   relative, so a level-3 cell means "this green's steepest", not a fixed
-   gradient.
+   (done 2026-10-20) the ball's height for the tree check (src/App.jsx reads
+   the line's heights through src/terrain.js `heightAt` for src/trees.js
+   `treesAlong`) and the green heights for the putts (item 2).
+2. (done 2026-10-20) The putt model on absolute slopes: src/putt.js (decision
+   D3, CLAUDE.md "Model") rolls WSR's putt over the green heights `gNN.bin`
+   (src/terrain.js `loadGreenHeights`) and, once the player edits the painted
+   grid or on a hole without heights, over the painted levels × `slopeMaxPct`
+   (the green's steepest cell, wsr-truth.json → derived.json); the 9×9 levels
+   stay per-green relative in derived.json and are scaled at read time. Left
+   to fit: the Switch's green speed (`greenSpeed`, from logged flat putts).
 3. (done 2026-10-20) Elevation for the shot model: the solver flies each club
    over the line's height profile from `public/terrain/` (src/model.js
    `solve` with `ctx.heightAt`, src/wsrsim.js `run({ profile })`; "Elevation"
