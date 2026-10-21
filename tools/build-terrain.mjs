@@ -34,7 +34,7 @@
 //   28 f32 stepYd (0.5)   32 f32 z0Yd: the green's mean height above the datum
 //   36 f32 yd per height unit (0.001)
 //   40 int16[w*h] height above z0Yd   40 + 2wh  uint8[w*h] 1 = inside the
-//      WSR green outline
+//      WSR green outline and not reading a KCL hole (below)
 // The headers hold NUL bytes on purpose: git (core.autocrlf on this repo)
 // takes a file with no NUL in its first 8000 bytes for text, and the height
 // data of holes 2 and 13 has none there. The files are not compressed; the
@@ -83,13 +83,27 @@
 // GREEN_MARGIN of it on every side (the app's green view, build-derived's
 // GT_MARGIN), grown by under half a step so the grid fits it exactly, read
 // bilinearly from the same mended raster, in GREEN_UNIT_YD above the green's
-// mean (over the mask), mask = inside the WSR green outline (wsr-truth.json
-// greenPoly). The unit is 0.001 yd, not 0.01: a step of 0.01 yd over the
-// 0.5 yd spacing is a 2% slope, against 1.9 / 5.5 / 11.8% at the p10 / p50 /
-// p90 of the 1,373 green cells of tools/wsr-truth.json's 9x9 grids; 0.001 yd
-// is 0.2%, about what the raster itself resolves (0.001-0.004 yd: uint16 over
-// each hole's height range). The box's heights stay within -25.0 yd (H17's
-// box reaches that hole) and +3.2 yd (H20) of their green's mean, inside
+// mean (over the mask). The mask is the WSR green outline (wsr-truth.json
+// greenPoly) less any node whose bilinear read takes in a raster px more than
+// GREEN_PIT_YD below the mean of its 8 neighbours inside the outline: that
+// read reaches into a hole in the KCL beside the green, not the green's
+// surface. Two nodes, both on H3 at its green's north-west edge beside a
+// water hole whose px lie 16.6-16.7 yd below them: they read 0.57 and 0.23 yd
+// below the green px of the same reads (0.58 yd under the next node inside, a
+// 115% slope in src/putt.js's gradient), which no test of a node's own height
+// tells from a sound green (0.52 and 0.12 yd under their neighbours' mean; a
+// node on H19's sound surface is 0.11 under). On the other 20 greens the
+// lowest px any read takes lies at most 0.19 yd (H19) under its neighbours'
+// mean. The class under a node does not tell either: both of H3's have green
+// under them (the nearest px), while 17 nodes on H2, H8, H9 and H18 have sand,
+// water, rough or outer ground there at their green's height. H3: 3,262
+// nodes inside the outline, 3,260 in the mask (index.json green.pits: 2).
+// The unit is 0.001 yd, not 0.01: a step of 0.01 yd over the 0.5 yd spacing
+// is a 2% slope, against 1.9 / 5.5 / 11.8% at the p10 / p50 / p90 of the
+// 1,373 green cells of tools/wsr-truth.json's 9x9 grids; 0.001 yd is 0.2%,
+// about what the raster itself resolves (0.001-0.004 yd: uint16 over each
+// hole's height range). The box's heights stay within -25.0 yd (H17's box
+// reaches that hole) and +3.2 yd (H20) of their green's mean, inside
 // int16's +-32.767 yd; the greens themselves have 0.6-3.3 yd of relief.
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
@@ -122,6 +136,7 @@ const GRID_PX = 2, GW = MAP_W / GRID_PX, GH = MAP_H / GRID_PX;
 const Z_UNIT_YD = 0.1, NODATA = -32768;
 const CRACK_DEPTH = 5; // KCL units: what the closing must lift for a pixel to count as a crack
 const GREEN_MARGIN = 0.12, GREEN_STEP_YD = 0.5, GREEN_UNIT_YD = 0.001;
+const GREEN_PIT_YD = 1; // a read taking in a px this far under its neighbours' mean is off the green (header)
 const HEADER = 20, GREEN_HEADER = 40;
 const NCLS = 17; // class ids 0-16
 const CLASS_NAMES = { 0: "nodata (beyond the raster's crop)", 1: "fairway (and the tee pad)", 2: "rough", 3: "bunker (sand, beaches, river gravel)", 4: "outer ground (OB terrain)", 5: "floor plane (the dead plane under water and OB)", 6: "green", 7: "water", 9: "fringe", 14: "zone (H1)", 16: "fall boundary (H14)" };
@@ -199,13 +214,28 @@ function buildHole(n) {
   const toMesh = (fx, fy) => [A[0][0] * fx + A[0][1] * fy + A[0][2], A[1][0] * fx + A[1][1] * fy + A[1][2]];
   // raster coordinates with pixel centres at integers (tools/lib/minimap.mjs)
   const toPx = (X, Z) => [(X - r.originX) / r.upp - 0.5, (Z - r.originZ) / r.upp - 0.5];
-  // bilinear height (KCL units) at a mesh point; null past the raster's crop
-  const heightAt = (X, Z) => {
+  // a bilinear read at a mesh point: the top-left of the four raster px it
+  // weighs and its fractions across them; null past the raster's crop
+  const readAt = (X, Z) => {
     let [c, q] = toPx(X, Z);
     if (c < -0.5 || q < -0.5 || c > w - 0.5 || q > h - 0.5) return null;
     c = Math.min(w - 1, Math.max(0, c)); q = Math.min(h - 1, Math.max(0, q));
-    const c0 = Math.min(w - 2, Math.floor(c)), q0 = Math.min(h - 2, Math.floor(q)), fx = c - c0, fy = q - q0, p = q0 * w + c0;
+    const c0 = Math.min(w - 2, Math.floor(c)), q0 = Math.min(h - 2, Math.floor(q));
+    return [q0 * w + c0, c - c0, q - q0];
+  };
+  // bilinear height (KCL units) at a mesh point; null past the raster's crop
+  const heightAt = (X, Z) => {
+    const rd = readAt(X, Z);
+    if (!rd) return null;
+    const [p, fx, fy] = rd;
     return (ht[p] * (1 - fx) + ht[p + 1] * fx) * (1 - fy) + (ht[p + w] * (1 - fx) + ht[p + w + 1] * fx) * fy;
+  };
+  // the lowest of the raster px that read weighs (KCL units)
+  const lowestAt = (X, Z) => {
+    const [p, fx, fy] = readAt(X, Z);
+    let lo = Infinity;
+    for (const [q, wt] of [[p, (1 - fx) * (1 - fy)], [p + 1, fx * (1 - fy)], [p + w, (1 - fx) * fy], [p + w + 1, fx * fy]]) if (wt > 0) lo = Math.min(lo, ht[q]);
+    return lo;
   };
   const toUnits = (y, unitYd) => Math.round((y - datumY) / UNITS_PER_YD / unitYd);
 
@@ -250,15 +280,31 @@ function buildHole(n) {
   const gw = Math.ceil(wYd / GREEN_STEP_YD - 1e-9) + 1, gh = Math.ceil(hYd / GREEN_STEP_YD - 1e-9) + 1;
   const growX = ((gw - 1) * GREEN_STEP_YD - wYd) / 2 / (MAP_W * sc), growY = ((gh - 1) * GREEN_STEP_YD - hYd) / 2 / (MAP_H * sc);
   gx0 -= growX; gx1 += growX; gy0 -= growY; gy1 += growY;
-  const gYd = new Float64Array(gw * gh), mask = new Uint8Array(gw * gh);
-  let sum = 0, inside = 0;
+  const gYd = new Float64Array(gw * gh), lowYd = new Float64Array(gw * gh), outline = new Uint8Array(gw * gh);
   for (let j = 0; j < gh; j++) for (let i = 0; i < gw; i++) {
     const fx = gx0 + (i / (gw - 1)) * (gx1 - gx0), fy = gy0 + (j / (gh - 1)) * (gy1 - gy0), k = j * gw + i;
-    const y = heightAt(...toMesh(fx, fy));
+    const [X, Z] = toMesh(fx, fy), y = heightAt(X, Z);
     if (y == null) throw new Error(`H${n}: the green grid reaches past the raster's crop at ${fx.toFixed(4)}, ${fy.toFixed(4)}`);
     gYd[k] = (y - datumY) / UNITS_PER_YD;
-    if (pointInPoly(t.greenPoly, fx, fy)) { mask[k] = 1; sum += gYd[k]; inside++; }
+    lowYd[k] = (lowestAt(X, Z) - datumY) / UNITS_PER_YD;
+    if (pointInPoly(t.greenPoly, fx, fy)) outline[k] = 1;
   }
+  // the mask: the outline less the nodes whose read takes in a KCL hole
+  // (header), each against its neighbours inside the outline
+  const mask = Uint8Array.from(outline);
+  let pits = 0;
+  for (let j = 0; j < gh; j++) for (let i = 0; i < gw; i++) {
+    const k = j * gw + i;
+    if (!outline[k]) continue;
+    let s = 0, c = 0;
+    for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) {
+      const ii = i + di, jj = j + dj;
+      if ((di || dj) && ii >= 0 && jj >= 0 && ii < gw && jj < gh && outline[jj * gw + ii]) { s += gYd[jj * gw + ii]; c++; }
+    }
+    if (lowYd[k] < (c ? s / c : gYd[k]) - GREEN_PIT_YD) { mask[k] = 0; pits++; }
+  }
+  let sum = 0, inside = 0;
+  for (let k = 0; k < gw * gh; k++) if (mask[k]) { sum += gYd[k]; inside++; }
   const z0Yd = +(sum / inside).toFixed(4);
   const gData = new Int16Array(gw * gh);
   let clamped = 0, lo = Infinity, hi = -Infinity;
@@ -289,10 +335,10 @@ function buildHole(n) {
   const entry = {
     file: `h${nn}.bin`, meshId: hole.meshId, datumY: +datumY.toFixed(2), datumYd: +(datumY / UNITS_PER_YD).toFixed(4), bytes: tb.length, sha1: sha1(tb),
     classes: tally, noHeight, cracks, deadPx: dead,
-    green: { file: `g${nn}.bin`, w: gw, h: gh, box: { x0: +gx0.toFixed(6), y0: +gy0.toFixed(6), x1: +gx1.toFixed(6), y1: +gy1.toFixed(6) }, stepYd: GREEN_STEP_YD, z0Yd, unitYd: GREEN_UNIT_YD, inside, rangeYd: [+lo.toFixed(3), +hi.toFixed(3)], bytes: gb.length, sha1: sha1(gb) },
+    green: { file: `g${nn}.bin`, w: gw, h: gh, box: { x0: +gx0.toFixed(6), y0: +gy0.toFixed(6), x1: +gx1.toFixed(6), y1: +gy1.toFixed(6) }, stepYd: GREEN_STEP_YD, z0Yd, unitYd: GREEN_UNIT_YD, inside, ...(pits ? { pits } : {}), rangeYd: [+lo.toFixed(3), +hi.toFixed(3)], bytes: gb.length, sha1: sha1(gb) },
   };
   const yd = (k) => (heights[k] === NODATA ? "-" : (heights[k] * Z_UNIT_YD).toFixed(1));
-  console.log(`H${n} ${hole.meshId}: datum ${datumY} u (${entry.datumYd} yd); ${GW}x${GH} samples, ${noHeight} past the raster's crop; classes ${Object.entries(tally).map(([c, k]) => `${c}:${k}`).join(" ")} (${ties} ties); ${cracks} crack px mended, nodata px ${dead.water} -> water, ${dead.outer} -> outer, ${dead.nearest} -> nearest; heights ${yd(heights.indexOf(Math.min(...heights.filter((v) => v !== NODATA))))}..${yd(heights.indexOf(Math.max(...heights)))} yd; green ${gw}x${gh} at ${GREEN_STEP_YD} yd (${inside} inside the outline), mean ${z0Yd} yd, box ${lo.toFixed(2)}..${hi.toFixed(2)} yd round it`);
+  console.log(`H${n} ${hole.meshId}: datum ${datumY} u (${entry.datumYd} yd); ${GW}x${GH} samples, ${noHeight} past the raster's crop; classes ${Object.entries(tally).map(([c, k]) => `${c}:${k}`).join(" ")} (${ties} ties); ${cracks} crack px mended, nodata px ${dead.water} -> water, ${dead.outer} -> outer, ${dead.nearest} -> nearest; heights ${yd(heights.indexOf(Math.min(...heights.filter((v) => v !== NODATA))))}..${yd(heights.indexOf(Math.max(...heights)))} yd; green ${gw}x${gh} at ${GREEN_STEP_YD} yd (${inside} inside the outline${pits ? `, ${pits} more left out of the mask as reading a KCL hole` : ""}), mean ${z0Yd} yd, box ${lo.toFixed(2)}..${hi.toFixed(2)} yd round it`);
   return { n, nn, entry, tb, gb };
 }
 
@@ -308,7 +354,7 @@ for (const { n, entry, tb, gb } of built) {
   raw += tb.length; gz += gzipSync(tb, { level: 9 }).length; rawG += gb.length; gzG += gzipSync(gb, { level: 9 }).length;
 }
 const index = {
-  _note: "Course terrain for the app, written by tools/build-terrain.mjs from the WSR collision-mesh rasters (tools/mesh-heightmap.mjs) through tools/mesh-registration.json; read by src/terrain.js. hNN.bin: the ground height and KCL class on a w x h grid over the 250x304 map frame (sample (i, j) = the map px square [2i, 2i+2) x [2j, 2j+2), its centre at ((i+0.5)/w, (j+0.5)/h)), heights in ydPerUnit above the hole's datum (datumY, KCL units = 0.1 m: the WSR player start's height; datumYd the same in yd), nodata past the raster's crop; the classes are the KCL's, except that the raster's nodata takes what tools/map-style.json says the minimap draws there and its 1-2 px rasterising cracks are closed (the tool's header). gNN.bin: heights over the WSR green box + margin at stepYd, in unitYd above z0Yd (the green's mean height above the datum), with a mask of the WSR green outline. Byte layouts in the tool's header; both files repeat their own sizes, datum, box and units in a header. classes: per-hole sample counts by class; noHeight: samples past the raster's crop; cracks: raster px mended; deadPx: nodata raster px by what they became.",
+  _note: "Course terrain for the app, written by tools/build-terrain.mjs from the WSR collision-mesh rasters (tools/mesh-heightmap.mjs) through tools/mesh-registration.json; read by src/terrain.js. hNN.bin: the ground height and KCL class on a w x h grid over the 250x304 map frame (sample (i, j) = the map px square [2i, 2i+2) x [2j, 2j+2), its centre at ((i+0.5)/w, (j+0.5)/h)), heights in ydPerUnit above the hole's datum (datumY, KCL units = 0.1 m: the WSR player start's height; datumYd the same in yd), nodata past the raster's crop; the classes are the KCL's, except that the raster's nodata takes what tools/map-style.json says the minimap draws there and its 1-2 px rasterising cracks are closed (the tool's header). gNN.bin: heights over the WSR green box + margin at stepYd, in unitYd above z0Yd (the green's mean height above the datum), with a mask of the WSR green outline (less green.pits nodes, where a hole's floor bleeds into the read). Byte layouts in the tool's header; both files repeat their own sizes, datum, box and units in a header. classes: per-hole sample counts by class; noHeight: samples past the raster's crop; cracks: raster px mended; deadPx: nodata raster px by what they became.",
   version: LAYOUT, w: GW, h: GH, mapPxPerSample: GRID_PX, ydPerUnit: Z_UNIT_YD, nodata: NODATA, headerBytes: HEADER,
   classNames: CLASS_NAMES,
   green: { stepYd: GREEN_STEP_YD, margin: GREEN_MARGIN, unitYd: GREEN_UNIT_YD, headerBytes: GREEN_HEADER },

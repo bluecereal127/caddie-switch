@@ -67,7 +67,8 @@ export function classAt(t, x, y) {
 
 // gNN.bin -> { hole, w, h, box ({x0, y0, x1, y1}, map fractions), stepYd, z0Yd,
 // unitYd, data (Int16Array, unitYd above z0Yd), mask (Uint8Array, 1 = inside
-// the WSR green outline) }. Node (i, j) sits at box.x0 + i(box.x1 - box.x0)/(w - 1),
+// the WSR green outline, less the nodes build-terrain leaves out as pits
+// (index.json `pits`)) }. Node (i, j) sits at box.x0 + i(box.x1 - box.x0)/(w - 1),
 // box.y0 + j(box.y1 - box.y0)/(h - 1), stepYd apart; the box is the WSR green
 // box plus 0.12 of it on every side, grown to fit the grid.
 export function parseGreenHeights(buf) {

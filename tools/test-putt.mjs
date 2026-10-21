@@ -23,7 +23,10 @@
 //     (uphill), and a straight one on the flat at aim 0
 //  f. the source: mesh heights unless the painted grid is edited (gridEdited),
 //     the painted levels converted through slopeMaxPct, a height grid's KCL pit
-//     outside the mask not read; the putts differ by source as their fields do
+//     outside the mask not read; the putts differ by source as their fields do;
+//     H3's shipped grid (its mask less the two nodes build-terrain leaves out
+//     beside its water holes, B4b) read at the green's own slope at and round
+//     them
 //  g. H7 (derived.json + public/terrain/g07.bin): a 10 yd putt from the
 //     most-seen pin's downhill side, solved and run straight (no assertion
 //     beyond "runs and stops"); a 30 yd putt's solve time (well under 100 ms);
@@ -178,9 +181,6 @@ const DECODE = [1.8, 3.8, 6.0, 8.1, 10.2, 12.3, 14.4, 16.4, 18.5, 20.5, 25.4, 30
     mask[j * w + i] = inside ? 1 : 0;
     data[j * w + i] = inside ? Math.round((Math.tan(2 * DEG) * (i * 0.5 - 10)) / 0.001) : -30000;
   }
-  // and one node inside the outline beside the pit reading 0.6 yd low, as the
-  // raster's bilinear samples bleed into H3's water holes
-  data[20 * w + 3] -= 600;
   const heights = { w, h, box: gbox, stepYd: 0.5, z0Yd: 0, unitYd: 0.001, data, mask };
   const grid = Array.from({ length: 9 }, () => Array.from({ length: 9 }, () => [0, 3]));
   const green = { box: gbox, grid, slopeMaxPct: 5 };
@@ -190,7 +190,7 @@ const DECODE = [1.8, 3.8, 6.0, 8.1, 10.2, 12.3, 14.4, 16.4, 18.5, 20.5, 25.4, 30
   let worstEdge = 0;
   for (const [x, y] of [[10, 10], [0.2, 10], [19.9, 19.9], [10, 0.1], [1.4, 1.6], [25, -3], [1.5, 10], [1.75, 10.1], [2.1, 9.8]]) { fh.grad(x, y, o); worstEdge = Math.max(worstEdge, Math.abs(o[0] - Math.tan(2 * DEG)), Math.abs(o[1])); }
   // within the data's own resolution: 0.001 yd over a 0.5 yd step is 0.002 of slope
-  ok(worstEdge <= 0.002, `the heights' gradient off the 2° plane by ${worstEdge} (the pit outside the mask, and the node bled into it, must not be read)`);
+  ok(worstEdge <= 0.002, `the heights' gradient off the 2° plane by ${worstEdge} (the pit outside the mask must not be read)`);
   fe.grad(10, 10, o);
   ok(Math.abs(o[0]) < 1e-12 && Math.abs(o[1] + 0.856 * 0.05) < 1e-12, `the edited grid's level 3 at 5 %: [${o[0]}, ${o[1]}], expected [0, ${-0.856 * 0.05}]`);
   const lv = [1, 2, 3].map((m) => { const f = gridField([[[m, 0]]], 1, 1, 10); f.grad(0.5, 0.5, o); return -o[0]; });
@@ -206,13 +206,43 @@ const DECODE = [1.8, 3.8, 6.0, 8.1, 10.2, 12.3, 14.4, 16.4, 18.5, 20.5, 25.4, 30
   const se = solvePutt(fe, ball, cup), sh = solvePutt(fh, ball, cup);
   ok(se.r.D === sh.r.D && (se.a !== sh.a || se.p !== sh.p), "the edited grid's solve should differ from the heights'");
   console.log(`f. heights: straight putt breaks ${((rh.stop[0] - 0.5) * W).toFixed(2)} yd, solve aim ${sh.a}° at ${sh.p.toFixed(3)}; edited grid (5 % uphill): runs ${((ball.y - re.stop[1]) * H).toFixed(2)} of 14 yd, solve aim ${se.a}° at ${se.p.toFixed(3)}`);
+  // the shipped H3 grid (public/terrain/g03.bin): its mask is the WSR outline
+  // less the two nodes build-terrain leaves out as pits, (19, 10) and (20, 10),
+  // whose bilinear reads took in a px of the 16-17 yd water holes beside the
+  // green (B4b; (19, 10) read 0.58 yd under the next node, a 115 % step, and
+  // the field 136 % there, 133 % at the box's 60 x 60 sampling). heightField
+  // reads the mask as shipped (B4's belt in nodeGrads, which dropped a masked
+  // node beside a > 1 yd drop to an unmasked one, went with B4b), so it reads
+  // the green's own slope at the two and at the eight rim nodes beside the
+  // holes the belt used to drop: 0.8-4.8 % at the ten (the belt had put up to
+  // 5.1 % there), 12.6 % at the steepest over the box
+  {
+    const d3 = JSON.parse(readFileSync(join(root, "public/derived.json"), "utf8")).holes[3];
+    const g3 = parseGreenHeights(readFileSync(join(root, "public/terrain/g03.bin")));
+    const inMask = g3.mask.reduce((a, v) => a + v, 0);
+    ok(inMask === 3260 && !g3.mask[10 * g3.w + 19] && !g3.mask[10 * g3.w + 20], `g03.bin's mask holds ${inMask} nodes (expected 3,260, without (19, 10) and (20, 10))`);
+    const bw3 = (d3.greenBox.x1 - d3.greenBox.x0) * MAP_W * d3.scale, bh3 = (d3.greenBox.y1 - d3.greenBox.y0) * MAP_H * d3.scale, f3 = heightField(g3, d3.greenBox, bw3, bh3);
+    // the slope at the grid's node (i, j), through the putt box's yd
+    const atNode = (i, j) => {
+      const fx = g3.box.x0 + (i / (g3.w - 1)) * (g3.box.x1 - g3.box.x0), fy = g3.box.y0 + (j / (g3.h - 1)) * (g3.box.y1 - g3.box.y0);
+      f3.grad(((fx - d3.greenBox.x0) / (d3.greenBox.x1 - d3.greenBox.x0)) * bw3, ((fy - d3.greenBox.y0) / (d3.greenBox.y1 - d3.greenBox.y0)) * bh3, o);
+      return Math.hypot(o[0], o[1]);
+    };
+    const rim = [[19, 10], [20, 10], [21, 10], [69, 11], [69, 12], [72, 12], [71, 56], [72, 56], [73, 56], [71, 57]].map(([i, j]) => atNode(i, j));
+    ok(rim.every((m) => m < 0.1), `H3 at the two pits and the rim beside its water holes reads ${rim.map((m) => (100 * m).toFixed(1)).join(" / ")} % (expected under 10)`);
+    let m3 = 0;
+    for (let i = 0; i < 60; i++) for (let j = 0; j < 60; j++) { f3.grad((i / 59) * bw3, (j / 59) * bh3, o); m3 = Math.max(m3, Math.hypot(o[0], o[1])); }
+    ok(m3 < 0.15, `H3's steepest over its box ${(100 * m3).toFixed(1)} % (expected under 15)`);
+    console.log(`f. H3 (g03.bin, ${inMask} masked nodes): ${rim.map((m) => (100 * m).toFixed(1)).join(" / ")} % at the pits and the rim beside its water holes, ${(100 * m3).toFixed(1)} % at the steepest over the box`);
+  }
 }
 
 // ---- g. the real greens; H7 ----
 {
   // no green reads a cliff: the steepest gradient over each green box (a 60 x
-  // 60 sampling) under 35 % (the steepest is H21's 30 %; H3's read 136 % before
-  // the nodes bled into its water holes were dropped)
+  // 60 sampling) under 35 % (the steepest is H21's 30 %; H3 read 136 % until
+  // build-terrain left the two nodes bled into its water holes out of the
+  // mask, B4b, and reads 13 % now)
   const all = JSON.parse(readFileSync(join(root, "public/derived.json"), "utf8")).holes, o = new Float64Array(2), steep = [];
   for (let n = 1; n <= 21; n++) {
     const d = all[n], g = parseGreenHeights(readFileSync(join(root, `public/terrain/g${String(n).padStart(2, "0")}.bin`)));

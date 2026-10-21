@@ -1,5 +1,5 @@
 {
- "_note": "Course terrain for the app, written by tools/build-terrain.mjs from the WSR collision-mesh rasters (tools/mesh-heightmap.mjs) through tools/mesh-registration.json; read by src/terrain.js. hNN.bin: the ground height and KCL class on a w x h grid over the 250x304 map frame (sample (i, j) = the map px square [2i, 2i+2) x [2j, 2j+2), its centre at ((i+0.5)/w, (j+0.5)/h)), heights in ydPerUnit above the hole's datum (datumY, KCL units = 0.1 m: the WSR player start's height; datumYd the same in yd), nodata past the raster's crop; the classes are the KCL's, except that the raster's nodata takes what tools/map-style.json says the minimap draws there and its 1-2 px rasterising cracks are closed (the tool's header). gNN.bin: heights over the WSR green box + margin at stepYd, in unitYd above z0Yd (the green's mean height above the datum), with a mask of the WSR green outline. Byte layouts in the tool's header; both files repeat their own sizes, datum, box and units in a header. classes: per-hole sample counts by class; noHeight: samples past the raster's crop; cracks: raster px mended; deadPx: nodata raster px by what they became.",
+ "_note": "Course terrain for the app, written by tools/build-terrain.mjs from the WSR collision-mesh rasters (tools/mesh-heightmap.mjs) through tools/mesh-registration.json; read by src/terrain.js. hNN.bin: the ground height and KCL class on a w x h grid over the 250x304 map frame (sample (i, j) = the map px square [2i, 2i+2) x [2j, 2j+2), its centre at ((i+0.5)/w, (j+0.5)/h)), heights in ydPerUnit above the hole's datum (datumY, KCL units = 0.1 m: the WSR player start's height; datumYd the same in yd), nodata past the raster's crop; the classes are the KCL's, except that the raster's nodata takes what tools/map-style.json says the minimap draws there and its 1-2 px rasterising cracks are closed (the tool's header). gNN.bin: heights over the WSR green box + margin at stepYd, in unitYd above z0Yd (the green's mean height above the datum), with a mask of the WSR green outline (less green.pits nodes, where a hole's floor bleeds into the read). Byte layouts in the tool's header; both files repeat their own sizes, datum, box and units in a header. classes: per-hole sample counts by class; noHeight: samples past the raster's crop; cracks: raster px mended; deadPx: nodata raster px by what they became.",
  "version": 1,
  "w": 125,
  "h": 152,
@@ -158,13 +158,14 @@
     "stepYd": 0.5,
     "z0Yd": -7.918,
     "unitYd": 0.001,
-    "inside": 3262,
+    "inside": 3260,
+    "pits": 2,
     "rangeYd": [
      -16.36,
      1.045
     ],
     "bytes": 20464,
-    "sha1": "53aeab82e5ef4d0b20eba93db190830834a26c53"
+    "sha1": "f4ee95fd5d74e191cd9c7aa7b20ab1bd5b09b42e"
    }
   },
   "4": {

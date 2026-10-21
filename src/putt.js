@@ -128,31 +128,25 @@ export function launchHop(rise) {
 
 // B4's green heights (src/terrain.js parseGreenHeights: a stepYd grid over the
 // WSR green box plus 0.12 of it, int16 in unitYd above z0Yd, mask = inside the
-// WSR green outline): the gradient at each node inside the outline by central
-// differences over the nodes inside (one-sided at its edge); a node outside
-// takes the gradient of the nearest node inside (breadth first), because the
-// margins hold KCL holes (water 130-160 u down round H3's green, a 25 yd drop
-// at the north edge of H17's box) that would read as cliffs. A node inside
-// the outline next to a drop of over PIT_YD outside it counts as outside too:
-// its height was sampled bilinearly from a raster pixel in the hole. That is
-// 10 nodes, all on H3, beside its 16-17 yd water holes (one reads 0.58 yd below
-// its neighbours, a 115 % slope); on the other 20 greens the biggest drop from
-// a node inside to one outside is 0.20 yd. Cached per grid.
-const PIT_YD = 1;
+// WSR green outline less the nodes tools/build-terrain.mjs leaves out as pits,
+// whose bilinear read took in a raster px of a KCL hole beside the green: two
+// on H3, which read 0.57 and 0.23 yd low beside its 16-17 yd water holes, one
+// 0.58 yd under the next node, a 115 % slope): the gradient at each node in
+// the mask by central differences over the nodes in it (one-sided at its
+// edge); a node outside takes the gradient of the nearest node inside
+// (breadth first), because the margins hold KCL holes (water 130-160 u down
+// round H3's green, a 25 yd drop at the north edge of H17's box) that would
+// read as cliffs. The mask is read as shipped: B4's belt here, which also
+// dropped a masked node beside a drop of over 1 yd to a node outside the
+// mask, went with B4b, since on the fixed grids it only discarded sound
+// nodes, eight on H3 at the rim of those holes and none elsewhere, and moved
+// the gradient there by up to 2.5 slope points. The steepest gradient a green
+// box reads is H21's 30 %, H3's 13 % (tools/test-putt.mjs g). Cached per grid.
 const gradCache = new WeakMap();
 function nodeGrads(g) {
   let c = gradCache.get(g);
   if (c) return c;
-  const { w, h, data } = g, n = w * h, s = g.unitYd / g.stepYd, pit = PIT_YD / g.unitYd;
-  const mask = Uint8Array.from(g.mask);
-  for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) {
-    const k = j * w + i;
-    if (!g.mask[k]) continue;
-    for (let dj = -1; dj <= 1 && mask[k]; dj++) for (let di = -1; di <= 1; di++) {
-      const ii = i + di, jj = j + dj, kk = jj * w + ii;
-      if (ii >= 0 && jj >= 0 && ii < w && jj < h && !g.mask[kk] && data[k] - data[kk] > pit) { mask[k] = 0; break; }
-    }
-  }
+  const { w, h, data, mask } = g, n = w * h, s = g.unitYd / g.stepYd;
   const gx = new Float64Array(n), gy = new Float64Array(n), got = new Uint8Array(n), queue = new Int32Array(n);
   let qn = 0;
   for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) {

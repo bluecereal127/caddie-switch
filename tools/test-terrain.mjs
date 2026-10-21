@@ -17,7 +17,9 @@
 //     (KNOWN below, tools/MESHES.md "Where the model and the KCL differ") -
 //     known differences, not bugs; and the nodata the minimap draws as water
 //  6. the green grids against tools/wsr-truth.json gridPct (9x9 cells built
-//     the same way): direction within 20 deg and size within 20%
+//     the same way): direction within 20 deg and size within 20%; each mask
+//     the WSR outline less index.json's pits, and no node in it reading a
+//     KCL hole (H3's case)
 //  7. derived.json's trees: kind, size and sy as in wsr-pins.json, z = the
 //     tree's meshY above the WSR start's height in yd
 //  8. lieOf, and the loaders through a fetch stand-in (one fetch per file,
@@ -167,6 +169,49 @@ for (let n = 1; n <= 21; n++) {
   // the two grids agree where both reach: the coarse grid at the green centre
   const [gcx, gcy] = tr.greenCentre, dh = T.heightAt(terr[n], gcx, gcy) - T.greenHeightAt(g, gcx, gcy);
   ok(Math.abs(dh) <= 0.3, `H${n} terrain and green grid differ by ${dh.toFixed(2)} yd at the green centre`);
+}
+
+// 6b. the masks: the WSR outline less the nodes build-terrain leaves out as
+// reading a KCL hole (index.json green.pits), and no node left in a mask
+// below the surface round it: none more than PIT_DEV_YD under the mean of its
+// 8 neighbours in the mask, no step to a 4-neighbour in it steeper than
+// PIT_STEP. H3's case: two nodes at its green's edge beside a water hole
+// 16.6 yd down read 0.52 and 0.12 yd under their neighbours' mean, the first
+// 0.58 yd under the next node, a 115% step (the second passes both bounds,
+// a 48% step: build-terrain finds it by the raster px its read takes in, so
+// pits is checked too); H3's mask held 3,262 nodes before B4b (the whole
+// outline), 3,260 after. A 1 yd bound on a node's own height would catch
+// neither; on the other 20 greens a node lies at most 0.11 yd under its
+// neighbours' mean (H19) and the steepest step is 30% (H21).
+{
+  const PIT_DEV_YD = 0.25, PIT_STEP = 0.5;
+  let dev = 0, devAt = "", step = 0, stepAt = "";
+  for (let n = 1; n <= 21; n++) {
+    const g = green[n], e = index.holes[n].green, poly = truth[n].greenPoly;
+    let inMask = 0, offOutline = 0, leftOut = 0;
+    for (let j = 0; j < g.h; j++) for (let i = 0; i < g.w; i++) {
+      const k = j * g.w + i, inPoly = pointInPoly(poly, g.box.x0 + (i / (g.w - 1)) * (g.box.x1 - g.box.x0), g.box.y0 + (j / (g.h - 1)) * (g.box.y1 - g.box.y0));
+      if (!g.mask[k]) { if (inPoly) leftOut++; continue; }
+      inMask++; if (!inPoly) offOutline++;
+      let s = 0, c = 0;
+      for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) {
+        const ii = i + di, jj = j + dj;
+        if ((di || dj) && ii >= 0 && jj >= 0 && ii < g.w && jj < g.h && g.mask[jj * g.w + ii]) { s += g.data[jj * g.w + ii]; c++; }
+      }
+      const d = c ? (s / c - g.data[k]) * g.unitYd : 0;
+      ok(d <= PIT_DEV_YD, `H${n} green node (${i}, ${j}) lies ${d.toFixed(3)} yd under its neighbours' mean`);
+      if (d > dev) { dev = d; devAt = `H${n} (${i}, ${j})`; }
+      for (const kk of [i < g.w - 1 ? k + 1 : -1, j < g.h - 1 ? k + g.w : -1]) {
+        if (kk < 0 || !g.mask[kk]) continue;
+        const st = (Math.abs(g.data[kk] - g.data[k]) * g.unitYd) / g.stepYd;
+        ok(st <= PIT_STEP, `H${n} green node (${i}, ${j}): a ${(100 * st).toFixed(0)}% step to its neighbour`);
+        if (st > step) { step = st; stepAt = `H${n} (${i}, ${j})`; }
+      }
+    }
+    ok(inMask === e.inside && !offOutline && leftOut === (e.pits ?? 0), `H${n} green mask: ${inMask} nodes (index.json ${e.inside}), ${offOutline} outside the WSR outline, ${leftOut} inside it left out (index.json pits ${e.pits ?? 0})`);
+  }
+  ok(index.holes[3].green.pits > 0, "H3: no green node left out beside its water holes");
+  console.log(`green masks: the WSR outline less ${Object.entries(index.holes).filter(([, e]) => e.green.pits).map(([n, e]) => `${e.green.pits} on H${n}`).join(", ") || "none"} (H3 ${index.holes[3].green.inside} nodes); deepest node under its neighbours' mean ${dev.toFixed(3)} yd (${devAt}), steepest step ${(100 * step).toFixed(1)}% (${stepAt})`);
 }
 
 // 7. derived.json trees against wsr-pins.json (the on-map subset, in order)
