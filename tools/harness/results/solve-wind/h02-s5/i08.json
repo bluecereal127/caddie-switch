@@ -246,7 +246,41 @@
    "target": 1,
    "nearYd": 0.3333,
    "legacy": "holed under the first rule (before the 1-ft rule; the flag cloth as the tee state drew it)"
+  },
+  "0:8": {
+   "dir": 0,
+   "speedIdx": 8,
+   "mph": 16,
+   "rule": "near",
+   "target": 1,
+   "nearYd": 0.3333,
+   "solved": true,
+   "tries": 1,
+   "ms": 49558,
+   "strokes": [
+    {
+     "k": 1,
+     "club": "5iron",
+     "power": 0.8870000000000006,
+     "gamePower": 0.8870634436607361,
+     "heading": -3.035749912261963,
+     "from": [
+      500.1000061035156,
+      -3.450000047683716,
+      548.7000122070312
+     ],
+     "lie": 15,
+     "rest": [
+      301.2103576660156,
+      -175.4971923828125,
+      -789.5432739257812
+     ],
+     "holed": true,
+     "toPin": 0.08628024127458238,
+     "how": "roll"
+    }
+   ]
   }
  },
- "updated": "2026-10-22T14:27:58.050Z"
+ "updated": "2026-10-22T16:44:03.615Z"
 }

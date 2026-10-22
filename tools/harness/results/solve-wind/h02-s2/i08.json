@@ -212,7 +212,75 @@
    "target": 1,
    "nearYd": 0.3333,
    "legacy": "holed under the first rule (before the 1-ft rule; the flag cloth as the tee state drew it)"
+  },
+  "0:8": {
+   "dir": 0,
+   "speedIdx": 8,
+   "mph": 16,
+   "rule": "near",
+   "target": 1,
+   "nearYd": 0.3333,
+   "solved": true,
+   "tries": 1,
+   "ms": 28326,
+   "strokes": [
+    {
+     "k": 1,
+     "club": "spoon",
+     "power": 0.37150305793715543,
+     "gamePower": 0.37155959010124207,
+     "heading": -2.8989005088806152,
+     "from": [
+      500.1000061035156,
+      -3.450000047683716,
+      548.7000122070312
+     ],
+     "lie": 15,
+     "rest": [
+      174.57801818847656,
+      -179.0587158203125,
+      -804.8282470703125
+     ],
+     "holed": true,
+     "toPin": 0.10936059691385563,
+     "how": "roll"
+    }
+   ]
+  },
+  "4:8": {
+   "dir": 4,
+   "speedIdx": 8,
+   "mph": 16,
+   "rule": "near",
+   "target": 1,
+   "nearYd": 0.3333,
+   "solved": true,
+   "tries": 1,
+   "ms": 53158,
+   "strokes": [
+    {
+     "k": 1,
+     "club": "7iron",
+     "power": 0.7380000000000004,
+     "gamePower": 0.7380319833755493,
+     "heading": -2.84605073928833,
+     "from": [
+      500.1000061035156,
+      -3.450000047683716,
+      548.7000122070312
+     ],
+     "lie": 15,
+     "rest": [
+      173.3041534423828,
+      -179.0587158203125,
+      -803.54541015625
+     ],
+     "holed": true,
+     "toPin": 0.08980760662674979,
+     "how": "roll"
+    }
+   ]
   }
  },
- "updated": "2026-10-22T14:27:58.046Z"
+ "updated": "2026-10-22T16:43:26.621Z"
 }
