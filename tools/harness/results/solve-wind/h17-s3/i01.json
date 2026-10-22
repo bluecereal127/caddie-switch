@@ -1,0 +1,132 @@
+{
+ "hole": 17,
+ "cup": "s3",
+ "label": "AM",
+ "sets": [
+  2
+ ],
+ "par": 3,
+ "speedIdx": 1,
+ "mph": 2,
+ "winds": {
+  "0:1": {
+   "dir": 0,
+   "speedIdx": 1,
+   "mph": 2,
+   "rule": "near",
+   "target": 1,
+   "nearYd": 0.3333,
+   "solved": false,
+   "tries": 0,
+   "ms": 9212,
+   "strokes": null
+  },
+  "1:1": {
+   "dir": 1,
+   "speedIdx": 1,
+   "mph": 2,
+   "rule": "near",
+   "target": 1,
+   "nearYd": 0.3333,
+   "solved": false,
+   "tries": 0,
+   "ms": 8713,
+   "strokes": null
+  },
+  "2:1": {
+   "dir": 2,
+   "speedIdx": 1,
+   "mph": 2,
+   "rule": "near",
+   "target": 1,
+   "nearYd": 0.3333,
+   "solved": false,
+   "tries": 0,
+   "ms": 10358,
+   "strokes": null
+  },
+  "3:1": {
+   "dir": 3,
+   "speedIdx": 1,
+   "mph": 2,
+   "rule": "near",
+   "target": 1,
+   "nearYd": 0.3333,
+   "solved": false,
+   "tries": 0,
+   "ms": 7738,
+   "strokes": null
+  },
+  "4:1": {
+   "dir": 4,
+   "speedIdx": 1,
+   "mph": 2,
+   "rule": "near",
+   "target": 1,
+   "nearYd": 0.3333,
+   "solved": false,
+   "tries": 0,
+   "ms": 6955,
+   "strokes": null
+  },
+  "5:1": {
+   "dir": 5,
+   "speedIdx": 1,
+   "mph": 2,
+   "rule": "near",
+   "target": 1,
+   "nearYd": 0.3333,
+   "solved": false,
+   "tries": 0,
+   "ms": 7718,
+   "strokes": null
+  },
+  "6:1": {
+   "dir": 6,
+   "speedIdx": 1,
+   "mph": 2,
+   "rule": "near",
+   "target": 1,
+   "nearYd": 0.3333,
+   "solved": false,
+   "tries": 3,
+   "ms": 61465,
+   "strokes": null
+  },
+  "7:1": {
+   "dir": 7,
+   "speedIdx": 1,
+   "mph": 2,
+   "rule": "near",
+   "target": 1,
+   "nearYd": 0.3333,
+   "solved": true,
+   "tries": 1,
+   "ms": 28260,
+   "strokes": [
+    {
+     "k": 1,
+     "club": "spoon",
+     "power": 0.9540000000000006,
+     "gamePower": 0.9541319608688354,
+     "heading": 2.8946876525878906,
+     "from": [
+      -55.20000076293945,
+      0.949999988079071,
+      1142.800048828125
+     ],
+     "lie": 15,
+     "rest": [
+      434.49884033203125,
+      202.04014587402344,
+      -754.5708618164062
+     ],
+     "holed": true,
+     "toPin": 0.106737779117779,
+     "how": "roll"
+    }
+   ]
+  }
+ },
+ "updated": "2026-10-22T20:47:00.058Z"
+}

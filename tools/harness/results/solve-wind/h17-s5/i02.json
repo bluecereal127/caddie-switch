@@ -1,0 +1,132 @@
+{
+ "hole": 17,
+ "cup": "s5",
+ "label": "AL",
+ "sets": [
+  2
+ ],
+ "par": 3,
+ "speedIdx": 2,
+ "mph": 4,
+ "winds": {
+  "0:2": {
+   "dir": 0,
+   "speedIdx": 2,
+   "mph": 4,
+   "rule": "near",
+   "target": 1,
+   "nearYd": 0.3333,
+   "solved": false,
+   "tries": 3,
+   "ms": 63906,
+   "strokes": null
+  },
+  "1:2": {
+   "dir": 1,
+   "speedIdx": 2,
+   "mph": 4,
+   "rule": "near",
+   "target": 1,
+   "nearYd": 0.3333,
+   "solved": false,
+   "tries": 0,
+   "ms": 9790,
+   "strokes": null
+  },
+  "2:2": {
+   "dir": 2,
+   "speedIdx": 2,
+   "mph": 4,
+   "rule": "near",
+   "target": 1,
+   "nearYd": 0.3333,
+   "solved": false,
+   "tries": 0,
+   "ms": 9815,
+   "strokes": null
+  },
+  "3:2": {
+   "dir": 3,
+   "speedIdx": 2,
+   "mph": 4,
+   "rule": "near",
+   "target": 1,
+   "nearYd": 0.3333,
+   "solved": true,
+   "tries": 1,
+   "ms": 24753,
+   "strokes": [
+    {
+     "k": 1,
+     "club": "spoon",
+     "power": 0.9052101814188406,
+     "gamePower": 0.9053953289985657,
+     "heading": 2.9387874603271484,
+     "from": [
+      -55.20000076293945,
+      0.949999988079071,
+      1142.800048828125
+     ],
+     "lie": 15,
+     "rest": [
+      380.786865234375,
+      199.9028778076172,
+      -705.9414672851562
+     ],
+     "holed": true,
+     "toPin": 0.10496847634014043,
+     "how": "roll"
+    }
+   ]
+  },
+  "4:2": {
+   "dir": 4,
+   "speedIdx": 2,
+   "mph": 4,
+   "rule": "near",
+   "target": 1,
+   "nearYd": 0.3333,
+   "solved": false,
+   "tries": 0,
+   "ms": 9904,
+   "strokes": null
+  },
+  "5:2": {
+   "dir": 5,
+   "speedIdx": 2,
+   "mph": 4,
+   "rule": "near",
+   "target": 1,
+   "nearYd": 0.3333,
+   "solved": false,
+   "tries": 0,
+   "ms": 9308,
+   "strokes": null
+  },
+  "6:2": {
+   "dir": 6,
+   "speedIdx": 2,
+   "mph": 4,
+   "rule": "near",
+   "target": 1,
+   "nearYd": 0.3333,
+   "solved": false,
+   "tries": 0,
+   "ms": 8701,
+   "strokes": null
+  },
+  "7:2": {
+   "dir": 7,
+   "speedIdx": 2,
+   "mph": 4,
+   "rule": "near",
+   "target": 1,
+   "nearYd": 0.3333,
+   "solved": false,
+   "tries": 3,
+   "ms": 66341,
+   "strokes": null
+  }
+ },
+ "updated": "2026-10-22T20:37:24.727Z"
+}
