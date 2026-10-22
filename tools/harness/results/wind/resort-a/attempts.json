@@ -1,0 +1,17 @@
+[
+ {
+  "n": 1,
+  "instance": 15,
+  "holes": {
+   "1": 2,
+   "2": 1,
+   "3": 3
+  },
+  "strokes": 6,
+  "toPar": -6,
+  "complete": true,
+  "why": "played",
+  "card": "results/wind/resort-a/card-1.png",
+  "ended": "2026-10-22T12:45:31.278Z"
+ }
+]

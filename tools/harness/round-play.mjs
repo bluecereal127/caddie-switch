@@ -350,6 +350,37 @@ export async function playHole({ gdb, dsu, hole, last = false, maxStrokes = 15, 
         if (adjust) log(`hole ${hole} stroke ${k}: [${P.playbook.near ? "playbook-near" : "playbook"} ${P.playbook.cup} ${P.playbook.k}] the D-pad reached ${(reached * R2D).toFixed(4)} deg${reached !== aim.heading ? ` (it read ${(aim.heading * R2D).toFixed(4)})` : ""}, ${(angDiff(reached, planReach) * R2D).toFixed(4)} deg off the plan's ${(planReach * R2D).toFixed(4)}: power ${pl.power.toFixed(4)} -> ${power.toFixed(4)}${adjust.kept ? " (kept)" : ""} (${adjust.ms} ms): ${adjust.why}`);
       }
     }
+    // a planner's holing stroke (round-planner's expect.src candidate:holing)
+    // whose aim the D-pad did not reach exactly (it drifts 0.001-0.055 deg with
+    // the release timing): the power that holes at the aim it did reach, in the
+    // hole's own wind, by the planner's own round-model.mjs (the rolling-in rule
+    // of hole-solve.mjs; the middle of the longest holing run of powers +-0.02
+    // by 0.0005), the plan's power when nothing holes there. Putts are left as
+    // planned. Computing only, the CPU halted, nothing waited for.
+    else if (pl.club !== "putter" && pl.expect?.src === "candidate:holing" && Number.isFinite(pl.power) && typeof Pl.models === "function") {
+      try {
+        let reached = aim.heading;
+        try { const hh = await headingNow(gdb); if (Number.isFinite(hh)) reached = hh; } catch { /* the D-pad's own reading */ }
+        if (Math.abs(angDiff(reached, pl.heading)) > 0.0005 * (Math.PI / 180)) {
+          const t0 = Date.now(), { RM } = await Pl.models();
+          const lie = st.player.lie, BUNKER = { driver: 0.25, spoon: 0.25, "3iron": 0.5, "5iron": 0.5, "7iron": 0.5, "9iron": 0.5, wedge: 0.75 };
+          const cap = lie === 2 ? 0.75 : lie === 3 || lie === 16 ? BUNKER[pl.club] ?? 1 : 1, lo = 0.1 * cap;
+          const rolls = (o) => o.holed && !!o.cupPass && o.cupPass.h < 0.25 && (!o.flag || (o.flag.vn * 240) / YD <= 3.4);
+          const qs = [];
+          for (let q = pl.power - 0.02; q <= pl.power + 0.02 + 1e-9; q += 0.0005) if (q >= lo - 1e-9 && q <= cap + 1e-9) qs.push(+q.toFixed(5));
+          const ok = qs.map((q) => rolls(RM.predict({ hole, ball: st.ball.pos, heading: reached, club: pl.club, power: q, lie, wind: st.wind, pin: st.pin })));
+          let best = null;
+          for (let i = 0; i < ok.length; ) { if (!ok[i]) { i++; continue; } let j = i; while (j + 1 < ok.length && ok[j + 1]) j++; if (!best || j - i > best[1] - best[0]) best = [i, j]; i = j + 1; }
+          const R2D = 180 / Math.PI;
+          if (best) {
+            const q = qs[Math.floor((best[0] + best[1]) / 2)];
+            adjust = { planned: pl.power, power: q, heading: reached, ms: Date.now() - t0, why: `holes at the aim reached for ${qs[best[0]].toFixed(4)}-${qs[best[1]].toFixed(4)} (${best[1] - best[0] + 1} of ${qs.length})` };
+            power = q;
+          } else adjust = { planned: pl.power, power: pl.power, heading: reached, ms: Date.now() - t0, kept: true, why: "nothing holes at the aim reached: the plan's power" };
+          log(`hole ${hole} stroke ${k}: [holing, wind dir ${st.wind.dir} idx ${st.wind.speedIdx}] the D-pad reached ${(reached * R2D).toFixed(4)} deg, ${(angDiff(reached, pl.heading) * R2D).toFixed(4)} deg off the plan's ${(pl.heading * R2D).toFixed(4)}: power ${pl.power.toFixed(4)} -> ${power.toFixed(4)}${adjust.kept ? " (kept)" : ""} (${adjust.ms} ms): ${adjust.why}`);
+        }
+      } catch (e) { log(`hole ${hole} stroke ${k}: adjusting the holing power for the aim reached failed (${e.message}); the plan's power stands`); }
+    }
     let tStrike = null;
     const shot = await shoot(gdb, { dsu, power, powerMode: "game", holdWindow: false, keepGameSpin: true, trace: false, untilRest: "real", timeoutMs: 300000, onHandoff: async () => { tStrike = Date.now(); } });
     const b = shot.ball, holed = b.holeFrame >= 0;

@@ -451,3 +451,48 @@ Natural rounds of Wii Sports Resort golf in Dolphin (tools/harness/round-play.mj
 - The plan: [playbook h02-s0 1] 7iron 0.8790, aim -168.2484 deg (0.02 deg right of the pin line), 155.2 yd: stroke 1 of 1 of the calm-wind solution (target 1, par 3; results/solve/h02-s0.json); there the game launched 0.8792, the D-pad reached -168.2405 deg, and it holed
 
 ![round Resort A playbook #11 hole 2](highlights/resort-a-playbook-11-h02.png)
+
+## Hole-in-one: Classic B wind #1, hole 13 (par 3)
+
+- When: 2026-10-22 12:43:00 UTC, stroke 1 of the hole.
+- From: 145.68 yd to the pin, lie 15, wind 16 mph (the game's direction 3).
+- The swing: 5iron at 0.692 power (raw swing value 0.6534, the game's launch power 0.6918), aimed within 0.027 deg of the plan, struck 2.7 s after the ball was ready.
+- The plan: 5iron 0.6927 aimed -5.03 deg right of the pin, 145.7 yd: holes 68% under the aim's error (WSR's ball over the KCL, cup and flagstick in; 9 of 182 grid launches hole); 1.34 strokes to hole out (spoon 1.43, 7iron 1.59, 3iron 2.01); 1648 flights, 2739 ms
+
+![round Classic B wind #1 hole 13](highlights/classic-b-wind-1-h13.png)
+
+## Hole-in-one: Classic A wind #1, hole 11 (par 3)
+
+- When: 2026-10-22 12:43:52 UTC, stroke 1 of the hole.
+- From: 139.4 yd to the pin, lie 15, wind 0 mph (the game's direction 6).
+- The swing: 7iron at 0.913 power (raw swing value 0.8999, the game's launch power 0.9131), aimed within 0.016 deg of the plan, struck 2.1 s after the ball was ready.
+- The plan: 7iron 0.9155 aimed -0.19 deg right of the pin, 139.4 yd: holes 80% under the aim's error (WSR's ball over the KCL, cup and flagstick in; 21 of 182 grid launches hole); 1.22 strokes to hole out (3iron 1.36, 5iron 2.01, spoon 2.02); 1650 flights, 1221 ms
+
+![round Classic A wind #1 hole 11](highlights/classic-a-wind-1-h11.png)
+
+## Hole-in-one: Resort A wind #1, hole 2 (par 3)
+
+- When: 2026-10-22 12:43:57 UTC, stroke 1 of the hole.
+- From: 155.19 yd to the pin, lie 15, wind 4 mph (the game's direction 5).
+- The swing: 7iron at 0.906 power (raw swing value 0.8915, the game's launch power 0.9058), aimed within 0.022 deg of the plan, struck 1.9 s after the ball was ready.
+- The plan: 7iron 0.9026 aimed +2.08 deg right of the pin, 155.2 yd: holes 81% under the aim's error (WSR's ball over the KCL, cup and flagstick in; 84 of 182 grid launches hole); 1.21 strokes to hole out (spoon 1.21, 3iron 1.23, 5iron 2.01, 7iron (long) 2.01); 1922 flights, 1655 ms
+
+![round Resort A wind #1 hole 2](highlights/resort-a-wind-1-h02.png)
+
+## Albatross: Classic C wind #1, hole 18 (par 5)
+
+- When: 2026-10-22 12:44:44 UTC, stroke 2 of the hole.
+- From: 180.09 yd to the pin, lie 1, wind 22 mph (the game's direction 2).
+- The swing: spoon at 0.612 power (raw swing value 0.5191, the game's launch power 0.6124), aimed within 0.012 deg of the plan, struck 2.1 s after the ball was ready.
+- The plan: spoon 0.6109 aimed -4.75 deg right of the pin, 180.1 yd: holes 72% under the aim's error (WSR's ball over the KCL, cup and flagstick in; 35 of 182 grid launches hole); 1.32 strokes to hole out (3iron 1.43, driver 2.04, 3iron (long) 2.02); 2285 flights, 1574 ms
+
+![round Classic C wind #1 hole 18](highlights/classic-c-wind-1-h18.png)
+
+## Albatross: Classic A wind #1, hole 12 (par 5)
+
+- When: 2026-10-22 12:44:51 UTC, stroke 2 of the hole.
+- From: 217.27 yd to the pin, lie 1, wind 4 mph (the game's direction 0).
+- The swing: driver at 0.705 power (raw swing value 0.6251, the game's launch power 0.7051), aimed within 0.014 deg of the plan, struck 1.9 s after the ball was ready.
+- The plan: driver 0.7056 aimed -0.89 deg right of the pin, 217.3 yd: holes 70% under the aim's error (WSR's ball over the KCL, cup and flagstick in; 55 of 182 grid launches hole); 1.36 strokes to hole out (spoon 1.64, driver (long) 2.01); 1343 flights, 900 ms
+
+![round Classic A wind #1 hole 12](highlights/classic-a-wind-1-h12.png)

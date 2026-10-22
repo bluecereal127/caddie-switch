@@ -1,225 +1,98 @@
-// The stroke planner of a natural WSR round (tools/harness/round-play.mjs
-// imports it afresh before every stroke, so it can be improved while the
-// round goes on). It only reads the state the caller passes; nothing here
-// touches the game. Everything it knows is what a player sees (the ball, the
-// pin, the lie, the wind the game drew) plus the course's own geometry (the
-// KCL triangles, the trees), the port of WSR's ball (src/wsrsim.js) and what
-// the harness's own earlier strokes showed (results/knowledge/strokes.jsonl:
-// each stroke's plan against where the ball went; round-play.mjs adds every
-// stroke it plays).
-// - Full shots: launch lines round the line to the pin and round the game's
-//   own line, every club the lie allows at powers 0.10 to its cap in 0.02
-//   steps (the best refined to 0.01), each flown by the port over the KCL
-//   profile of its line WITH the game's wind (run({ wind }), WSR's wind law,
-//   which the harness found the port to follow to 0.3 yd at every power);
-//   the rest point is the stop along the line plus the wind's lateral drift.
-//   From rough or sand the ball leaves 2 deg right of the aim (LIE_YAW), so
-//   the aim is the launch line turned back by it. A candidate must come to
-//   rest on fairway, tee, green, fringe, rough or bunker with no hazard on
-//   the line from its carry to its stop, its landing and rest kept clear of
-//   water, out of bounds and valleys by a margin; it is scored by how far it
-//   rests from the pin plus a lie penalty (rough 4, bunker 12, fringe 0.5)
-//   and a little for less lofted clubs. When it cannot finish near the pin,
-//   six distinct rests are valued by the best second shot from each (a
-//   coarse search refined round its best), plus 1 yd for a rest in rough and
-//   3 in sand, and tried first in that order. The candidates are then flown
-//   again, traced, through the app's tree check (src/trees.js) and a trunk
-//   gap; the first that clears every tree by 2 yd is taken, else the first by
-//   1, else by 0. Every candidate is tried (hole 14's second stroke of rounds
-//   10 and 11 found its first clear shot at #511 of 3,880, past an old cap of
-//   300). Nothing clear: the same search over launch lines all round the ball.
-// - What earlier strokes showed: a line that put a ball into a tree or a
-//   hazard, or 15 yd and more from where the port said, from within 4 yd of
-//   this ball is not tried again (rounds 10 and 11 hit hole 14's trees from
-//   the same spot twice running); a candidate that repeats an earlier stroke
-//   (same hole and lie, ball within 1.5 yd, club, power within 0.006, launch
-//   line within 0.3 deg, the same wind) is moved by that stroke's miss of its
-//   own port prediction (the game is deterministic: identical strokes rest
-//   alike). The match was 3 yd / 0.03 / 1.5 deg until 2026-10-22: 0.03 of
-//   power is 6-9 yd of a driver, and the "repeats" it found landed on other
-//   ground (over the course attempts the corrected strokes missed their plans
-//   by 9.1 yd on Resort C and 7.1 on Classic B, against 5.9 and 3.9).
-// - On the green: the strength-forgiving read made with WSR's tick over the
-//   green's KCL triangles (lib/kclputt.mjs), searched round the app's read
-//   (src/putt.js solvePutt), which stands if the port finds no holing line.
-// - On the fringe: lib/play.mjs planStroke's putt over the KCL line.
+// A candidate stroke planner for the natural WSR rounds: a drop-in for
+// round-planner.mjs (the same exports, the same plan() shape; round-play.mjs
+// re-imports the planner before every stroke). It reads only the state the
+// caller passes (the ball, the pin, the lie, the wind the game drew) and the
+// course's own geometry; nothing here touches the game.
 //
-// CANDIDATE (2026-10-22, not live): the same planner with WSR's ball flown in
-// 3D over the hole's own KCL triangles (lib/kclshot.mjs shot3d: run()'s tick
-// over the triangles round the ball, cross-slopes, banks and walls included;
-// against the harness's real strokes it rests a median 0.19 yd from the game,
-// p90 1.6, where the 2D port above misses by 3.4 / 14). Where it pays:
-// - the 2D scan still generates the candidates, but its roll check lets a
-//   roll cross out-of-bounds ground (KCL 4, "outer") or a wall (12): WSR
-//   bounces and rolls on outer ground and only a ball RESTING there is out of
-//   bounds (FINDINGS.md; rounds 2 and 3 landed hole 12's drive on the forest
-//   floor and it rested on the island fairway). Such a candidate (`rel`) is
-//   only ever taken on its 3D flight. Water, valleys and no ground still reject.
-// - the first N3D_FIRST candidates in ranking order are flown again in 3D,
-//   and so is every candidate the later steps reach (the two-shot picks, the
-//   tree loop) up to N3D_MAX flights a search: the 3D flight replaces its
-//   carry, stop, drift, rest, rest lie and yd from the pin; a 3D hazard
-//   (water, valley, a rest on outer ground or below the course) or a rest off
-//   the legal lies rejects it; a repeat of an earlier stroke is moved by that
-//   stroke's miss of ITS 3D flight. A candidate the budget leaves unflown is
-//   judged as before (2D, the strict roll check).
-// - the hazard margins on a 3D flight: its landing (the first contact) keeps
-//   the margin from water, valleys and no ground but not from outer ground
-//   (it bounces there); its rest keeps the full margin (outer ground too).
-// - the two-shot picks value the 3D rests; the tree check and the trunk gap
-//   read the 3D path.
-// - a 3D candidate is taken only when it is robust: flown at q -+0.01 and the
-//   launch -+1 deg it still rests on a legal lie with no hazard, and its first
-//   contact is not within SEAM_YD of an outer-ground seam (the model's one
-//   known knife edge: hole 12's q 1.00 drive landing on the island's lip).
-// - predictAlong adds the 3D flight to `pred` (pred.k3d), and knowRow marks a
-//   stroke failed when it rests 15 yd from THAT (the model the plan was made
-//   with); rows without pred.k3d are judged against the 2D port as before.
-// plan(hole, st, { k3d: false }) is the live planner, unchanged.
+// Every stroke is judged by WSR's own ball (round-model.mjs fly(): the tick
+// over the course's KCL prisms, the trees, the flagstick, water, valleys and
+// out of bounds; replayed against 443 logged strokes it puts the rest a median
+// 0.02 yd from the game's), and the stroke chosen is the one with the fewest
+// expected strokes to hole out, not the one that rests nearest the pin:
+// - in reach of the pin (any club can rest there) it searches, per club, the
+//   launch that HOLES: a centre launch whose ball, with the cup taken away,
+//   comes to rest just past the pin, then a grid of aims and powers round it
+//   flown with the cup and the flagstick, then a fine grid round the holing
+//   region's best point, whose holed share under the D-pad's aim error (the
+//   logged residual: uniform within +-0.031 deg) and the model's own error
+//   (0.03 yd across, 0.08 yd along) is the chance to hole; a miss is worth
+//   the putt (or chip) it leaves;
+// - out of reach (or when a holing approach is poor) it scores a fan of
+//   clubs, powers and lines by where they rest: on what, how far from the
+//   pin, and the next stroke's power cap there (rough 3 bars, a bunker 1-2),
+//   through a value table of the expected strokes from a lie and a distance;
+//   the best few distinct rests are then valued by a reduced holing search
+//   from each (two shots ahead), and the winners' neighbours (power +-0.003
+//   of the cap, aim +-0.1 deg) are flown so a rest at an edge (a lip, a bank,
+//   the rough line, a canopy) is valued by where its neighbours go too;
+// - within SHORT_YD of the pin and on the fringe the same holing search runs
+//   with the chipping clubs (and the putter from the fringe), each candidate
+//   also scored as the pin-power assist would pull it (round-short.mjs's
+//   measured rule: PI_ASSIST of the strokes, the aim table's young states);
+// - on the green: round-short.mjs shortPlan (WSR's tick over the green's KCL,
+//   both launches: as swung and as the assist pulls), else the current
+//   planner's KCL read, else lib/play.mjs.
+// Every power is within the game's own range (the floor 0.1 of the lie's cap,
+// the putter's 0.05, to the cap): a pin nearer than the softest legal stroke
+// rests is played with that stroke.
+// The rough and bunker launch yaw (2 deg right of the aim) is the model's own
+// (round-model.mjs lieYaw): `heading` is the aim to set by D-pad.
+// Measured offline (2026-10-22) from the 1,308 distinct starting spots of the
+// logged strokes (rounds 1-13, the 3-hole course attempts): planning median
+// 1.9 s off the green (max 4.9 s), 1.0 s on it (max 4.8 s). Flown by the same
+// model and valued the same way, its strokes leave 1.43 expected strokes from a
+// par-3 tee (the old plans' 2.04), 1.39 from 40-240 yd (2.10), 1.05 for chips
+// (1.98), the model's holing chance 0.59, 0.64 and 0.95: the model's verdict,
+// untested by a deliberate hole-out in play.
+//   plan(hole, st) -> { club, power, heading, expect, why }
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { YD, kcl, groundAt, kclProfile, simOf, ATTR_LIE } from "./lib/course.mjs";
-import { shot3dSync } from "./lib/kclshot.mjs";
-import { lineTrees, appTreeCheck } from "./lib/apptrees.mjs";
+import { YD, kcl, groundAt as kclGround, kclProfile, simOf } from "./lib/course.mjs";
 import { greenModel, P } from "./lib/green.mjs";
 import { planStroke } from "./lib/play.mjs";
 import { run } from "../lib/wsrsim.mjs";
 import { packGreen, fastPutt } from "./lib/kclputt.mjs";
-import * as RM from "./round-model.mjs";
-
-// WSR's own trees, flagstick and out of bounds, the last word on a candidate
-// before it is taken: round-model.mjs predict() (WSR's tick over the disc's own
-// KCL and placement files, trees by their collision shapes; a median 0.02 yd
-// from where 443 logged strokes rested). A candidate it puts into water, out
-// of bounds or a valley, onto a lie that is not in play, into a tree that
-// moves its rest 4 yd or more, or 8 yd and more from the 3D rest, is not taken
-// (Classic C #20's hole 16 drive came down out of bounds off t16-94's canopy,
-// which the app's tree check passed by 8.4 yd; round-model put it 109.6 yd from
-// the pin, where it rested). If round-model cannot run, nothing is vetoed.
-function rmVeto(hole, ball, c, yaw, st) {
-  try {
-    const p = RM.predict({ hole, ball, heading: c.line.h + yaw, club: c.club, power: c.q, lie: st.player.lie, wind: { dir: st.wind.dir, speedIdx: st.wind.speedIdx, angle: st.wind.angle }, pin: st.pin });
-    if (p.holed) return null;
-    const tree = p.tree ? ` (${p.tree.code === 1 ? "the trunk" : "the canopy"} of ${p.tree.id})` : "";
-    if (p.hazard) return `${p.hazardName || "a hazard"}${tree}`;
-    if (!(p.restLie in PEN)) return `rests on ${p.restLie}${tree}`;
-    const d = Math.hypot(p.rest[0] - c.rest[0], p.rest[1] - c.rest[1]) / YD;
-    if (p.tree && d >= 4) return `rests ${d.toFixed(0)} yd from the 3D rest${tree}`;
-    if (d >= 8) return `rests ${d.toFixed(0)} yd from the 3D rest`;
-    return null;
-  } catch { return null; }
-}
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-const CLUBS_BY_LOFT = ["wedge", "9iron", "7iron", "5iron", "3iron", "spoon", "driver"];
-export const CLUB_INDEX = { driver: 0, spoon: 1, "3iron": 2, "5iron": 3, "7iron": 4, "9iron": 5, wedge: 6, putter: 7 };
-const BUNKER_CAP = { driver: 0.25, spoon: 0.25, "3iron": 0.5, "5iron": 0.5, "7iron": 0.5, "9iron": 0.5, wedge: 0.75 };
-const capOf = (club, lie) => (lie === 2 ? 0.75 : lie === 3 || lie === 16 ? BUNKER_CAP[club] : 1.0);
-const SURF = { 1: "fairway", 2: "rough", 3: "bunker", 6: "green", 9: "fringe", 15: "fairway", 16: "bunker" };
-const LIE_OF_ATTR = { 1: "fairway", 2: "rough", 3: "bunker", 6: "green", 9: "fringe", 10: "green", 11: "green", 15: "tee" };
-const PEN = { fairway: 0, tee: 0, green: 0, fringe: 0.5, rough: 4, bunker: 12 };
-// the second-shot ranking's lean against approaching from rough or sand (yd)
-const LIE_TIE = { rough: 1, bunker: 3 };
-const angDiff = (a, b) => Math.atan2(Math.sin(a - b), Math.cos(a - b));
 const DEG = Math.PI / 180;
+const deg = (r) => r / DEG;
+const angDiff = (a, b) => Math.atan2(Math.sin(a - b), Math.cos(a - b));
+const clamp = (x, a, b) => Math.min(Math.max(x, a), b);
 
-// From rough or sand a straight swing leaves 2 deg off the aim: WSR's lie yaw
-// (wsr-swing-redzone-spin.md 4.1: exactly 2.000 deg for a straight swing or
-// from 180 yd and more; which side was left open there). The natural rounds
-// give the side: their 86 rough strokes flown again by the port along the aim
-// turned 2 deg right (the heading less 2 deg) miss where the ball rested by
-// 2.5 yd at the median, against 5.9 along the aim; the six from sand 1.1
-// against 3.8; fairway strokes fit best along the aim (2.2). The search works
-// in launch lines and aims each one at the launch line plus the yaw.
+// the planning budget (ms) and the short game's reach (yd)
+export const BUDGET_MS = 6500;
+export const SHORT_YD = 40;
+// the putter from the fairway, rough or sand: off until a round has shown
+// the D-pad reaches it there (round-play.mjs's club change throws, and the
+// hole call with it, when it cannot)
+export const PUTTER_OFF_GREEN = false;
+
+export const CLUB_INDEX = { driver: 0, spoon: 1, "3iron": 2, "5iron": 3, "7iron": 4, "9iron": 5, wedge: 6, putter: 7 };
+const BY_LOFT = ["wedge", "9iron", "7iron", "5iron", "3iron", "spoon", "driver"];
+const BUNKER_CAP = { driver: 0.25, spoon: 0.25, "3iron": 0.5, "5iron": 0.5, "7iron": 0.5, "9iron": 0.5, wedge: 0.75, putter: 1 };
+export const capOf = (club, lie) => (club === "putter" ? 1 : lie === 2 ? 0.75 : lie === 3 || lie === 16 ? BUNKER_CAP[club] : 1);
+const isBunker = (lie) => lie === 3 || lie === 16;
+const SURF = { 1: "fairway", 2: "rough", 3: "bunker", 6: "green", 9: "fringe", 15: "fairway", 16: "bunker" };
+
+// ---- what round-play.mjs and the tools use of the planner (as round-planner.mjs) ----
 export const LIE_YAW = { 2: 2 * DEG, 3: 2 * DEG };
 export const launchOf = (aim, lie) => aim - (LIE_YAW[lie] ?? 0);
-
-// water, out of bounds or a valley within r yd of (x, z), or no ground at
-// all: the port flies a level-across line, so a ball that drifts in the wind
-// or rolls off a bank sideways can find a lake beside the line (rounds 3 and
-// 4 on hole 14 both did); landings and rests keep a margin from them
-const HAZ = new Set([4, 5, 7, 13]);
-// a 3D flight's landing: outer ground is not a hazard to bounce on
-const HAZ_LAND = new Set([5, 7, 13]);
-export function nearHazard(m, x, z, r, haz = HAZ) {
-  for (const f of [1, 0.5]) for (let a = 0; a < 8; a++) {
-    const t = (a * Math.PI) / 4, g = groundAt(m, x + Math.sin(t) * r * f * YD, z + Math.cos(t) * r * f * YD);
-    if (!g || haz.has(g.attr)) return true;
-  }
-  return false;
-}
-const marginYd = (yd) => 2 + 0.025 * yd;
-
-// the 3D flight's budget per search (fullShot): the first N3D_FIRST in the
-// ranking, then lazily whatever the picks and the tree loop reach, up to
-// N3D_MAX in all (a count, not a clock, so a plan does not depend on the
-// machine's load); the robustness flights (4 a taken candidate) come on top
-export const N3D_FIRST = 150, N3D_MAX = 600;
-export const ROBUST = { dq: 0.01, dh: 1 * (Math.PI / 180) };
-export const SEAM_YD = 1;
-export const USE_3D = process.env.PLANNER_3D !== "0";
-
-// the least gap (yd) between the ball's path and a trunk, less the margin the
-// path's own error needs at that point of it: none at the ball, growing to
-// 1 yd by 8 yd out (0.2 + 0.1 yd a yard), plus 1.5 % of the distance along
-// (k scales it: 0.5 for the relaxed search). The app's tree check
-// (src/trees.js treeCheck) weighs a canopy's clearance, not the trunk's
-// sideways gap, and checks the flight and 5 yd of the bounce only; rounds 2
-// and 3 both put hole 16's second stroke into tree t16-4's trunk on a path it
-// passed "under by 2.4 yd", 0.5 yd from the trunk. Over the whole path (the
-// roll too), wherever the ball is within a trunk's height. (The margin was a
-// flat 1 yd + 1.5 % of the tree's distance until Classic B #3's hole 14: its
-// ball came to rest 1.4 yd behind t14-46's trunk, every path then failed at
-// its very first point, even those leaving the tree behind, and the old
-// fallback hit the trunk five times running.)
-const TRUNK = { 2: { r: 6, top: 60 }, 3: { r: 4.4, top: 70 }, 6: { r: 7, top: 132 } };
-const trunkNeed = (a) => Math.min(1, 0.2 + 0.1 * Math.max(0, a)) + 0.015 * Math.max(0, a);
-function trunkGap(trees, o, k = 1) {
-  let worst = Infinity;
-  for (const t of trees ?? []) {
-    const T = TRUNK[t.kind];
-    if (!T) continue;
-    const r = (T.r * t.sx + 0.5) / YD, top = (T.top * t.sy) / YD;
-    for (const p of o.path ?? []) {
-      const [a, y, lat = 0] = p, hb = y - (t.z ?? 0);
-      if (hb < -r || hb > top + r || Math.abs(a - t.s) > r + 6) continue;
-      const gap = Math.hypot(a - t.s, lat - t.l) - r - k * trunkNeed(a);
-      if (gap < worst) worst = gap;
-    }
-  }
-  return worst;
-}
-// a candidate's landing and rest, each with its margin (times k), clear of hazards
-function clearOf(m, ball, c, k = 1) {
-  const { dx, dz } = c.line, lat = c.o.lateral ?? 0, f = c.o.stop > 0 ? Math.min(1, c.o.carry / c.o.stop) : 1;
-  const lx = ball[0] + (dx * c.o.carry - dz * lat * f) * YD, lz = ball[2] + (dz * c.o.carry + dx * lat * f) * YD;
-  return !nearHazard(m, lx, lz, k * marginYd(c.o.carry)) && !nearHazard(m, c.rest[0], c.rest[1], k * marginYd(c.o.stop));
-}
-// the same for a candidate flown in 3D: its own first contact (no margin from
-// outer ground there: WSR bounces on it) and its 3D rest (the full margin)
-function clear3d(m, c, k = 1) {
-  const L = c.first3;
-  return !(L && nearHazard(m, L[0], L[2], k * marginYd(c.o.carry), HAZ_LAND)) && !nearHazard(m, c.rest[0], c.rest[1], k * marginYd(c.o.stop));
-}
-const clr = (m, ball, c, k = 1) => (c.k3d ? clear3d(m, c, k) : clearOf(m, ball, c, k));
-const deg = (r) => (r * 180) / Math.PI;
-
-// the game's wind relative to a heading, for run(): mph (WSR: 2 per speed
-// index), deg 0 = a tailwind, 90 = toward the right (the air moving along
-// (sin a, cos a) in x east / z south, fieldManager+0x78)
+// the game's wind relative to a heading, for src/wsrsim.js run(): mph, deg 0 = tail, 90 = toward the right
 export function windAlong(st, dx, dz) {
   if (!st.wind.speedIdx) return null;
   const a = st.wind.angle, wx = Math.sin(a), wz = Math.cos(a);
   return { mph: 2 * st.wind.speedIdx, deg: deg(Math.atan2(wx * -dz + wz * dx, wx * dx + wz * dz)) };
 }
-
-// What the harness's earlier strokes showed (results/knowledge/strokes.jsonl,
-// one stroke a line: hole, the ball, lie, club, game power q, the launch line
-// `launch` (the aim less the lie yaw), wind, the port's prediction along the
-// launch line `pred` { stop, lateral } and where the ball went: `end`, the
-// rest or, for a hazard, the spot the game took it from; `fail` when it went
-// into a hazard or a tree or rested 15 yd and more from the prediction).
+// water, out of bounds or a valley within r yd of (x, z) on the OBJ mesh m, or no ground (as before)
+const HAZ = new Set([4, 5, 7, 13]);
+export function nearHazard(m, x, z, r) {
+  for (const f of [1, 0.5]) for (let a = 0; a < 8; a++) {
+    const t = (a * Math.PI) / 4, g = kclGround(m, x + Math.sin(t) * r * f * YD, z + Math.cos(t) * r * f * YD);
+    if (!g || HAZ.has(g.attr)) return true;
+  }
+  return false;
+}
 export const KNOW = path.join(HERE, "results", "knowledge", "strokes.jsonl");
 let known = { mtime: -1, rows: [] };
 export function knowledge() {
@@ -227,7 +100,8 @@ export function knowledge() {
     const t = fs.statSync(KNOW).mtimeMs;
     if (t !== known.mtime) {
       // a later row of the same stroke replaces the earlier one (round-play.mjs
-      // marks a stroke failed when the game put the ball back where it was hit)
+      // marks a stroke failed when the game put the ball back where it was hit),
+      // as round-planner.mjs reads them
       const bySrc = new Map();
       let i = 0;
       for (const l of fs.readFileSync(KNOW, "utf8").split("\n")) { if (!l) continue; try { const r = JSON.parse(l); bySrc.set(r.src ?? `row ${i++}`, r); } catch { /* a torn line */ } }
@@ -236,378 +110,601 @@ export function knowledge() {
   } catch { known = { mtime: -1, rows: [] }; }
   return known.rows;
 }
-const near = (a, b, yd) => Math.hypot(a[0] - b[0], a[2] - b[2]) / YD < yd;
-// the port's flight of a stroke along its launch line, at the power the game
-// launched it with (a knowledge row's pred)
+// the line model's flight of a stroke along its launch line (the knowledge rows' pred, as before)
 export async function predictAlong(hole, from, lie, wind, club, q, launch) {
   const dx = Math.sin(launch), dz = Math.cos(launch), prof = await kclProfile(hole, from[0], from[2], dx, dz);
   if (!prof) return null;
   const o = run({ club, q, surface: SURF[lie] ?? "fairway", profile: simOf(prof), wind: windAlong({ wind }, dx, dz), trace: false });
-  const pred = { carry: +o.carry.toFixed(2), stop: +o.stop.toFixed(2), lateral: +(o.lateral ?? 0).toFixed(2) };
-  // the 3D flight too (additive: old readers see the 2D fields unchanged)
-  if (USE_3D) {
-    const m = await kcl(hole);
-    if (m) {
-      const s = shot3dSync(m, { from, launch, club, q, lie, wind: windAlong({ wind }, dx, dz) });
-      pred.k3d = { carry: +s.carry.toFixed(2), stop: +s.stop.toFixed(2), lateral: +(s.lateral ?? 0).toFixed(2), hazard: s.hazard, restLie: ATTR_LIE[s.restAttr] ?? s.restAttr };
-    }
-  }
-  return pred;
+  return { carry: +o.carry.toFixed(2), stop: +o.stop.toFixed(2), lateral: +(o.lateral ?? 0).toFixed(2) };
 }
-// a played stroke as a knowledge row (wind = { dir, speedIdx, angle })
 export function knowRow({ src, at, hole, k, lie, from, pin, wind, club, q, aim, pred, rest, hazard = 0, placed = null, holed = false }) {
   const launch = club === "putter" ? aim : launchOf(aim, lie);
   const end = hazard && placed ? placed.from : rest;
   let fail = null;
   if (hazard) fail = `hazard ${hazard}`;
   else if (pred && !holed && club !== "putter") {
-    // against the 3D flight when the row has one (the model the plan used)
-    const P = pred.k3d && !pred.k3d.hazard ? pred.k3d : pred;
     const dx = Math.sin(launch), dz = Math.cos(launch);
-    const px = from[0] + (dx * P.stop - dz * P.lateral) * YD, pz = from[2] + (dz * P.stop + dx * P.lateral) * YD;
+    const px = from[0] + (dx * pred.stop - dz * pred.lateral) * YD, pz = from[2] + (dz * pred.stop + dx * pred.lateral) * YD;
     const miss = Math.hypot(end[0] - px, end[2] - pz) / YD;
     if (miss >= 15) fail = `rested ${miss.toFixed(0)} yd from the port's rest`;
   }
   return { src, at, hole, k, lie, from, pin, wind: { dir: wind.dir, speedIdx: wind.speedIdx }, club, q, aim, launch, pred, end, rest, hazard, holed, fail };
 }
 export function appendKnow(row) { fs.mkdirSync(path.dirname(KNOW), { recursive: true }); fs.appendFileSync(KNOW, JSON.stringify(row) + "\n"); }
-// the lines that failed from about here
-function failedLines(hole, ball) {
-  return knowledge().filter((r) => r.hole === hole && r.fail && r.club !== "putter" && near(r.from, ball, 4)).map((r) => ({ h: r.launch, why: r.fail, club: r.club, src: r.src }));
+
+// ---- the models, imported afresh when their files change (round-play.mjs
+// re-imports only the planner; a static import would freeze them for the
+// rest of a running round). A replaced round-model.mjs has its courses
+// dropped first, so the old copy holds no meshes.
+async function fresh(file, key) {
+  const t = fs.statSync(file).mtimeMs, g = (globalThis.__plannerCandidateMods ??= {});
+  if (g[key] && g[key].t === t) return g[key].mod;
+  const mod = await import(`${pathToFileURL(file).href}?v=${t}`);
+  if (g[key]?.mod?.dropCourse) for (let h = 1; h <= 21; h++) g[key].mod.dropCourse(h);
+  g[key] = { t, mod };
+  return mod;
 }
-// an earlier stroke this candidate repeats, with its miss of the port in its
-// own launch frame (along, across); q is the power the game launched with
-// and pred the port's flight at it
-function repeatOf(hole, ball, c, st) {
-  let best = null;
-  for (const r of knowledge()) {
-    if (r.hole !== hole || r.fail || r.club !== c.club || !r.pred || !r.end || r.hazard || r.lie !== st.player.lie) continue;
-    if (Math.abs(r.q - c.q) > 0.006 || Math.abs(angDiff(r.launch, c.line.h)) > 0.3 * DEG || !near(r.from, ball, 1.5)) continue;
-    if (r.wind?.dir !== st.wind.dir || r.wind?.speedIdx !== st.wind.speedIdx) continue;
-    const e = Math.abs(r.q - c.q) / 0.006 + Math.abs(angDiff(r.launch, c.line.h)) / (0.3 * DEG) + Math.hypot(r.from[0] - ball[0], r.from[2] - ball[2]) / (1.5 * YD);
-    if (best && e >= best.e) continue;
-    const dx = Math.sin(r.launch), dz = Math.cos(r.launch), ex = r.end[0] - r.from[0], ez = r.end[2] - r.from[2];
-    best = { e, src: r.src, row: r, along: (ex * dx + ez * dz) / YD - r.pred.stop, across: (ex * -dz + ez * dx) / YD - r.pred.lateral };
-  }
-  return best;
+const RM_FILE = path.join(HERE, "round-model.mjs"), RS_FILE = path.join(HERE, "round-short.mjs");
+export const models = async () => ({ RM: await fresh(RM_FILE, "rm"), RS: await fresh(RS_FILE, "rs") });
+
+// ---- what a rest is worth: the expected strokes still to play from it ----
+// Every chance below is the model's own times RELY(d): its rest is the game's
+// to a median 0.02 yd, but 5 % of the logged strokes forked by 0.5 yd and more,
+// a longer stroke more often; RELY(d) of what the model holes is taken to hole
+export const RELY = (D) => clamp(1 - 0.0012 * D, 0.6, 1);
+// and less from the lies the model was checked on least: 109 logged strokes
+// from rough, 7 from sand (round-eval.mjs), against 327 from tee and fairway
+export const LIE_RELY = { rough: 0.96, bunker: 0.88 };
+const lieName = (lie) => (lie === 2 ? "rough" : lie === 3 || lie === 16 ? "bunker" : lie === 9 ? "fringe" : "fairway");
+// A putt's chance by distance: round-short.mjs shortPlan's (it holes 224 of the
+// 227 logged green putts; in play the old read holed 215, its misses the
+// assist's pulls, steep greens and lip-outs), the same basis as off the green
+const PUTT_P = [[0, 0.995], [4, 0.995], [10, 0.98], [20, 0.93], [30, 0.8], [40, 0.6], [60, 0.4], [100, 0.3]];
+export function puttRate(d) { return Math.max(0.3, knot(PUTT_P, d)) * RELY(d); }
+// The holing chance of a stroke from d yd off the green: the holing search
+// below (holingPlan, four clubs) run from the 421 distinct off-green spots of
+// the logged rounds and 3-hole course attempts (2026-10-22), the model's mean
+// chance per band times RELY(d), smoothed. The model's own means: fairway and
+// tee 0.90 to 20 yd (the assist's 10 % pull is the miss), 0.97 at 20-70, 0.96 at
+// 70-100, 0.91 at 100-130, 0.83 at 130-160, 0.76 at 160-190, then 0.06 at
+// 190-220 (hole 17's green, which the logged tee shots ran off by 8-35 yd, is
+// 10 of those 12) and 0.05-0.13 at 220-290; rough 0.91-1.0 to 70, 0.78-0.82 at
+// 70-130, 0.58 at 130-160, 0.17-0.24 at 160-220 (the 3-bar cap); sand 0.9-1.0
+// to 40, 0.07 at 100-130; fringe 0.99-1.0 to 40. [d, P] knots, linear between, 0
+// past the last
+export const HOLE_P = {
+  fairway: [[0, 0.88], [15, 0.88], [30, 0.93], [55, 0.91], [85, 0.86], [115, 0.78], [145, 0.69], [175, 0.6], [205, 0.28], [235, 0.08], [270, 0.07], [290, 0]],
+  rough: [[0, 0.88], [15, 0.88], [30, 0.9], [55, 0.86], [85, 0.72], [115, 0.68], [145, 0.48], [175, 0.2], [205, 0.12], [225, 0]],
+  bunker: [[0, 0.86], [15, 0.88], [30, 0.9], [55, 0.8], [80, 0.4], [115, 0.05], [130, 0]],
+  fringe: [[0, 0.95], [10, 0.95], [20, 0.93], [40, 0.88], [60, 0.75], [80, 0]],
+};
+const REACH = { fairway: 300, rough: 225, bunker: 130, fringe: 80 };
+// a full stroke's advance from each lie when the pin is out of reach (yd)
+const ADVANCE = { fairway: 265, rough: 195, bunker: 95 };
+const knot = (K, d) => {
+  if (d <= K[0][0]) return K[0][1];
+  for (let i = 1; i < K.length; i++) if (d <= K[i][0]) { const [a, pa] = K[i - 1], [b, pb] = K[i]; return pa + ((pb - pa) * (d - a)) / (b - a); }
+  return 0;
+};
+// a miss's leave: a tap-in from close, a longer putt or a chip from further out
+// (the calibration's misses: about 1.06 at 100 yd, 1.2 at 200, 1.25 at 235)
+const missLeave = (d) => { const x = Math.min(d, 300); return 1.01 + 0.0001 * x + 0.000004 * x * x; };
+// the better of going for the pin from here and a stroke to the best spot a
+// full stroke from this lie can reach (the table's sweet spot, 40 yd short, or
+// as near it as the stroke's advance allows), a little worse than a holing
+// approach from there
+export function offValue(d, lie = "fairway", depth = 0) {
+  const inReach = d <= (REACH[lie] ?? REACH.fairway);
+  const p = inReach ? knot(HOLE_P[lie] ?? HOLE_P.fairway, d) * (LIE_RELY[lie] ?? 1) : 0;
+  const go = inReach ? 1 + (1 - p) * missLeave(d) : Infinity;
+  if (d <= 70) return go;
+  if (depth >= 4) return Number.isFinite(go) ? go : 2.4 + 0.004 * d;
+  const leave = clamp(40, Math.max(0, d - (ADVANCE[lie] ?? ADVANCE.fairway)), d);
+  return Math.min(go, 1.04 + offValue(leave, "fairway", depth + 1));
 }
-// an earlier stroke's miss of its own 3D flight (along, across its launch
-// line, yd), flown again from the row; cached by the row
-const rep3 = new Map();
-function repeat3dOf(m, r) {
-  const key = `${r.src}|${r.at}`;
-  if (rep3.has(key)) return rep3.get(key);
-  const dx = Math.sin(r.launch), dz = Math.cos(r.launch);
-  const s = shot3dSync(m, { from: r.from, launch: r.launch, club: r.club, q: r.q, lie: r.lie, wind: windAlong({ wind: { ...r.wind, angle: (r.wind.dir * Math.PI) / 4 } }, dx, dz) });
-  const ex = r.end[0] - s.rest[0], ez = r.end[2] - s.rest[2];
-  const v = { along: (ex * dx + ez * dz) / YD, across: (ex * -dz + ez * dx) / YD, hazard3d: s.hazard };
-  rep3.set(key, v);
-  return v;
+const GREEN = new Set([6, 10, 11]);
+const LIE_NAME = { 1: "fairway", 2: "rough", 3: "bunker", 6: "green", 9: "fringe", 10: "green", 11: "green", 15: "tee", 16: "bunker" };
+// a rest at d yd from the pin on KCL attribute attr
+export function posValue(d, attr) {
+  if (GREEN.has(attr)) return 1 + (1 - puttRate(d));
+  if (attr === 9) return offValue(d, "fringe");
+  if (attr === 1 || attr === 15) return offValue(d, "fairway");
+  if (attr === 2) return offValue(d, "rough");
+  if (attr === 3 || attr === 16) return offValue(d, "bunker");
+  return 3.5;   // a wall, outer ground, water, a valley, nothing: a lost ball's worth
 }
 
-async function fullShot(hole, st, target, { wide = false, k3d = USE_3D } = {}) {
-  const ball = st.ball.pos, lie = st.player.lie, surface = SURF[lie] ?? "fairway";
-  const m = await kcl(hole);
-  const clubs = lie === 3 || lie === 16 ? CLUBS_BY_LOFT.slice(0, 5) : CLUBS_BY_LOFT;
-  const yaw = LIE_YAW[lie] ?? 0;
-  const toT = Math.atan2(target[0] - ball[0], target[2] - ball[2]), game = launchOf(Math.atan2(st.player.aim[0], st.player.aim[1]), lie);
-  const heads = [];
-  if (wide) for (let d = 0; d < 360; d += 10) heads.push(toT + d * DEG);
-  else {
-    for (const d of [0, 1, -1, 2, -2, 3, -3, 4, -4, 6, -6, 8, -8, 10, -10, 13, -13, 16, -16, 20, -20]) heads.push(toT + d * DEG);
-    for (const d of [0, 3, -3, 6, -6]) heads.push(game + d * DEG);
+// ---- the engine: one stroke by round-model.mjs fly() ----
+function makeCtx(RM, hole, st, deadline) {
+  const c = RM.loadCourse(hole);
+  const ball = st.ball.pos, pin = st.pin;
+  const lie = st.player.lie === 10 || st.player.lie === 11 ? 6 : st.player.lie;
+  const D = Math.hypot(pin[0] - ball[0], pin[2] - ball[2]) / YD, toPin = Math.atan2(pin[0] - ball[0], pin[2] - ball[2]);
+  const wind = st.wind?.speedIdx > 0 ? { angle: st.wind.angle ?? (st.wind.dir * Math.PI) / 4, speedIdx: st.wind.speedIdx, dir: st.wind.dir } : null;
+  const aim = st.player.aim ? Math.atan2(st.player.aim[0], st.player.aim[1]) : toPin;
+  return { RM, c, hole, ball, pin, lie, D, toPin, gameAim: aim, onGreen: lie === 6, wind, yaw: RM.lieYaw(lie), deadline, sims: 0, st };
+}
+// a context for the next stroke from a rest (two shots ahead)
+function restCtx(ctx, o) {
+  const lie = o.restAttr === 10 || o.restAttr === 11 ? 6 : o.restAttr;
+  const ball = o.rest, pin = ctx.pin;
+  const D = Math.hypot(pin[0] - ball[0], pin[2] - ball[2]) / YD, toPin = Math.atan2(pin[0] - ball[0], pin[2] - ball[2]);
+  return { ...ctx, ball, lie, D, toPin, gameAim: toPin, onGreen: lie === 6, yaw: ctx.RM.lieYaw(lie), depth: (ctx.depth ?? 0) + 1, sims: 0, failRows: undefined };
+}
+function fly(ctx, club, h, q, cup = true, extra = {}) {
+  ctx.sims++;
+  return ctx.RM.fly({ course: ctx.c, pos: ctx.ball, heading: h, yaw: extra.yaw ?? ctx.yaw, club, q, wind: ctx.onGreen ? null : ctx.wind, pin: ctx.pin, flagIn: cup && !ctx.onGreen, holeOut: cup, lieAttr: ctx.lie, trace: !!extra.trace, traceEvery: extra.traceEvery ?? 4 });
+}
+// a point's distance along and across (+ right) the line from the ball at bearing dir (yd)
+function rel(ctx, p, dir = ctx.toPin) {
+  const dx = p[0] - ctx.ball[0], dz = p[2] - ctx.ball[2];
+  return { a: (dx * Math.sin(dir) + dz * Math.cos(dir)) / YD, x: (dx * -Math.cos(dir) + dz * Math.sin(dir)) / YD };
+}
+const pinDist = (ctx, p) => Math.hypot(p[0] - ctx.pin[0], p[2] - ctx.pin[2]) / YD;
+// the expected strokes after a stroke that ended as o (0 when holed)
+function outValue(ctx, o) {
+  if (o.outcome === "holed") return 0;
+  if (o.hazard) {
+    // a penalty stroke and the next from the drop (the last ground under the
+    // ball that was not water or a wall; out of bounds without one: the ball's spot)
+    const at = o.drop ?? ctx.ball;
+    const g = ctx.RM.groundAt(ctx.c, at[0], at[2], { yMax: at[1] + 5 });
+    const attr = g && ![4, 5, 7, 12, 13].includes(g.attr) ? g.attr : 1;
+    return 1 + posValue(pinDist(ctx, at), attr) + 0.1;
   }
-  const failed = failedLines(hole, ball);
-  const avoided = new Set();
-  let cands = [];
-  const seen = [];
-  const stats = { n2d: 0, rel: 0, n3d: 0, rej3d: 0, robustFlights: 0, notRobust: 0 };
-  for (const h of heads) {
-    if (seen.some((s) => Math.abs(angDiff(s, h)) < 0.25 * DEG)) continue;
-    seen.push(h);
-    const f = failed.find((r) => Math.abs(angDiff(r.h, h)) < 2.5 * DEG);
-    if (f) { avoided.add(`${deg(angDiff(f.h, toT)).toFixed(1)} deg (${f.why}, ${f.src})`); continue; }
-    const dx = Math.sin(h), dz = Math.cos(h), rx = -dz, rz = dx;
-    const prof = await kclProfile(hole, ball[0], ball[2], dx, dz);
-    if (!prof) continue;
-    const at = (yd) => prof.lies[Math.min(prof.n - 1, Math.max(0, prof.i0 + Math.round(yd / prof.step)))];
-    const line = { h, dx, dz, prof, at, sim: simOf(prof), wind: windAlong(st, dx, dz), trees: null };
-    for (const [ci, club] of clubs.entries()) {
-      for (let k = Math.round(Math.min(capOf(club, lie), 1) * 100); k >= 10; k -= wide ? 4 : 2) {
-        const q = k / 100, o = run({ club, q, surface, profile: line.sim, wind: line.wind, trace: false });
-        stats.n2d++;
-        const lat = o.lateral ?? 0;
-        const sx = ball[0] + (dx * o.stop + rx * lat) * YD, sz = ball[2] + (dz * o.stop + rz * lat) * YD;
-        const g = groundAt(m, sx, sz);
-        const restLie = g ? LIE_OF_ATTR[g.attr] : null;
-        if (!(restLie in PEN)) continue;
-        // the roll from the carry to the stop: no water, valley or missing
-        // ground; with the 3D flight to judge it, outer ground and walls only
-        // mark the candidate `rel` (taken on its 3D flight alone)
-        let bad = false, rel = false;
-        for (let yd = Math.min(o.carry, o.stop); yd <= Math.max(o.carry, o.stop) + 1e-9 && !bad; yd += prof.step) {
-          const l = at(yd);
-          if (l in PEN || l === "tee") continue;
-          if (k3d && (l === "outer" || l === "wall")) rel = true;
-          else bad = true;
-        }
-        if (bad) continue;
-        if (rel) stats.rel++;
-        const yd = Math.hypot(sx - target[0], sz - target[2]) / YD;
-        cands.push({ line, club, q, o, restLie, rest: [sx, sz], yd, extra: 0.3 * ci, score: yd + PEN[restLie] + 0.3 * ci, rel });
-      }
-    }
+  if (o.outcome !== "rest") return 3.5;
+  return posValue(pinDist(ctx, o.rest), o.restAttr);
+}
+// a stroke struck earlier from within 2 yd, with the same club, power (0.02),
+// launch line (0.6 deg) and wind, that went into a hazard or that the game put
+// back where it was hit (out of bounds the model did not see: round-play.mjs
+// marks the row's fail so); the game is deterministic
+const lostBefore = (r) => !!r.hazard || /put the ball back/.test(r.fail ?? "");
+function failedBefore(ctx, club, h, q) {
+  const launch = h + ctx.yaw;
+  ctx.failRows ??= knowledge().filter((r) => r.hole === ctx.hole && lostBefore(r) && r.from && Math.hypot(r.from[0] - ctx.ball[0], r.from[2] - ctx.ball[2]) / YD <= 2);
+  for (const r of ctx.failRows) {
+    if (r.club !== club) continue;
+    if (Math.abs(r.q - q) > 0.02 || Math.abs(angDiff(r.launch, launch)) > 0.6 * DEG) continue;
+    if (r.wind?.dir !== ctx.wind?.dir && (r.wind?.speedIdx ?? 0) + (ctx.wind?.speedIdx ?? 0) > 0) continue;
+    if ((r.wind?.speedIdx ?? 0) !== (ctx.wind?.speedIdx ?? 0)) continue;
+    return r.src;
   }
-  cands.sort((a, b) => a.score - b.score);
-  // the coarse scan steps 0.02; the best few are refined to 0.01 either side
-  const refine = [];
-  for (const c of cands.slice(0, 10)) {
-    for (const dq of [-0.01, 0.01]) {
-      const q = +(c.q + dq).toFixed(2), cap = Math.min(capOf(c.club, lie), 1);
-      if (q < 0.1 || q > cap + 1e-9) continue;
-      const o = run({ club: c.club, q, surface, profile: c.line.sim, wind: c.line.wind, trace: false });
-      const lat = o.lateral ?? 0, { dx, dz } = c.line;
-      const sx = ball[0] + (dx * o.stop - dz * lat) * YD, sz = ball[2] + (dz * o.stop + dx * lat) * YD;
-      const g = groundAt(m, sx, sz), restLie = g ? LIE_OF_ATTR[g.attr] : null;
-      if (!(restLie in PEN)) continue;
-      const yd = Math.hypot(sx - target[0], sz - target[2]) / YD;
-      refine.push({ ...c, q, o, restLie, rest: [sx, sz], yd, score: yd + PEN[restLie] + c.extra });
-    }
-  }
-  cands.push(...refine);
-  // a candidate that repeats an earlier stroke rests where that one did,
-  // relative to the port (the port's prediction moved by that stroke's miss)
-  for (const c of cands) {
-    const r = repeatOf(hole, ball, c, st);
-    if (!r) continue;
-    const { dx, dz } = c.line, sx = c.rest[0] + (dx * r.along - dz * r.across) * YD, sz = c.rest[1] + (dz * r.along + dx * r.across) * YD;
-    const g = groundAt(m, sx, sz), restLie = g ? LIE_OF_ATTR[g.attr] : null;
-    c.repeat = r;
-    if (!(restLie in PEN)) { c.score = Infinity; continue; }
-    c.rest = [sx, sz]; c.restLie = restLie; c.yd = Math.hypot(sx - target[0], sz - target[2]) / YD; c.score = c.yd + PEN[restLie] + c.extra;
-  }
-  cands = cands.filter((c) => c.score < Infinity);
-  cands.sort((a, b) => a.score - b.score);
-
-  // the 3D flight of a candidate (once): its carry, stop, drift, rest, rest
-  // lie and yd from the pin replace the 2D port's; a hazard or a rest off the
-  // legal lies sets its score to Infinity
-  const fly3d = (c) => {
-    if (c.k3d) return c.score < Infinity;
-    if (stats.n3d >= N3D_MAX) return false;
-    stats.n3d++;
-    const s = shot3dSync(m, { from: ball, launch: c.line.h, club: c.club, q: c.q, lie, wind: c.line.wind });
-    c.k3d = true; c.o2 = c.o; c.lie2 = c.restLie; c.yd2 = c.yd;
-    c.o = { carry: s.carry, stop: s.stop, lateral: s.lateral ?? 0 };
-    c.first3 = s.first ?? s.rest;
-    c.hazard3 = s.hazard;
-    if (s.hazard) { c.score = Infinity; stats.rej3d++; return false; }
-    let rest = [s.rest[0], s.rest[2]], restLie = LIE_OF_ATTR[s.restAttr];
-    if (c.repeat) {
-      const r3 = repeat3dOf(m, c.repeat.row), { dx, dz } = c.line;
-      rest = [rest[0] + (dx * r3.along - dz * r3.across) * YD, rest[1] + (dz * r3.along + dx * r3.across) * YD];
-      const g = groundAt(m, rest[0], rest[1]);
-      restLie = g ? LIE_OF_ATTR[g.attr] : null;
-      c.repeat = { ...c.repeat, along: r3.along, across: r3.across, k3d: true };
-    }
-    if (!(restLie in PEN)) { c.score = Infinity; stats.rej3d++; return false; }
-    c.rest = rest; c.restLie = restLie; c.yd = Math.hypot(rest[0] - target[0], rest[1] - target[2]) / YD;
-    c.score = c.yd + PEN[restLie] + c.extra;
-    return true;
-  };
-  // a 3D candidate is taken only when its neighbours (q -+0.01, the launch
-  // -+1 deg) rest on a legal lie too and its first contact is clear of an
-  // outer-ground seam; a repeat of an earlier stroke needs neither (the game
-  // is deterministic and that stroke rested legally). null = robust
-  const cap0 = (club) => Math.min(capOf(club, lie), 1);
-  const robust = (c) => {
-    if (!c.k3d || c.repeat) return null;
-    if (c.robust !== undefined) return c.robust;
-    let why = null;
-    for (const [dq, dh] of [[-ROBUST.dq, 0], [ROBUST.dq, 0], [0, ROBUST.dh], [0, -ROBUST.dh]]) {
-      const q = +(c.q + dq).toFixed(4), h = c.line.h + dh;
-      if (q < 0.1 - 1e-9 || q > cap0(c.club) + 1e-9) continue;
-      stats.robustFlights++;
-      const s = shot3dSync(m, { from: ball, launch: h, club: c.club, q, lie, wind: dh ? windAlong(st, Math.sin(h), Math.cos(h)) : c.line.wind });
-      const l = LIE_OF_ATTR[s.restAttr];
-      if (s.hazard || !(l in PEN)) { why = `at ${dq ? `q ${q.toFixed(2)}` : `${dh > 0 ? "+" : ""}${deg(dh).toFixed(0)} deg`} it ${s.hazard === 1 ? "finds water" : s.hazard === 3 ? "finds a valley" : s.hazard === 2 ? "is out of bounds" : `rests on ${ATTR_LIE[s.restAttr] ?? s.restAttr}`}`; break; }
-    }
-    if (!why && c.first3) {
-      let out = false, legal = false;
-      for (const f of [1, 0.5]) for (let a = 0; a < 8; a++) {
-        const t = (a * Math.PI) / 4, g = groundAt(m, c.first3[0] + Math.sin(t) * SEAM_YD * f * YD, c.first3[2] + Math.cos(t) * SEAM_YD * f * YD);
-        if (!g) continue;
-        if (g.attr === 4) out = true; else if (LIE_OF_ATTR[g.attr] in PEN) legal = true;
-      }
-      if (out && legal) why = `it lands within ${SEAM_YD} yd of an out-of-bounds seam`;
-    }
-    if (why) stats.notRobust++;
-    c.robust = why;
-    return why;
-  };
-  // the first N3D_FIRST in the ranking flown in 3D, then ranked again; a
-  // candidate only the relaxed roll check let in is dropped unless flown
-  if (k3d) {
-    for (let i = 0, n = 0; i < cands.length && n < N3D_FIRST; i++) { n++; fly3d(cands[i]); }
-    cands = cands.filter((c) => c.score < Infinity);
-    cands.sort((a, b) => a.score - b.score);
-  }
-  // fly a candidate the ranking reaches (lazily, within N3D_MAX); false: skip it
-  // (its 3D flight rejects it, or it is `rel` and the budget is spent)
-  const ready = (c) => !k3d || (c.k3d ? c.score < Infinity : fly3d(c) || (!c.k3d && !c.rel));
-  // two shots ahead when this one cannot finish near the pin: the next
-  // stroke's lie caps its power (rough 3 bars, a bunker 1-2), so a rest a
-  // little further from the pin on the fairway can leave a better second shot
-  // than one nearer in the rough (the user's example: round 4's hole 5). Six
-  // distinct rests (8 yd apart) from the top of the one-shot ranking are
-  // valued by the best second shot from each (secondValue), plus LIE_TIE for
-  // a rest in rough or sand (a second shot's value differs by grid luck by a
-  // yard or two, and rounds 10 and 11 left hole 10's drive in the rough for
-  // 0.9 against 1.2 from the fairway), and tried first in that order.
-  if (cands.length && cands[0].yd > 25) {
-    const picks = [];
-    for (const c of cands) {
-      if (picks.length >= 6) break;
-      if (!ready(c)) continue;
-      if (!clr(m, ball, c)) continue;
-      if (picks.some((p) => Math.hypot(p.rest[0] - c.rest[0], p.rest[1] - c.rest[1]) / YD < 8)) continue;
-      picks.push(c);
-    }
-    for (const c of picks) c.v2 = await secondValue(hole, m, c.rest, c.restLie, st, target);
-    const v = (c) => c.v2 + (LIE_TIE[c.restLie] ?? 0);
-    picks.sort((a, b) => v(a) - v(b));
-    cands = [...picks, ...cands.filter((c) => !picks.includes(c) && c.score < Infinity)];
-  }
-  // the first candidate whose flight clears every tree by 2 yd under the full
-  // rules (hazard margins, trunk gap); else the first by 1 yd, else by 0
-  // (level 0). Only when no candidate passes the full rules: the first under
-  // relaxed ones, the hazard margins and the trunk gap's margin halved (level
-  // 1), else the first whose path meets no trunk or canopy at all (level 2):
-  // a ball tucked behind a tree gets out sideways or back rather than into it.
-  // A candidate the ranking reaches unflown is flown in 3D first; if its 3D
-  // score falls behind the next one's it goes back into the ranking there.
-  const by = { 1: null, 0: null, r1: null, r2: null };
-  const vetoed = [];
-  const done = (b, level) => { const p = planOf(b.c, b.tc, toT, yaw, avoided, wide, level, stats); if (vetoed.length) { p.why += `; set aside by WSR's own trees and bounds (round-model.mjs): ${vetoed.slice(0, 3).join("; ")}${vetoed.length > 3 ? ` and ${vetoed.length - 3} more` : ""}`; p.expect.vetoed = vetoed.length; } return p; };
-  for (let i = 0; i < cands.length; i++) {
-    const c = cands[i];
-    if (k3d && !c.k3d) {
-      const was = c.score;
-      if (!ready(c)) continue;
-      if (c.k3d && c.score > was + 1e-9) {
-        let j = i + 1;
-        while (j < cands.length && cands[j].score <= c.score) j++;
-        if (j > i + 1) { cands.splice(j, 0, c); cands.splice(i, 1); i--; continue; }
-      }
-    }
-    const full = clr(m, ball, c), half = full || clr(m, ball, c, 0.5);
-    if (!full && (by[1] || by[0] || by.r1 || (!half && by.r2))) continue;
-    const o = c.k3d
-      ? shot3dSync(m, { from: ball, launch: c.line.h, club: c.club, q: c.q, lie, wind: c.line.wind, trace: true })
-      : run({ club: c.club, q: c.q, surface, profile: c.line.sim, wind: c.line.wind, trace: true });
-    c.line.trees ??= lineTrees(hole, ball, c.line.dx, c.line.dz);
-    const tc = appTreeCheck(c.line.trees, o);
-    if (tc.kind === "trunk" || tc.kind === "canopy") continue;
-    const mg = tc.margin ?? Infinity;
-    const level = full && mg >= 0 && trunkGap(c.line.trees, o) >= 0 ? 0 : half && trunkGap(c.line.trees, o, 0.5) >= 0 ? 1 : 2;
-    // the slot it would fill must still be open before it is worth the robustness flights
-    const slot = level === 0 ? (mg >= 2 ? "take" : mg >= 1 ? 1 : 0) : level === 1 ? "r1" : "r2";
-    if (slot !== "take" && by[slot]) continue;
-    if (robust(c)) continue;
-    const veto = rmVeto(hole, ball, c, yaw, st);
-    if (veto) { vetoed.push(`${c.club} ${c.q.toFixed(2)} ${deg(angDiff(c.line.h, toT)).toFixed(1)} deg: ${veto}`); continue; }
-    if (slot === "take") return done({ c, tc }, 0);
-    by[slot] = { c, tc };
-  }
-  if (by[1] ?? by[0]) return done(by[1] ?? by[0], 0);
-  if (by.r1) return done(by.r1, 1);
-  if (by.r2) return done(by.r2, 2);
   return null;
 }
 
-function planOf(c, tc, toT, yaw, avoided, wide, level = 0, stats = null) {
-  const off = deg(angDiff(c.line.h, toT));
-  const r1 = (v) => +v.toFixed(1);
-  return {
-    level, club: c.club, power: c.q, heading: c.line.h + yaw, launch: c.line.h,
-    expect: {
-      carry: r1(c.o.carry), stop: r1(c.o.stop), lateral: r1(c.o.lateral ?? 0), restLie: c.restLie, toPin: r1(c.yd),
-      model: c.k3d ? "kcl3d" : "port2d",
-      port2d: c.k3d ? { carry: r1(c.o2.carry), stop: r1(c.o2.stop), lateral: r1(c.o2.lateral ?? 0), restLie: c.lie2, toPin: r1(c.yd2), rel: !!c.rel } : undefined,
-      repeat: c.repeat ? { src: c.repeat.src, along: r1(c.repeat.along), across: r1(c.repeat.across), k3d: !!c.repeat.k3d } : undefined,
-      search: stats ?? undefined,
-    },
-    why: `${c.club} ${c.q.toFixed(2)} ${off >= 0 ? "+" : ""}${off.toFixed(1)} deg off the pin line${yaw ? ` (aimed ${deg(yaw).toFixed(1)} deg left of that: the lie's launch yaw)` : ""}${wide ? " (from the search all round the ball)" : ""}${level === 1 ? " (relaxed: hazard and trunk margins halved, nothing passed the full ones)" : level === 2 ? " (escape: the only paths clear of every trunk and canopy break the margins)" : ""}, wind ${c.line.wind ? `${c.line.wind.mph} mph at ${c.line.wind.deg.toFixed(0)} deg` : "calm"}: ${c.k3d ? "3D over the KCL" : "the 2D port"} carry ${c.o.carry.toFixed(1)}, rest ${c.o.stop.toFixed(1)} yd, drift ${(c.o.lateral ?? 0).toFixed(1)}, on ${c.restLie}, ${c.yd.toFixed(1)} yd from the pin${c.k3d ? ` (2D: rest ${c.o2.stop.toFixed(1)} on ${c.lie2}${c.rel ? ", its roll crossing outer ground or a wall" : ""})` : ""}${c.repeat ? ` (as ${c.repeat.src} rested: ${c.repeat.along >= 0 ? "+" : ""}${c.repeat.along.toFixed(1)} along, ${c.repeat.across >= 0 ? "+" : ""}${c.repeat.across.toFixed(1)} across the ${c.repeat.k3d ? "3D flight" : "port"})` : ""}${c.v2 != null ? `, the best second shot from there ${c.v2.toFixed(1)}` : ""}; trees ${tc.kind}${tc.margin != null ? ` by ${tc.margin.toFixed(1)} yd` : ""}${avoided.size ? `; lines that failed from here before, not tried: ${[...avoided].join("; ")}` : ""}`,
+// ---- the pin-power assist (round-short.mjs's rule, flown by round-model.mjs) ----
+// PI_ASSIST of the swings keep the state-1 window open past its first frame,
+// and the assist then pulls the launch power toward the aim table's best
+// power; the table freezes TABLE_FRAMES after the last D-pad turn frame
+const PI_ASSIST = { putter: 0.34, other: 0.1 };
+const TABLE_FRAMES = [5, 8.5];
+const TABLE_ORDER = [0, 256, 128, 64, 192, 32, 96, 160, 224, 16, 48, 80, 112, 144, 176, 208, 240];
+const TAPS = [1, 5, 15, 30, 45, 51, 45, 30, 15, 5, 1].map((x) => x / 243);
+function tableBest(res) {
+  const keys = [...res.keys()].sort((a, b) => a - b), a = new Float64Array(257);
+  for (let i = 0; i <= 256; i++) {
+    let lo = null, hi = null;
+    for (const k of keys) { if (k <= i) lo = k; if (k >= i && hi == null) hi = k; }
+    if (lo == null) a[i] = res.get(hi);
+    else if (hi == null || hi === lo) a[i] = res.get(lo);
+    else a[i] = res.get(lo) + ((res.get(hi) - res.get(lo)) * (i - lo)) / (hi - lo);
+  }
+  let runS = -1, best = null;
+  for (let i = 0; i <= 257; i++) {
+    if (i <= 256 && a[i] === 0) { if (runS < 0) runS = i; continue; }
+    if (runS >= 0) { const len = i - runS; if (!best || len > best.len) best = { len, idx: Math.floor((runS + i - 1) / 2) }; runS = -1; }
+  }
+  if (best) return { pPin: best.idx / 256, best: 0 };
+  let bi = 0, bv = Infinity;
+  for (let i = 0; i <= 256; i++) {
+    let s = 0;
+    for (let t = -5; t <= 5; t++) s += TAPS[t + 5] * a[clamp(i + t, 0, 256)];
+    if (s < bv) { bv = s; bi = i; }
+  }
+  return { pPin: bi / 256, best: bv };
+}
+// the table states the swing can find along aim h, weighted by their share of TABLE_FRAMES
+function tableWeights(ctx, club, h) {
+  const [F0, F1] = TABLE_FRAMES, res = new Map(), out = [];
+  let ticks = 0, prev = null;
+  for (const k of TABLE_ORDER) {
+    // the table's balls fly along the aim itself (no lie yaw), with the cup
+    const o = fly(ctx, club, h, k / 256, true, { yaw: 0 });
+    ticks += o.ticks;
+    let v;
+    if (o.outcome === "holed") v = 0;
+    else {
+      const attr = o.hazard ? 7 : o.restAttr;
+      v = Math.hypot(o.rest[0] - ctx.pin[0], o.rest[2] - ctx.pin[2]) * (o.hazard || attr === 4 ? 2 : attr === 2 ? 1.1 : isBunker(attr) ? 1.3 : 1);
+    }
+    res.set(k, v);
+    const st = { from: ticks / 160, ...tableBest(res) };
+    if (prev) prev.to = st.from;
+    out.push(st);
+    prev = st;
+    if (st.from > F1) break;
+  }
+  prev.to = Infinity;
+  const w = [];
+  for (const s of out) { const x = (Math.min(s.to, F1) - Math.max(s.from, F0)) / (F1 - F0); if (x > 1e-9) w.push({ w: x, pPin: s.pPin, best: s.best }); }
+  return w.length ? w : [{ w: 1, pPin: 0, best: null }];
+}
+// round-short.mjs assistedPower: a swing under the cap whose table rests
+// within 300 u of the pin is pulled toward the table's power
+function assistedPower(ctx, p2, club, pPin, best) {
+  const cap = capOf(club, ctx.lie), mult = ctx.lie === 2 ? 1.1 : isBunker(ctx.lie) ? 1.3 : 1;
+  const b = best ?? ctx.D * YD * mult;
+  if (p2 >= cap || !(b < 300)) return p2;
+  const d = Math.abs(p2 - pPin);
+  let w = clamp(0.5 + 0.5 * (d < 0.001 ? 0 : Math.pow(d / 0.3, Math.log2(1000))), 0.5, 1);
+  if (b === 0) w = Math.min(w, clamp(0.01 + 0.99 * (d < 0.001 ? 0 : Math.pow(d / 0.05, Math.log2(20))), 0.01, 1));
+  return Math.max(0, p2 + (1 - w) * cap * (pPin - p2));
+}
+// can the assist reach this stroke at all? (a young table resting within 300 u: the
+// ball itself within 32.8 yd, or a swing within 0.3 of full power)
+const assistMayAct = (ctx, club, q) => ctx.D * YD * (ctx.lie === 2 ? 1.1 : isBunker(ctx.lie) ? 1.3 : 1) < 300 || q > capOf(club, ctx.lie) - 0.3;
+
+// ---- the holing search ----
+// the powers a club can be launched at from the lie: the game's own floor to the
+// cap (lib/shot.mjs rawFor: p1 = max(P3c, ...), P3c 0.1 of the cap, the putter's
+// 0.05, so a plan under it would fire at the floor; round-short.mjs's p3c * cap)
+function powerRange(ctx, club) {
+  if (club === "putter") return { lo: 0.05, hi: 1.8 };
+  const cap = capOf(club, ctx.lie);
+  return { lo: 0.1 * cap, hi: cap };
+}
+// the power whose rest, with no cup, lies dT along the pin line at aim h:
+// a scan (or a narrow one round `near`), the bracket whose ends rest nearest
+// the line, bisected; when even the softest legal stroke rests past the target
+// (the pin nearer than it reaches), that stroke. -> { q, a, x, o } or { reach }
+function powerFor(ctx, club, h, dT, R, near = null) {
+  const qs = near != null ? [0.94, 0.97, 1, 1.03, 1.06].map((f) => clamp(near * f, R.lo, R.hi)) : Array.from({ length: 14 }, (_, k) => R.lo + ((R.hi - R.lo) * k) / 13);
+  const S = [];
+  for (const q of qs) { if (S.length && Math.abs(S[S.length - 1].q - q) < 1e-9) continue; const o = fly(ctx, club, h, q, false), r = rel(ctx, o.rest); S.push({ q, a: o.hazard ? r.a : r.a, x: r.x, o }); }
+  let best = null;
+  for (let k = 0; k + 1 < S.length; k++) {
+    const A = S[k], B = S[k + 1];
+    if ((A.a - dT) * (B.a - dT) > 0) continue;
+    const sc = Math.abs(A.x) + Math.abs(B.x) + (A.o.hazard || B.o.hazard ? 60 : 0);
+    if (!best || sc < best.sc) best = { A, B, sc };
+  }
+  if (!best) {
+    if (near != null) return powerFor(ctx, club, h, dT, R, null);
+    // the pin nearer than the softest legal stroke rests: that stroke (the grid round it tells its worth)
+    const soft = S.reduce((b, s) => (s.q < b.q ? s : b));
+    if (soft.a > dT && !soft.o.hazard) return soft;
+    return { reach: Math.max(...S.map((s) => s.a)) };
+  }
+  let { A, B } = best;
+  for (let i = 0; i < 8; i++) {
+    const m = (A.q + B.q) / 2, o = fly(ctx, club, h, m, false), r = rel(ctx, o.rest), M = { q: m, a: r.a, x: r.x, o };
+    if ((M.a - dT) * (A.a - dT) <= 0) B = M; else A = M;
+  }
+  return Math.abs(A.a - dT) <= Math.abs(B.a - dT) ? A : B;
+}
+// the centre launch: its rest (no cup) `past` yd beyond the pin on the line
+// to it; the aim turned by the rest's offset, the power bisected again, then
+// a Newton step on a local Jacobian; also the rest's slope against power
+function centreOf(ctx, club, past) {
+  const R = powerRange(ctx, club), dT = ctx.D + past;
+  let h = ctx.toPin - ctx.yaw, pf = null;
+  for (let it = 0; it < 5; it++) {
+    pf = powerFor(ctx, club, h, dT, R, pf?.q ?? null);
+    if (pf.q == null) return it === 0 ? { reach: pf.reach } : null;
+    if (Math.abs(pf.x) < 0.06) break;
+    h += pf.x / Math.max(3, pf.a);
+  }
+  let q = pf.q, e = { a: pf.a - dT, x: pf.x };
+  const dh = (0.15 / Math.max(5, ctx.D)), dq = 0.004 * (R.hi - R.lo);
+  let slope = null;
+  for (let it = 0; it < 2; it++) {
+    const oh = fly(ctx, club, h + dh, q, false), oq = fly(ctx, club, h, Math.min(R.hi, q + dq), false);
+    const rh = rel(ctx, oh.rest), rq = rel(ctx, oq.rest), dqq = Math.min(R.hi, q + dq) - q;
+    if (!(dqq > 0)) break;
+    const J = [[(rh.a - dT - e.a) / dh, (rq.a - dT - e.a) / dqq], [(rh.x - e.x) / dh, (rq.x - e.x) / dqq]];
+    slope = J[0][1];
+    if (Math.abs(e.a) < 0.05 && Math.abs(e.x) < 0.04) break;
+    const det = J[0][0] * J[1][1] - J[0][1] * J[1][0];
+    if (!(Math.abs(det) > 1e-9)) break;
+    const sh = clamp(-(J[1][1] * e.a - J[0][1] * e.x) / det, -0.3 * DEG, 0.3 * DEG), sq = clamp(-(-J[1][0] * e.a + J[0][0] * e.x) / det, -0.03, 0.03);
+    const o = fly(ctx, club, h + sh, clamp(q + sq, R.lo, R.hi), false), r = rel(ctx, o.rest);
+    const e2 = { a: r.a - dT, x: r.x };
+    if (Math.hypot(e2.a, e2.x) < Math.hypot(e.a, e.x)) { h += sh; q = clamp(q + sq, R.lo, R.hi); e = e2; } else break;
+  }
+  return { h, q, miss: Math.hypot(e.a, e.x), slope };
+}
+// the aim error's weights over fine-grid heading steps of `step` rad: the
+// D-pad's residual (uniform within +-0.031 deg) and the model's own 0.03 yd across
+const Phi = (x) => { const t = 1 / (1 + 0.2316419 * Math.abs(x)), d = 0.3989423 * Math.exp((-x * x) / 2); const p = d * t * (0.3193815 + t * (-0.3565638 + t * (1.781478 + t * (-1.821256 + t * 1.330274)))); return x >= 0 ? 1 - p : p; };
+function aimKernel(D, step, n) {
+  const a = 0.031 * DEG, s = Math.max(1e-6, 0.03 / Math.max(1, D));
+  const dens = (e) => (Phi((e + a) / s) - Phi((e - a) / s)) / (2 * a);
+  const w = [];
+  for (let u = -n; u <= n; u++) { let t = 0; for (let k = -2; k <= 2; k++) t += dens((u + k / 5) * step); w.push(t); }
+  const S = w.reduce((x, y) => x + y, 0);
+  return w.map((x) => x / S);
+}
+// along: the model's 0.08 yd, over steps of `stepYd`
+function alongKernel(stepYd, n) {
+  const s = 0.08 / stepYd, w = [];
+  for (let v = -n; v <= n; v++) w.push(Math.exp((-v * v) / (2 * s * s)));
+  const S = w.reduce((x, y) => x + y, 0);
+  return w.map((x) => x / S);
+}
+// the stroke's expected strokes over a fine grid round (h0, q0): the shift of
+// the kernel's centre within +-1 step that holes most -> { h, q, P, E, missV }
+// (q kept inside the club's range: a shift past the floor or the cap reports it)
+function fineEval(ctx, club, h0, q0, slope, { nu = 4, nw = 2, stepDeg = 0.0125, stepYd = 0.12 } = {}) {
+  const R = powerRange(ctx, club), dh = stepDeg * DEG, dq = stepYd / slope;
+  const cell = new Map();
+  const at = (u, w) => {
+    const k = `${u},${w}`;
+    if (!cell.has(k)) {
+      const q = q0 + w * dq;
+      if (q < R.lo - 1e-9 || q > R.hi + 1e-9) cell.set(k, null);
+      else { const o = fly(ctx, club, h0 + u * dh, q, true); cell.set(k, { holed: o.outcome === "holed", v: outValue(ctx, o), o }); }
+    }
+    return cell.get(k);
   };
+  const Wh = aimKernel(ctx.D, dh, nu), Wq = alongKernel(stepYd, nw);
+  let best = null;
+  for (const [su, sw] of [[0, 0], [-1, 0], [1, 0], [0, -1], [0, 1]]) {
+    let E = 0, Pw = 0, W = 0, mv = 0, mw = 0;
+    for (let u = -nu; u <= nu; u++) for (let w = -nw; w <= nw; w++) {
+      const r = at(u + su, w + sw), wt = Wh[u + nu] * Wq[w + nw];
+      if (!r) continue;
+      W += wt;
+      if (r.holed) { E += wt; Pw += wt; } else { E += wt * (1 + r.v); mv += wt * r.v; mw += wt; }
+    }
+    if (!(W > 0)) continue;
+    const res = { h: h0 + su * dh, q: clamp(q0 + sw * dq, R.lo, R.hi), P: Pw / W, E: E / W, missV: mw > 0 ? mv / mw : 0, n: cell.size };
+    if (!best || res.E < best.E - 1e-9) best = res;
+    // only shift toward a better centre when the centre itself misses
+    if (su === 0 && sw === 0 && res.P > 0.999) break;
+  }
+  return best;
+}
+// When no rest lies near the pin (a cup on a slope the ball rolls off, a
+// tiered green), the launch whose path passes the cup closest while slow
+// enough to drop: a grid of aims (+-3 yd at the pin) and powers (+-12 %)
+// round the centre, flown with the cup's pass recorded but no capture
+function passCentre(ctx, club, cen) {
+  const R = powerRange(ctx, club), dh = 0.5 / Math.max(5, ctx.D);
+  let best = null;
+  for (let i = -6; i <= 6; i++) for (let j = -5; j <= 5; j++) {
+    const h = cen.h + i * dh, q = clamp(cen.q * (1 + 0.024 * j), R.lo, R.hi);
+    const o = fly(ctx, club, h, q, false);
+    const cp = o.cupPass;
+    const J = cp ? cp.d + 0.4 * Math.max(0, cp.v - 3) : 5 + pinDist(ctx, o.rest);
+    if (!best || J < best.J) best = { h, q, J, cp };
+  }
+  return best;
+}
+// one club's best holing launch -> { club, h, q, P, E, ... } or null
+function holeClub(ctx, club, { reduced = false } = {}) {
+  const past = club === "putter" ? 0.3 : 0.5;
+  let cen = centreOf(ctx, club, past);
+  if (!cen || cen.q == null) return null;
+  const R = powerRange(ctx, club);
+  if (cen.miss > 1 && !reduced) {
+    const pc = passCentre(ctx, club, cen);
+    if (pc && pc.J < 1) cen = { ...cen, h: pc.h, q: pc.q, miss: pc.J, viaPass: true };
+  }
+  const slope = cen.slope > 10 && cen.slope < 4000 ? cen.slope : club === "putter" ? 25 : 150;
+  const NI = reduced ? 9 : 13, NJ = reduced ? 9 : 14, latYd = reduced ? 0.09 : 0.07, alongYd = reduced ? 0.5 : 0.35, j0 = reduced ? 3 : 5;
+  const dh = latYd / Math.max(1, ctx.D), dq = alongYd / slope, i0 = (NI - 1) / 2;
+  const cells = [];
+  let holed = 0;
+  for (let i = 0; i < NI; i++) for (let j = 0; j < NJ; j++) {
+    if (Date.now() > ctx.deadline && cells.length > 20) break;
+    const h = cen.h + (i - i0) * dh, q = cen.q + (j - j0) * dq;
+    if (q < R.lo - 1e-9 || q > R.hi + 1e-9) continue;
+    const o = fly(ctx, club, h, q, true), H = o.outcome === "holed";
+    if (H) holed++;
+    cells.push({ i, j, h, q, holed: H, v: H ? 0 : outValue(ctx, o) });
+  }
+  if (!cells.length) return null;
+  // the fine grid's centre: the holed cell with the most holed neighbours
+  // (ties to the grid's centre), else the cell with the best value
+  let pick;
+  if (holed) {
+    const key = new Map(cells.map((c) => [`${c.i},${c.j}`, c]));
+    let bs = -1;
+    for (const c of cells) {
+      if (!c.holed) continue;
+      let n = 0;
+      for (let di = -1; di <= 1; di++) for (let dj = -2; dj <= 2; dj++) if (key.get(`${c.i + di},${c.j + dj}`)?.holed) n++;
+      const s = n - 0.01 * (Math.abs(c.i - i0) + Math.abs(c.j - j0));
+      if (s > bs) { bs = s; pick = c; }
+    }
+  } else pick = cells.reduce((b, c) => (c.v < b.v ? c : b));
+  if (Date.now() > ctx.deadline && reduced) return trusted(ctx, { club, h: pick.h, q: pick.q, P: holed ? 0.5 : 0, E: holed ? 1 + 0.5 * missLeave(ctx.D) : 1 + pick.v, missV: holed ? missLeave(ctx.D) : pick.v, grid: { holed, n: cells.length }, cen, rough: true });
+  const f = fineEval(ctx, club, pick.h, pick.q, slope, reduced ? { nu: 2, nw: 1, stepDeg: 0.025, stepYd: 0.2 } : {});
+  if (!f) return null;
+  const r = trusted(ctx, { club, ...f, grid: { holed, n: cells.length, dhDeg: +deg(dh).toFixed(4), dqYd: alongYd }, cen: { miss: +cen.miss.toFixed(2), slope: +slope.toFixed(0), viaPass: !!cen.viaPass } });
+  return reduced ? r : edgeProbe(ctx, r);
+}
+// The model's own chance discounted by RELY(D) (above): the share it cannot
+// vouch for leaves the miss's putt (a holing approach's miss is mostly a tap-in)
+function trusted(ctx, r) {
+  if (!(r.P > 0)) return { ...r, Pmodel: 0 };
+  const rho = RELY(ctx.D) * (LIE_RELY[lieName(ctx.lie)] ?? 1), miss = r.missV > 0 ? r.missV : missLeave(ctx.D);
+  return { ...r, Pmodel: r.P, P: rho * r.P, E: 1 + rho * (1 - r.P) * miss + (1 - rho) * missLeave(ctx.D) };
+}
+// the launch's neighbours at the model's forking scale (power +-0.003 of the cap,
+// aim +-0.1 deg): a hazard among them costs its share
+function edgeProbe(ctx, r) {
+  const R = powerRange(ctx, r.club), cap = R.hi;
+  let pen = 0;
+  const hz = [];
+  for (const [dh, dq] of [[0.1, 0], [-0.1, 0], [0, 0.003], [0, -0.003]]) {
+    const o = fly(ctx, r.club, r.h + dh * DEG, clamp(r.q + dq * cap, R.lo, R.hi), true);
+    if (o.hazard) { pen += 0.1 * Math.max(0, 1 + outValue(ctx, o) - r.E); hz.push(o.hazard); }
+  }
+  return pen ? { ...r, E: r.E + pen, edge: hz } : r;
+}
+// water, out of bounds or a valley within r yd of (x, z) (eight points round it and four nearer)
+function hazardNear(ctx, p, r) {
+  for (const f of [1, 0.5]) for (let a = 0; a < 8; a += f === 1 ? 1 : 2) {
+    const t = (a * Math.PI) / 4, g = ctx.RM.groundAt(ctx.c, p[0] + Math.sin(t) * r * f * YD, p[2] + Math.cos(t) * r * f * YD, { yMax: p[1] + 40 });
+    if (!g || g.attr === 4 || g.attr === 5 || g.attr === 7 || g.attr === 13) return true;
+  }
+  return false;
+}
+// the assist's share of a candidate: the pulled launches flown at the table's states
+function withAssist(ctx, r) {
+  if (!r || !assistMayAct(ctx, r.club, r.q)) return r;
+  const pi = r.club === "putter" ? PI_ASSIST.putter : PI_ASSIST.other;
+  // at the cap the assist never pulls (assistedPower: p2 >= cap): nothing to fly
+  if (r.q >= capOf(r.club, ctx.lie) - 1e-9) return { ...r, assist: { pi, moved: false } };
+  let Epull = 0, Ppull = 0, moved = false, qa = r.q;
+  for (const t of tableWeights(ctx, r.club, r.h)) {
+    const q3 = assistedPower(ctx, r.q, r.club, t.pPin, t.best);
+    if (Math.abs(q3 - r.q) < 1e-6) { Epull += t.w * r.E; Ppull += t.w * r.P; continue; }
+    moved = true; qa = q3;
+    const o = fly(ctx, r.club, r.h, q3, true), H = o.outcome === "holed";
+    Epull += t.w * (H ? 1 : 1 + outValue(ctx, o)); Ppull += t.w * (H ? 1 : 0);
+  }
+  if (!moved) return { ...r, assist: { pi, moved: false } };
+  return { ...r, Eswung: r.E, Pswung: r.P, E: (1 - pi) * r.E + pi * Epull, P: (1 - pi) * r.P + pi * Ppull, assist: { pi, moved: true, power: +qa.toFixed(4), E: +Epull.toFixed(3) } };
+}
+function holingClubs(ctx) {
+  if (ctx.lie === 9) return ["putter", "wedge", "9iron", "7iron"];
+  const short = ctx.D <= SHORT_YD;
+  let clubs = isBunker(ctx.lie) ? ["wedge", "9iron", "7iron", "5iron", "3iron"] : BY_LOFT.slice();
+  if (short) clubs = clubs.filter((c) => ["wedge", "9iron", "7iron", "5iron"].includes(c));
+  if (short && PUTTER_OFF_GREEN && !isBunker(ctx.lie)) clubs.unshift("putter");
+  return clubs;
+}
+// the holing search over the clubs that reach, natural club first (the most
+// lofted whose full stroke rests past the pin), then the longer ones, then
+// the more lofted (which cannot reach and drop out cheaply)
+function holingPlan(ctx, { maxClubs = 4, reduced = false } = {}) {
+  const clubs = holingClubs(ctx);
+  const res = [];
+  let tried = 0;
+  for (const club of clubs) {
+    if (tried >= maxClubs || (Date.now() > ctx.deadline && res.length)) break;
+    const r = holeClub(ctx, club, { reduced });
+    if (!r) continue;
+    tried++;
+    res.push(reduced && !assistMayAct(ctx, r.club, r.q) ? r : withAssist(ctx, r));
+  }
+  res.sort((a, b) => a.E - b.E);
+  return res;
 }
 
-// the best a second stroke can do from a rest: the distance from the pin it
-// can finish at (plus half its lie penalty), with that rest's lie cap, over a
-// coarse search (launch lines 0, +-3, +-6 deg round the pin line, powers every
-// 0.05 from the cap), refined round its best (lines +-0.5 to +-2 deg, powers
-// +-0.04 every 0.01); on the green or fringe a putt's share of the distance
-const LIE_CODE = { fairway: 1, tee: 1, rough: 2, bunker: 3, green: 6, fringe: 9 };
-async function secondValue(hole, m, rest, restLie, st, target) {
-  const yd0 = Math.hypot(rest[0] - target[0], rest[1] - target[2]) / YD;
-  if (restLie === "green") return 0.05 * yd0 + 0.5;
-  if (restLie === "fringe") return 0.08 * yd0 + 1;
-  const lie = LIE_CODE[restLie] ?? 1, surface = SURF[lie] ?? "fairway";
-  const clubs = lie === 3 ? CLUBS_BY_LOFT.slice(0, 5) : CLUBS_BY_LOFT;
-  const toT = Math.atan2(target[0] - rest[0], target[2] - rest[1]);
-  const lines = new Map();
-  const lineAt = async (h) => {
-    const key = h.toFixed(5);
-    if (!lines.has(key)) {
-      const dx = Math.sin(h), dz = Math.cos(h), prof = await kclProfile(hole, rest[0], rest[1], dx, dz);
-      lines.set(key, prof ? { dx, dz, prof, sim: simOf(prof), wind: windAlong(st, dx, dz), at: (yd) => prof.lies[Math.min(prof.n - 1, Math.max(0, prof.i0 + Math.round(yd / prof.step)))] } : null);
-    }
-    return lines.get(key);
+// ---- the long search: where a stroke comes to rest, and what that is worth ----
+const LEVELS = { driver: [1, 0.94, 0.88, 0.8, 0.7, 0.6, 0.5], spoon: [1, 0.9, 0.8, 0.7], "3iron": [1, 0.85, 0.7], "5iron": [1, 0.8, 0.6], "7iron": [1, 0.75], "9iron": [1, 0.7], wedge: [1, 0.6] };
+const FAN = [0, 3, -3, 6, -6, 10, -10, 15, -15, 20, -20, 26, -26];
+// doglegs: the logged tee lines ran up to 39 deg off the pin line (hole 12's
+// 35-39 right, hole 14's 31-32 left); the long clubs also go out along these
+const FAN_WIDE = [33, -33, 40, -40, 48, -48];
+const WIDE_LEVELS = { driver: [1, 0.88, 0.76], spoon: [1, 0.85], "3iron": [1, 0.8], "5iron": [1] };
+// the fan: every club at a few powers along lines round the pin line and the
+// game's own line; wide: lines all round the ball (when the fan finds nothing playable)
+function longCands(ctx, { wide = false } = {}) {
+  const clubs = isBunker(ctx.lie) ? ["3iron", "5iron", "7iron", "9iron", "wedge"] : ["driver", "spoon", "3iron", "5iron", "7iron", "9iron", "wedge"];
+  const heads = wide ? Array.from({ length: 36 }, (_, k) => ctx.toPin + k * 10 * DEG) : FAN.map((d) => ctx.toPin + d * DEG);
+  // the game's own line (the hole's suggested aim: a dogleg's fairway) and round it
+  if (!wide) for (const d of [0, 4, -4, 8, -8]) { const h = ctx.gameAim + d * DEG; if (!heads.some((x) => Math.abs(angDiff(x, h)) < 1.5 * DEG)) heads.push(h); }
+  const out = [];
+  for (const club of clubs) for (const f of wide ? [1, 0.7] : LEVELS[club]) for (const h of heads) out.push({ club, h, q: f * capOf(club, ctx.lie) });
+  if (!wide && ctx.D > 150) for (const club of clubs) for (const f of WIDE_LEVELS[club] ?? []) for (const d of FAN_WIDE) out.push({ club, h: ctx.toPin + d * DEG, q: f * capOf(club, ctx.lie) });
+  return out;
+}
+// a fan candidate's value; one that holes only on its own nominal line counts as a
+// tap-in (the holing search, which weighs the aim's error, is the one that claims holes)
+function evalCand(ctx, c) {
+  const o = fly(ctx, c.club, c.h, c.q, true);
+  let V = o.outcome === "holed" ? 1.01 : outValue(ctx, o);
+  const fb = failedBefore(ctx, c.club, c.h, c.q);
+  if (fb) V += 2;
+  return { ...c, o, V, E: 1 + V, failed: fb };
+}
+// the value two shots ahead of a rest: the reduced holing search from it
+// (one or two clubs), else its table value
+function restValue(ctx, o) {
+  // a nominal flight that holes is a tap-in here too (evalCand): the holing
+  // search, which weighs the aim's error, is the one that claims holes
+  if (o.outcome === "holed") return { V: 1.01 };
+  if (o.hazard || o.outcome !== "rest") return { V: outValue(ctx, o) };
+  const attr = o.restAttr, d = pinDist(ctx, o.rest);
+  if (GREEN.has(attr) || ![1, 2, 3, 9, 15, 16].includes(attr)) return { V: outValue(ctx, o) };
+  const table = outValue(ctx, o);
+  const sub = restCtx(ctx, o);
+  if (d > (REACH[LIE_NAME[attr] === "tee" ? "fairway" : LIE_NAME[attr]] ?? 265)) return { V: table };
+  const r = holingPlan(sub, { maxClubs: 2, reduced: true });
+  ctx.sims += sub.sims;
+  if (!r.length) return { V: table, sub: "none" };
+  // a reduced search finds a holing region less often than the full one: the
+  // table bounds its pessimism
+  return { V: Math.min(r[0].E, table + 0.15), sub: { club: r[0].club, P: +r[0].P.toFixed(2), E: +r[0].E.toFixed(3) } };
+}
+const o0hazard = (c) => !!c.o.hazard || c.o.outcome !== "rest";
+function longPlan(ctx, { keep = 5, wide = false } = {}) {
+  const cands = [];
+  for (const c of longCands(ctx, { wide })) {
+    if (Date.now() > ctx.deadline && cands.length > 30) break;
+    cands.push(evalCand(ctx, c));
+  }
+  if (!cands.length) return [];
+  cands.sort((a, b) => a.E - b.E);
+  // refine round the best distinct rests: aim +-1 and +-2 deg, power +-0.03 / 0.06 of the cap
+  const distinct = (list, n, yd) => {
+    const out = [];
+    for (const c of list) { if (out.length >= n) break; if (out.some((p) => Math.hypot(p.o.rest[0] - c.o.rest[0], p.o.rest[2] - c.o.rest[2]) / YD < yd)) continue; out.push(c); }
+    return out;
   };
-  const valueOf = (L, club, q) => {
-    const o = run({ club, q, surface, profile: L.sim, wind: L.wind, trace: false });
-    const lat = o.lateral ?? 0;
-    const sx = rest[0] + (L.dx * o.stop - L.dz * lat) * YD, sz = rest[1] + (L.dz * o.stop + L.dx * lat) * YD;
-    const g = groundAt(m, sx, sz), l2 = g ? LIE_OF_ATTR[g.attr] : null;
-    if (!(l2 in PEN)) return Infinity;
-    if (nearHazard(m, sx, sz, marginYd(o.stop))) return Infinity;
-    for (let yd = Math.min(o.carry, o.stop); yd <= Math.max(o.carry, o.stop) + 1e-9; yd += L.prof.step) { const l = L.at(yd); if (!(l in PEN) && l !== "tee") return Infinity; }
-    return Math.hypot(sx - target[0], sz - target[2]) / YD + 0.5 * PEN[l2];
-  };
-  let best = { v: Infinity };
-  for (const d of [0, 3, -3, 6, -6]) {
-    const h = toT + d * DEG, L = await lineAt(h);
-    if (!L) continue;
-    for (const club of clubs) for (let k = Math.round(Math.min(capOf(club, lie), 1) * 100); k >= 12; k -= 5) {
-      const v = valueOf(L, club, k / 100);
-      if (v < best.v) best = { v, h, club, k };
+  for (const c of distinct(cands, 6, 6)) {
+    if (Date.now() > ctx.deadline) break;
+    const cap = capOf(c.club, ctx.lie);
+    for (const [dh, dq] of [[1, 0], [-1, 0], [2, 0], [-2, 0], [0, 0.03], [0, -0.03], [0, 0.06], [0, -0.06]]) {
+      const q = c.q + dq * cap;
+      if (q > cap + 1e-9 || q < 0.1 * cap) continue;
+      cands.push(evalCand(ctx, { club: c.club, h: c.h + dh * DEG, q }));
     }
   }
-  if (best.v === Infinity) return yd0;
-  const top = { ...best };
-  for (const dd of [-2, -1, -0.5, 0, 0.5, 1, 2]) {
-    const h = top.h + dd * DEG, L = await lineAt(h);
-    if (!L) continue;
-    for (let dk = -4; dk <= 4; dk++) {
-      const k = top.k + dk;
-      if (k < 10 || k > Math.round(Math.min(capOf(top.club, lie), 1) * 100)) continue;
-      const v = valueOf(L, top.club, k / 100);
-      if (v < best.v) best = { v, h, club: top.club, k };
-    }
+  cands.sort((a, b) => a.E - b.E);
+  // two shots ahead for the best distinct rests
+  const top = distinct(cands, keep, 5);
+  for (const c of top) {
+    if (Date.now() > ctx.deadline) break;
+    const rv = restValue(ctx, c.o);
+    c.V1 = rv.V; c.sub = rv.sub; c.E1 = 1 + rv.V + (c.failed ? 2 : 0);
   }
-  return best.v;
+  // past the deadline the rest keep their table values
+  for (const c of top) c.E1 ??= c.E + 0.05;
+  // the neighbours of the best three: a rest at an edge is worth what its neighbours make of it
+  const ranked = top.filter((c) => c.E1 != null).sort((a, b) => a.E1 - b.E1);
+  for (const c of ranked.slice(0, 3)) {
+    if (Date.now() > ctx.deadline + 600) break;
+    const cap = capOf(c.club, ctx.lie);
+    let dv = 0;
+    const nb = [];
+    for (const [dh, dq] of [[0.1, 0], [-0.1, 0], [0, 0.003], [0, -0.003]]) {
+      const q = clamp(c.q + dq * cap, 0.02, cap);
+      const o = fly(ctx, c.club, c.h + dh * DEG, q, true);
+      const v = outValue(ctx, o);
+      nb.push({ restLie: o.outcome === "holed" ? "cup" : o.hazard ? "hazard" : LIE_NAME[o.restAttr] ?? o.restAttr, d: +(Math.hypot(o.rest[0] - c.o.rest[0], o.rest[2] - c.o.rest[2]) / YD).toFixed(1) });
+      dv += 0.1 * Math.max(0, v - c.V);
+    }
+    // a rest within a few yards of water, out of bounds or a valley: the
+    // model's rare forks (5 of 443 logged strokes by 3 yd and more) find it
+    const near = !o0hazard(c) && hazardNear(ctx, c.o.rest, 2.5 + 0.005 * Math.min(300, ctx.D));
+    c.Erob = c.E1 + dv + (near ? 0.12 : 0);
+    c.nb = nb;
+    if (near) c.nearHazard = true;
+  }
+  for (const c of ranked) c.Efinal = c.Erob ?? c.E1 + 0.05;
+  ranked.sort((a, b) => a.Efinal - b.Efinal);
+  return ranked.length ? ranked : cands.slice(0, 1).map((c) => ({ ...c, Efinal: c.E }));
 }
 
-// WSR putter power for a launch speed (yd/s): the inverse of wsrPuttV0 (run-puttread.mjs)
-const E = Math.log2(1 / 0.63), YD_S = 240 / 9.144;
-const powerOfV0 = (v) => { const u = v / YD_S; return u > 0.004 ? Math.pow((u - 0.004) / 0.406, 1 / E) : 0; };
-
-// The read on the green, made with WSR's own tick over the green's KCL
-// triangles (lib/kclputt.mjs: in WSR, its strength-forgiving read holed its
-// own putt from 56 of 58 steep spots, the app's 39): of the aims within 6 deg
-// of the app's read (src/putt.js solvePutt), the one whose holing putter
-// powers span the widest run, at its middle; aims every 0.25 deg and powers
-// every 0.01 first, the best three refined to 0.05 deg and 0.002. The app's
-// read stands when the port finds no holing line.
+// ---- the green: shortPlan, else the KCL read of round-planner.mjs ----
+const E_ = Math.log2(1 / 0.63), YD_S = 240 / 9.144;
+const powerOfV0 = (v) => { const u = v / YD_S; return u > 0.004 ? Math.pow((u - 0.004) / 0.406, 1 / E_) : 0; };
 const U = 240 / YD;
 async function portRead(hole, st, gm, a0, q0) {
   const g = packGreen(await kcl(hole), st.pin[0], st.pin[2], 40 * YD), cup = [st.pin[0], st.pin[2]];
@@ -630,71 +727,97 @@ async function portRead(hole, st, gm, a0, q0) {
   }
   return top;
 }
-
 async function greenPutt(hole, st) {
   const g = greenModel(hole, st.ball.pos, st.pin);
   const rd = P.solvePutt(g.field, g.fBall, g.fCup);
   const a0 = rd ? rd.a : 0, q0 = rd ? powerOfV0(rd.p * P.vFlat(g.D)) : powerOfV0(P.vFlat(g.D + 0.5));
-  const t0 = Date.now();
   const top = await portRead(hole, st, g, a0, q0);
-  const ms = Date.now() - t0;
-  if (top) {
-    return {
-      club: "putter", power: top.mid, heading: g.toPin - top.a * DEG,
-      expect: { distance: +g.D.toFixed(2), aimDeg: +top.a.toFixed(3), holes: [+top.lo.toFixed(4), +top.hi.toFixed(4)], src: "kcl-port", app: { aimDeg: +a0.toFixed(3), power: +q0.toFixed(4) } },
-      why: `putt ${g.D.toFixed(2)} yd (WSR's tick over the green's KCL, ${ms} ms): aim ${top.a >= 0 ? "+" : ""}${top.a.toFixed(2)} deg right of the cup, putter ${top.mid.toFixed(4)} (holes ${top.lo.toFixed(3)}-${top.hi.toFixed(3)}; the app's read ${a0.toFixed(2)} deg ${q0.toFixed(4)})`,
-    };
-  }
+  if (top) return { club: "putter", power: top.mid, heading: g.toPin - top.a * DEG, expect: { src: "kcl-port", distance: +g.D.toFixed(2), aimDeg: +top.a.toFixed(3), holes: [+top.lo.toFixed(4), +top.hi.toFixed(4)] }, why: `putt ${g.D.toFixed(2)} yd (the KCL port's read): aim ${top.a >= 0 ? "+" : ""}${top.a.toFixed(2)} deg right of the cup, putter ${top.mid.toFixed(4)} (holes ${top.lo.toFixed(3)}-${top.hi.toFixed(3)})` };
   if (!rd) return null;
+  return { club: "putter", power: q0, heading: g.toPin - a0 * DEG, expect: { src: "app", distance: +g.D.toFixed(2), aimDeg: +a0.toFixed(3) }, why: `putt ${g.D.toFixed(2)} yd: the app's read, aim ${a0 >= 0 ? "+" : ""}${a0.toFixed(2)} deg right of the cup, putter ${q0.toFixed(4)}` };
+}
+
+// ---- the plan ----
+const pct = (x) => `${Math.round(100 * x)}%`;
+function holingOut(ctx, r, ms, others) {
+  const off = deg(angDiff(ctx.toPin, r.h));
+  const o = fly(ctx, r.club, r.h, r.q, true), rr = rel(ctx, o.rest, r.h);
+  const restLie = o.outcome === "holed" ? "cup" : o.hazard ? (o.hazard === 1 ? "water" : o.hazard === 2 ? "ob" : "valley") : LIE_NAME[o.restAttr] ?? String(o.restAttr);
   return {
-    club: "putter", power: q0, heading: g.toPin - a0 * DEG,
-    expect: { distance: +g.D.toFixed(2), aimDeg: +a0.toFixed(3), holes: rd.power ? [+powerOfV0(rd.power.lo * P.vFlat(g.D)).toFixed(4), +powerOfV0(rd.power.hi * P.vFlat(g.D)).toFixed(4)] : null, src: "app" },
-    why: `putt ${g.D.toFixed(2)} yd: the KCL port found no holing line within 6 deg (${ms} ms); the app's read, aim ${a0 >= 0 ? "+" : ""}${a0.toFixed(2)} deg right of the cup, putter ${q0.toFixed(4)}`,
+    club: r.club, power: r.q, heading: r.h,
+    expect: { src: "candidate:holing", D: +ctx.D.toFixed(2), holeP: +r.P.toFixed(3), E: +r.E.toFixed(3), aimDeg: +off.toFixed(3), restLie, toPin: +(o.outcome === "holed" ? 0 : pinDist(ctx, o.rest)).toFixed(2), carry: +rel(ctx, o.carry, r.h).a.toFixed(1), stop: +rr.a.toFixed(1), lateral: +rr.x.toFixed(2), assist: r.assist, grid: r.grid, others, sims: ctx.sims, ms },
+    why: `${r.club} ${r.q.toFixed(4)} aimed ${off >= 0 ? "+" : ""}${off.toFixed(2)} deg right of the pin${ctx.yaw ? " (the lie's 2 deg yaw included)" : ""}, ${ctx.D.toFixed(1)} yd: holes ${pct(r.P)} under the aim's error (WSR's ball over the KCL, cup and flagstick in; ${r.grid?.holed ?? 0} of ${r.grid?.n ?? 0} grid launches hole)${o.outcome === "holed" ? "" : `, the centre rests ${pinDist(ctx, o.rest).toFixed(2)} yd away on ${restLie}`}${r.assist?.moved ? `; ${pct(r.assist.pi)} chance the assist pulls it to ${r.assist.power}` : ""}; ${r.E.toFixed(2)} strokes to hole out${others.length ? ` (${others.map((x) => `${x.club} ${x.E}`).join(", ")})` : ""}; ${ctx.sims} flights, ${ms} ms`,
   };
 }
-
-// The short game first: round-short.mjs (an earlier workflow's planner; putts
-// on the green, putts and chips from the fringe, chips from within 40 yd of
-// the pin). Every candidate is flown by WSR's ball in 3D over the hole's KCL
-// (fastPutt for the putter: the game's verdict on 239 of 240 logged putts, 13
-// of 13 from the fringe, where the straight port putt below holed 1 of 13) and
-// scored both as swung and as the hidden assist would pull it; the putter gets
-// its whole range, up to 2.5 from the green, fringe or fairway, the red
-// included (the user, 2026-10-22: "you may experiment with redlining when
-// putting ... putting is guaranteed to go straight"; seven putts in the red
-// before, 1.04-1.40, six holed). Re-imported when its file changes; the paths
-// below when it has nothing or fails.
-let shortMod = { mtime: -1, mod: null };
-async function shortPlanner() {
-  const f = path.join(HERE, "round-short.mjs"), t = fs.statSync(f).mtimeMs;
-  if (t !== shortMod.mtime) shortMod = { mtime: t, mod: await import(`${pathToFileURL(f).href}?v=${t}`) };
-  return shortMod.mod;
+function longOut(ctx, c, ms, others) {
+  const off = deg(angDiff(ctx.toPin, c.h));
+  const o = c.o, rr = rel(ctx, o.rest, c.h);
+  const restLie = o.outcome === "holed" ? "cup" : o.hazard ? (o.hazard === 1 ? "water" : o.hazard === 2 ? "ob" : "valley") : LIE_NAME[o.restAttr] ?? String(o.restAttr);
+  const toPin = o.outcome === "holed" ? 0 : pinDist(ctx, o.rest);
+  return {
+    club: c.club, power: c.q, heading: c.h,
+    expect: { src: "candidate:long", D: +ctx.D.toFixed(2), E: +c.Efinal.toFixed(3), restLie, toPin: +toPin.toFixed(1), carry: +rel(ctx, o.carry, c.h).a.toFixed(1), stop: +rr.a.toFixed(1), lateral: +rr.x.toFixed(1), next: c.sub, tree: o.tree ? { id: o.tree.id, code: o.tree.code } : undefined, neighbours: c.nb, others, sims: ctx.sims, ms },
+    why: `${c.club} ${c.q.toFixed(3)} ${off >= 0 ? "+" : ""}${off.toFixed(1)} deg right of the pin line${ctx.yaw ? " (the lie's 2 deg yaw included)" : ""}: rests ${rr.a.toFixed(1)} yd out, ${rr.x >= 0 ? "+" : ""}${rr.x.toFixed(1)} across, on ${restLie}, ${toPin.toFixed(1)} yd from the pin${o.tree ? ` (meets tree ${o.tree.id})` : ""}; ${c.sub?.club ? `two shots ahead the ${c.sub.club} holes ${pct(c.sub.P)} from there, ` : ""}${c.Efinal.toFixed(2)} strokes to hole out${c.nb ? `, neighbours ${c.nb.map((n) => `${n.restLie} ${n.d}`).join("/")}` : ""}${others.length ? ` (${others.map((x) => `${x.club} ${x.E}`).join(", ")})` : ""}; ${ctx.sims} flights, ${ms} ms`,
+  };
+}
+async function fullPlan(hole, st, deadline) {
+  const t0 = Date.now();
+  const { RM } = await models();
+  const ctx = makeCtx(RM, hole, st, deadline);
+  // the holing search when the pin is in reach (its clubs drop out cheaply when they cannot reach)
+  const inReach = ctx.D <= (ctx.lie === 2 ? REACH.rough : isBunker(ctx.lie) ? REACH.bunker : REACH.fairway) + 15;
+  let hp = [];
+  if (inReach) {
+    const save = ctx.deadline;
+    // keep time for the long search when the approach is long
+    if (ctx.D > 150 || isBunker(ctx.lie)) ctx.deadline = t0 + 0.55 * (deadline - t0);
+    hp = holingPlan(ctx, { maxClubs: 4 });
+    ctx.deadline = save;
+  }
+  const bestHole = hp[0] ?? null;
+  // the long search, unless a holing approach is clearly the best there is
+  let lp = [];
+  if (!bestHole || bestHole.E > 1.45 || ctx.D > 150) lp = ctx.D > SHORT_YD || !bestHole ? longPlan(ctx) : [];
+  // nothing playable along the fan (every rest a hazard or lost): lines all round the ball
+  if ((!lp.length || lp[0].Efinal > 4.2) && (!bestHole || bestHole.E > 4.2)) {
+    const save = ctx.deadline;
+    ctx.deadline = Math.max(ctx.deadline, Date.now() + 2500);
+    const w = longPlan(ctx, { wide: true });
+    ctx.deadline = save;
+    if (w.length && (!lp.length || w[0].Efinal < lp[0].Efinal)) lp = w.map((c) => ({ ...c, wide: true }));
+  }
+  const ms = () => Date.now() - t0;
+  const bestLong = lp[0] ?? null;
+  if (bestHole && (!bestLong || bestHole.E <= bestLong.Efinal)) return holingOut(ctx, bestHole, ms(), [...hp.slice(1).map((r) => ({ club: r.club, E: +r.E.toFixed(2), P: +r.P.toFixed(2) })), ...(bestLong ? [{ club: `${bestLong.club} (long)`, E: +bestLong.Efinal.toFixed(2) }] : [])]);
+  if (bestLong) return longOut(ctx, bestLong, ms(), [...lp.slice(1, 4).map((c) => ({ club: c.club, E: +c.Efinal.toFixed(2) })), ...(bestHole ? [{ club: `${bestHole.club} (holing)`, E: +bestHole.E.toFixed(2) }] : [])]);
+  return null;
 }
 
-export async function plan(hole, st, { k3d = USE_3D } = {}) {
-  try {
-    const S = await shortPlanner();
-    const sp = await S.shortPlan(hole, st);
-    if (sp) return { ...sp, why: `${sp.why} [round-short.mjs]` };
-  } catch (e) { /* the full planner below */ }
+export async function plan(hole, st) {
+  const t0 = Date.now(), deadline = t0 + BUDGET_MS;
   const lie = st.player.lie;
+  const notes = [];
   if (lie === 6 || lie === 10 || lie === 11) {
-    const p = await greenPutt(hole, st);
-    if (p) return p;
+    try {
+      const { RS } = await models();
+      const sp = await RS.shortPlan(hole, st, { budgetMs: 4500 });
+      if (sp) return { ...sp, expect: { ...sp.expect, src: "candidate:shortPlan" }, why: `${sp.why} (round-short.mjs shortPlan)` };
+      notes.push("shortPlan found no putt");
+    } catch (e) { notes.push(`shortPlan failed: ${e.message}`); }
+    try {
+      const p = await greenPutt(hole, st);
+      if (p) return { ...p, why: `${p.why}${notes.length ? ` [${notes.join("; ")}]` : ""}` };
+    } catch (e) { notes.push(`the KCL read failed: ${e.message}`); }
+  } else {
+    try {
+      const p = await fullPlan(hole, st, deadline);
+      if (p) return p;
+      notes.push("no stroke found");
+    } catch (e) { notes.push(`the search failed: ${e.message}`); }
   }
-  if (lie === 6 || lie === 9 || lie === 10 || lie === 11) {
-    const p = await planStroke(hole, { ...st, wind: { ...st.wind, speedIdx: 0 } });
-    return { ...p, why: `${p.why} (the port's putt over the KCL line)` };
-  }
-  // round the pin's and the game's lines first; all round the ball when
-  // nothing there passes the full rules; a relaxed level of either only when
-  // neither has a stroke under the full rules (the nearer search first)
-  const a = await fullShot(hole, st, st.pin, { k3d });
-  if (a && a.level === 0) return a;
-  const b = await fullShot(hole, st, st.pin, { wide: true, k3d });
-  if (b && b.level === 0) return b;
-  const r = [a, b].filter(Boolean).sort((x, y) => x.level - y.level)[0];
-  if (r) return r;
-  const f = await planStroke(hole, st);
-  return { ...f, why: `${f.why} (lib/play.mjs: no searched stroke clear of every trunk and canopy, all round the ball either)` };
+  const f = await planStroke(hole, lie === 9 ? { ...st, wind: { ...st.wind, speedIdx: 0 } } : st);
+  return { ...f, why: `${f.why} (lib/play.mjs; ${notes.join("; ")})` };
 }
+
+// for the offline evaluation
+export const _internals = { makeCtx, restCtx, fly, rel, outValue, holingPlan, holeClub, withAssist, longPlan, longCands, restValue, centreOf, fineEval, aimKernel, tableWeights, assistedPower, assistMayAct, PI_ASSIST, REACH };

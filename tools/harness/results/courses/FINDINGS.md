@@ -44,6 +44,16 @@ The full account is in tools/harness/FLAGSTICK.md (measured in WSR 2026-10-22, 1
   - Classic B −7 (1-2-2) and Classic C −6 (2-1-3), on their first attempts.
   - Resort A, Resort B, Resort C and Classic A −6, on their first attempt after the fix went live (attempts 10–12). Before it, those four repeated −4 or −5.
 
+## Back in the game's own wind: all six courses at -5 or better, first attempt (2026-10-22)
+
+- **Natural rounds again.** Played from the course menu in the game's own wind and pins (results/wind), with a goal of -5.
+- **The planner.** round-planner.mjs is now the candidate planner (backup: state/round-planner.before-candidate.mjs). It flies every candidate with round-model.mjs and plays for the fewest expected strokes, searching for holing launches whenever the pin is in reach. Before the swap the reviewer's run-all.mjs was re-run on it: 300 logged and 368 adversarial states, no errors and no problems, the longest plan 1.5 s.
+- **The aim drift, in wind.** When the D-pad misses a holing stroke's aim, round-play.mjs re-solves the power for the aim actually reached. It uses the hole's own wind and the rolling-in rule, and takes the middle of the longest holing run of powers.
+- **Result: every course made the goal on its first attempt.**
+  - Classic A -7 (2-1-2), Resort A -6 (2-1-3), Classic B -6 (1-3-2), Classic C -6 (2-2-2), Resort B -5 (2-3-2), Resort C -5 (2-2-3).
+  - The winds ran from speed 0 to 15 (30 mph).
+  - The planner tried 15 holing strokes from off the green and 14 dropped. The one miss was Classic B hole 14's 7-iron, rated 54%.
+
 ## The game's hidden assist on partial swings
 
 - WSR pulls a partial swing's power toward the power its own look-ahead table says lands nearest the pin, while the swing's follow-through window is open (wsr-swing-redzone-spin.md 3.5). The harness strikes as soon as it is lined up (the user's rule: no waiting), before that table is built, so the pull goes toward a table that is mostly empty: **89 of 376 putts (24 %) launched at a power other than the one swung, most at exactly half** (the pull halfway toward 0); 68 of them still dropped (short putts forgive it), the rest came up short or long. Of 535 partial non-putt swings 22 were pulled (Resort B #8, hole 4: a 10 yd chip at 0.110 launched at 0.055 and stopped 6.5 yd short).

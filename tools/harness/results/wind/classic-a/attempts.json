@@ -1,0 +1,17 @@
+[
+ {
+  "n": 1,
+  "instance": 18,
+  "holes": {
+   "10": 2,
+   "11": 1,
+   "12": 2
+  },
+  "strokes": 5,
+  "toPar": -7,
+  "complete": true,
+  "why": "played",
+  "card": "results/wind/classic-a/card-1.png",
+  "ended": "2026-10-22T12:45:15.098Z"
+ }
+]
