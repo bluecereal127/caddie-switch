@@ -475,10 +475,12 @@ function holeability(rest, st) {
   let best = 0;
   for (const club of clubs) {
     const cap = capOf(club, lie), lo = club === "putter" ? 0.03 : 0.08;
-    const at = (q, h) => { const p = RM.predict({ hole, ball, heading: h, club, power: q, lie, wind: WIND, pin }); return { q, h, d: nearness(p, pin), rx: p.rest[0], rz: p.rest[1] }; };
+    const ux = Math.sin(h0), uz = Math.cos(h0);
+    const at = (q, h) => { const p = RM.predict({ hole, ball, heading: h, club, power: q, lie, wind: WIND, pin }); return { q, h, d: nearness(p, pin), rx: p.rest[0], rz: p.rest[1], along: ((p.rest[0] - ball[0]) * ux + (p.rest[1] - ball[2]) * uz) / YD }; };
     let b = null;
-    // each power at the pin line, then at its wind-corrected aim
-    for (let q = lo; q <= cap + 1e-9; q += 0.02) { const t = at(q, h0); const t2 = WIND.speedIdx ? at(q, h0 + aimFix(ball, pin, t)) : t; for (const u of [t, t2]) if (!b || u.d < b.d) b = u; }
+    // each power at the pin line, then, when its rest is within 15 yd of the
+    // pin's distance along the line, at its wind-corrected aim
+    for (let q = lo; q <= cap + 1e-9; q += 0.02) { const t = at(q, h0); const t2 = WIND.speedIdx && Math.abs(t.along - D) <= 15 ? at(q, h0 + aimFix(ball, pin, t)) : t; for (const u of [t, t2]) if (!b || u.d < b.d) b = u; }
     if (!b || b.d > 12) continue;
     const scanQ = (span, step) => { const base = b; for (let x = -span; x <= span + 1e-9; x += step) { const q = base.q + x; if (q < lo || q > cap) continue; const t = at(q, base.h); if (t.d < b.d) b = t; } };
     const scanA = (span, step) => { const base = b; for (let a = -span; a <= span + 1e-9; a += step) { const t = at(base.q, base.h + a * DEG); if (t.d < b.d) b = t; } };
@@ -492,7 +494,7 @@ function holeability(rest, st) {
       if (rule(p)) n++;
     }
     best = Math.max(best, n);
-    if (best >= (RULE === "near" ? 60 : 12)) break;
+    if (best >= (RULE === "near" ? 30 : 12)) break;
   }
   return best;
 }

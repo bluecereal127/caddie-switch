@@ -93,7 +93,9 @@ export function nearHazard(m, x, z, r) {
   }
   return false;
 }
-export const KNOW = path.join(HERE, "results", "knowledge", "strokes.jsonl");
+// HARNESS_KNOW: another memory file (natural-18.sh's fresh rounds start from an
+// empty one, so no stroke of an earlier round in the same wind is recalled)
+export const KNOW = process.env.HARNESS_KNOW ? path.resolve(process.env.HARNESS_KNOW) : path.join(HERE, "results", "knowledge", "strokes.jsonl");
 let known = { mtime: -1, rows: [] };
 export function knowledge() {
   try {

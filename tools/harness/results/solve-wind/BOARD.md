@@ -1,16 +1,16 @@
 # The wind campaign: every pin in every wind
 
-114 of 12032 winds solved, 116 played: holed or within 1 ft of the cup with the attempt stroke (a par 3's tee shot, a par 4's or 5's second), no flag catches. Holes in the campaign's order; each cell is the directions solved / played at that speed (— : calm stands from results/solve). Updated 2026-10-22 14:40 UTC.
+369 of 12032 winds solved, 371 played: holed or within 1 ft of the cup with the attempt stroke (a par 3's tee shot, a par 4's or 5's second), no flag catches. Holes in the campaign's order; each cell is the directions solved / played at that speed (— : calm stands from results/solve). Updated 2026-10-22 15:12 UTC.
 
 | Speed | calm | 16 mph | 30 mph | 8 mph | 24 mph | 4 mph | 12 mph | 20 mph | 28 mph | 2 mph | 6 mph | 10 mph | 14 mph | 18 mph | 22 mph | 26 mph |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| solved / played / all | 0/1/32 | 88/89/800 | 10/10/800 | 8/8/800 | 5/5/800 | 2/2/800 | 0/0/800 | 0/0/800 | 0/0/800 | 0/0/800 | 0/0/800 | 0/0/800 | 0/0/800 | 1/1/800 | 0/0/800 | 0/0/800 |
+| solved / played / all | 0/1/32 | 88/89/800 | 24/24/800 | 25/25/800 | 24/24/800 | 24/24/800 | 24/24/800 | 24/24/800 | 24/24/800 | 24/24/800 | 24/24/800 | 23/23/800 | 21/21/800 | 17/17/800 | 2/2/800 | 1/1/800 |
 
 | Hole | Pin | 0 | 16 | 30 | 8 | 24 | 4 | 12 | 20 | 28 | 2 | 6 | 10 | 14 | 18 | 22 | 26 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| 1 | s0 L | — | 8/8 | 4/4 | 3/3 | 2/2 | 1/1 |  |  |  |  |  |  |  |  |  |  |
-| 1 | s1 R | — | 8/8 | 3/3 | 2/2 | 2/2 | 1/1 |  |  |  |  |  |  |  |  |  |  |
-| 1 | s2 M | — | 8/8 | 3/3 | 2/2 | 1/1 |  |  |  |  |  |  |  |  |  |  |  |
+| 1 | s0 L | — | 8/8 | 8/8 | 8/8 | 8/8 | 8/8 | 8/8 | 8/8 | 8/8 | 8/8 | 8/8 | 8/8 | 8/8 | 6/6 | 1/1 | 1/1 |
+| 1 | s1 R | — | 8/8 | 8/8 | 8/8 | 8/8 | 8/8 | 8/8 | 8/8 | 8/8 | 8/8 | 8/8 | 8/8 | 7/7 | 5/5 | 1/1 |  |
+| 1 | s2 M | — | 8/8 | 8/8 | 8/8 | 8/8 | 8/8 | 8/8 | 8/8 | 8/8 | 8/8 | 8/8 | 7/7 | 6/6 | 5/5 |  |  |
 | 10 | s0 BL | — |  |  | 1/1 |  |  |  |  |  |  |  |  |  | 1/1 |  |  |
 | 10 | s1 BM | — |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |
 | 10 | s2 BR | — |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |
