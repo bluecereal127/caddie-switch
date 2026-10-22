@@ -13,5 +13,105 @@
   "why": "played",
   "card": "results/wind/resort-b/card-1.png",
   "ended": "2026-10-22T12:45:31.440Z"
+ },
+ {
+  "n": 2,
+  "instance": 16,
+  "holes": {
+   "4": 1,
+   "5": 2,
+   "6": 2
+  },
+  "pins": {
+   "4": "s0",
+   "5": "s1",
+   "6": "s0"
+  },
+  "strokes": 5,
+  "toPar": -7,
+  "complete": true,
+  "why": "played",
+  "card": "results/wind/resort-b/card-2.png",
+  "ended": "2026-10-22T13:07:14.329Z"
+ },
+ {
+  "n": 3,
+  "instance": 16,
+  "holes": {
+   "4": 1,
+   "5": 3,
+   "6": 2
+  },
+  "pins": {
+   "4": "s1",
+   "5": "s2",
+   "6": "s1"
+  },
+  "strokes": 6,
+  "toPar": -6,
+  "complete": true,
+  "why": "played",
+  "card": "results/wind/resort-b/card-3.png",
+  "ended": "2026-10-22T13:11:09.385Z"
+ },
+ {
+  "n": 4,
+  "instance": 16,
+  "holes": {
+   "4": 2,
+   "5": 2,
+   "6": 2
+  },
+  "pins": {
+   "4": "s3",
+   "5": "s3",
+   "6": "s3"
+  },
+  "strokes": 6,
+  "toPar": -6,
+  "complete": true,
+  "why": "played",
+  "card": "results/wind/resort-b/card-4.png",
+  "ended": "2026-10-22T13:14:32.799Z"
+ },
+ {
+  "n": 5,
+  "instance": 16,
+  "holes": {
+   "4": 1,
+   "5": 3,
+   "6": 2
+  },
+  "pins": {
+   "4": "s4",
+   "5": "s4",
+   "6": "s4"
+  },
+  "strokes": 6,
+  "toPar": -6,
+  "complete": true,
+  "why": "played",
+  "card": "results/wind/resort-b/card-5.png",
+  "ended": "2026-10-22T13:17:54.321Z"
+ },
+ {
+  "n": 6,
+  "instance": 16,
+  "holes": {
+   "4": 1,
+   "5": 3,
+   "6": 2
+  },
+  "pins": {
+   "4": "s5",
+   "5": "s5",
+   "6": "s5"
+  },
+  "strokes": 6,
+  "toPar": -6,
+  "complete": true,
+  "why": "played",
+  "card": "results/wind/resort-b/card-6.png",
+  "ended": "2026-10-22T13:21:40.478Z"
  }
 ]

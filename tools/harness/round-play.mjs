@@ -248,7 +248,7 @@ async function planFrom(hole, st, windSet = null) {
   return { Pl, pl, ms: Date.now() - t0, from: st.ball.pos, lie: st.player.lie };
 }
 
-export async function playHole({ gdb, dsu, hole, last = false, maxStrokes = 15, logFile = null, src = null, label = null, windSet = null }) {
+export async function playHole({ gdb, dsu, hole, last = false, maxStrokes = 15, logFile = null, src = null, label = null, windSet = null, forceNext = null }) {
   if (logFile) LOG = logFile;
   // the stroke's name in the planner's memory (results/knowledge/strokes.jsonl)
   src ??= path.basename(LOG, ".log");
@@ -438,6 +438,22 @@ export async function playHole({ gdb, dsu, hole, last = false, maxStrokes = 15, 
     const nextSt = aheadOf(st, b.pos, lie);
     await gdb.go();
     ahead = await planFrom(hole, nextSt, windSet);
+  }
+  // the next hole's pin forced to WSR slot forceNext (round-ctl.mjs --pins; the
+  // user's permission to set the pins, 2026-10-22): armed now, before the
+  // hole-out's screens are advanced, so the next hole's start stops after
+  // choosePin and the slot is written over its draw (lib/pins.mjs forceAtStart,
+  // which advances the screens itself); on a failure the game's draw stands
+  if (!last && forceNext != null) {
+    try {
+      const PN = await import(pathToFileURL(path.join(HERE, "lib", "pins.mjs")).href);
+      await gdb.haltSafe(); await gdb.addBreak(PN.FORCE_PC); await gdb.go();
+      rec.forcedNext = await PN.forceAtStart(s, { hole: hole + 1, slot: forceNext, log });
+    } catch (e) {
+      rec.forceError = String(e.message ?? e);
+      log(`hole ${hole + 1}: forcing the pin to slot ${forceNext} failed (${e.message}); the game's own draw stands`);
+      try { await gdb.haltSafe(); await gdb.clearBreaks(); await gdb.go(); } catch { /* running already */ }
+    }
   }
   if (!last) {
     const w = await waitStroke(s, hole, { maxSteps: 160 }).catch((e) => ({ error: e.message }));

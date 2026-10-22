@@ -7,7 +7,12 @@
 // make-states.mjs walks to a tee. Only button presses and the pointer.
 // With --course (a driver booted on saves/menu-course.sav, "Select Course"):
 // that 3-hole course's tile instead, to its first hole's tee.
-//   node tools/harness/round-start.mjs --port 8815 [--course "Classic A"]
+// With --pin SLOT (and --course): the first hole's pin forced to that WSR slot
+// (the user's permission to set the pins, 2026-10-22): the tile's A pressed
+// with lib/pins.mjs's force armed (as make-pinstates.mjs's menu route), the
+// hole start stopped after choosePin and the slot written over its draw, all
+// in one eval (the driver clears the breakpoints after each).
+//   node tools/harness/round-start.mjs --port 8815 [--course "Classic A"] [--pin 3]
 import http from "node:http";
 
 const arg = (n, d) => { const i = process.argv.indexOf(n); return i >= 0 ? process.argv[i + 1] : d; };
@@ -37,10 +42,17 @@ const course = arg("--course", null);
 if (course && !COURSES[course]) { console.log(`no course ${course}`); process.exit(2); }
 const first = course ? COURSES[course].first : 1;
 const [px, py] = course ? COURSES[course].tile : [0.004, -0.552];
+const PIN = arg("--pin", null);
 await post("point", [String(px), String(py)]);
 await post("wait", ["700"]);
-await post("press", ["A", "200"]);
-await post("wait", ["3500"]);
+if (PIN != null && course) {
+  const pins = new URL("./lib/pins.mjs", import.meta.url).href;
+  const r = await post("eval", [`const P = await import(${JSON.stringify(pins)}); await gdb.haltSafe(); await gdb.addBreak(P.FORCE_PC); await gdb.go(); await dsu.tap(0, "Cross", 250); let out; try { out = await P.forceAtStart({ gdb, dsu }, { hole: ${first}, slot: ${Number(PIN)}, menu: true }); } catch (e) { out = { error: String(e.message ?? e) }; } try { await gdb.haltSafe(); } catch { /* the wrapper resumes a halted CPU */ } return JSON.stringify(out);`]);
+  console.log(`hole ${first}: the pin forced to slot ${PIN}: ${r}`);
+} else {
+  await post("press", ["A", "200"]);
+  await post("wait", ["3500"]);
+}
 for (let i = 0; i < 80; i++) {
   const r = JSON.parse(await post("eval", [READY]));
   if (r.ready && r.hole === first) {

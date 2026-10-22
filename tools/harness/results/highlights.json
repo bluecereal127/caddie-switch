@@ -5042,5 +5042,4881 @@
    ]
   },
   "after": 0
+ },
+ {
+  "kind": "hole-in-one",
+  "round": "Resort B wind #2",
+  "hole": 4,
+  "par": 3,
+  "stroke": 1,
+  "at": "2026-10-22T13:04:48.651Z",
+  "screenshot": "results\\highlights\\resort-b-wind-2-h04.png",
+  "k": 1,
+  "lie": 15,
+  "from": [
+   546.2000122070312,
+   0.949999988079071,
+   855.5
+  ],
+  "toPin": 165.2,
+  "wind": {
+   "dir": 6,
+   "speedIdx": 9,
+   "mph": 18
+  },
+  "pin": [
+   -169.60000610351562,
+   -45,
+   -474.70001220703125
+  ],
+  "plan": {
+   "club": "3iron",
+   "power": 0.73123,
+   "heading": -2.734418982617647,
+   "expect": {
+    "src": "candidate:holing",
+    "D": 165.2,
+    "holeP": 0.697,
+    "E": 1.33,
+    "aimDeg": 4.956,
+    "restLie": "cup",
+    "toPin": 0,
+    "carry": 150.5,
+    "stop": 164.5,
+    "lateral": -14.28,
+    "assist": {
+     "pi": 0.1,
+     "moved": false
+    },
+    "grid": {
+     "holed": 6,
+     "n": 182,
+     "dhDeg": 0.0243,
+     "dqYd": 0.35
+    },
+    "others": [
+     {
+      "club": "spoon",
+      "E": 1.94,
+      "P": 0.1
+     },
+     {
+      "club": "5iron",
+      "E": 2.01,
+      "P": 0
+     },
+     {
+      "club": "driver",
+      "E": 2.11,
+      "P": 0
+     },
+     {
+      "club": "3iron (long)",
+      "E": 2.01
+     }
+    ],
+    "sims": 2401,
+    "ms": 3185
+   },
+   "why": "3iron 0.7327 aimed +4.96 deg right of the pin, 165.2 yd: holes 70% under the aim's error (WSR's ball over the KCL, cup and flagstick in; 6 of 182 grid launches hole); 1.33 strokes to hole out (spoon 1.94, 5iron 2.01, driver 2.11, 3iron (long) 2.01); 2401 flights, 3185 ms",
+   "ms": 3189,
+   "ahead": true,
+   "planned": 0.7327333981255436,
+   "adjust": {
+    "planned": 0.7327333981255436,
+    "power": 0.73123,
+    "heading": -2.7348179817199707,
+    "ms": 160,
+    "why": "holes at the aim reached for 0.7312-0.7317 (2 of 81)"
+   }
+  },
+  "club": "3iron",
+  "aim": {
+   "heading": -2.7348179817199707,
+   "errDeg": 0.023,
+   "passes": 2
+  },
+  "readyToStrikeMs": 2091,
+  "raw": 0.6965233134470952,
+  "gamePower": 0.7313185334205627,
+  "curveC": 0,
+  "rest": [
+   -170.23092651367188,
+   -47.67030715942383,
+   -473.964111328125
+  ],
+  "holed": true,
+  "hazard": 0,
+  "placed": {
+   "from": [
+    472.6902770996094,
+    61.14202117919922,
+    686.046875
+   ],
+   "to": [
+    447.38775634765625,
+    79.72846984863281,
+    628.5869750976562
+   ]
+  },
+  "after": 0
+ },
+ {
+  "kind": "hole-in-one",
+  "round": "Classic B wind #2",
+  "hole": 13,
+  "par": 3,
+  "stroke": 1,
+  "at": "2026-10-22T13:04:54.342Z",
+  "screenshot": "results\\highlights\\classic-b-wind-2-h13.png",
+  "k": 1,
+  "lie": 15,
+  "from": [
+   70.30000305175781,
+   50.95000076293945,
+   560.7000122070312
+  ],
+  "toPin": 142.64,
+  "wind": {
+   "dir": 6,
+   "speedIdx": 9,
+   "mph": 18
+  },
+  "pin": [
+   -199.3000030517578,
+   -4,
+   -715.4000244140625
+  ],
+  "plan": {
+   "club": "spoon",
+   "power": 0.41814,
+   "heading": -2.9848259734337597,
+   "expect": {
+    "src": "candidate:holing",
+    "D": 142.64,
+    "holeP": 0.829,
+    "E": 1.189,
+    "aimDeg": 2.947,
+    "restLie": "cup",
+    "toPin": 0,
+    "carry": 106.1,
+    "stop": 142.3,
+    "lateral": -7.31,
+    "grid": {
+     "holed": 27,
+     "n": 182,
+     "dhDeg": 0.0281,
+     "dqYd": 0.35
+    },
+    "others": [
+     {
+      "club": "5iron",
+      "E": 1.44,
+      "P": 0.58
+     },
+     {
+      "club": "7iron",
+      "E": 1.99,
+      "P": 0.04
+     },
+     {
+      "club": "3iron",
+      "E": 2.01,
+      "P": 0
+     }
+    ],
+    "sims": 1446,
+    "ms": 1993
+   },
+   "why": "spoon 0.4161 aimed +2.95 deg right of the pin, 142.6 yd: holes 83% under the aim's error (WSR's ball over the KCL, cup and flagstick in; 27 of 182 grid launches hole); 1.19 strokes to hole out (5iron 1.44, 7iron 1.99, 3iron 2.01); 1446 flights, 1993 ms",
+   "ms": 1994,
+   "ahead": true,
+   "planned": 0.4161359071118373,
+   "adjust": {
+    "planned": 0.4161359071118373,
+    "power": 0.41814,
+    "heading": -2.984635353088379,
+    "ms": 136,
+    "why": "holes at the aim reached for 0.4136-0.4231 (20 of 81)"
+   }
+  },
+  "club": "spoon",
+  "aim": {
+   "heading": -2.984635353088379,
+   "errDeg": -0.011,
+   "passes": 2
+  },
+  "readyToStrikeMs": 2439,
+  "raw": 0.3194959765121869,
+  "gamePower": 0.41814061999320984,
+  "curveC": 0,
+  "rest": [
+   -198.67784118652344,
+   -6.55433988571167,
+   -715.0767822265625
+  ],
+  "holed": true,
+  "hazard": 0,
+  "placed": {
+   "from": [
+    61.65599060058594,
+    61.26169204711914,
+    506.3113708496094
+   ],
+   "to": [
+    51.99428176879883,
+    71.75863647460938,
+    446.1661071777344
+   ]
+  },
+  "after": 0
+ },
+ {
+  "kind": "hole-in-one",
+  "round": "Resort A wind #2",
+  "hole": 2,
+  "par": 3,
+  "stroke": 1,
+  "at": "2026-10-22T13:05:44.357Z",
+  "screenshot": "results\\highlights\\resort-a-wind-2-h02.png",
+  "k": 1,
+  "lie": 15,
+  "from": [
+   500.1000061035156,
+   -3.450000047683716,
+   548.7000122070312
+  ],
+  "toPin": 155.26,
+  "wind": {
+   "dir": 2,
+   "speedIdx": 3,
+   "mph": 6
+  },
+  "pin": [
+   249.60000610351562,
+   -177.3000030517578,
+   -848.7000122070312
+  ],
+  "plan": {
+   "club": "driver",
+   "power": 0.31926,
+   "heading": -2.944915022254891,
+   "expect": {
+    "src": "candidate:holing",
+    "D": 155.26,
+    "holeP": 0.814,
+    "E": 1.209,
+    "aimDeg": -1.106,
+    "restLie": "cup",
+    "toPin": 0,
+    "carry": 105.3,
+    "stop": 155.1,
+    "lateral": 3.03,
+    "grid": {
+     "holed": 21,
+     "n": 182,
+     "dhDeg": 0.0258,
+     "dqYd": 0.35
+    },
+    "others": [
+     {
+      "club": "spoon",
+      "E": 1.21,
+      "P": 0.81
+     },
+     {
+      "club": "3iron",
+      "E": 1.25,
+      "P": 0.77
+     },
+     {
+      "club": "5iron",
+      "E": 1.34,
+      "P": 0.68
+     },
+     {
+      "club": "5iron (long)",
+      "E": 2.01
+     }
+    ],
+    "sims": 1689,
+    "ms": 1763
+   },
+   "why": "driver 0.3193 aimed -1.11 deg right of the pin, 155.3 yd: holes 81% under the aim's error (WSR's ball over the KCL, cup and flagstick in; 21 of 182 grid launches hole); 1.21 strokes to hole out (spoon 1.21, 3iron 1.25, 5iron 1.34, 5iron (long) 2.01); 1689 flights, 1763 ms",
+   "ms": 1764,
+   "ahead": true,
+   "planned": 0.3192608372614934,
+   "adjust": {
+    "planned": 0.3192608372614934,
+    "power": 0.31926,
+    "heading": -2.9447503089904785,
+    "ms": 96,
+    "why": "holes at the aim reached for 0.3183-0.3203 (5 of 81)"
+   }
+  },
+  "club": "driver",
+  "aim": {
+   "heading": -2.9447503089904785,
+   "errDeg": -0.009,
+   "passes": 2
+  },
+  "readyToStrikeMs": 2267,
+  "raw": 0.2324552367939327,
+  "gamePower": 0.31930890679359436,
+  "curveC": 0,
+  "rest": [
+   249.87811279296875,
+   -179.9562530517578,
+   -847.8763427734375
+  ],
+  "holed": true,
+  "hazard": 0,
+  "placed": null,
+  "after": 0
+ },
+ {
+  "kind": "hole-in-one",
+  "round": "Classic A wind #2",
+  "hole": 11,
+  "par": 3,
+  "stroke": 1,
+  "at": "2026-10-22T13:05:47.410Z",
+  "screenshot": "results\\highlights\\classic-a-wind-2-h11.png",
+  "k": 1,
+  "lie": 15,
+  "from": [
+   -284.70001220703125,
+   36.95000076293945,
+   787.5
+  ],
+  "toPin": 136.12,
+  "wind": {
+   "dir": 4,
+   "speedIdx": 2,
+   "mph": 4
+  },
+  "pin": [
+   100,
+   -7.5,
+   -396.20001220703125
+  ],
+  "plan": {
+   "club": "3iron",
+   "power": 0.51194,
+   "heading": 2.800126000525939,
+   "expect": {
+    "src": "candidate:holing",
+    "D": 136.12,
+    "holeP": 0.464,
+    "E": 1.574,
+    "aimDeg": 1.561,
+    "restLie": "cup",
+    "toPin": 0,
+    "carry": 104.7,
+    "stop": 136,
+    "lateral": -3.61,
+    "grid": {
+     "holed": 15,
+     "n": 182,
+     "dhDeg": 0.0295,
+     "dqYd": 0.35
+    },
+    "others": [
+     {
+      "club": "7iron",
+      "E": 2.02,
+      "P": 0
+     },
+     {
+      "club": "5iron",
+      "E": 2.03,
+      "P": 0
+     },
+     {
+      "club": "spoon",
+      "E": 2.06,
+      "P": 0
+     },
+     {
+      "club": "9iron (long)",
+      "E": 2.04
+     }
+    ],
+    "sims": 2756,
+    "ms": 1877
+   },
+   "why": "3iron 0.5054 aimed +1.56 deg right of the pin, 136.1 yd: holes 46% under the aim's error (WSR's ball over the KCL, cup and flagstick in; 15 of 182 grid launches hole); 1.57 strokes to hole out (7iron 2.02, 5iron 2.03, spoon 2.06, 9iron (long) 2.04); 2756 flights, 1877 ms",
+   "ms": 1878,
+   "ahead": true,
+   "planned": 0.5054407114469088,
+   "adjust": {
+    "planned": 0.5054407114469088,
+    "power": 0.51194,
+    "heading": 2.7999398708343506,
+    "ms": 54,
+    "why": "holes at the aim reached for 0.5109-0.5134 (6 of 81)"
+   }
+  },
+  "club": "3iron",
+  "aim": {
+   "heading": 2.7999398708343506,
+   "errDeg": 0.011,
+   "passes": 1
+  },
+  "readyToStrikeMs": 2093,
+  "raw": 0.46368361406242603,
+  "gamePower": 0.511953592300415,
+  "curveC": 0,
+  "rest": [
+   99.23631286621094,
+   -10.021368026733398,
+   -396.3684997558594
+  ],
+  "holed": true,
+  "hazard": 0,
+  "placed": null,
+  "after": 0
+ },
+ {
+  "kind": "albatross",
+  "round": "Resort B wind #2",
+  "hole": 5,
+  "par": 5,
+  "stroke": 2,
+  "at": "2026-10-22T13:05:48.758Z",
+  "screenshot": "results\\highlights\\resort-b-wind-2-h05.png",
+  "k": 2,
+  "lie": 1,
+  "from": [
+   -393.0525817871094,
+   -9.188922882080078,
+   -36.7536506652832
+  ],
+  "toPin": 268.67,
+  "wind": {
+   "dir": 4,
+   "speedIdx": 7,
+   "mph": 14
+  },
+  "pin": [
+   552.9000244140625,
+   129.5,
+   -2304.10009765625
+  ],
+  "plan": {
+   "club": "driver",
+   "power": 0.9603,
+   "heading": 2.716045390689178,
+   "expect": {
+    "src": "candidate:holing",
+    "D": 268.67,
+    "holeP": 0.517,
+    "E": 1.589,
+    "aimDeg": 1.736,
+    "restLie": "cup",
+    "toPin": 0,
+    "carry": 221.4,
+    "stop": 268.4,
+    "lateral": -8.11,
+    "assist": {
+     "pi": 0.1,
+     "moved": false
+    },
+    "grid": {
+     "holed": 25,
+     "n": 182,
+     "dhDeg": 0.0149,
+     "dqYd": 0.35
+    },
+    "others": [
+     {
+      "club": "driver (long)",
+      "E": 2.01
+     }
+    ],
+    "sims": 1170,
+    "ms": 1037
+   },
+   "why": "driver 0.9603 aimed +1.74 deg right of the pin, 268.7 yd: holes 52% under the aim's error (WSR's ball over the KCL, cup and flagstick in; 25 of 182 grid launches hole); 1.59 strokes to hole out (driver (long) 2.01); 1170 flights, 1037 ms",
+   "ms": 1038,
+   "ahead": true,
+   "planned": 0.9603046848510622,
+   "adjust": {
+    "planned": 0.9603046848510622,
+    "power": 0.9603,
+    "heading": 2.716481924057007,
+    "ms": 124,
+    "why": "holes at the aim reached for 0.9593-0.9613 (5 of 81)"
+   }
+  },
+  "club": "driver",
+  "aim": {
+   "heading": 2.716481924057007,
+   "errDeg": -0.025,
+   "passes": 2
+  },
+  "readyToStrikeMs": 1867,
+  "raw": 0.9465585961836462,
+  "gamePower": 0.9603312015533447,
+  "curveC": 0,
+  "rest": [
+   552.2218627929688,
+   127.02134704589844,
+   -2304.053466796875
+  ],
+  "holed": true,
+  "hazard": 0,
+  "placed": {
+   "from": [
+    77.55192565917969,
+    175.27880859375,
+    -1095.7342529296875
+   ],
+   "to": [
+    103.2195053100586,
+    179.87986755371094,
+    -1156.027099609375
+   ]
+  },
+  "after": 0
+ },
+ {
+  "kind": "albatross",
+  "round": "Classic B wind #2",
+  "hole": 14,
+  "par": 5,
+  "stroke": 2,
+  "at": "2026-10-22T13:05:51.998Z",
+  "screenshot": "results\\highlights\\classic-b-wind-2-h14.png",
+  "k": 2,
+  "lie": 1,
+  "from": [
+   -304.9013366699219,
+   -117.8276596069336,
+   -1032.7193603515625
+  ],
+  "toPin": 120.82,
+  "wind": {
+   "dir": 4,
+   "speedIdx": 7,
+   "mph": 14
+  },
+  "pin": [
+   305,
+   0,
+   -1953.9000244140625
+  ],
+  "plan": {
+   "club": "7iron",
+   "power": 0.7872,
+   "heading": 2.4729367878049566,
+   "expect": {
+    "src": "candidate:holing",
+    "D": 120.82,
+    "holeP": 0.74,
+    "E": 1.272,
+    "aimDeg": 4.803,
+    "restLie": "cup",
+    "toPin": 0,
+    "carry": 89.8,
+    "stop": 120.3,
+    "lateral": -10.1,
+    "assist": {
+     "pi": 0.1,
+     "moved": false
+    },
+    "grid": {
+     "holed": 10,
+     "n": 182,
+     "dhDeg": 0.0332,
+     "dqYd": 0.35
+    },
+    "others": [
+     {
+      "club": "5iron",
+      "E": 2.02,
+      "P": 0
+     },
+     {
+      "club": "3iron",
+      "E": 2.06,
+      "P": 0
+     },
+     {
+      "club": "spoon",
+      "E": 2.08,
+      "P": 0
+     }
+    ],
+    "sims": 1965,
+    "ms": 1500
+   },
+   "why": "7iron 0.7882 aimed +4.80 deg right of the pin, 120.8 yd: holes 74% under the aim's error (WSR's ball over the KCL, cup and flagstick in; 10 of 182 grid launches hole); 1.27 strokes to hole out (5iron 2.02, 3iron 2.06, spoon 2.08); 1965 flights, 1500 ms",
+   "ms": 1502,
+   "ahead": true,
+   "planned": 0.7882032944320975,
+   "adjust": {
+    "planned": 0.7882032944320975,
+    "power": 0.7872,
+    "heading": 2.473398447036743,
+    "ms": 50,
+    "why": "holes at the aim reached for 0.7867-0.7877 (3 of 81)"
+   }
+  },
+  "club": "7iron",
+  "aim": {
+   "heading": 2.473398447036743,
+   "errDeg": -0.026,
+   "passes": 4
+  },
+  "readyToStrikeMs": 2076,
+  "raw": 0.7582714384604264,
+  "gamePower": 0.787311315536499,
+  "curveC": 0,
+  "rest": [
+   304.598388671875,
+   -2.409464120864868,
+   -1954.7784423828125
+  ],
+  "holed": true,
+  "hazard": 0,
+  "placed": null,
+  "after": 0
+ },
+ {
+  "kind": "hole-in-one",
+  "round": "Resort C wind #2",
+  "hole": 8,
+  "par": 3,
+  "stroke": 1,
+  "at": "2026-10-22T13:05:54.014Z",
+  "screenshot": "results\\highlights\\resort-c-wind-2-h08.png",
+  "k": 1,
+  "lie": 15,
+  "from": [
+   97.80000305175781,
+   38.45000076293945,
+   973.2000122070312
+  ],
+  "toPin": 162.57,
+  "wind": {
+   "dir": 4,
+   "speedIdx": 12,
+   "mph": 24
+  },
+  "pin": [
+   -120.5,
+   -107,
+   -497.20001220703125
+  ],
+  "plan": {
+   "club": "5iron",
+   "power": 0.76257,
+   "heading": -2.9340846748468543,
+   "expect": {
+    "src": "candidate:holing",
+    "D": 162.57,
+    "holeP": 0.803,
+    "E": 1.223,
+    "aimDeg": -3.445,
+    "restLie": "cup",
+    "toPin": 0,
+    "carry": 150.7,
+    "stop": 162.3,
+    "lateral": 9.62,
+    "assist": {
+     "pi": 0.1,
+     "moved": false
+    },
+    "grid": {
+     "holed": 16,
+     "n": 182,
+     "dhDeg": 0.0247,
+     "dqYd": 0.35
+    },
+    "others": [
+     {
+      "club": "3iron",
+      "E": 1.93,
+      "P": 0.1
+     },
+     {
+      "club": "spoon",
+      "E": 2.02,
+      "P": 0
+     },
+     {
+      "club": "driver",
+      "E": 2.27,
+      "P": 0
+     },
+     {
+      "club": "7iron (long)",
+      "E": 2.01
+     }
+    ],
+    "sims": 2024,
+    "ms": 2121
+   },
+   "why": "5iron 0.7626 aimed -3.44 deg right of the pin, 162.6 yd: holes 80% under the aim's error (WSR's ball over the KCL, cup and flagstick in; 16 of 182 grid launches hole); 1.22 strokes to hole out (3iron 1.93, spoon 2.02, driver 2.27, 7iron (long) 2.01); 2024 flights, 2121 ms",
+   "ms": 2124,
+   "ahead": true,
+   "planned": 0.7625697206643905,
+   "adjust": {
+    "planned": 0.7625697206643905,
+    "power": 0.76257,
+    "heading": -2.9336483478546143,
+    "ms": 84,
+    "why": "holes at the aim reached for 0.7621-0.7631 (3 of 81)"
+   }
+  },
+  "club": "5iron",
+  "aim": {
+   "heading": -2.9336483478546143,
+   "errDeg": -0.025,
+   "passes": 2
+  },
+  "readyToStrikeMs": 1844,
+  "raw": 0.730995876676455,
+  "gamePower": 0.7626091837882996,
+  "curveC": 0,
+  "rest": [
+   -121.11183166503906,
+   -109.71382141113281,
+   -497.9909973144531
+  ],
+  "holed": true,
+  "hazard": 0,
+  "placed": null,
+  "after": 0
+ },
+ {
+  "kind": "albatross",
+  "round": "Classic C wind #2",
+  "hole": 18,
+  "par": 5,
+  "stroke": 2,
+  "at": "2026-10-22T13:06:43.804Z",
+  "screenshot": "results\\highlights\\classic-c-wind-2-h18.png",
+  "k": 2,
+  "lie": 1,
+  "from": [
+   -410.4064636230469,
+   -117.7262191772461,
+   -178.0333251953125
+  ],
+  "toPin": 141.89,
+  "wind": {
+   "dir": 3,
+   "speedIdx": 14,
+   "mph": 28
+  },
+  "pin": [
+   -257.20001220703125,
+   -61.70000076293945,
+   -1466.4000244140625
+  ],
+  "plan": {
+   "club": "5iron",
+   "power": 0.68661,
+   "heading": 3.1526036053347237,
+   "expect": {
+    "src": "candidate:holing",
+    "D": 141.89,
+    "holeP": 0.816,
+    "E": 1.201,
+    "aimDeg": -7.412,
+    "restLie": "cup",
+    "toPin": 0,
+    "carry": 109.7,
+    "stop": 140.6,
+    "lateral": 18.25,
+    "grid": {
+     "holed": 19,
+     "n": 182,
+     "dhDeg": 0.0283,
+     "dqYd": 0.35
+    },
+    "others": [
+     {
+      "club": "3iron",
+      "E": 1.22,
+      "P": 0.8
+     },
+     {
+      "club": "7iron",
+      "E": 1.88,
+      "P": 0.14
+     },
+     {
+      "club": "spoon",
+      "E": 2.05,
+      "P": 0
+     }
+    ],
+    "sims": 1660,
+    "ms": 1208
+   },
+   "why": "5iron 0.6871 aimed -7.41 deg right of the pin, 141.9 yd: holes 82% under the aim's error (WSR's ball over the KCL, cup and flagstick in; 19 of 182 grid launches hole); 1.20 strokes to hole out (3iron 1.22, 7iron 1.88, spoon 2.05); 1660 flights, 1208 ms",
+   "ms": 1209,
+   "ahead": true,
+   "planned": 0.6871096738102086,
+   "adjust": {
+    "planned": 0.6871096738102086,
+    "power": 0.68661,
+    "heading": 3.152162551879883,
+    "ms": 64,
+    "why": "holes at the aim reached for 0.6866-0.6871 (2 of 81)"
+   }
+  },
+  "club": "5iron",
+  "aim": {
+   "heading": 3.152162551879883,
+   "errDeg": 0.025,
+   "passes": 4
+  },
+  "readyToStrikeMs": 2538,
+  "raw": 0.6479153283807703,
+  "gamePower": 0.6866673827171326,
+  "curveC": 0,
+  "rest": [
+   -256.2798767089844,
+   -64.33143615722656,
+   -1466.6287841796875
+  ],
+  "holed": true,
+  "hazard": 0,
+  "placed": null,
+  "after": 0
+ },
+ {
+  "kind": "albatross",
+  "round": "Classic A wind #2",
+  "hole": 12,
+  "par": 5,
+  "stroke": 2,
+  "at": "2026-10-22T13:06:43.876Z",
+  "screenshot": "results\\highlights\\classic-a-wind-2-h12.png",
+  "k": 2,
+  "lie": 1,
+  "from": [
+   -798.5680541992188,
+   99.97059631347656,
+   -136.46868896484375
+  ],
+  "toPin": 211.63,
+  "wind": {
+   "dir": 5,
+   "speedIdx": 0,
+   "mph": 0
+  },
+  "pin": [
+   -468.70001220703125,
+   -46,
+   -2043.300048828125
+  ],
+  "plan": {
+   "club": "3iron",
+   "power": 0.98758,
+   "heading": 2.9709755494738777,
+   "expect": {
+    "src": "candidate:holing",
+    "D": 211.63,
+    "holeP": 0.167,
+    "E": 1.891,
+    "aimDeg": -0.039,
+    "restLie": "green",
+    "toPin": 1.14,
+    "carry": 201.4,
+    "stop": 210.9,
+    "lateral": -0.72,
+    "assist": {
+     "pi": 0.1,
+     "moved": false
+    },
+    "grid": {
+     "holed": 1,
+     "n": 169,
+     "dhDeg": 0.019,
+     "dqYd": 0.35
+    },
+    "others": [
+     {
+      "club": "spoon",
+      "E": 2.01,
+      "P": 0
+     },
+     {
+      "club": "driver",
+      "E": 2.02,
+      "P": 0
+     },
+     {
+      "club": "3iron (long)",
+      "E": 2.01
+     }
+    ],
+    "sims": 2407,
+    "ms": 1486
+   },
+   "why": "3iron 0.9881 aimed -0.04 deg right of the pin, 211.6 yd: holes 17% under the aim's error (WSR's ball over the KCL, cup and flagstick in; 1 of 169 grid launches hole), the centre rests 1.14 yd away on green; 1.89 strokes to hole out (spoon 2.01, driver 2.02, 3iron (long) 2.01); 2407 flights, 1486 ms",
+   "ms": 1488,
+   "ahead": true,
+   "planned": 0.9880830321966034,
+   "adjust": {
+    "planned": 0.9880830321966034,
+    "power": 0.98758,
+    "heading": 2.9706943035125732,
+    "ms": 43,
+    "why": "holes at the aim reached for 0.9876-0.9876 (1 of 64)"
+   }
+  },
+  "club": "3iron",
+  "aim": {
+   "heading": 2.9706943035125732,
+   "errDeg": 0.016,
+   "passes": 1
+  },
+  "readyToStrikeMs": 1560,
+  "raw": 0.9856158428282841,
+  "gamePower": 0.9877602458000183,
+  "curveC": 0,
+  "rest": [
+   -468.7113952636719,
+   -48.55889892578125,
+   -2042.372802734375
+  ],
+  "holed": true,
+  "hazard": 0,
+  "placed": {
+   "from": [
+    -694.735595703125,
+    288.5489501953125,
+    -738.1228637695312
+   ],
+   "to": [
+    -684.4888305664062,
+    302.698486328125,
+    -797.4970092773438
+   ]
+  },
+  "after": 0
+ },
+ {
+  "kind": "albatross",
+  "round": "Resort A wind #2",
+  "hole": 3,
+  "par": 5,
+  "stroke": 2,
+  "at": "2026-10-22T13:06:44.977Z",
+  "screenshot": "results\\highlights\\resort-a-wind-2-h03.png",
+  "k": 2,
+  "lie": 1,
+  "from": [
+   -257.7862854003906,
+   -537.0599365234375,
+   -116.85445404052734
+  ],
+  "toPin": 266.76,
+  "wind": {
+   "dir": 4,
+   "speedIdx": 2,
+   "mph": 4
+  },
+  "pin": [
+   704.5,
+   -413.70001220703125,
+   -2358.300048828125
+  ],
+  "plan": {
+   "club": "driver",
+   "power": 0.9322,
+   "heading": 2.7219707566103875,
+   "expect": {
+    "src": "candidate:holing",
+    "D": 266.76,
+    "holeP": 0.539,
+    "E": 1.565,
+    "aimDeg": 0.808,
+    "restLie": "cup",
+    "toPin": 0,
+    "carry": 204.7,
+    "stop": 266.6,
+    "lateral": -3.8,
+    "assist": {
+     "pi": 0.1,
+     "moved": false
+    },
+    "grid": {
+     "holed": 20,
+     "n": 182,
+     "dhDeg": 0.015,
+     "dqYd": 0.35
+    },
+    "others": [
+     {
+      "club": "driver (long)",
+      "E": 2.01
+     }
+    ],
+    "sims": 854,
+    "ms": 875
+   },
+   "why": "driver 0.9322 aimed +0.81 deg right of the pin, 266.8 yd: holes 54% under the aim's error (WSR's ball over the KCL, cup and flagstick in; 20 of 182 grid launches hole); 1.56 strokes to hole out (driver (long) 2.01); 854 flights, 875 ms",
+   "ms": 876,
+   "ahead": true,
+   "planned": 0.9322022810224134,
+   "adjust": {
+    "planned": 0.9322022810224134,
+    "power": 0.9322,
+    "heading": 2.7218191623687744,
+    "ms": 85,
+    "why": "holes at the aim reached for 0.9307-0.9342 (8 of 81)"
+   }
+  },
+  "club": "driver",
+  "aim": {
+   "heading": 2.7218191623687744,
+   "errDeg": 0.009,
+   "passes": 2
+  },
+  "readyToStrikeMs": 1237,
+  "raw": 0.9092585583099068,
+  "gamePower": 0.9323217868804932,
+  "curveC": 0,
+  "rest": [
+   703.927978515625,
+   -416.2848205566406,
+   -2357.806396484375
+  ],
+  "holed": true,
+  "hazard": 0,
+  "placed": {
+   "from": [
+    246.34181213378906,
+    -354.37353515625,
+    -1256.5340576171875
+   ],
+   "to": [
+    270.2448425292969,
+    -352.9790344238281,
+    -1311.7171630859375
+   ]
+  },
+  "after": 0
+ },
+ {
+  "kind": "albatross",
+  "round": "Resort C wind #2",
+  "hole": 9,
+  "par": 5,
+  "stroke": 2,
+  "at": "2026-10-22T13:06:55.703Z",
+  "screenshot": "results\\highlights\\resort-c-wind-2-h09.png",
+  "k": 2,
+  "lie": 1,
+  "from": [
+   192.11703491210938,
+   122.46479797363281,
+   212.72828674316406
+  ],
+  "toPin": 272.71,
+  "wind": {
+   "dir": 5,
+   "speedIdx": 10,
+   "mph": 20
+  },
+  "pin": [
+   150.10000610351562,
+   -70,
+   -2280.60009765625
+  ],
+  "plan": {
+   "club": "driver",
+   "power": 0.83923,
+   "heading": -3.1939279405750396,
+   "expect": {
+    "src": "candidate:holing",
+    "D": 272.71,
+    "holeP": 0.52,
+    "E": 1.59,
+    "aimDeg": 3.964,
+    "restLie": "cup",
+    "toPin": 0,
+    "carry": 243.1,
+    "stop": 271.9,
+    "lateral": -18.84,
+    "assist": {
+     "pi": 0.1,
+     "moved": false
+    },
+    "grid": {
+     "holed": 11,
+     "n": 182,
+     "dhDeg": 0.0147,
+     "dqYd": 0.35
+    },
+    "others": [
+     {
+      "club": "driver (long)",
+      "E": 2.01
+     }
+    ],
+    "sims": 1029,
+    "ms": 665
+   },
+   "why": "driver 0.8397 aimed +3.96 deg right of the pin, 272.7 yd: holes 52% under the aim's error (WSR's ball over the KCL, cup and flagstick in; 11 of 182 grid launches hole); 1.59 strokes to hole out (driver (long) 2.01); 1029 flights, 665 ms",
+   "ms": 666,
+   "ahead": true,
+   "planned": 0.8397307232718012,
+   "adjust": {
+    "planned": 0.8397307232718012,
+    "power": 0.83923,
+    "heading": -3.193657636642456,
+    "ms": 72,
+    "why": "holes at the aim reached for 0.8387-0.8402 (4 of 81)"
+   }
+  },
+  "club": "driver",
+  "aim": {
+   "heading": -3.193657636642456,
+   "errDeg": -0.015,
+   "passes": 3
+  },
+  "readyToStrikeMs": 2110,
+  "raw": 0.7890909334663804,
+  "gamePower": 0.8394020795822144,
+  "curveC": 0,
+  "rest": [
+   149.67715454101562,
+   -72.780517578125,
+   -2279.925537109375
+  ],
+  "holed": true,
+  "hazard": 0,
+  "placed": {
+   "from": [
+    231.4030303955078,
+    275.60400390625,
+    -881.2996826171875
+   ],
+   "to": [
+    231.44850158691406,
+    277.25177001953125,
+    -942.6974487304688
+   ]
+  },
+  "after": 0
+ },
+ {
+  "kind": "hole-in-one",
+  "round": "Resort B wind #3",
+  "hole": 4,
+  "par": 3,
+  "stroke": 1,
+  "at": "2026-10-22T13:08:09.775Z",
+  "screenshot": "results\\highlights\\resort-b-wind-3-h04.png",
+  "k": 1,
+  "lie": 15,
+  "from": [
+   546.2000122070312,
+   0.949999988079071,
+   855.5
+  ],
+  "toPin": 163.45,
+  "wind": {
+   "dir": 6,
+   "speedIdx": 9,
+   "mph": 18
+  },
+  "pin": [
+   -55.20000076293945,
+   -49.400001525878906,
+   -512.7000122070312
+  ],
+  "plan": {
+   "club": "3iron",
+   "power": 0.71442,
+   "heading": -2.819622316801439,
+   "expect": {
+    "src": "candidate:holing",
+    "D": 163.45,
+    "holeP": 0.797,
+    "E": 1.229,
+    "aimDeg": 5.281,
+    "restLie": "cup",
+    "toPin": 0,
+    "carry": 147.6,
+    "stop": 162.6,
+    "lateral": -15,
+    "assist": {
+     "pi": 0.1,
+     "moved": false
+    },
+    "grid": {
+     "holed": 54,
+     "n": 182,
+     "dhDeg": 0.0245,
+     "dqYd": 0.35
+    },
+    "others": [
+     {
+      "club": "spoon",
+      "E": 1.33,
+      "P": 0.7
+     },
+     {
+      "club": "5iron",
+      "E": 1.51,
+      "P": 0.52
+     },
+     {
+      "club": "driver",
+      "E": 2,
+      "P": 0.03
+     },
+     {
+      "club": "3iron (long)",
+      "E": 2.01
+     }
+    ],
+    "sims": 2041,
+    "ms": 2572
+   },
+   "why": "3iron 0.7159 aimed +5.28 deg right of the pin, 163.4 yd: holes 80% under the aim's error (WSR's ball over the KCL, cup and flagstick in; 54 of 182 grid launches hole); 1.23 strokes to hole out (spoon 1.33, 5iron 1.51, driver 2, 3iron (long) 2.01); 2041 flights, 2572 ms",
+   "ms": 2574,
+   "ahead": true,
+   "planned": 0.7159167212222172,
+   "adjust": {
+    "planned": 0.7159167212222172,
+    "power": 0.71442,
+    "heading": -2.8195176124572754,
+    "ms": 107,
+    "why": "holes at the aim reached for 0.7124-0.7164 (9 of 81)"
+   }
+  },
+  "club": "3iron",
+  "aim": {
+   "heading": -2.8195176124572754,
+   "errDeg": -0.006,
+   "passes": 3
+  },
+  "readyToStrikeMs": 2530,
+  "raw": 0.6781443795616332,
+  "gamePower": 0.7145082950592041,
+  "curveC": 0,
+  "rest": [
+   -54.740962982177734,
+   -51.96278381347656,
+   -511.92938232421875
+  ],
+  "holed": true,
+  "hazard": 0,
+  "placed": {
+   "from": [
+    488.04302978515625,
+    60.2030143737793,
+    682.7357788085938
+   ],
+   "to": [
+    467.9432678222656,
+    78.4227523803711,
+    624.1332397460938
+   ]
+  },
+  "after": 0
+ },
+ {
+  "kind": "hole-in-one",
+  "round": "Classic B wind #3",
+  "hole": 13,
+  "par": 3,
+  "stroke": 1,
+  "at": "2026-10-22T13:08:16.812Z",
+  "screenshot": "results\\highlights\\classic-b-wind-3-h13.png",
+  "k": 1,
+  "lie": 15,
+  "from": [
+   70.30000305175781,
+   50.95000076293945,
+   560.7000122070312
+  ],
+  "toPin": 138.08,
+  "wind": {
+   "dir": 2,
+   "speedIdx": 5,
+   "mph": 10
+  },
+  "pin": [
+   -64.80000305175781,
+   4.900000095367432,
+   -694.7000122070312
+  ],
+  "plan": {
+   "club": "5iron",
+   "power": 0.77257,
+   "heading": -2.9497837242840372,
+   "expect": {
+    "src": "candidate:holing",
+    "D": 138.08,
+    "holeP": 0.819,
+    "E": 1.198,
+    "aimDeg": -4.848,
+    "restLie": "cup",
+    "toPin": 0,
+    "carry": 129.6,
+    "stop": 137.5,
+    "lateral": 11.64,
+    "assist": {
+     "pi": 0.1,
+     "moved": false
+    },
+    "grid": {
+     "holed": 19,
+     "n": 182,
+     "dhDeg": 0.029,
+     "dqYd": 0.35
+    },
+    "others": [
+     {
+      "club": "spoon",
+      "E": 1.2,
+      "P": 0.81
+     },
+     {
+      "club": "7iron",
+      "E": 1.26,
+      "P": 0.76
+     },
+     {
+      "club": "3iron",
+      "E": 1.96,
+      "P": 0.09
+     }
+    ],
+    "sims": 1794,
+    "ms": 2055
+   },
+   "why": "5iron 0.7796 aimed -4.85 deg right of the pin, 138.1 yd: holes 82% under the aim's error (WSR's ball over the KCL, cup and flagstick in; 19 of 182 grid launches hole); 1.20 strokes to hole out (spoon 1.2, 7iron 1.26, 3iron 1.96); 1794 flights, 2055 ms",
+   "ms": 2057,
+   "ahead": true,
+   "planned": 0.7795701831931481,
+   "adjust": {
+    "planned": 0.7795701831931481,
+    "power": 0.77257,
+    "heading": -2.9493024349212646,
+    "ms": 152,
+    "why": "holes at the aim reached for 0.7726-0.7731 (2 of 81)"
+   }
+  },
+  "club": "5iron",
+  "aim": {
+   "heading": -2.9493024349212646,
+   "errDeg": -0.028,
+   "passes": 3
+  },
+  "readyToStrikeMs": 2116,
+  "raw": 0.742050843035646,
+  "gamePower": 0.7726960778236389,
+  "curveC": 0,
+  "rest": [
+   -64.6310043334961,
+   2.4991612434387207,
+   -694.0530395507812
+  ],
+  "holed": true,
+  "hazard": 0,
+  "placed": null,
+  "after": 0
+ },
+ {
+  "kind": "hole-in-one",
+  "round": "Resort A wind #3",
+  "hole": 2,
+  "par": 3,
+  "stroke": 1,
+  "at": "2026-10-22T13:09:04.287Z",
+  "screenshot": "results\\highlights\\resort-a-wind-3-h02.png",
+  "k": 1,
+  "lie": 15,
+  "from": [
+   500.1000061035156,
+   -3.450000047683716,
+   548.7000122070312
+  ],
+  "toPin": 152.2,
+  "wind": {
+   "dir": 4,
+   "speedIdx": 0,
+   "mph": 0
+  },
+  "pin": [
+   173.8000030517578,
+   -176.5,
+   -804.2000122070312
+  ],
+  "plan": {
+   "club": "3iron",
+   "power": 0.50315,
+   "heading": -2.879610637244269,
+   "expect": {
+    "src": "candidate:holing",
+    "D": 152.2,
+    "holeP": 0.811,
+    "E": 1.21,
+    "aimDeg": -1.451,
+    "restLie": "cup",
+    "toPin": 0,
+    "carry": 114.8,
+    "stop": 152,
+    "lateral": 3.79,
+    "grid": {
+     "holed": 28,
+     "n": 182,
+     "dhDeg": 0.0264,
+     "dqYd": 0.35
+    },
+    "others": [
+     {
+      "club": "7iron",
+      "E": 1.22,
+      "P": 0.81
+     },
+     {
+      "club": "spoon",
+      "E": 1.22,
+      "P": 0.8
+     },
+     {
+      "club": "5iron",
+      "E": 2.01,
+      "P": 0
+     },
+     {
+      "club": "7iron (long)",
+      "E": 2.01
+     }
+    ],
+    "sims": 1753,
+    "ms": 2235
+   },
+   "why": "3iron 0.5041 aimed -1.45 deg right of the pin, 152.2 yd: holes 81% under the aim's error (WSR's ball over the KCL, cup and flagstick in; 28 of 182 grid launches hole); 1.21 strokes to hole out (7iron 1.22, spoon 1.22, 5iron 2.01, 7iron (long) 2.01); 1753 flights, 2235 ms",
+   "ms": 2236,
+   "ahead": true,
+   "planned": 0.5041460674548928,
+   "adjust": {
+    "planned": 0.5041460674548928,
+    "power": 0.50315,
+    "heading": -2.879300594329834,
+    "ms": 101,
+    "why": "holes at the aim reached for 0.5027-0.5041 (4 of 81)"
+   }
+  },
+  "club": "3iron",
+  "aim": {
+   "heading": -2.879300594329834,
+   "errDeg": -0.018,
+   "passes": 3
+  },
+  "readyToStrikeMs": 1977,
+  "raw": 0.4547015212656521,
+  "gamePower": 0.5032430291175842,
+  "curveC": 0,
+  "rest": [
+   174.10719299316406,
+   -179.0587158203125,
+   -803.3237915039062
+  ],
+  "holed": true,
+  "hazard": 0,
+  "placed": null,
+  "after": 0
+ },
+ {
+  "kind": "hole-in-one",
+  "round": "Classic A wind #3",
+  "hole": 11,
+  "par": 3,
+  "stroke": 1,
+  "at": "2026-10-22T13:09:09.060Z",
+  "screenshot": "results\\highlights\\classic-a-wind-3-h11.png",
+  "k": 1,
+  "lie": 15,
+  "from": [
+   -284.70001220703125,
+   36.95000076293945,
+   787.5
+  ],
+  "toPin": 138.13,
+  "wind": {
+   "dir": 4,
+   "speedIdx": 2,
+   "mph": 4
+  },
+  "pin": [
+   174.3000030517578,
+   -6,
+   -389.20001220703125
+  ],
+  "plan": {
+   "club": "3iron",
+   "power": 0.51823,
+   "heading": 2.7538604815347614,
+   "expect": {
+    "src": "candidate:holing",
+    "D": 138.13,
+    "holeP": 0.768,
+    "E": 1.249,
+    "aimDeg": 0.906,
+    "restLie": "cup",
+    "toPin": 0,
+    "carry": 107.2,
+    "stop": 138,
+    "lateral": -2.18,
+    "grid": {
+     "holed": 38,
+     "n": 182,
+     "dhDeg": 0.029,
+     "dqYd": 0.35
+    },
+    "others": [
+     {
+      "club": "7iron",
+      "E": 2.01,
+      "P": 0
+     },
+     {
+      "club": "5iron",
+      "E": 2.01,
+      "P": 0
+     },
+     {
+      "club": "spoon",
+      "E": 2.1,
+      "P": 0
+     }
+    ],
+    "sims": 1871,
+    "ms": 1575
+   },
+   "why": "3iron 0.5192 aimed +0.91 deg right of the pin, 138.1 yd: holes 77% under the aim's error (WSR's ball over the KCL, cup and flagstick in; 38 of 182 grid launches hole); 1.25 strokes to hole out (7iron 2.01, 5iron 2.01, spoon 2.1); 1871 flights, 1575 ms",
+   "ms": 1576,
+   "ahead": true,
+   "planned": 0.5192345818819919,
+   "adjust": {
+    "planned": 0.5192345818819919,
+    "power": 0.51823,
+    "heading": 2.753390073776245,
+    "ms": 66,
+    "why": "holes at the aim reached for 0.5162-0.5207 (10 of 81)"
+   }
+  },
+  "club": "3iron",
+  "aim": {
+   "heading": 2.753390073776245,
+   "errDeg": 0.027,
+   "passes": 2
+  },
+  "readyToStrikeMs": 2438,
+  "raw": 0.4701298936404162,
+  "gamePower": 0.518313467502594,
+  "curveC": 0,
+  "rest": [
+   173.36917114257812,
+   -8.65593147277832,
+   -389.5654602050781
+  ],
+  "holed": true,
+  "hazard": 0,
+  "placed": null,
+  "after": 0
+ },
+ {
+  "kind": "hole-in-one",
+  "round": "Classic C wind #3",
+  "hole": 17,
+  "par": 3,
+  "stroke": 1,
+  "at": "2026-10-22T13:09:11.760Z",
+  "screenshot": "results\\highlights\\classic-c-wind-3-h17.png",
+  "k": 1,
+  "lie": 15,
+  "from": [
+   -55.20000076293945,
+   0.949999988079071,
+   1142.800048828125
+  ],
+  "toPin": 216.07,
+  "wind": {
+   "dir": 3,
+   "speedIdx": 13,
+   "mph": 26
+  },
+  "pin": [
+   374.20001220703125,
+   200.5,
+   -785.7000122070312
+  ],
+  "plan": {
+   "club": "3iron",
+   "power": 0.96027,
+   "heading": 3.039030799358949,
+   "expect": {
+    "src": "candidate:holing",
+    "D": 216.07,
+    "holeP": 0.56,
+    "E": 1.498,
+    "aimDeg": -6.676,
+    "restLie": "cup",
+    "toPin": 0,
+    "carry": 169.5,
+    "stop": 214.5,
+    "lateral": 25.18,
+    "assist": {
+     "pi": 0.1,
+     "moved": false
+    },
+    "grid": {
+     "holed": 25,
+     "n": 182,
+     "dhDeg": 0.0186,
+     "dqYd": 0.35
+    },
+    "others": [
+     {
+      "club": "spoon",
+      "E": 2.14,
+      "P": 0
+     },
+     {
+      "club": "driver",
+      "E": 3.33,
+      "P": 0
+     },
+     {
+      "club": "spoon (long)",
+      "E": 2.01
+     }
+    ],
+    "sims": 2089,
+    "ms": 1873
+   },
+   "why": "3iron 0.9563 aimed -6.68 deg right of the pin, 216.1 yd: holes 56% under the aim's error (WSR's ball over the KCL, cup and flagstick in; 25 of 182 grid launches hole); 1.50 strokes to hole out (spoon 2.14, driver 3.33, spoon (long) 2.01); 2089 flights, 1873 ms",
+   "ms": 1874,
+   "ahead": true,
+   "planned": 0.9562677170620025,
+   "adjust": {
+    "planned": 0.9562677170620025,
+    "power": 0.96027,
+    "heading": 3.0388870239257812,
+    "ms": 140,
+    "why": "holes at the aim reached for 0.9598-0.9613 (4 of 81)"
+   }
+  },
+  "club": "3iron",
+  "aim": {
+   "heading": 3.0388870239257812,
+   "errDeg": 0.008,
+   "passes": 2
+  },
+  "readyToStrikeMs": 2054,
+  "raw": 0.9541001815820123,
+  "gamePower": 0.96030193567276,
+  "curveC": 0,
+  "rest": [
+   375.18426513671875,
+   198.02853393554688,
+   -785.8596801757812
+  ],
+  "holed": true,
+  "hazard": 0,
+  "placed": {
+   "from": [
+    -0.3979392349720001,
+    156.97122192382812,
+    650.7277221679688
+   ],
+   "to": [
+    7.870574951171875,
+    173.62745666503906,
+    586.8661499023438
+   ]
+  },
+  "after": 0
+ },
+ {
+  "kind": "albatross",
+  "round": "Classic B wind #3",
+  "hole": 14,
+  "par": 5,
+  "stroke": 2,
+  "at": "2026-10-22T13:09:12.594Z",
+  "screenshot": "results\\highlights\\classic-b-wind-3-h14.png",
+  "k": 2,
+  "lie": 1,
+  "from": [
+   -164.32655334472656,
+   -108.5890121459961,
+   -1166.960693359375
+  ],
+  "toPin": 110.62,
+  "wind": {
+   "dir": 3,
+   "speedIdx": 8,
+   "mph": 16
+  },
+  "pin": [
+   409.70001220703125,
+   0.5,
+   -1999.800048828125
+  ],
+  "plan": {
+   "club": "7iron",
+   "power": 0.65478,
+   "heading": 2.564806004771103,
+   "expect": {
+    "src": "candidate:holing",
+    "D": 110.62,
+    "holeP": 0.787,
+    "E": 1.223,
+    "aimDeg": -1.529,
+    "restLie": "cup",
+    "toPin": 0,
+    "carry": 69.3,
+    "stop": 110.5,
+    "lateral": 2.98,
+    "grid": {
+     "holed": 8,
+     "n": 182,
+     "dhDeg": 0.0363,
+     "dqYd": 0.35
+    },
+    "others": [
+     {
+      "club": "3iron",
+      "E": 2.05,
+      "P": 0
+     },
+     {
+      "club": "9iron",
+      "E": 2.05,
+      "P": 0
+     },
+     {
+      "club": "5iron",
+      "E": 2.09,
+      "P": 0
+     }
+    ],
+    "sims": 1751,
+    "ms": 978
+   },
+   "why": "7iron 0.6498 aimed -1.53 deg right of the pin, 110.6 yd: holes 79% under the aim's error (WSR's ball over the KCL, cup and flagstick in; 8 of 182 grid launches hole); 1.22 strokes to hole out (3iron 2.05, 9iron 2.05, 5iron 2.09); 1751 flights, 978 ms",
+   "ms": 979,
+   "ahead": true,
+   "planned": 0.6497814485977876,
+   "adjust": {
+    "planned": 0.6497814485977876,
+    "power": 0.65478,
+    "heading": 2.5645406246185303,
+    "ms": 47,
+    "why": "holes at the aim reached for 0.6538-0.6558 (5 of 81)"
+   }
+  },
+  "club": "7iron",
+  "aim": {
+   "heading": 2.5645406246185303,
+   "errDeg": 0.015,
+   "passes": 3
+  },
+  "readyToStrikeMs": 1578,
+  "raw": 0.613596585369452,
+  "gamePower": 0.6548510193824768,
+  "curveC": 0,
+  "rest": [
+   410.5865783691406,
+   -1.958374261856079,
+   -1999.341796875
+  ],
+  "holed": true,
+  "hazard": 0,
+  "placed": null,
+  "after": 0
+ },
+ {
+  "kind": "hole-in-one",
+  "round": "Resort C wind #3",
+  "hole": 8,
+  "par": 3,
+  "stroke": 1,
+  "at": "2026-10-22T13:09:45.610Z",
+  "screenshot": "results\\highlights\\resort-c-wind-3-h08.png",
+  "k": 1,
+  "lie": 15,
+  "from": [
+   97.80000305175781,
+   38.45000076293945,
+   973.2000122070312
+  ],
+  "toPin": 167.57,
+  "wind": {
+   "dir": 4,
+   "speedIdx": 12,
+   "mph": 24
+  },
+  "pin": [
+   -149.3000030517578,
+   -107.5,
+   -539
+  ],
+  "plan": {
+   "club": "3iron",
+   "power": 0.63916,
+   "heading": -2.9360211813693535,
+   "expect": {
+    "src": "candidate:holing",
+    "D": 167.57,
+    "holeP": 0.798,
+    "E": 1.23,
+    "aimDeg": -2.498,
+    "restLie": "cup",
+    "toPin": 0,
+    "carry": 150.2,
+    "stop": 167.4,
+    "lateral": 7.21,
+    "grid": {
+     "holed": 21,
+     "n": 182,
+     "dhDeg": 0.0239,
+     "dqYd": 0.35
+    },
+    "others": [
+     {
+      "club": "driver",
+      "E": 1.91,
+      "P": 0.31
+     },
+     {
+      "club": "spoon",
+      "E": 1.93,
+      "P": 0.29
+     },
+     {
+      "club": "5iron",
+      "E": 2.01,
+      "P": 0
+     },
+     {
+      "club": "5iron (long)",
+      "E": 2.01
+     }
+    ],
+    "sims": 2350,
+    "ms": 2321
+   },
+   "why": "3iron 0.6392 aimed -2.50 deg right of the pin, 167.6 yd: holes 80% under the aim's error (WSR's ball over the KCL, cup and flagstick in; 21 of 182 grid launches hole); 1.23 strokes to hole out (driver 1.91, spoon 1.93, 5iron 2.01, 5iron (long) 2.01); 2350 flights, 2321 ms",
+   "ms": 2323,
+   "ahead": true,
+   "planned": 0.6391625354003011,
+   "adjust": {
+    "planned": 0.6391625354003011,
+    "power": 0.63916,
+    "heading": -2.936448335647583,
+    "ms": 76,
+    "why": "holes at the aim reached for 0.6382-0.6407 (6 of 81)"
+   }
+  },
+  "club": "3iron",
+  "aim": {
+   "heading": -2.936448335647583,
+   "errDeg": 0.024,
+   "passes": 2
+  },
+  "readyToStrikeMs": 2106,
+  "raw": 0.59686868461299,
+  "gamePower": 0.6392316222190857,
+  "curveC": 0,
+  "rest": [
+   -149.0788116455078,
+   -110.13513946533203,
+   -538.254150390625
+  ],
+  "holed": true,
+  "hazard": 0,
+  "placed": null,
+  "after": 0
+ },
+ {
+  "kind": "albatross",
+  "round": "Resort A wind #3",
+  "hole": 3,
+  "par": 5,
+  "stroke": 2,
+  "at": "2026-10-22T13:10:05.123Z",
+  "screenshot": "results\\highlights\\resort-a-wind-3-h03.png",
+  "k": 2,
+  "lie": 1,
+  "from": [
+   -267.8186340332031,
+   -537.5799560546875,
+   -121.22472381591797
+  ],
+  "toPin": 261.52,
+  "wind": {
+   "dir": 3,
+   "speedIdx": 4,
+   "mph": 8
+  },
+  "pin": [
+   719.7000122070312,
+   -417.20001220703125,
+   -2299.10009765625
+  ],
+  "plan": {
+   "club": "driver",
+   "power": 0.90808,
+   "heading": 2.7320957681528384,
+   "expect": {
+    "src": "candidate:holing",
+    "D": 261.52,
+    "holeP": 0.522,
+    "E": 1.576,
+    "aimDeg": -0.929,
+    "restLie": "cup",
+    "toPin": 0,
+    "carry": 199.1,
+    "stop": 261.4,
+    "lateral": 4.24,
+    "assist": {
+     "pi": 0.1,
+     "moved": false
+    },
+    "grid": {
+     "holed": 21,
+     "n": 182,
+     "dhDeg": 0.0153,
+     "dqYd": 0.35
+    },
+    "others": [
+     {
+      "club": "driver (long)",
+      "E": 2.01
+     }
+    ],
+    "sims": 1158,
+    "ms": 832
+   },
+   "why": "driver 0.9081 aimed -0.93 deg right of the pin, 261.5 yd: holes 52% under the aim's error (WSR's ball over the KCL, cup and flagstick in; 21 of 182 grid launches hole); 1.58 strokes to hole out (driver (long) 2.01); 1158 flights, 832 ms",
+   "ms": 833,
+   "ahead": true,
+   "planned": 0.908082674354893,
+   "adjust": {
+    "planned": 0.908082674354893,
+    "power": 0.90808,
+    "heading": 2.731896162033081,
+    "ms": 79,
+    "why": "holes at the aim reached for 0.9061-0.9101 (9 of 81)"
+   }
+  },
+  "club": "driver",
+  "aim": {
+   "heading": 2.731896162033081,
+   "errDeg": 0.011,
+   "passes": 2
+  },
+  "readyToStrikeMs": 1378,
+  "raw": 0.8775976494632877,
+  "gamePower": 0.9082688689231873,
+  "curveC": 0,
+  "rest": [
+   720.6014404296875,
+   -419.7617492675781,
+   -2298.996826171875
+  ],
+  "holed": true,
+  "hazard": 0,
+  "placed": {
+   "from": [
+    168.03887939453125,
+    -369.6449890136719,
+    -1114.5635986328125
+   ],
+   "to": [
+    194.44778442382812,
+    -365.4068298339844,
+    -1173.3912353515625
+   ]
+  },
+  "after": 0
+ },
+ {
+  "kind": "albatross",
+  "round": "Classic A wind #3",
+  "hole": 12,
+  "par": 5,
+  "stroke": 2,
+  "at": "2026-10-22T13:10:07.199Z",
+  "screenshot": "results\\highlights\\classic-a-wind-3-h12.png",
+  "k": 2,
+  "lie": 1,
+  "from": [
+   -563.4816284179688,
+   99.40978240966797,
+   -188.05450439453125
+  ],
+  "toPin": 205.42,
+  "wind": {
+   "dir": 5,
+   "speedIdx": 0,
+   "mph": 0
+  },
+  "pin": [
+   -409.20001220703125,
+   -47.900001525878906,
+   -2060.10009765625
+  ],
+  "plan": {
+   "club": "spoon",
+   "power": 0.74434,
+   "heading": 3.0742058009375723,
+   "expect": {
+    "src": "candidate:holing",
+    "D": 205.42,
+    "holeP": 0.753,
+    "E": 1.296,
+    "aimDeg": -0.85,
+    "restLie": "cup",
+    "toPin": 0,
+    "carry": 189.7,
+    "stop": 205.3,
+    "lateral": 2.98,
+    "assist": {
+     "pi": 0.1,
+     "moved": false
+    },
+    "grid": {
+     "holed": 28,
+     "n": 182,
+     "dhDeg": 0.0195,
+     "dqYd": 0.35
+    },
+    "others": [
+     {
+      "club": "driver",
+      "E": 1.36,
+      "P": 0.69
+     },
+     {
+      "club": "3iron",
+      "E": 2.01,
+      "P": 0
+     },
+     {
+      "club": "spoon (long)",
+      "E": 2.01
+     }
+    ],
+    "sims": 1453,
+    "ms": 1018
+   },
+   "why": "spoon 0.7448 aimed -0.85 deg right of the pin, 205.4 yd: holes 75% under the aim's error (WSR's ball over the KCL, cup and flagstick in; 28 of 182 grid launches hole); 1.30 strokes to hole out (driver 1.36, 3iron 2.01, spoon (long) 2.01); 1453 flights, 1018 ms",
+   "ms": 1019,
+   "ahead": true,
+   "planned": 0.7448390897576453,
+   "adjust": {
+    "planned": 0.7448390897576453,
+    "power": 0.74434,
+    "heading": 3.0738723278045654,
+    "ms": 58,
+    "why": "holes at the aim reached for 0.7443-0.7448 (2 of 81)"
+   }
+  },
+  "club": "spoon",
+  "aim": {
+   "heading": 3.0738723278045654,
+   "errDeg": 0.019,
+   "passes": 2
+  },
+  "readyToStrikeMs": 2061,
+  "raw": 0.6718957385064033,
+  "gamePower": 0.7444633841514587,
+  "curveC": 0,
+  "rest": [
+   -409.2275085449219,
+   -50.469398498535156,
+   -2059.12158203125
+  ],
+  "holed": true,
+  "hazard": 0,
+  "placed": {
+   "from": [
+    -534.77880859375,
+    177.4073486328125,
+    -611.232177734375
+   ],
+   "to": [
+    -530.706298828125,
+    186.91473388671875,
+    -671.275146484375
+   ]
+  },
+  "after": 0
+ },
+ {
+  "kind": "albatross",
+  "round": "Classic C wind #3",
+  "hole": 18,
+  "par": 5,
+  "stroke": 2,
+  "at": "2026-10-22T13:10:12.873Z",
+  "screenshot": "results\\highlights\\classic-c-wind-3-h18.png",
+  "k": 2,
+  "lie": 1,
+  "from": [
+   -741.6101684570312,
+   -100.01628112792969,
+   143.3247833251953
+  ],
+  "toPin": 183.84,
+  "wind": {
+   "dir": 6,
+   "speedIdx": 12,
+   "mph": 24
+  },
+  "pin": [
+   -257.20001220703125,
+   -61.70000076293945,
+   -1466.4000244140625
+  ],
+  "plan": {
+   "club": "spoon",
+   "power": 0.66982,
+   "heading": 2.748817835650678,
+   "expect": {
+    "src": "candidate:holing",
+    "D": 183.84,
+    "holeP": 0.774,
+    "E": 1.262,
+    "aimDeg": 5.756,
+    "restLie": "cup",
+    "toPin": 0,
+    "carry": 141,
+    "stop": 182.8,
+    "lateral": -18.42,
+    "grid": {
+     "holed": 33,
+     "n": 182,
+     "dhDeg": 0.0218,
+     "dqYd": 0.35
+    },
+    "others": [
+     {
+      "club": "driver",
+      "E": 1.49,
+      "P": 0.55
+     },
+     {
+      "club": "3iron",
+      "E": 2.01,
+      "P": 0
+     },
+     {
+      "club": "spoon (long)",
+      "E": 2.01
+     }
+    ],
+    "sims": 1662,
+    "ms": 1399
+   },
+   "why": "spoon 0.6703 aimed +5.76 deg right of the pin, 183.8 yd: holes 77% under the aim's error (WSR's ball over the KCL, cup and flagstick in; 33 of 182 grid launches hole); 1.26 strokes to hole out (driver 1.49, 3iron 2.01, spoon (long) 2.01); 1662 flights, 1399 ms",
+   "ms": 1401,
+   "ahead": true,
+   "planned": 0.6703205082360062,
+   "adjust": {
+    "planned": 0.6703205082360062,
+    "power": 0.66982,
+    "heading": 2.7486939430236816,
+    "ms": 79,
+    "why": "holes at the aim reached for 0.6688-0.6713 (6 of 81)"
+   }
+  },
+  "club": "spoon",
+  "aim": {
+   "heading": 2.7486939430236816,
+   "errDeg": 0.007,
+   "passes": 3
+  },
+  "readyToStrikeMs": 2240,
+  "raw": 0.5840477772498043,
+  "gamePower": 0.6699514389038086,
+  "curveC": 0,
+  "rest": [
+   -258.052978515625,
+   -64.33143615722656,
+   -1466.9185791015625
+  ],
+  "holed": true,
+  "hazard": 0,
+  "placed": {
+   "from": [
+    -546.2166748046875,
+    -12.353906631469727,
+    -341.0387268066406
+   ],
+   "to": [
+    -524.5451049804688,
+    -5.556260585784912,
+    -397.8660583496094
+   ]
+  },
+  "after": 0
+ },
+ {
+  "kind": "hole-in-one",
+  "round": "Classic B wind #4",
+  "hole": 13,
+  "par": 3,
+  "stroke": 1,
+  "at": "2026-10-22T13:11:38.522Z",
+  "screenshot": "results\\highlights\\classic-b-wind-4-h13.png",
+  "k": 1,
+  "lie": 15,
+  "from": [
+   70.30000305175781,
+   50.95000076293945,
+   560.7000122070312
+  ],
+  "toPin": 135.27,
+  "wind": {
+   "dir": 6,
+   "speedIdx": 9,
+   "mph": 18
+  },
+  "pin": [
+   -100,
+   2.4000000953674316,
+   -664.4000244140625
+  ],
+  "plan": {
+   "club": "5iron",
+   "power": 0.69498,
+   "heading": -3.150375374843421,
+   "expect": {
+    "src": "candidate:holing",
+    "D": 135.27,
+    "holeP": 0.817,
+    "E": 1.199,
+    "aimDeg": 8.417,
+    "restLie": "cup",
+    "toPin": 0,
+    "carry": 118,
+    "stop": 133.9,
+    "lateral": -19.66,
+    "grid": {
+     "holed": 8,
+     "n": 182,
+     "dhDeg": 0.0297,
+     "dqYd": 0.35
+    },
+    "others": [
+     {
+      "club": "spoon",
+      "E": 1.22,
+      "P": 0.8
+     },
+     {
+      "club": "7iron",
+      "E": 2.01,
+      "P": 0
+     },
+     {
+      "club": "3iron",
+      "E": 2.03,
+      "P": 0
+     }
+    ],
+    "sims": 1784,
+    "ms": 2433
+   },
+   "why": "5iron 0.6955 aimed +8.42 deg right of the pin, 135.3 yd: holes 82% under the aim's error (WSR's ball over the KCL, cup and flagstick in; 8 of 182 grid launches hole); 1.20 strokes to hole out (spoon 1.22, 7iron 2.01, 3iron 2.03); 1784 flights, 2433 ms",
+   "ms": 2435,
+   "ahead": true,
+   "planned": 0.6954783989116243,
+   "adjust": {
+    "planned": 0.6954783989116243,
+    "power": 0.69498,
+    "heading": -3.1505346298217773,
+    "ms": 174,
+    "why": "holes at the aim reached for 0.6940-0.6960 (5 of 81)"
+   }
+  },
+  "club": "5iron",
+  "aim": {
+   "heading": -3.1505346298217773,
+   "errDeg": 0.009,
+   "passes": 3
+  },
+  "readyToStrikeMs": 2562,
+  "raw": 0.6569898522327668,
+  "gamePower": 0.6951172947883606,
+  "curveC": 0,
+  "rest": [
+   -99.1008529663086,
+   -0.04901697486639023,
+   -664.771484375
+  ],
+  "holed": true,
+  "hazard": 0,
+  "placed": null,
+  "after": 0
+ },
+ {
+  "kind": "hole-in-one",
+  "round": "Resort A wind #4",
+  "hole": 2,
+  "par": 3,
+  "stroke": 1,
+  "at": "2026-10-22T13:12:26.895Z",
+  "screenshot": "results\\highlights\\resort-a-wind-4-h02.png",
+  "k": 1,
+  "lie": 15,
+  "from": [
+   500.1000061035156,
+   -3.450000047683716,
+   548.7000122070312
+  ],
+  "toPin": 150.05,
+  "wind": {
+   "dir": 6,
+   "speedIdx": 4,
+   "mph": 8
+  },
+  "pin": [
+   105.5,
+   -170.8000030517578,
+   -765.4000244140625
+  ],
+  "plan": {
+   "club": "3iron",
+   "power": 0.49676,
+   "heading": -2.8706901231757866,
+   "expect": {
+    "src": "candidate:holing",
+    "D": 150.05,
+    "holeP": 0.789,
+    "E": 1.231,
+    "aimDeg": 1.192,
+    "restLie": "cup",
+    "toPin": 0,
+    "carry": 113.8,
+    "stop": 149.9,
+    "lateral": -3.14,
+    "grid": {
+     "holed": 15,
+     "n": 182,
+     "dhDeg": 0.0267,
+     "dqYd": 0.35
+    },
+    "others": [
+     {
+      "club": "5iron",
+      "E": 1.32,
+      "P": 0.71
+     },
+     {
+      "club": "spoon",
+      "E": 1.38,
+      "P": 0.64
+     },
+     {
+      "club": "7iron",
+      "E": 2,
+      "P": 0.02
+     },
+     {
+      "club": "5iron (long)",
+      "E": 2.01
+     }
+    ],
+    "sims": 1755,
+    "ms": 1512
+   },
+   "why": "3iron 0.4973 aimed +1.19 deg right of the pin, 150.1 yd: holes 79% under the aim's error (WSR's ball over the KCL, cup and flagstick in; 15 of 182 grid launches hole); 1.23 strokes to hole out (5iron 1.32, spoon 1.38, 7iron 2, 5iron (long) 2.01); 1755 flights, 1512 ms",
+   "ms": 1513,
+   "ahead": true,
+   "planned": 0.4972611108672047,
+   "adjust": {
+    "planned": 0.4972611108672047,
+    "power": 0.49676,
+    "heading": -2.8705506324768066,
+    "ms": 68,
+    "why": "holes at the aim reached for 0.4963-0.4978 (4 of 81)"
+   }
+  },
+  "club": "3iron",
+  "aim": {
+   "heading": -2.8705506324768066,
+   "errDeg": -0.008,
+   "passes": 3
+  },
+  "readyToStrikeMs": 1906,
+  "raw": 0.44819140996587603,
+  "gamePower": 0.49679094552993774,
+  "curveC": 0,
+  "rest": [
+   105.61412811279297,
+   -173.4822235107422,
+   -764.563720703125
+  ],
+  "holed": true,
+  "hazard": 0,
+  "placed": null,
+  "after": 0
+ },
+ {
+  "kind": "hole-in-one",
+  "round": "Classic A wind #4",
+  "hole": 11,
+  "par": 3,
+  "stroke": 1,
+  "at": "2026-10-22T13:12:27.672Z",
+  "screenshot": "results\\highlights\\classic-a-wind-4-h11.png",
+  "k": 1,
+  "lie": 15,
+  "from": [
+   -284.70001220703125,
+   36.95000076293945,
+   787.5
+  ],
+  "toPin": 144.01,
+  "wind": {
+   "dir": 4,
+   "speedIdx": 2,
+   "mph": 4
+  },
+  "pin": [
+   226.10000610351562,
+   -2,
+   -426.20001220703125
+  ],
+  "plan": {
+   "club": "7iron",
+   "power": 0.90316,
+   "heading": 2.7269381454114003,
+   "expect": {
+    "src": "candidate:holing",
+    "D": 144.01,
+    "holeP": 0.819,
+    "E": 1.2,
+    "aimDeg": 0.934,
+    "restLie": "cup",
+    "toPin": 0,
+    "carry": 125.2,
+    "stop": 143.9,
+    "lateral": -2.33,
+    "assist": {
+     "pi": 0.1,
+     "moved": false
+    },
+    "grid": {
+     "holed": 30,
+     "n": 182,
+     "dhDeg": 0.0279,
+     "dqYd": 0.35
+    },
+    "others": [
+     {
+      "club": "5iron",
+      "E": 1.21,
+      "P": 0.81
+     },
+     {
+      "club": "spoon",
+      "E": 2.07,
+      "P": 0
+     },
+     {
+      "club": "3iron",
+      "E": 2.09,
+      "P": 0
+     }
+    ],
+    "sims": 1571,
+    "ms": 1262
+   },
+   "why": "7iron 0.9032 aimed +0.93 deg right of the pin, 144.0 yd: holes 82% under the aim's error (WSR's ball over the KCL, cup and flagstick in; 30 of 182 grid launches hole); 1.20 strokes to hole out (5iron 1.21, spoon 2.07, 3iron 2.09); 1571 flights, 1262 ms",
+   "ms": 1263,
+   "ahead": true,
+   "planned": 0.9031606346631048,
+   "adjust": {
+    "planned": 0.9031606346631048,
+    "power": 0.90316,
+    "heading": 2.727140188217163,
+    "ms": 72,
+    "why": "holes at the aim reached for 0.8997-0.9072 (16 of 81)"
+   }
+  },
+  "club": "7iron",
+  "aim": {
+   "heading": 2.727140188217163,
+   "errDeg": -0.012,
+   "passes": 3
+  },
+  "readyToStrikeMs": 2146,
+  "raw": 0.8887148643874284,
+  "gamePower": 0.9033360481262207,
+  "curveC": 0,
+  "rest": [
+   225.53549194335938,
+   -4.6064772605896,
+   -425.961181640625
+  ],
+  "holed": true,
+  "hazard": 0,
+  "placed": null,
+  "after": 0
+ },
+ {
+  "kind": "hole-in-one",
+  "round": "Classic C wind #4",
+  "hole": 17,
+  "par": 3,
+  "stroke": 1,
+  "at": "2026-10-22T13:12:33.842Z",
+  "screenshot": "results\\highlights\\classic-c-wind-4-h17.png",
+  "k": 1,
+  "lie": 15,
+  "from": [
+   -55.20000076293945,
+   0.949999988079071,
+   1142.800048828125
+  ],
+  "toPin": 214.39,
+  "wind": {
+   "dir": 4,
+   "speedIdx": 12,
+   "mph": 24
+  },
+  "pin": [
+   434.20001220703125,
+   204.5,
+   -755.5
+  ],
+  "plan": {
+   "club": "3iron",
+   "power": 0.95894,
+   "heading": 2.855226593556036,
+   "expect": {
+    "src": "candidate:holing",
+    "D": 214.39,
+    "holeP": 0.329,
+    "E": 1.73,
+    "aimDeg": 1.951,
+    "restLie": "green",
+    "toPin": 3.15,
+    "carry": 171.7,
+    "stop": 217.3,
+    "lateral": -7.95,
+    "assist": {
+     "pi": 0.1,
+     "moved": false
+    },
+    "grid": {
+     "holed": 3,
+     "n": 182,
+     "dhDeg": 0.0187,
+     "dqYd": 0.35
+    },
+    "others": [
+     {
+      "club": "spoon",
+      "E": 2.12,
+      "P": 0
+     },
+     {
+      "club": "driver",
+      "E": 2.34,
+      "P": 0
+     },
+     {
+      "club": "spoon (long)",
+      "E": 2.04
+     }
+    ],
+    "sims": 3604,
+    "ms": 2272
+   },
+   "why": "3iron 0.9584 aimed +1.95 deg right of the pin, 214.4 yd: holes 33% under the aim's error (WSR's ball over the KCL, cup and flagstick in; 3 of 182 grid launches hole), the centre rests 3.15 yd away on green; 1.73 strokes to hole out (spoon 2.12, driver 2.34, spoon (long) 2.04); 3604 flights, 2272 ms",
+   "ms": 2273,
+   "ahead": true,
+   "planned": 0.9584388172298954,
+   "adjust": {
+    "planned": 0.9584388172298954,
+    "power": 0.95894,
+    "heading": 2.855137825012207,
+    "ms": 84,
+    "why": "holes at the aim reached for 0.9584-0.9599 (4 of 81)"
+   }
+  },
+  "club": "3iron",
+  "aim": {
+   "heading": 2.855137825012207,
+   "errDeg": 0.005,
+   "passes": 3
+  },
+  "readyToStrikeMs": 2353,
+  "raw": 0.9525693944056323,
+  "gamePower": 0.9589970707893372,
+  "curveC": 0,
+  "rest": [
+   434.9908447265625,
+   202.04014587402344,
+   -756.0739135742188
+  ],
+  "holed": true,
+  "hazard": 0,
+  "placed": {
+   "from": [
+    115.44971466064453,
+    186.57809448242188,
+    552.2611083984375
+   ],
+   "to": [
+    131.76531982421875,
+    199.96104431152344,
+    493.34356689453125
+   ]
+  },
+  "after": 0
+ },
+ {
+  "kind": "albatross",
+  "round": "Resort B wind #4",
+  "hole": 5,
+  "par": 5,
+  "stroke": 2,
+  "at": "2026-10-22T13:13:03.164Z",
+  "screenshot": "results\\highlights\\resort-b-wind-4-h05.png",
+  "k": 2,
+  "lie": 1,
+  "from": [
+   -451.8551940917969,
+   -8.256830215454102,
+   -1.8614375591278076
+  ],
+  "toPin": 282.18,
+  "wind": {
+   "dir": 4,
+   "speedIdx": 6,
+   "mph": 12
+  },
+  "pin": [
+   442.1000061035156,
+   140.60000610351562,
+   -2422.300048828125
+  ],
+  "plan": {
+   "club": "driver",
+   "power": 0.9854,
+   "heading": 2.7584331497514296,
+   "expect": {
+    "src": "candidate:holing",
+    "D": 282.18,
+    "holeP": 0.398,
+    "E": 1.725,
+    "aimDeg": 1.682,
+    "restLie": "cup",
+    "toPin": 0,
+    "carry": 226.6,
+    "stop": 282,
+    "lateral": -8.26,
+    "assist": {
+     "pi": 0.1,
+     "moved": false
+    },
+    "grid": {
+     "holed": 13,
+     "n": 182,
+     "dhDeg": 0.0142,
+     "dqYd": 0.35
+    },
+    "others": [
+     {
+      "club": "driver (long)",
+      "E": 2.02
+     }
+    ],
+    "sims": 866,
+    "ms": 745
+   },
+   "why": "driver 0.9839 aimed +1.68 deg right of the pin, 282.2 yd: holes 40% under the aim's error (WSR's ball over the KCL, cup and flagstick in; 13 of 182 grid launches hole); 1.72 strokes to hole out (driver (long) 2.02); 866 flights, 745 ms",
+   "ms": 746,
+   "ahead": true,
+   "planned": 0.9839029886587266,
+   "adjust": {
+    "planned": 0.9839029886587266,
+    "power": 0.9854,
+    "heading": 2.7578933238983154,
+    "ms": 135,
+    "why": "holes at the aim reached for 0.9854-0.9854 (1 of 73)"
+   }
+  },
+  "club": "driver",
+  "aim": {
+   "heading": 2.7578933238983154,
+   "errDeg": 0.031,
+   "passes": 12
+  },
+  "readyToStrikeMs": 3287,
+  "raw": 0.9802465860721027,
+  "gamePower": 0.9855942726135254,
+  "curveC": 0,
+  "rest": [
+   443.02142333984375,
+   138.17855834960938,
+   -2422.299560546875
+  ],
+  "holed": true,
+  "hazard": 0,
+  "placed": {
+   "from": [
+    32.694557189941406,
+    192.17913818359375,
+    -1227.5750732421875
+   ],
+   "to": [
+    54.49802017211914,
+    194.16009521484375,
+    -1285.552490234375
+   ]
+  },
+  "after": 0
+ },
+ {
+  "kind": "hole-in-one",
+  "round": "Resort C wind #4",
+  "hole": 8,
+  "par": 3,
+  "stroke": 1,
+  "at": "2026-10-22T13:13:11.721Z",
+  "screenshot": "results\\highlights\\resort-c-wind-4-h08.png",
+  "k": 1,
+  "lie": 15,
+  "from": [
+   97.80000305175781,
+   38.45000076293945,
+   973.2000122070312
+  ],
+  "toPin": 152.9,
+  "wind": {
+   "dir": 7,
+   "speedIdx": 11,
+   "mph": 22
+  },
+  "pin": [
+   -83,
+   -110.5,
+   -413.20001220703125
+  ],
+  "plan": {
+   "club": "5iron",
+   "power": 0.97339,
+   "heading": -3.1693810371865587,
+   "expect": {
+    "src": "candidate:holing",
+    "D": 152.9,
+    "holeP": 0.357,
+    "E": 1.667,
+    "aimDeg": 9.022,
+    "restLie": "cup",
+    "toPin": 0,
+    "carry": 151,
+    "stop": 151.2,
+    "lateral": -23.94,
+    "assist": {
+     "pi": 0.1,
+     "moved": false
+    },
+    "grid": {
+     "holed": 0,
+     "n": 182,
+     "dhDeg": 0.0262,
+     "dqYd": 0.35
+    },
+    "others": [
+     {
+      "club": "3iron",
+      "E": 2.01,
+      "P": 0
+     },
+     {
+      "club": "driver",
+      "E": 2.07,
+      "P": 0
+     },
+     {
+      "club": "spoon",
+      "E": 3.48,
+      "P": 0
+     },
+     {
+      "club": "5iron (long)",
+      "E": 2.01
+     }
+    ],
+    "sims": 2265,
+    "ms": 1847
+   },
+   "why": "5iron 0.9769 aimed +9.02 deg right of the pin, 152.9 yd: holes 36% under the aim's error (WSR's ball over the KCL, cup and flagstick in; 0 of 182 grid launches hole); 1.67 strokes to hole out (3iron 2.01, driver 2.07, spoon 3.48, 5iron (long) 2.01); 2265 flights, 1847 ms",
+   "ms": 1848,
+   "ahead": true,
+   "planned": 0.9768876310558776,
+   "adjust": {
+    "planned": 0.9768876310558776,
+    "power": 0.97339,
+    "heading": -3.1691973209381104,
+    "ms": 90,
+    "why": "holes at the aim reached for 0.9724-0.9749 (6 of 81)"
+   }
+  },
+  "club": "5iron",
+  "aim": {
+   "heading": -3.1691973209381104,
+   "errDeg": -0.011,
+   "passes": 3
+  },
+  "readyToStrikeMs": 2576,
+  "raw": 0.9692210233919603,
+  "gamePower": 0.973564863204956,
+  "curveC": 0,
+  "rest": [
+   -83.53135681152344,
+   -113.04954528808594,
+   -413.763916015625
+  ],
+  "holed": true,
+  "hazard": 0,
+  "placed": null,
+  "after": 0
+ },
+ {
+  "kind": "albatross",
+  "round": "Classic A wind #4",
+  "hole": 12,
+  "par": 5,
+  "stroke": 2,
+  "at": "2026-10-22T13:13:26.152Z",
+  "screenshot": "results\\highlights\\classic-a-wind-4-h12.png",
+  "k": 2,
+  "lie": 1,
+  "from": [
+   -718.6476440429688,
+   99.4665298461914,
+   -148.25775146484375
+  ],
+  "toPin": 218.92,
+  "wind": {
+   "dir": 5,
+   "speedIdx": 0,
+   "mph": 0
+  },
+  "pin": [
+   -460.20001220703125,
+   -43,
+   -2133.300048828125
+  ],
+  "plan": {
+   "club": "driver",
+   "power": 0.70231,
+   "heading": 3.0212226873652868,
+   "expect": {
+    "src": "candidate:holing",
+    "D": 218.92,
+    "holeP": 0.666,
+    "E": 1.393,
+    "aimDeg": -0.521,
+    "restLie": "cup",
+    "toPin": 0,
+    "carry": 197.2,
+    "stop": 218.8,
+    "lateral": 1.94,
+    "assist": {
+     "pi": 0.1,
+     "moved": false
+    },
+    "grid": {
+     "holed": 39,
+     "n": 182,
+     "dhDeg": 0.0183,
+     "dqYd": 0.35
+    },
+    "others": [
+     {
+      "club": "spoon",
+      "E": 1.54,
+      "P": 0.52
+     },
+     {
+      "club": "driver (long)",
+      "E": 2.01
+     }
+    ],
+    "sims": 1658,
+    "ms": 1059
+   },
+   "why": "driver 0.7018 aimed -0.52 deg right of the pin, 218.9 yd: holes 67% under the aim's error (WSR's ball over the KCL, cup and flagstick in; 39 of 182 grid launches hole); 1.39 strokes to hole out (spoon 1.54, driver (long) 2.01); 1658 flights, 1059 ms",
+   "ms": 1060,
+   "ahead": true,
+   "planned": 0.7018091807502089,
+   "adjust": {
+    "planned": 0.7018091807502089,
+    "power": 0.70231,
+    "heading": 3.0208582878112793,
+    "ms": 62,
+    "why": "holes at the aim reached for 0.7018-0.7028 (3 of 81)"
+   }
+  },
+  "club": "driver",
+  "aim": {
+   "heading": 3.0208582878112793,
+   "errDeg": 0.021,
+   "passes": 3
+  },
+  "readyToStrikeMs": 2047,
+  "raw": 0.6218743998584492,
+  "gamePower": 0.7024202346801758,
+  "curveC": 0,
+  "rest": [
+   -459.9618835449219,
+   -45.51218795776367,
+   -2132.657958984375
+  ],
+  "holed": true,
+  "hazard": 0,
+  "placed": {
+   "from": [
+    -648.3189697265625,
+    190.4660186767578,
+    -727.9213256835938
+   ],
+   "to": [
+    -640.0826416015625,
+    197.96145629882812,
+    -795.80615234375
+   ]
+  },
+  "after": 0
+ },
+ {
+  "kind": "albatross",
+  "round": "Classic C wind #4",
+  "hole": 18,
+  "par": 5,
+  "stroke": 2,
+  "at": "2026-10-22T13:13:34.660Z",
+  "screenshot": "results\\highlights\\classic-c-wind-4-h18.png",
+  "k": 2,
+  "lie": 1,
+  "from": [
+   -686.8151245117188,
+   -99.89350891113281,
+   46.60945129394531
+  ],
+  "toPin": 172.01,
+  "wind": {
+   "dir": 5,
+   "speedIdx": 10,
+   "mph": 20
+  },
+  "pin": [
+   -257.20001220703125,
+   -61.70000076293945,
+   -1466.4000244140625
+  ],
+  "plan": {
+   "club": "spoon",
+   "power": 0.56291,
+   "heading": 2.8080862190553213,
+   "expect": {
+    "src": "candidate:holing",
+    "D": 172.01,
+    "holeP": 0.791,
+    "E": 1.239,
+    "aimDeg": 3.257,
+    "restLie": "cup",
+    "toPin": 0,
+    "carry": 119.8,
+    "stop": 171.6,
+    "lateral": -9.76,
+    "grid": {
+     "holed": 40,
+     "n": 182,
+     "dhDeg": 0.0233,
+     "dqYd": 0.35
+    },
+    "others": [
+     {
+      "club": "5iron",
+      "E": 1.44,
+      "P": 0.59
+     },
+     {
+      "club": "3iron",
+      "E": 2.01,
+      "P": 0
+     },
+     {
+      "club": "driver",
+      "E": 2.01,
+      "P": 0
+     },
+     {
+      "club": "3iron (long)",
+      "E": 2.01
+     }
+    ],
+    "sims": 3203,
+    "ms": 2379
+   },
+   "why": "spoon 0.5619 aimed +3.26 deg right of the pin, 172.0 yd: holes 79% under the aim's error (WSR's ball over the KCL, cup and flagstick in; 40 of 182 grid launches hole); 1.24 strokes to hole out (5iron 1.44, 3iron 2.01, driver 2.01, 3iron (long) 2.01); 3203 flights, 2379 ms",
+   "ms": 2380,
+   "ahead": true,
+   "planned": 0.5619065529437159,
+   "adjust": {
+    "planned": 0.5619065529437159,
+    "power": 0.56291,
+    "heading": 2.807982921600342,
+    "ms": 64,
+    "why": "holes at the aim reached for 0.5604-0.5654 (11 of 81)"
+   }
+  },
+  "club": "spoon",
+  "aim": {
+   "heading": 2.807982921600342,
+   "errDeg": 0.006,
+   "passes": 3
+  },
+  "readyToStrikeMs": 2257,
+  "raw": 0.4651225393651948,
+  "gamePower": 0.5630072951316833,
+  "curveC": 0,
+  "rest": [
+   -257.5598449707031,
+   -64.33143615722656,
+   -1465.88623046875
+  ],
+  "holed": true,
+  "hazard": 0,
+  "placed": {
+   "from": [
+    -618.2570190429688,
+    -61.81069564819336,
+    -152.75897216796875
+   ],
+   "to": [
+    -597.2218017578125,
+    -51.495086669921875,
+    -214.86341857910156
+   ]
+  },
+  "after": 0
+ },
+ {
+  "kind": "albatross",
+  "round": "Resort C wind #4",
+  "hole": 9,
+  "par": 5,
+  "stroke": 2,
+  "at": "2026-10-22T13:14:14.540Z",
+  "screenshot": "results\\highlights\\resort-c-wind-4-h09.png",
+  "k": 2,
+  "lie": 1,
+  "from": [
+   531.0543823242188,
+   95.28528594970703,
+   81.99022674560547
+  ],
+  "toPin": 261.63,
+  "wind": {
+   "dir": 3,
+   "speedIdx": 14,
+   "mph": 28
+  },
+  "pin": [
+   265.20001220703125,
+   -65.5,
+   -2295.5
+  ],
+  "plan": {
+   "club": "spoon",
+   "power": 0.93593,
+   "heading": -2.8952682796265456,
+   "expect": {
+    "src": "candidate:holing",
+    "D": 261.63,
+    "holeP": 0,
+    "E": 2.005,
+    "aimDeg": -7.733,
+    "restLie": "green",
+    "toPin": 0.28,
+    "carry": 239.4,
+    "stop": 259.5,
+    "lateral": 35.21,
+    "assist": {
+     "pi": 0.1,
+     "moved": false
+    },
+    "grid": {
+     "holed": 0,
+     "n": 182,
+     "dhDeg": 0.0153,
+     "dqYd": 0.35
+    },
+    "others": [
+     {
+      "club": "driver",
+      "E": 2.01,
+      "P": 0
+     },
+     {
+      "club": "spoon (long)",
+      "E": 2.02
+     }
+    ],
+    "sims": 1726,
+    "ms": 1020
+   },
+   "why": "spoon 0.9374 aimed -7.73 deg right of the pin, 261.6 yd: holes 0% under the aim's error (WSR's ball over the KCL, cup and flagstick in; 0 of 182 grid launches hole), the centre rests 0.28 yd away on green; 2.01 strokes to hole out (driver 2.01, spoon (long) 2.02); 1726 flights, 1020 ms",
+   "ms": 1021,
+   "ahead": true,
+   "planned": 0.937428312013702,
+   "adjust": {
+    "planned": 0.937428312013702,
+    "power": 0.93593,
+    "heading": -2.895724296569824,
+    "ms": 62,
+    "why": "holes at the aim reached for 0.9354-0.9364 (3 of 81)"
+   }
+  },
+  "club": "spoon",
+  "aim": {
+   "heading": -2.895724296569824,
+   "errDeg": 0.026,
+   "passes": 4
+  },
+  "readyToStrikeMs": 2873,
+  "raw": 0.9141842604616445,
+  "gamePower": 0.9360939264297485,
+  "curveC": 0,
+  "rest": [
+   265.7879333496094,
+   -68.10386657714844,
+   -2296.29296875
+  ],
+  "holed": true,
+  "hazard": 0,
+  "placed": {
+   "from": [
+    311.3869323730469,
+    270.0323791503906,
+    -889.8048095703125
+   ],
+   "to": [
+    301.1207580566406,
+    275.2629699707031,
+    -949.80517578125
+   ]
+  },
+  "after": 0
+ },
+ {
+  "kind": "hole-in-one",
+  "round": "Classic B wind #5",
+  "hole": 13,
+  "par": 3,
+  "stroke": 1,
+  "at": "2026-10-22T13:15:05.593Z",
+  "screenshot": "results\\highlights\\classic-b-wind-5-h13.png",
+  "k": 1,
+  "lie": 15,
+  "from": [
+   70.30000305175781,
+   50.95000076293945,
+   560.7000122070312
+  ],
+  "toPin": 147.9,
+  "wind": {
+   "dir": 6,
+   "speedIdx": 9,
+   "mph": 18
+  },
+  "pin": [
+   -175.5,
+   -0.10000000149011612,
+   -769.2000122070312
+  ],
+  "plan": {
+   "club": "5iron",
+   "power": 0.80048,
+   "heading": -3.14335791738556,
+   "expect": {
+    "src": "candidate:holing",
+    "D": 147.9,
+    "holeP": 0.823,
+    "E": 1.197,
+    "aimDeg": 10.573,
+    "restLie": "cup",
+    "toPin": 0,
+    "carry": 133.4,
+    "stop": 145.3,
+    "lateral": -27,
+    "assist": {
+     "pi": 0.1,
+     "moved": false
+    },
+    "grid": {
+     "holed": 35,
+     "n": 182,
+     "dhDeg": 0.0271,
+     "dqYd": 0.35
+    },
+    "others": [
+     {
+      "club": "3iron",
+      "E": 1.23,
+      "P": 0.79
+     },
+     {
+      "club": "driver",
+      "E": 1.31,
+      "P": 0.71
+     },
+     {
+      "club": "spoon",
+      "E": 2.08,
+      "P": 0
+     }
+    ],
+    "sims": 1829,
+    "ms": 2030
+   },
+   "why": "5iron 0.8005 aimed +10.57 deg right of the pin, 147.9 yd: holes 82% under the aim's error (WSR's ball over the KCL, cup and flagstick in; 35 of 182 grid launches hole); 1.20 strokes to hole out (3iron 1.23, driver 1.31, spoon 2.08); 1829 flights, 2030 ms",
+   "ms": 2032,
+   "ahead": true,
+   "planned": 0.8004784133440441,
+   "adjust": {
+    "planned": 0.8004784133440441,
+    "power": 0.80048,
+    "heading": -3.1428346633911133,
+    "ms": 191,
+    "why": "holes at the aim reached for 0.8000-0.8010 (3 of 81)"
+   }
+  },
+  "club": "5iron",
+  "aim": {
+   "heading": -3.1428346633911133,
+   "errDeg": -0.03,
+   "passes": 12
+  },
+  "readyToStrikeMs": 3622,
+  "raw": 0.773043037897614,
+  "gamePower": 0.8005910515785217,
+  "curveC": 0,
+  "rest": [
+   -174.8858642578125,
+   -2.631514072418213,
+   -768.4659423828125
+  ],
+  "holed": true,
+  "hazard": 0,
+  "placed": null,
+  "after": 0
+ },
+ {
+  "kind": "hole-in-one",
+  "round": "Resort B wind #5",
+  "hole": 4,
+  "par": 3,
+  "stroke": 1,
+  "at": "2026-10-22T13:15:24.425Z",
+  "screenshot": "results\\highlights\\resort-b-wind-5-h04.png",
+  "k": 1,
+  "lie": 15,
+  "from": [
+   546.2000122070312,
+   0.949999988079071,
+   855.5
+  ],
+  "toPin": 174.89,
+  "wind": {
+   "dir": 1,
+   "speedIdx": 10,
+   "mph": 20
+  },
+  "pin": [
+   -174.3000030517578,
+   -39,
+   -572.2000122070312
+  ],
+  "plan": {
+   "club": "3iron",
+   "power": 0.90328,
+   "heading": -2.6140059120470434,
+   "expect": {
+    "src": "candidate:holing",
+    "D": 174.89,
+    "holeP": 0.733,
+    "E": 1.298,
+    "aimDeg": -3.45,
+    "restLie": "cup",
+    "toPin": 0,
+    "carry": 163,
+    "stop": 174.5,
+    "lateral": 10.41,
+    "assist": {
+     "pi": 0.1,
+     "moved": false
+    },
+    "grid": {
+     "holed": 3,
+     "n": 182,
+     "dhDeg": 0.0229,
+     "dqYd": 0.35
+    },
+    "others": [
+     {
+      "club": "driver",
+      "E": 2.01,
+      "P": 0
+     },
+     {
+      "club": "spoon",
+      "E": 2.03,
+      "P": 0
+     },
+     {
+      "club": "3iron (long)",
+      "E": 2.01
+     }
+    ],
+    "sims": 1898,
+    "ms": 2195
+   },
+   "why": "3iron 0.9033 aimed -3.45 deg right of the pin, 174.9 yd: holes 73% under the aim's error (WSR's ball over the KCL, cup and flagstick in; 3 of 182 grid launches hole); 1.30 strokes to hole out (driver 2.01, spoon 2.03, 3iron (long) 2.01); 1898 flights, 2195 ms",
+   "ms": 2197,
+   "ahead": true,
+   "planned": 0.9032816107714232,
+   "adjust": {
+    "planned": 0.9032816107714232,
+    "power": 0.90328,
+    "heading": -2.61391282081604,
+    "ms": 101,
+    "why": "holes at the aim reached for 0.9023-0.9043 (5 of 81)"
+   }
+  },
+  "club": "3iron",
+  "aim": {
+   "heading": -2.61391282081604,
+   "errDeg": -0.005,
+   "passes": 3
+  },
+  "readyToStrikeMs": 2511,
+  "raw": 0.8888514946991544,
+  "gamePower": 0.9034568667411804,
+  "curveC": 0,
+  "rest": [
+   -175.23648071289062,
+   -41.68042755126953,
+   -571.9256591796875
+  ],
+  "holed": true,
+  "hazard": 0,
+  "placed": {
+   "from": [
+    336.4620361328125,
+    134.21241760253906,
+    493.7596740722656
+   ],
+   "to": [
+    305.6535339355469,
+    151.05027770996094,
+    440.00347900390625
+   ]
+  },
+  "after": 0
+ },
+ {
+  "kind": "hole-in-one",
+  "round": "Classic C wind #5",
+  "hole": 17,
+  "par": 3,
+  "stroke": 1,
+  "at": "2026-10-22T13:15:49.039Z",
+  "screenshot": "results\\highlights\\classic-c-wind-5-h17.png",
+  "k": 1,
+  "lie": 15,
+  "from": [
+   -55.20000076293945,
+   0.949999988079071,
+   1142.800048828125
+  ],
+  "toPin": 220.41,
+  "wind": {
+   "dir": 3,
+   "speedIdx": 13,
+   "mph": 26
+  },
+  "pin": [
+   449.20001220703125,
+   201.3000030517578,
+   -808.5
+  ],
+  "plan": {
+   "club": "3iron",
+   "power": 0.96165,
+   "heading": 3.016566978568356,
+   "expect": {
+    "src": "candidate:holing",
+    "D": 220.41,
+    "holeP": 0.258,
+    "E": 1.805,
+    "aimDeg": -7.33,
+    "restLie": "green",
+    "toPin": 1.85,
+    "carry": 170.3,
+    "stop": 220.3,
+    "lateral": 28.79,
+    "assist": {
+     "pi": 0.1,
+     "moved": false
+    },
+    "grid": {
+     "holed": 12,
+     "n": 182,
+     "dhDeg": 0.0182,
+     "dqYd": 0.35
+    },
+    "others": [
+     {
+      "club": "driver",
+      "E": 2.11,
+      "P": 0
+     },
+     {
+      "club": "spoon",
+      "E": 2.22,
+      "P": 0
+     },
+     {
+      "club": "3iron (long)",
+      "E": 2.03
+     }
+    ],
+    "sims": 2421,
+    "ms": 2396
+   },
+   "why": "3iron 0.9596 aimed -7.33 deg right of the pin, 220.4 yd: holes 26% under the aim's error (WSR's ball over the KCL, cup and flagstick in; 12 of 182 grid launches hole), the centre rests 1.85 yd away on green; 1.80 strokes to hole out (driver 2.11, spoon 2.22, 3iron (long) 2.03); 2421 flights, 2396 ms",
+   "ms": 2399,
+   "ahead": true,
+   "planned": 0.9596464737008716,
+   "adjust": {
+    "planned": 0.9596464737008716,
+    "power": 0.96165,
+    "heading": 3.0168371200561523,
+    "ms": 161,
+    "why": "holes at the aim reached for 0.9607-0.9631 (6 of 81)"
+   }
+  },
+  "club": "3iron",
+  "aim": {
+   "heading": 3.0168371200561523,
+   "errDeg": -0.015,
+   "passes": 3
+  },
+  "readyToStrikeMs": 2280,
+  "raw": 0.9556889160355951,
+  "gamePower": 0.9616537094116211,
+  "curveC": 0,
+  "rest": [
+   448.5537414550781,
+   198.84507751464844,
+   -808.0784912109375
+  ],
+  "holed": true,
+  "hazard": 0,
+  "placed": {
+   "from": [
+    27.32427215576172,
+    185.22189331054688,
+    541.3245239257812
+   ],
+   "to": [
+    37.173744201660156,
+    198.87144470214844,
+    480.9163818359375
+   ]
+  },
+  "after": 0
+ },
+ {
+  "kind": "hole-in-one",
+  "round": "Resort A wind #5",
+  "hole": 2,
+  "par": 3,
+  "stroke": 1,
+  "at": "2026-10-22T13:15:52.170Z",
+  "screenshot": "results\\highlights\\resort-a-wind-5-h02.png",
+  "k": 1,
+  "lie": 15,
+  "from": [
+   500.1000061035156,
+   -3.450000047683716,
+   548.7000122070312
+  ],
+  "toPin": 146.63,
+  "wind": {
+   "dir": 2,
+   "speedIdx": 3,
+   "mph": 6
+  },
+  "pin": [
+   234.60000610351562,
+   -175,
+   -765.5
+  ],
+  "plan": {
+   "club": "3iron",
+   "power": 0.49278,
+   "heading": -2.8903140392879982,
+   "expect": {
+    "src": "candidate:holing",
+    "D": 146.63,
+    "holeP": 0.82,
+    "E": 1.199,
+    "aimDeg": -2.976,
+    "restLie": "cup",
+    "toPin": 0,
+    "carry": 111.6,
+    "stop": 146.3,
+    "lateral": 7.63,
+    "grid": {
+     "holed": 40,
+     "n": 182,
+     "dhDeg": 0.0274,
+     "dqYd": 0.35
+    },
+    "others": [
+     {
+      "club": "7iron",
+      "E": 1.21,
+      "P": 0.81
+     },
+     {
+      "club": "5iron",
+      "E": 1.22,
+      "P": 0.8
+     },
+     {
+      "club": "spoon",
+      "E": 1.22,
+      "P": 0.8
+     }
+    ],
+    "sims": 1663,
+    "ms": 1531
+   },
+   "why": "3iron 0.4923 aimed -2.98 deg right of the pin, 146.6 yd: holes 82% under the aim's error (WSR's ball over the KCL, cup and flagstick in; 40 of 182 grid launches hole); 1.20 strokes to hole out (7iron 1.21, 5iron 1.22, spoon 1.22); 1663 flights, 1531 ms",
+   "ms": 1532,
+   "ahead": true,
+   "planned": 0.4922771256940406,
+   "adjust": {
+    "planned": 0.4922771256940406,
+    "power": 0.49278,
+    "heading": -2.890500545501709,
+    "ms": 70,
+    "why": "holes at the aim reached for 0.4913-0.4948 (8 of 81)"
+   }
+  },
+  "club": "3iron",
+  "aim": {
+   "heading": -2.890500545501709,
+   "errDeg": 0.011,
+   "passes": 2
+  },
+  "readyToStrikeMs": 1735,
+  "raw": 0.44414502181846255,
+  "gamePower": 0.49282264709472656,
+  "curveC": 0,
+  "rest": [
+   235.5938262939453,
+   -177.55979919433594,
+   -765.4486694335938
+  ],
+  "holed": true,
+  "hazard": 0,
+  "placed": null,
+  "after": 0
+ },
+ {
+  "kind": "hole-in-one",
+  "round": "Classic A wind #5",
+  "hole": 11,
+  "par": 3,
+  "stroke": 1,
+  "at": "2026-10-22T13:16:01.439Z",
+  "screenshot": "results\\highlights\\classic-a-wind-5-h11.png",
+  "k": 1,
+  "lie": 15,
+  "from": [
+   -284.70001220703125,
+   36.95000076293945,
+   787.5
+  ],
+  "toPin": 145.1,
+  "wind": {
+   "dir": 2,
+   "speedIdx": 5,
+   "mph": 10
+  },
+  "pin": [
+   180.10000610351562,
+   -1.2000000476837158,
+   -455.20001220703125
+  ],
+  "plan": {
+   "club": "5iron",
+   "power": 0.76268,
+   "heading": 2.869592893992056,
+   "expect": {
+    "src": "candidate:holing",
+    "D": 145.1,
+    "holeP": 0.343,
+    "E": 1.678,
+    "aimDeg": -4.923,
+    "restLie": "cup",
+    "toPin": 0,
+    "carry": 130.5,
+    "stop": 144.6,
+    "lateral": 12.56,
+    "assist": {
+     "pi": 0.1,
+     "moved": false
+    },
+    "grid": {
+     "holed": 9,
+     "n": 182,
+     "dhDeg": 0.0276,
+     "dqYd": 0.35
+    },
+    "others": [
+     {
+      "club": "3iron",
+      "E": 2.05,
+      "P": 0
+     },
+     {
+      "club": "spoon",
+      "E": 2.07,
+      "P": 0
+     },
+     {
+      "club": "driver",
+      "E": 2.07,
+      "P": 0
+     },
+     {
+      "club": "7iron (long)",
+      "E": 2.01
+     }
+    ],
+    "sims": 2560,
+    "ms": 1978
+   },
+   "why": "5iron 0.7717 aimed -4.92 deg right of the pin, 145.1 yd: holes 34% under the aim's error (WSR's ball over the KCL, cup and flagstick in; 9 of 182 grid launches hole); 1.68 strokes to hole out (3iron 2.05, spoon 2.07, driver 2.07, 7iron (long) 2.01); 2560 flights, 1978 ms",
+   "ms": 1980,
+   "ahead": true,
+   "planned": 0.7716800487114951,
+   "adjust": {
+    "planned": 0.7716800487114951,
+    "power": 0.76268,
+    "heading": 2.8699395656585693,
+    "ms": 80,
+    "why": "holes at the aim reached for 0.7627-0.7632 (2 of 81)"
+   }
+  },
+  "club": "5iron",
+  "aim": {
+   "heading": 2.8699395656585693,
+   "errDeg": -0.02,
+   "passes": 3
+  },
+  "readyToStrikeMs": 2547,
+  "raw": 0.7311173374022443,
+  "gamePower": 0.762717068195343,
+  "curveC": 0,
+  "rest": [
+   179.25054931640625,
+   -4.020913124084473,
+   -454.9784851074219
+  ],
+  "holed": true,
+  "hazard": 0,
+  "placed": null,
+  "after": 0
+ },
+ {
+  "kind": "albatross",
+  "round": "Classic B wind #5",
+  "hole": 14,
+  "par": 5,
+  "stroke": 2,
+  "at": "2026-10-22T13:16:05.066Z",
+  "screenshot": "results\\highlights\\classic-b-wind-5-h14.png",
+  "k": 2,
+  "lie": 1,
+  "from": [
+   -207.2947235107422,
+   -116.91490936279297,
+   -1053.68017578125
+  ],
+  "toPin": 123.38,
+  "wind": {
+   "dir": 4,
+   "speedIdx": 7,
+   "mph": 14
+  },
+  "pin": [
+   349.70001220703125,
+   4.5,
+   -2034.800048828125
+  ],
+  "plan": {
+   "club": "7iron",
+   "power": 0.77071,
+   "heading": 2.5528653953234346,
+   "expect": {
+    "src": "candidate:holing",
+    "D": 123.38,
+    "holeP": 0.851,
+    "E": 1.161,
+    "aimDeg": 4.147,
+    "restLie": "cup",
+    "toPin": 0,
+    "carry": 86,
+    "stop": 123,
+    "lateral": -9.01,
+    "assist": {
+     "pi": 0.1,
+     "moved": false
+    },
+    "grid": {
+     "holed": 9,
+     "n": 182,
+     "dhDeg": 0.0325,
+     "dqYd": 0.35
+    },
+    "others": [
+     {
+      "club": "5iron",
+      "E": 1.53,
+      "P": 0.5
+     },
+     {
+      "club": "spoon",
+      "E": 2.05,
+      "P": 0
+     },
+     {
+      "club": "3iron",
+      "E": 2.07,
+      "P": 0
+     }
+    ],
+    "sims": 1804,
+    "ms": 1362
+   },
+   "why": "7iron 0.7707 aimed +4.15 deg right of the pin, 123.4 yd: holes 85% under the aim's error (WSR's ball over the KCL, cup and flagstick in; 9 of 182 grid launches hole); 1.16 strokes to hole out (5iron 1.53, spoon 2.05, 3iron 2.07); 1804 flights, 1362 ms",
+   "ms": 1363,
+   "ahead": true,
+   "planned": 0.7707119615061698,
+   "adjust": {
+    "planned": 0.7707119615061698,
+    "power": 0.77071,
+    "heading": 2.5525965690612793,
+    "ms": 68,
+    "why": "holes at the aim reached for 0.7687-0.7727 (9 of 81)"
+   }
+  },
+  "club": "7iron",
+  "aim": {
+   "heading": 2.5525965690612793,
+   "errDeg": 0.015,
+   "passes": 3
+  },
+  "readyToStrikeMs": 1919,
+  "raw": 0.7399926233102059,
+  "gamePower": 0.7708154320716858,
+  "curveC": 0,
+  "rest": [
+   349.0293884277344,
+   2.0600457191467285,
+   -2034.2933349609375
+  ],
+  "holed": true,
+  "hazard": 0,
+  "placed": null,
+  "after": 0
+ },
+ {
+  "kind": "albatross",
+  "round": "Classic C wind #5",
+  "hole": 18,
+  "par": 5,
+  "stroke": 2,
+  "at": "2026-10-22T13:16:51.253Z",
+  "screenshot": "results\\highlights\\classic-c-wind-5-h18.png",
+  "k": 2,
+  "lie": 1,
+  "from": [
+   -741.6101684570312,
+   -100.01628112792969,
+   143.3247833251953
+  ],
+  "toPin": 183.84,
+  "wind": {
+   "dir": 6,
+   "speedIdx": 12,
+   "mph": 24
+  },
+  "pin": [
+   -257.20001220703125,
+   -61.70000076293945,
+   -1466.4000244140625
+  ],
+  "plan": {
+   "club": "spoon",
+   "power": 0.66982,
+   "heading": 2.748817835650678,
+   "expect": {
+    "src": "candidate:holing",
+    "D": 183.84,
+    "holeP": 0.774,
+    "E": 1.262,
+    "aimDeg": 5.756,
+    "restLie": "cup",
+    "toPin": 0,
+    "carry": 141,
+    "stop": 182.8,
+    "lateral": -18.42,
+    "grid": {
+     "holed": 33,
+     "n": 182,
+     "dhDeg": 0.0218,
+     "dqYd": 0.35
+    },
+    "others": [
+     {
+      "club": "driver",
+      "E": 1.49,
+      "P": 0.55
+     },
+     {
+      "club": "3iron",
+      "E": 2.01,
+      "P": 0
+     },
+     {
+      "club": "spoon (long)",
+      "E": 2.01
+     }
+    ],
+    "sims": 1662,
+    "ms": 1327
+   },
+   "why": "spoon 0.6703 aimed +5.76 deg right of the pin, 183.8 yd: holes 77% under the aim's error (WSR's ball over the KCL, cup and flagstick in; 33 of 182 grid launches hole); 1.26 strokes to hole out (driver 1.49, 3iron 2.01, spoon (long) 2.01); 1662 flights, 1327 ms",
+   "ms": 1328,
+   "ahead": true,
+   "planned": 0.6703205082360062,
+   "adjust": {
+    "planned": 0.6703205082360062,
+    "power": 0.66982,
+    "heading": 2.749354839324951,
+    "ms": 64,
+    "why": "holes at the aim reached for 0.6683-0.6718 (8 of 81)"
+   }
+  },
+  "club": "spoon",
+  "aim": {
+   "heading": 2.749354839324951,
+   "errDeg": -0.031,
+   "passes": 12
+  },
+  "readyToStrikeMs": 3631,
+  "raw": 0.5840477772498043,
+  "gamePower": 0.6699514389038086,
+  "curveC": 0,
+  "rest": [
+   -257.1878662109375,
+   -64.33143615722656,
+   -1467.11279296875
+  ],
+  "holed": true,
+  "hazard": 0,
+  "placed": {
+   "from": [
+    -563.4913330078125,
+    -18.327770233154297,
+    -297.2899475097656
+   ],
+   "to": [
+    -541.0264892578125,
+    -10.528326988220215,
+    -355.55474853515625
+   ]
+  },
+  "after": 0
+ },
+ {
+  "kind": "albatross",
+  "round": "Resort C wind #5",
+  "hole": 9,
+  "par": 5,
+  "stroke": 2,
+  "at": "2026-10-22T13:17:46.491Z",
+  "screenshot": "results\\highlights\\resort-c-wind-5-h09.png",
+  "k": 2,
+  "lie": 1,
+  "from": [
+   465.94189453125,
+   83.16138458251953,
+   20.8951358795166
+  ],
+  "toPin": 260.7,
+  "wind": {
+   "dir": 4,
+   "speedIdx": 15,
+   "mph": 30
+  },
+  "pin": [
+   205.10000610351562,
+   -57,
+   -2348.60009765625
+  ],
+  "plan": {
+   "club": "spoon",
+   "power": 0.86164,
+   "heading": -3.0226461552664,
+   "expect": {
+    "src": "candidate:holing",
+    "D": 260.7,
+    "holeP": 0.553,
+    "E": 1.544,
+    "aimDeg": -0.533,
+    "restLie": "cup",
+    "toPin": 0,
+    "carry": 232.8,
+    "stop": 260.6,
+    "lateral": 2.51,
+    "assist": {
+     "pi": 0.1,
+     "moved": false
+    },
+    "grid": {
+     "holed": 16,
+     "n": 182,
+     "dhDeg": 0.0154,
+     "dqYd": 0.35
+    },
+    "others": [
+     {
+      "club": "driver",
+      "E": 2.04,
+      "P": 0
+     },
+     {
+      "club": "3iron (long)",
+      "E": 2.02
+     }
+    ],
+    "sims": 1337,
+    "ms": 859
+   },
+   "why": "spoon 0.8621 aimed -0.53 deg right of the pin, 260.7 yd: holes 55% under the aim's error (WSR's ball over the KCL, cup and flagstick in; 16 of 182 grid launches hole); 1.54 strokes to hole out (driver 2.04, 3iron (long) 2.02); 1337 flights, 859 ms",
+   "ms": 860,
+   "ahead": true,
+   "planned": 0.8621441833686315,
+   "adjust": {
+    "planned": 0.8621441833686315,
+    "power": 0.86164,
+    "heading": -3.0224406719207764,
+    "ms": 64,
+    "why": "holes at the aim reached for 0.8611-0.8621 (3 of 81)"
+   }
+  },
+  "club": "spoon",
+  "aim": {
+   "heading": -3.0224406719207764,
+   "errDeg": -0.012,
+   "passes": 1
+  },
+  "readyToStrikeMs": 1853,
+  "raw": 0.81758929111906,
+  "gamePower": 0.8617300391197205,
+  "curveC": 0,
+  "rest": [
+   204.95455932617188,
+   -59.535736083984375,
+   -2347.7568359375
+  ],
+  "holed": true,
+  "hazard": 0,
+  "placed": {
+   "from": [
+    379.1784362792969,
+    216.9360809326172,
+    -716.575439453125
+   ],
+   "to": [
+    371.72882080078125,
+    225.30032348632812,
+    -782.3240356445312
+   ]
+  },
+  "after": 0
+ },
+ {
+  "kind": "hole-in-one",
+  "round": "Classic B wind #6",
+  "hole": 13,
+  "par": 3,
+  "stroke": 1,
+  "at": "2026-10-22T13:18:22.731Z",
+  "screenshot": "results\\highlights\\classic-b-wind-6-h13.png",
+  "k": 1,
+  "lie": 15,
+  "from": [
+   70.30000305175781,
+   50.95000076293945,
+   560.7000122070312
+  ],
+  "toPin": 131.14,
+  "wind": {
+   "dir": 1,
+   "speedIdx": 10,
+   "mph": 20
+  },
+  "pin": [
+   -144.60000610351562,
+   -1.600000023841858,
+   -619
+  ],
+  "plan": {
+   "club": "5iron",
+   "power": 0.77364,
+   "heading": -2.872760782889158,
+   "expect": {
+    "src": "candidate:holing",
+    "D": 131.14,
+    "holeP": 0.765,
+    "E": 1.25,
+    "aimDeg": -5.079,
+    "restLie": "cup",
+    "toPin": 0,
+    "carry": 121.4,
+    "stop": 130.5,
+    "lateral": 11.51,
+    "assist": {
+     "pi": 0.1,
+     "moved": false
+    },
+    "grid": {
+     "holed": 14,
+     "n": 182,
+     "dhDeg": 0.0306,
+     "dqYd": 0.35
+    },
+    "others": [
+     {
+      "club": "driver",
+      "E": 2.01,
+      "P": 0
+     },
+     {
+      "club": "3iron",
+      "E": 2.04,
+      "P": 0
+     },
+     {
+      "club": "spoon",
+      "E": 2.11,
+      "P": 0
+     }
+    ],
+    "sims": 1739,
+    "ms": 1939
+   },
+   "why": "5iron 0.7771 aimed -5.08 deg right of the pin, 131.1 yd: holes 77% under the aim's error (WSR's ball over the KCL, cup and flagstick in; 14 of 182 grid launches hole); 1.25 strokes to hole out (driver 2.01, 3iron 2.04, spoon 2.11); 1739 flights, 1939 ms",
+   "ms": 1940,
+   "ahead": true,
+   "planned": 0.7771420714573815,
+   "adjust": {
+    "planned": 0.7771420714573815,
+    "power": 0.77364,
+    "heading": -2.873246908187866,
+    "ms": 101,
+    "why": "holes at the aim reached for 0.7736-0.7741 (2 of 81)"
+   }
+  },
+  "club": "5iron",
+  "aim": {
+   "heading": -2.873246908187866,
+   "errDeg": 0.028,
+   "passes": 4
+  },
+  "readyToStrikeMs": 2437,
+  "raw": 0.7432352840570429,
+  "gamePower": 0.7737759947776794,
+  "curveC": 0,
+  "rest": [
+   -143.6224365234375,
+   -4.173776149749756,
+   -619.2035522460938
+  ],
+  "holed": true,
+  "hazard": 0,
+  "placed": null,
+  "after": 0
+ },
+ {
+  "kind": "hole-in-one",
+  "round": "Resort B wind #6",
+  "hole": 4,
+  "par": 3,
+  "stroke": 1,
+  "at": "2026-10-22T13:18:48.754Z",
+  "screenshot": "results\\highlights\\resort-b-wind-6-h04.png",
+  "k": 1,
+  "lie": 15,
+  "from": [
+   546.2000122070312,
+   0.949999988079071,
+   855.5
+  ],
+  "toPin": 160.13,
+  "wind": {
+   "dir": 4,
+   "speedIdx": 9,
+   "mph": 18
+  },
+  "pin": [
+   -154.5,
+   -43.20000076293945,
+   -430.20001220703125
+  ],
+  "plan": {
+   "club": "5iron",
+   "power": 0.81097,
+   "heading": -2.557143476878128,
+   "expect": {
+    "src": "candidate:holing",
+    "D": 160.13,
+    "holeP": 0.736,
+    "E": 1.289,
+    "aimDeg": -4.896,
+    "restLie": "cup",
+    "toPin": 0,
+    "carry": 145.6,
+    "stop": 159.5,
+    "lateral": 13.6,
+    "assist": {
+     "pi": 0.1,
+     "moved": false
+    },
+    "grid": {
+     "holed": 12,
+     "n": 182,
+     "dhDeg": 0.025,
+     "dqYd": 0.35
+    },
+    "others": [
+     {
+      "club": "driver",
+      "E": 2.02,
+      "P": 0
+     },
+     {
+      "club": "3iron",
+      "E": 2.05,
+      "P": 0
+     },
+     {
+      "club": "spoon",
+      "E": 3.58,
+      "P": 0
+     },
+     {
+      "club": "5iron (long)",
+      "E": 2.01
+     }
+    ],
+    "sims": 2414,
+    "ms": 2580
+   },
+   "why": "5iron 0.8110 aimed -4.90 deg right of the pin, 160.1 yd: holes 74% under the aim's error (WSR's ball over the KCL, cup and flagstick in; 12 of 182 grid launches hole); 1.29 strokes to hole out (driver 2.02, 3iron 2.05, spoon 3.58, 5iron (long) 2.01); 2414 flights, 2580 ms",
+   "ms": 2582,
+   "ahead": true,
+   "planned": 0.8109684017801932,
+   "adjust": {
+    "planned": 0.8109684017801932,
+    "power": 0.81097,
+    "heading": -2.557311773300171,
+    "ms": 151,
+    "why": "holes at the aim reached for 0.8095-0.8125 (7 of 81)"
+   }
+  },
+  "club": "5iron",
+  "aim": {
+   "heading": -2.557311773300171,
+   "errDeg": 0.01,
+   "passes": 3
+  },
+  "readyToStrikeMs": 2618,
+  "raw": 0.7847429132346995,
+  "gamePower": 0.8111333250999451,
+  "curveC": 0,
+  "rest": [
+   -155.03660583496094,
+   -45.82530975341797,
+   -429.78167724609375
+  ],
+  "holed": true,
+  "hazard": 0,
+  "placed": null,
+  "after": 0
+ },
+ {
+  "kind": "hole-in-one",
+  "round": "Resort A wind #6",
+  "hole": 2,
+  "par": 3,
+  "stroke": 1,
+  "at": "2026-10-22T13:19:14.423Z",
+  "screenshot": "results\\highlights\\resort-a-wind-6-h02.png",
+  "k": 1,
+  "lie": 15,
+  "from": [
+   500.1000061035156,
+   -3.450000047683716,
+   548.7000122070312
+  ],
+  "toPin": 147.93,
+  "wind": {
+   "dir": 0,
+   "speedIdx": 1,
+   "mph": 2
+  },
+  "pin": [
+   300.5,
+   -172.8000030517578,
+   -789.2000122070312
+  ],
+  "plan": {
+   "club": "3iron",
+   "power": 0.55485,
+   "heading": -3.0077881002963283,
+   "expect": {
+    "src": "candidate:holing",
+    "D": 147.93,
+    "holeP": 0.748,
+    "E": 1.272,
+    "aimDeg": 0.819,
+    "restLie": "cup",
+    "toPin": 0,
+    "carry": 124.8,
+    "stop": 147.9,
+    "lateral": -2.03,
+    "grid": {
+     "holed": 19,
+     "n": 182,
+     "dhDeg": 0.0271,
+     "dqYd": 0.35
+    },
+    "others": [
+     {
+      "club": "driver",
+      "E": 1.28,
+      "P": 0.74
+     },
+     {
+      "club": "spoon",
+      "E": 1.29,
+      "P": 0.73
+     },
+     {
+      "club": "5iron",
+      "E": 1.93,
+      "P": 0.1
+     }
+    ],
+    "sims": 1598,
+    "ms": 2199
+   },
+   "why": "3iron 0.5554 aimed +0.82 deg right of the pin, 147.9 yd: holes 75% under the aim's error (WSR's ball over the KCL, cup and flagstick in; 19 of 182 grid launches hole); 1.27 strokes to hole out (driver 1.28, spoon 1.29, 5iron 1.93); 1598 flights, 2199 ms",
+   "ms": 2199,
+   "ahead": true,
+   "planned": 0.5553537078946352,
+   "adjust": {
+    "planned": 0.5553537078946352,
+    "power": 0.55485,
+    "heading": -3.0077500343322754,
+    "ms": 74,
+    "why": "holes at the aim reached for 0.5544-0.5554 (3 of 81)"
+   }
+  },
+  "club": "3iron",
+  "aim": {
+   "heading": -3.0077500343322754,
+   "errDeg": -0.002,
+   "passes": 2
+  },
+  "readyToStrikeMs": 2128,
+  "raw": 0.5079610531978952,
+  "gamePower": 0.5549290776252747,
+  "curveC": 0,
+  "rest": [
+   301.1678771972656,
+   -175.4971923828125,
+   -789.488037109375
+  ],
+  "holed": true,
+  "hazard": 0,
+  "placed": null,
+  "after": 0
+ },
+ {
+  "kind": "albatross",
+  "round": "Classic B wind #6",
+  "hole": 14,
+  "par": 5,
+  "stroke": 2,
+  "at": "2026-10-22T13:19:20.731Z",
+  "screenshot": "results\\highlights\\classic-b-wind-6-h14.png",
+  "k": 2,
+  "lie": 1,
+  "from": [
+   -188.35842895507812,
+   -112.5189437866211,
+   -1135.290771484375
+  ],
+  "toPin": 110.15,
+  "wind": {
+   "dir": 4,
+   "speedIdx": 5,
+   "mph": 10
+  },
+  "pin": [
+   410,
+   3,
+   -1945.5
+  ],
+  "plan": {
+   "club": "7iron",
+   "power": 0.70208,
+   "heading": 2.4352434893670982,
+   "expect": {
+    "src": "candidate:holing",
+    "D": 110.15,
+    "holeP": 0.868,
+    "E": 1.141,
+    "aimDeg": 4.024,
+    "restLie": "cup",
+    "toPin": 0,
+    "carry": 75.6,
+    "stop": 109.8,
+    "lateral": -7.61,
+    "assist": {
+     "pi": 0.1,
+     "moved": false
+    },
+    "grid": {
+     "holed": 29,
+     "n": 182,
+     "dhDeg": 0.0364,
+     "dqYd": 0.35
+    },
+    "others": [
+     {
+      "club": "5iron",
+      "E": 2.01,
+      "P": 0
+     },
+     {
+      "club": "9iron",
+      "E": 2.03,
+      "P": 0
+     },
+     {
+      "club": "3iron",
+      "E": 2.05,
+      "P": 0
+     }
+    ],
+    "sims": 1748,
+    "ms": 1205
+   },
+   "why": "7iron 0.7026 aimed +4.02 deg right of the pin, 110.1 yd: holes 87% under the aim's error (WSR's ball over the KCL, cup and flagstick in; 29 of 182 grid launches hole); 1.14 strokes to hole out (5iron 2.01, 9iron 2.03, 3iron 2.05); 1748 flights, 1205 ms",
+   "ms": 1206,
+   "ahead": true,
+   "planned": 0.7025764105819434,
+   "adjust": {
+    "planned": 0.7025764105819434,
+    "power": 0.70208,
+    "heading": 2.434864044189453,
+    "ms": 56,
+    "why": "holes at the aim reached for 0.7016-0.7031 (4 of 81)"
+   }
+  },
+  "club": "7iron",
+  "aim": {
+   "heading": 2.434864044189453,
+   "errDeg": 0.022,
+   "passes": 3
+  },
+  "readyToStrikeMs": 1779,
+  "raw": 0.6647034589587463,
+  "gamePower": 0.7021920084953308,
+  "curveC": 0,
+  "rest": [
+   410.6690673828125,
+   0.5380081534385681,
+   -1945.6458740234375
+  ],
+  "holed": true,
+  "hazard": 0,
+  "placed": null,
+  "after": 0
+ },
+ {
+  "kind": "hole-in-one",
+  "round": "Classic A wind #6",
+  "hole": 11,
+  "par": 3,
+  "stroke": 1,
+  "at": "2026-10-22T13:19:42.384Z",
+  "screenshot": "results\\highlights\\classic-a-wind-6-h11.png",
+  "k": 1,
+  "lie": 15,
+  "from": [
+   -284.70001220703125,
+   36.95000076293945,
+   787.5
+  ],
+  "toPin": 133.22,
+  "wind": {
+   "dir": 7,
+   "speedIdx": 2,
+   "mph": 4
+  },
+  "pin": [
+   151.3000030517578,
+   -5.5,
+   -350
+  ],
+  "plan": {
+   "club": "3iron",
+   "power": 0.53428,
+   "heading": 2.756302671767429,
+   "expect": {
+    "src": "candidate:holing",
+    "D": 133.22,
+    "holeP": 0.761,
+    "E": 1.255,
+    "aimDeg": 1.104,
+    "restLie": "cup",
+    "toPin": 0,
+    "carry": 107.5,
+    "stop": 133.1,
+    "lateral": -2.58,
+    "grid": {
+     "holed": 31,
+     "n": 182,
+     "dhDeg": 0.0301,
+     "dqYd": 0.35
+    },
+    "others": [
+     {
+      "club": "7iron",
+      "E": 2.01,
+      "P": 0
+     },
+     {
+      "club": "5iron",
+      "E": 2.02,
+      "P": 0
+     },
+     {
+      "club": "spoon",
+      "E": 2.06,
+      "P": 0
+     }
+    ],
+    "sims": 1949,
+    "ms": 1544
+   },
+   "why": "3iron 0.5348 aimed +1.10 deg right of the pin, 133.2 yd: holes 76% under the aim's error (WSR's ball over the KCL, cup and flagstick in; 31 of 182 grid launches hole); 1.26 strokes to hole out (7iron 2.01, 5iron 2.02, spoon 2.06); 1949 flights, 1544 ms",
+   "ms": 1545,
+   "ahead": true,
+   "planned": 0.5347788710122424,
+   "adjust": {
+    "planned": 0.5347788710122424,
+    "power": 0.53428,
+    "heading": 2.756540060043335,
+    "ms": 48,
+    "why": "holes at the aim reached for 0.5323-0.5368 (10 of 81)"
+   }
+  },
+  "club": "3iron",
+  "aim": {
+   "heading": 2.756540060043335,
+   "errDeg": -0.014,
+   "passes": 3
+  },
+  "readyToStrikeMs": 2426,
+  "raw": 0.48664834040318383,
+  "gamePower": 0.5343396663665771,
+  "curveC": 0,
+  "rest": [
+   150.54905700683594,
+   -8.28420639038086,
+   -350.2319030761719
+  ],
+  "holed": true,
+  "hazard": 0,
+  "placed": null,
+  "after": 0
+ },
+ {
+  "kind": "hole-in-one",
+  "round": "Resort C wind #6",
+  "hole": 8,
+  "par": 3,
+  "stroke": 1,
+  "at": "2026-10-22T13:20:14.499Z",
+  "screenshot": "results\\highlights\\resort-c-wind-6-h08.png",
+  "k": 1,
+  "lie": 15,
+  "from": [
+   97.80000305175781,
+   38.45000076293945,
+   973.2000122070312
+  ],
+  "toPin": 156.74,
+  "wind": {
+   "dir": 4,
+   "speedIdx": 12,
+   "mph": 24
+  },
+  "pin": [
+   -171,
+   -102,
+   -434.6000061035156
+  ],
+  "plan": {
+   "club": "5iron",
+   "power": 0.7666077499337451,
+   "heading": -2.9040732135220324,
+   "expect": {
+    "src": "candidate:holing",
+    "D": 156.74,
+    "holeP": 0.809,
+    "E": 1.215,
+    "aimDeg": -2.799,
+    "restLie": "cup",
+    "toPin": 0,
+    "carry": 151.2,
+    "stop": 156.4,
+    "lateral": 7.6,
+    "assist": {
+     "pi": 0.1,
+     "moved": false
+    },
+    "grid": {
+     "holed": 30,
+     "n": 182,
+     "dhDeg": 0.0256,
+     "dqYd": 0.35
+    },
+    "others": [
+     {
+      "club": "spoon",
+      "E": 1.23,
+      "P": 0.79
+     },
+     {
+      "club": "3iron",
+      "E": 1.43,
+      "P": 0.6
+     },
+     {
+      "club": "7iron",
+      "E": 2.01,
+      "P": 0
+     },
+     {
+      "club": "5iron (long)",
+      "E": 2.01
+     }
+    ],
+    "sims": 2155,
+    "ms": 3065
+   },
+   "why": "5iron 0.7666 aimed -2.80 deg right of the pin, 156.7 yd: holes 81% under the aim's error (WSR's ball over the KCL, cup and flagstick in; 30 of 182 grid launches hole); 1.21 strokes to hole out (spoon 1.23, 3iron 1.43, 7iron 2.01, 5iron (long) 2.01); 2155 flights, 3065 ms",
+   "ms": 3068,
+   "ahead": true,
+   "planned": 0.7666077499337451,
+   "adjust": {
+    "planned": 0.7666077499337451,
+    "power": 0.7666077499337451,
+    "heading": -2.9038984775543213,
+    "ms": 104,
+    "kept": true,
+    "why": "nothing holes at the aim reached: the plan's power"
+   }
+  },
+  "club": "5iron",
+  "aim": {
+   "heading": -2.9038984775543213,
+   "errDeg": -0.01,
+   "passes": 3
+  },
+  "readyToStrikeMs": 2242,
+  "raw": 0.7354564164583925,
+  "gamePower": 0.7666482329368591,
+  "curveC": 0,
+  "rest": [
+   -171.22972106933594,
+   -104.5597915649414,
+   -434.0375061035156
+  ],
+  "holed": true,
+  "hazard": 0,
+  "placed": null,
+  "after": 0
+ },
+ {
+  "kind": "albatross",
+  "round": "Classic C wind #6",
+  "hole": 18,
+  "par": 5,
+  "stroke": 2,
+  "at": "2026-10-22T13:20:26.526Z",
+  "screenshot": "results\\highlights\\classic-c-wind-6-h18.png",
+  "k": 2,
+  "lie": 1,
+  "from": [
+   370.10516357421875,
+   -159.8386688232422,
+   546.4351806640625
+  ],
+  "toPin": 230.57,
+  "wind": {
+   "dir": 1,
+   "speedIdx": 14,
+   "mph": 28
+  },
+  "pin": [
+   -257.20001220703125,
+   -61.70000076293945,
+   -1466.4000244140625
+  ],
+  "plan": {
+   "club": "driver",
+   "power": 0.93816,
+   "heading": -2.7740770776196535,
+   "expect": {
+    "src": "candidate:holing",
+    "D": 230.57,
+    "holeP": 0.26,
+    "E": 1.812,
+    "aimDeg": -3.747,
+    "restLie": "cup",
+    "toPin": 0,
+    "carry": 194.6,
+    "stop": 230,
+    "lateral": 15.07,
+    "assist": {
+     "pi": 0.1,
+     "moved": false
+    },
+    "grid": {
+     "holed": 7,
+     "n": 182,
+     "dhDeg": 0.0174,
+     "dqYd": 0.35
+    },
+    "others": [
+     {
+      "club": "driver (long)",
+      "E": 2.01
+     }
+    ],
+    "sims": 1352,
+    "ms": 883
+   },
+   "why": "driver 0.9357 aimed -3.75 deg right of the pin, 230.6 yd: holes 26% under the aim's error (WSR's ball over the KCL, cup and flagstick in; 7 of 182 grid launches hole); 1.81 strokes to hole out (driver (long) 2.01); 1352 flights, 883 ms",
+   "ms": 884,
+   "ahead": true,
+   "planned": 0.9356595268702178,
+   "adjust": {
+    "planned": 0.9356595268702178,
+    "power": 0.93816,
+    "heading": -2.7745680809020996,
+    "ms": 87,
+    "why": "holes at the aim reached for 0.9382-0.9382 (1 of 81)"
+   }
+  },
+  "club": "driver",
+  "aim": {
+   "heading": -2.7745680809020996,
+   "errDeg": 0.028,
+   "passes": 2
+  },
+  "readyToStrikeMs": 1971,
+  "raw": 0.9171328686140621,
+  "gamePower": 0.9383409023284912,
+  "curveC": 0,
+  "rest": [
+   -256.2024841308594,
+   -64.33143615722656,
+   -1466.3460693359375
+  ],
+  "holed": true,
+  "hazard": 0,
+  "placed": {
+   "from": [
+    11.941862106323242,
+    8.994534492492676,
+    -412.8846435546875
+   ],
+   "to": [
+    -8.796757698059082,
+    14.840873718261719,
+    -472.6781921386719
+   ]
+  },
+  "after": 0
+ },
+ {
+  "kind": "albatross",
+  "round": "Classic A wind #6",
+  "hole": 12,
+  "par": 5,
+  "stroke": 2,
+  "at": "2026-10-22T13:20:42.631Z",
+  "screenshot": "results\\highlights\\classic-a-wind-6-h12.png",
+  "k": 2,
+  "lie": 1,
+  "from": [
+   -545.1143188476562,
+   99.01465606689453,
+   -211.51467895507812
+  ],
+  "toPin": 204.49,
+  "wind": {
+   "dir": 6,
+   "speedIdx": 5,
+   "mph": 10
+  },
+  "pin": [
+   -515,
+   -43.5,
+   -2081.10009765625
+  ],
+  "plan": {
+   "club": "3iron",
+   "power": 0.93729,
+   "heading": 3.015175235396023,
+   "expect": {
+    "src": "candidate:holing",
+    "D": 204.49,
+    "holeP": 0.508,
+    "E": 1.542,
+    "aimDeg": 6.32,
+    "restLie": "cup",
+    "toPin": 0,
+    "carry": 190.8,
+    "stop": 203.2,
+    "lateral": -22.38,
+    "assist": {
+     "pi": 0.1,
+     "moved": false
+    },
+    "grid": {
+     "holed": 9,
+     "n": 182,
+     "dhDeg": 0.0196,
+     "dqYd": 0.35
+    },
+    "others": [
+     {
+      "club": "driver",
+      "E": 1.58,
+      "P": 0.48
+     },
+     {
+      "club": "spoon",
+      "E": 2.01,
+      "P": 0
+     },
+     {
+      "club": "3iron (long)",
+      "E": 2.01
+     }
+    ],
+    "sims": 1644,
+    "ms": 1111
+   },
+   "why": "3iron 0.9373 aimed +6.32 deg right of the pin, 204.5 yd: holes 51% under the aim's error (WSR's ball over the KCL, cup and flagstick in; 9 of 182 grid launches hole); 1.54 strokes to hole out (driver 1.58, spoon 2.01, 3iron (long) 2.01); 1644 flights, 1111 ms",
+   "ms": 1112,
+   "ahead": true,
+   "planned": 0.9372915138384005,
+   "adjust": {
+    "planned": 0.9372915138384005,
+    "power": 0.93729,
+    "heading": 3.014625310897827,
+    "ms": 69,
+    "why": "holes at the aim reached for 0.9368-0.9378 (3 of 81)"
+   }
+  },
+  "club": "3iron",
+  "aim": {
+   "heading": 3.014625310897827,
+   "errDeg": 0.032,
+   "passes": 12
+  },
+  "readyToStrikeMs": 3770,
+  "raw": 0.9277044329411378,
+  "gamePower": 0.9374649524688721,
+  "curveC": 0,
+  "rest": [
+   -514.0545043945312,
+   -46.176761627197266,
+   -2081.216552734375
+  ],
+  "holed": true,
+  "hazard": 0,
+  "placed": {
+   "from": [
+    -507.7157287597656,
+    198.63185119628906,
+    -511.2626647949219
+   ],
+   "to": [
+    -500.61663818359375,
+    216.95851135253906,
+    -571.11572265625
+   ]
+  },
+  "after": 0
  }
 ]

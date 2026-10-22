@@ -20,18 +20,21 @@ const PLAY = pathToFileURL(path.join(HERE, "round-play.mjs")).href;
 const LABEL = arg("--label", null);
 // --wind dir:speedIdx: the wind the user set for the course (round-play.mjs applyWind), e.g. 0:0 for none
 const WIND = arg("--wind", null), windSet = WIND ? { dir: Number(WIND.split(":")[0]), speedIdx: Number(WIND.split(":")[1]) } : null;
+// --pins 1:0,2:3,3:3: the WSR slot each hole's pin is forced to (round-play.mjs
+// forceNext forces the next hole's; the first hole's is round-start.mjs --pin's)
+const PINS = Object.fromEntries((arg("--pins", "") || "").split(",").filter((t) => /^\d+:\d+$/.test(t)).map((t) => t.split(":").map(Number)));
 const SRC = path.relative(path.join(HERE, "results"), OUT).split(path.sep).join("/").replace(/\.json$/, "").replace(/^courses\//, "");
 
 const post = (body) => new Promise((resolve, reject) => {
   const req = http.request({ host: "127.0.0.1", port, method: "POST", path: "/" }, (res) => { let t = ""; res.on("data", (d) => (t += d)); res.on("end", () => resolve({ ok: res.statusCode === 200, text: t })); });
   req.on("error", reject); req.end(JSON.stringify(body));
 });
-const round = fs.existsSync(OUT) ? JSON.parse(fs.readFileSync(OUT, "utf8")) : { kind: "natural-round", course: LABEL ? LABEL.replace(/ #\d+$/, "") : "Eighteen Holes", label: LABEL, wind: windSet, holes: {} };
+const round = fs.existsSync(OUT) ? JSON.parse(fs.readFileSync(OUT, "utf8")) : { kind: "natural-round", course: LABEL ? LABEL.replace(/ #\d+$/, "") : "Eighteen Holes", label: LABEL, wind: windSet, pins: Object.keys(PINS).length ? PINS : null, holes: {} };
 const save = () => { fs.mkdirSync(path.dirname(OUT), { recursive: true }); fs.writeFileSync(OUT, JSON.stringify(round, null, 1)); };
 
 for (let hole = from; hole <= to; hole++) {
   for (let call = 0; call < 3; call++) {
-    const js = `const m = await import("${PLAY}?v=" + Date.now()); return await m.playHole({ gdb, dsu, hole: ${hole}, last: ${hole === to}, logFile: ${JSON.stringify(LOGF)}, src: ${JSON.stringify(SRC)}, label: ${JSON.stringify(LABEL)}, windSet: ${JSON.stringify(windSet)} });`;
+    const js = `const m = await import("${PLAY}?v=" + Date.now()); return await m.playHole({ gdb, dsu, hole: ${hole}, last: ${hole === to}, logFile: ${JSON.stringify(LOGF)}, src: ${JSON.stringify(SRC)}, label: ${JSON.stringify(LABEL)}, windSet: ${JSON.stringify(windSet)}, forceNext: ${hole < to && PINS[hole + 1] != null ? PINS[hole + 1] : "null"} });`;
     const r = await post({ op: "eval", args: [js] });
     if (r.ok) {
       const rec = JSON.parse(r.text);

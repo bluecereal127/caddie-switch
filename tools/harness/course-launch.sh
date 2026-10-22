@@ -11,9 +11,11 @@
 # next attempt. PHASE is the series ("courses": the game's own wind; e.g.
 # "calm" with WIND 0:0: the wind the user set, round-play.mjs applyWind);
 # WIND is dir:speedIdx, or - for the game's own.
-#   bash tools/harness/course-launch.sh <instance> <port> <slug> <attempt> <x> <y> <w> <h> [phase] [wind]
+# PINS is hole:slot,... (each hole's pin forced to that WSR slot: round-start.mjs
+# --pin for the first hole, round-ctl.mjs --pins for the others), or - for the game's draw.
+#   bash tools/harness/course-launch.sh <instance> <port> <slug> <attempt> <x> <y> <w> <h> [phase] [wind] [pins]
 set -u
-INST=$1; PORT=$2; SLUG=$3; N=$4; X=$5; Y=$6; W=$7; HT=$8; PHASE=${9:-courses}; WIND=${10:--}
+INST=$1; PORT=$2; SLUG=$3; N=$4; X=$5; Y=$6; W=$7; HT=$8; PHASE=${9:-courses}; WIND=${10:--}; PINS=${11:--}
 H="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "$H/../.." && pwd)"
 case "$SLUG" in
@@ -24,6 +26,7 @@ esac
 LAST=$((FIRST + 2))
 if [ "$PHASE" = "courses" ]; then LABEL="$NAME #$N"; else LABEL="$NAME $PHASE #$N"; fi
 WINDARGS=(); if [ "$WIND" != "-" ]; then WINDARGS=(--wind "$WIND"); fi
+PINARGS=(); STARTPIN=(); if [ "$PINS" != "-" ]; then PINARGS=(--pins "$PINS"); FP=$(echo "$PINS" | tr ',' '\n' | grep "^$FIRST:" | cut -d: -f2); if [ -n "$FP" ]; then STARTPIN=(--pin "$FP"); fi; fi
 mkdir -p "$H/state/$PHASE" "$H/results/$PHASE/$SLUG"
 LOG="$H/state/$PHASE/$SLUG-$N.log"
 CTL="$H/state/$PHASE/$SLUG-$N-ctl.log"
@@ -44,8 +47,8 @@ public class RL { [DllImport(\"user32.dll\")] public static extern bool SetWindo
 [RL]::SetWindowPos(\$p.MainWindowHandle, [IntPtr](-1), $X, $Y, $W, $HT, 0x0040) | Out-Null
 "
 sleep 4
-node tools/harness/round-start.mjs --port "$PORT" --course "$NAME" >> "$LOG" 2>&1
+node tools/harness/round-start.mjs --port "$PORT" --course "$NAME" "${STARTPIN[@]}" >> "$LOG" 2>&1
 powershell -NoProfile -ExecutionPolicy Bypass -File "$H/round-window.ps1" -Log "$LOG" -Round "$N" -Instance "$INST" -Label "$LABEL" -Holes 3 -Best "$H/results/$PHASE/$SLUG/attempts.json" -DolphinPid "$DPID" > /dev/null 2>&1 &
-node tools/harness/round-ctl.mjs --port "$PORT" --from "$FIRST" --to "$LAST" --log "state/$PHASE/$SLUG-$N.log" --out "results/$PHASE/$SLUG/attempt-$N.json" --label "$LABEL" "${WINDARGS[@]}" >> "$CTL" 2>&1
+node tools/harness/round-ctl.mjs --port "$PORT" --from "$FIRST" --to "$LAST" --log "state/$PHASE/$SLUG-$N.log" --out "results/$PHASE/$SLUG/attempt-$N.json" --label "$LABEL" "${WINDARGS[@]}" "${PINARGS[@]}" >> "$CTL" 2>&1
 echo "attempt $N over" >> "$CTL"
 wait $DRIVER

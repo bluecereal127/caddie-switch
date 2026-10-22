@@ -16,6 +16,15 @@
 // Attempts are started outside this process (PowerShell Start-Process), so
 // they outlive it: a restarted supervisor adopts the attempt each slot is
 // playing.
+// --cover (the user, 2026-10-22: "until we can get -5 or better for every pin
+// location per hole"): a course is done when every WSR pin of its three holes
+// has been played in a complete attempt at the goal or better. Each attempt
+// forces, on every hole, the first pin no such attempt has played yet
+// (course-launch.sh's pins argument: round-start.mjs --pin, round-ctl.mjs
+// --pins, lib/pins.mjs's force; the user allowed setting the pins), in the
+// game's own wind; a hole whose pins are all covered keeps its first pin. The
+// pins an attempt played are read back from its strokes, so a force that
+// failed counts the pin the game drew.
 //   node tools/harness/course-supervisor.mjs --slots 18:8818:0:0:resort-a,15:8815:0:700:classic-a,... [--goal -6] [--w 853] [--h 510]
 import fs from "node:fs";
 import path from "node:path";
@@ -34,6 +43,10 @@ const WIND = process.argv.includes("--wind") ? process.argv[process.argv.indexOf
 const CDIR = path.join(HERE, "results", PHASE);
 const arg = (n, d) => { const i = process.argv.indexOf(n); return i >= 0 ? process.argv[i + 1] : d; };
 const goal = Number(arg("--goal", -6)), W = Number(arg("--w", 853)), Hh = Number(arg("--h", 510));
+const COVER = process.argv.includes("--cover");
+// every hole's WSR pins: { id: s<slot>, slot, mesh } (tools/wsr-pins.json, as lib/pins.mjs's cups)
+const WSR_PINS = JSON.parse(fs.readFileSync(path.join(ROOT, "tools", "wsr-pins.json"), "utf8"));
+const spotsOf = (h) => WSR_PINS.holes[h].spots.map((sp) => ({ id: `s${sp.slots[0]}`, slot: sp.slots[0], mesh: sp.mesh }));
 const COURSES = {
   "resort-a": { name: "Resort A", holes: [1, 2, 3] }, "resort-b": { name: "Resort B", holes: [4, 5, 6] }, "resort-c": { name: "Resort C", holes: [7, 8, 9] },
   "classic-a": { name: "Classic A", holes: [10, 11, 12] }, "classic-b": { name: "Classic B", holes: [13, 14, 15] }, "classic-c": { name: "Classic C", holes: [16, 17, 18] },
@@ -66,10 +79,41 @@ function launch(s) {
   fs.mkdirSync(SDIR, { recursive: true });
   fs.writeFileSync(ctlOf(s.slug, n), `[${new Date().toISOString().slice(11, 19)}] queued by course-supervisor.mjs\n`);
   const bash = "C:\\Program Files\\Git\\bin\\bash.exe", script = path.join(HERE, "course-launch.sh").split(path.sep).join("/");
-  const args = [script, s.inst, s.port, s.slug, n, s.x, s.y, W, Hh, PHASE, WIND || "-"].map((a) => `'${a}'`).join(",");
+  const pins = COVER ? nextPins(s.slug) : "-";
+  const args = [script, s.inst, s.port, s.slug, n, s.x, s.y, W, Hh, PHASE, WIND || "-", pins].map((a) => `'${a}'`).join(",");
   ps(`Start-Process -WindowStyle Hidden -FilePath '${bash}' -ArgumentList ${args} -WorkingDirectory '${ROOT}'`);
   Object.assign(s, { n, state: "running", since: Date.now() });
-  say(`${COURSES[s.slug].name}${PHASE === "courses" ? "" : ` ${PHASE}`} #${n} started on instance ${s.inst}`);
+  say(`${COURSES[s.slug].name}${PHASE === "courses" ? "" : ` ${PHASE}`} #${n} started on instance ${s.inst}${COVER ? ` (pins ${pins})` : ""}`);
+}
+// the pins an attempt played, by hole: the WSR spot nearest its strokes' pin
+function pinsOf(slug, n) {
+  const out = {};
+  try {
+    const r = JSON.parse(read(outOf(slug, n)) || "{}");
+    for (const [h, rec] of Object.entries(r.holes ?? {})) {
+      const pin = rec.strokes?.[0]?.pin;
+      if (!pin) continue;
+      let best = null;
+      for (const sp of spotsOf(Number(h))) { const d = Math.hypot(sp.mesh[0] - pin[0], sp.mesh[2] - pin[2]); if (!best || d < best.d) best = { id: sp.id, d }; }
+      if (best && best.d < 3) out[h] = best.id;
+    }
+  } catch { /* none read */ }
+  return out;
+}
+// the pins covered: played in a complete attempt at the goal or better
+function covered(slug) {
+  const c = {};
+  for (const h of COURSES[slug].holes) c[h] = new Set();
+  // an attempt recorded before the pins were (the series' first rounds): its pins read back from its strokes
+  for (const a of attempts(slug)) if (a.complete && a.toPar <= goal) for (const [h, id] of Object.entries(a.pins ?? pinsOf(slug, a.n))) c[h]?.add(id);
+  return c;
+}
+const coverDone = (slug) => { const c = covered(slug); return COURSES[slug].holes.every((h) => spotsOf(h).every((sp) => c[h].has(sp.id))); };
+const coverCount = (slug) => { const c = covered(slug); let n = 0, t = 0; for (const h of COURSES[slug].holes) for (const sp of spotsOf(h)) { t++; if (c[h].has(sp.id)) n++; } return { n, t }; };
+// the next attempt's pins: each hole's first pin not yet covered (its first pin when all are)
+function nextPins(slug) {
+  const c = covered(slug);
+  return COURSES[slug].holes.map((h) => { const sp = spotsOf(h).find((x) => !c[h].has(x.id)) ?? spotsOf(h)[0]; return `${h}:${sp.slot}`; }).join(",");
 }
 // an attempt's card: the game's own count per finished hole
 function card(slug, n) {
@@ -104,7 +148,8 @@ function finish(s, why) {
   } catch { /* no card */ }
   const list = attempts(s.slug).filter((a) => a.n !== s.n);
   const prevBest = list.filter((a) => a.complete).reduce((b, a) => Math.min(b, a.toPar), Infinity);
-  list.push({ n: s.n, instance: s.inst, holes: c, strokes, toPar, complete, why, card: cardPng ? path.relative(HERE, cardPng).split(path.sep).join("/") : null, ended: new Date().toISOString() });
+  const pins = pinsOf(s.slug, s.n);
+  list.push({ n: s.n, instance: s.inst, holes: c, pins, strokes, toPar, complete, why, card: cardPng ? path.relative(HERE, cardPng).split(path.sep).join("/") : null, ended: new Date().toISOString() });
   list.sort((a, b) => a.n - b.n);
   fs.mkdirSync(path.join(CDIR, s.slug), { recursive: true });
   fs.writeFileSync(attemptsFile(s.slug), JSON.stringify(list, null, 1));
@@ -112,8 +157,9 @@ function finish(s, why) {
   board();
   try { execFileSync(process.execPath, ["--max-old-space-size=6000", path.join(HERE, "course-notes.mjs"), "--slug", s.slug, "--n", String(s.n), "--phase", PHASE], { cwd: ROOT, timeout: 300000, stdio: "ignore" }); } catch (e) { say(`notes for ${s.slug} #${s.n} failed: ${e.message.split("\n")[0]}`); }
   const fmt = (t) => (t > 0 ? `+${t}` : t === 0 ? "E" : `${t}`);
-  say(`${COURSES[s.slug].name} #${s.n} (instance ${s.inst}) ${complete ? "over" : `ended unfinished (${why})`}: ${hs.map((h) => c[h] ?? "-").join("-")}, ${strokes} strokes, ${fmt(toPar)}${complete && toPar < prevBest ? " (course best)" : ""}`);
-  return complete && toPar <= goal;
+  const cov = COVER ? coverCount(s.slug) : null;
+  say(`${COURSES[s.slug].name} #${s.n} (instance ${s.inst}) ${complete ? "over" : `ended unfinished (${why})`}: ${hs.map((h) => c[h] ?? "-").join("-")}, ${strokes} strokes, ${fmt(toPar)}${complete && toPar < prevBest ? " (course best)" : ""}${COVER ? `; pins ${hs.map((h) => pins[h] ?? "?").join(" ")}; covered ${cov.n} of ${cov.t}` : ""}`);
+  return COVER ? coverDone(s.slug) : complete && toPar <= goal;
 }
 
 // the slot's last attempt closed (its driver told to quit, then anything of
@@ -132,8 +178,8 @@ async function next(s) {
 for (const s of slots) {
   const n = lastN(s.slug), recorded = attempts(s.slug).some((a) => a.n === n);
   if (n && !read(ctlOf(s.slug, n)).includes("round over") && !recorded && dolphinsOn(s.inst) > 0) { Object.assign(s, { n, state: "running", since: Date.now() }); say(`adopted ${COURSES[s.slug].name} #${n} on instance ${s.inst}`); continue; }
-  if (n && !recorded) { s.n = n; if (finish(s, read(ctlOf(s.slug, n)).includes("round over") ? "played" : "found stopped")) { s.state = "done"; say(`GOAL: ${COURSES[s.slug].name} in ${goal} or better (#${s.n}); its card stays on screen`); continue; } }
-  if (attempts(s.slug).some((a) => a.complete && a.toPar <= goal)) { s.state = "done"; say(`${COURSES[s.slug].name} already in the goal`); continue; }
+  if (n && !recorded) { s.n = n; if (finish(s, read(ctlOf(s.slug, n)).includes("round over") ? "played" : "found stopped")) { s.state = "done"; say(`GOAL: ${COURSES[s.slug].name} ${COVER ? `has every pin played in ${goal} or better` : `in ${goal} or better`} (#${s.n}); its card stays on screen`); continue; } }
+  if (COVER ? coverDone(s.slug) : attempts(s.slug).some((a) => a.complete && a.toPar <= goal)) { s.state = "done"; say(`${COURSES[s.slug].name} already in the goal`); continue; }
   s.n = n;
   await next(s);
 }
@@ -149,7 +195,7 @@ for (;;) {
     else if (quiet > 12 * 60000) ended = `no log line for ${Math.round(quiet / 60000)} min`;
     if (!ended) continue;
     const inGoal = finish(s, ended);
-    if (inGoal) { s.state = "done"; say(`GOAL: ${COURSES[s.slug].name} in ${goal} or better (#${s.n}); its card stays on screen`); continue; }
+    if (inGoal) { s.state = "done"; say(`GOAL: ${COURSES[s.slug].name} ${COVER ? `has every pin played in ${goal} or better` : `in ${goal} or better`} (#${s.n}); its card stays on screen`); continue; }
     await next(s);
   }
   if (slots.every((s) => s.state === "done")) { say("every course in the goal"); process.exit(0); }
