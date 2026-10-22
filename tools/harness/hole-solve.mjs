@@ -85,7 +85,19 @@ const PAR = { 1: 4, 2: 3, 3: 5, 4: 3, 5: 5, 6: 4, 7: 4, 8: 3, 9: 5, 10: 4, 11: 3
 const par = PAR[hole];
 const target = hole === 14 ? 2 : { 3: 1, 4: 2, 5: 3 }[par];
 const YD = 9.144, DEG = Math.PI / 180, CALM = { dir: 0, speedIdx: 0 };
-const OUT = path.join(HERE, "results", "solve", `h${P.hh(hole)}-${cupId}.json`);
+// the wind the strokes are played and predicted in: calm, or the sweep's current one
+let WIND = CALM;
+let OUT = path.join(HERE, "results", "solve", `h${P.hh(hole)}-${cupId}.json`);
+// --winds d:i,... (the user, 2026-10-22: a solved hole for every wind and every
+// pin): one session; each wind set on a fresh load of the tee file and
+// solved. Each wind's full result goes to
+// state/solve-wind/hHH-<id>/dD-iI.json, the pin's summary to
+// results/solve-wind/hHH-<id>.json; a wind already in the summary is skipped
+// (a failed one too, unless --retry). At most --max-tries swings a wind; no
+// edges, no screenshots. WSR's wind is an integer index of 2 mph.
+const WINDS = arg("--winds", null)?.split(",").filter(Boolean).map((t) => { const [dir, speedIdx] = t.split(":").map(Number); return { dir, speedIdx }; }) ?? null;
+const RETRY = process.argv.includes("--retry"), MAX_TRIES = Number(arg("--max-tries", 60));
+class TriesOut extends Error {}
 const LOGF = path.join(HERE, "state", "solve", `h${P.hh(hole)}-${cupId}.log`);
 if (!DRY) { fs.mkdirSync(path.dirname(OUT), { recursive: true }); fs.mkdirSync(path.dirname(LOGF), { recursive: true }); }
 const log = (m) => { const l = `[${new Date().toISOString().slice(11, 19)}] ${m}`; console.log(l); if (!DRY) fs.appendFileSync(LOGF, l + "\n"); };
@@ -102,7 +114,7 @@ const cup = P.cupById(hole, cupId);
 if (!cup) { console.error(`no cup ${cupId} on hole ${hole}`); process.exit(2); }
 const teeFile = P.savePath(P.teeName(cup));
 if (!DRY && !fs.existsSync(teeFile)) { console.error(`no tee state ${teeFile} (make-pinstates.mjs --hole ${hole} --ids ${cupId})`); process.exit(3); }
-const result = { hole, cup: cupId, label: cup.label, sets: cup.sets, par, target, started: new Date().toISOString(), tries: [], strokes: null, edges: null };
+let result = { hole, cup: cupId, label: cup.label, sets: cup.sets, par, target, started: new Date().toISOString(), tries: [], strokes: null, edges: null };
 const save = () => { if (!DRY) fs.writeFileSync(OUT, JSON.stringify(result, null, 1)); };
 const Planner = await import(`${pathToFileURL(path.join(HERE, "round-planner.mjs")).href}?v=${Date.now()}`);
 
@@ -128,6 +140,7 @@ async function readyState() {
   return s.state();
 }
 async function strike(st, c) {
+  if (WINDS && tryNo >= MAX_TRIES) throw new TriesOut(`${MAX_TRIES} tries`);
   const gdb = s.gdb, dsu = s.dsu;
   if (![6, 10, 11].includes(st.player.lie)) await RP.dpadClub(gdb, dsu, CLUB_INDEX[c.club]);
   const aim = await RP.dpadAim(gdb, dsu, c.heading, {});
@@ -141,8 +154,8 @@ async function strike(st, c) {
 }
 
 // ---- the model ----
-const flags = (st) => ({ hole, ball: st.ball.pos, lie: st.player.lie, wind: CALM, pin: st.pin });
-const pred = (st, club, power, heading, withCup = true) => RM.predict({ hole, ball: st.ball.pos, heading, club, power, lie: st.player.lie, wind: CALM, pin: withCup ? st.pin : null });
+const flags = (st) => ({ hole, ball: st.ball.pos, lie: st.player.lie, wind: WIND, pin: st.pin });
+const pred = (st, club, power, heading, withCup = true) => RM.predict({ hole, ball: st.ball.pos, heading, club, power, lie: st.player.lie, wind: WIND, pin: withCup ? st.pin : null });
 const restXZ = (p) => [p.rest[0], p.rest[1]];
 // a model hole the game repeats: the ball rolling into the cup (its centre
 // under 0.25 u above the cup's level as it crosses the window: the model's
@@ -266,7 +279,7 @@ function flagSearch(st) {
   if (!FLAG_WIND) return { cells: [], skip: "no flag wind for this cup (index.json, RAM)" };
   const t0 = performance.now();
   try {
-    const cells = FC.flagCells(st, { hole, flagWind: FLAG_WIND, capOf, budgetMs: FLAG_BUDGET_MS });
+    const cells = FC.flagCells(st, { hole, flagWind: FLAG_WIND, wind: WIND, capOf, budgetMs: FLAG_BUDGET_MS });
     for (const c of cells) c.score = c.robust * FLAG_RATE;
     return { cells, stats: cells.stats, ms: Math.round(performance.now() - t0) };
   } catch (e) {
@@ -419,7 +432,7 @@ function holeability(rest, st) {
   let best = 0;
   for (const club of clubs) {
     const cap = capOf(club, lie), lo = club === "putter" ? 0.03 : 0.08;
-    const at = (q, h) => ({ q, h, d: off(RM.predict({ hole, ball, heading: h, club, power: q, lie, wind: CALM, pin: null })) });
+    const at = (q, h) => ({ q, h, d: off(RM.predict({ hole, ball, heading: h, club, power: q, lie, wind: WIND, pin: null })) });
     let b = null;
     for (let q = lo; q <= cap + 1e-9; q += 0.02) { const t = at(q, h0); if (!b || t.d < b.d) b = t; }
     if (!b || b.d > 12) continue;
@@ -431,7 +444,7 @@ function holeability(rest, st) {
     for (let i = -4; i <= 4; i++) for (let j = -8; j <= 8; j++) {
       const q = b.q + i * 0.001;
       if (q < lo || q > cap) continue;
-      const p = RM.predict({ hole, ball, heading: b.h + j * 0.02 * DEG, club, power: q, lie, wind: CALM, pin });
+      const p = RM.predict({ hole, ball, heading: b.h + j * 0.02 * DEG, club, power: q, lie, wind: WIND, pin });
       if (holes(p)) n++;
     }
     best = Math.max(best, n);
@@ -634,6 +647,55 @@ async function dryRun() {
 }
 if (DRY) {
   try { await dryRun(); } catch (e) { console.error(`--dry failed: ${e?.stack ?? e}`); process.exit(1); }
+  process.exit(0);
+}
+
+// ---- the wind sweep ----
+if (WINDS) {
+  const SUMF = path.join(HERE, "results", "solve-wind", `h${P.hh(hole)}-${cupId}.json`);
+  const WDIR = path.join(HERE, "state", "solve-wind", `h${P.hh(hole)}-${cupId}`);
+  fs.mkdirSync(path.dirname(SUMF), { recursive: true }); fs.mkdirSync(WDIR, { recursive: true });
+  // from here every save() goes to the sweep's own files, never over the calm result (flagFromRam saves at the boot)
+  OUT = path.join(WDIR, "boot.json");
+  let sum = {};
+  try { sum = JSON.parse(fs.readFileSync(SUMF, "utf8")); } catch { /* new */ }
+  Object.assign(sum, { hole, cup: cupId, label: cup.label, sets: cup.sets, par, target });
+  sum.winds ??= {};
+  const saveSum = () => { sum.updated = new Date().toISOString(); fs.writeFileSync(SUMF, JSON.stringify(sum, null, 1)); };
+  const todo = WINDS.filter((w) => { const e = sum.winds[`${w.dir}:${w.speedIdx}`]; return !e || (!e.solved && RETRY); });
+  log(`hole ${hole} (par ${par}) cup ${cupId} (${cup.label}): the wind sweep, ${todo.length} of ${WINDS.length} winds to solve (target ${target}); instance ${inst}; booting ${path.basename(teeFile)}`);
+  if (!todo.length) process.exit(0);
+  await s.start(teeFile);
+  status("booted");
+  const flagBoot = await readFlagFrame();
+  flagFromRam(flagBoot, flagBoot);
+  let firstWind = true, nSolved = 0;
+  for (const w of todo) {
+    const key = `${w.dir}:${w.speedIdx}`;
+    if (!firstWind) await s.load();   // the tee file again (slots 1-4 are the only ones with hotkeys, and the strokes use them)
+    firstWind = false;
+    WIND = w; tryNo = 0;
+    OUT = path.join(WDIR, `d${w.dir}-i${w.speedIdx}.json`);
+    result = { hole, cup: cupId, label: cup.label, sets: cup.sets, par, target, wind: { ...w, mph: 2 * w.speedIdx }, started: new Date().toISOString(), tries: [], strokes: null };
+    const tw = Date.now();
+    await s.paused(async (gdb) => RP.applyWind(gdb, hole, w));
+    const stw = await s.state();
+    if (stw.wind.speedIdx === w.speedIdx && Number.isFinite(stw.wind.angle)) WIND = { ...w, angle: stw.wind.angle };   // the angle as the game holds it
+    if (stw.wind.speedIdx !== w.speedIdx || (w.speedIdx > 0 && stw.wind.dir !== w.dir)) log(`wind ${key}: the game reads dir ${stw.wind.dir} idx ${stw.wind.speedIdx}`);
+    status(`wind ${w.dir}/${2 * w.speedIdx} mph (${nSolved} solved)`);
+    const teeW = await saveHere(1);
+    let sol = null, why = null;
+    try { sol = await solveFrom(1, teeW); } catch (e) { if (!(e instanceof TriesOut)) throw e; why = e.message; }
+    result.solved = !!sol; result.strokes = sol?.strokes ?? null; result.ms = Date.now() - tw; save();
+    // each solved stroke with the spot it was struck from (its try's row)
+    const strokes = sol ? sol.strokes.map((x) => { const t = result.tries.find((r) => r.k === x.k && r.gamePower === x.gamePower && r.heading === x.heading); return { k: x.k, club: x.club, power: x.power, gamePower: x.gamePower, heading: x.heading, from: t?.from ?? null, lie: t?.lie ?? null, rest: x.rest, holed: x.holed, how: x.how ?? "roll" }; }) : null;
+    sum.winds[key] = { dir: w.dir, speedIdx: w.speedIdx, mph: 2 * w.speedIdx, solved: !!sol, tries: tryNo, ms: result.ms, strokes, ...(why ? { why } : {}) };
+    saveSum();
+    if (sol) nSolved++;
+    log(`wind ${key} (${2 * w.speedIdx} mph): ${sol ? `SOLVED in ${sol.strokes.length}: ${sol.strokes.map((x) => `${x.club} ${x.gamePower.toFixed(4)} at ${(x.heading / DEG).toFixed(3)} deg`).join(", ")}` : `not solved (${why ?? "the search ran out"})`} after ${tryNo} tries, ${(result.ms / 60000).toFixed(1)} min`);
+  }
+  status(`the sweep: ${nSolved} of ${todo.length} winds solved`);
+  await s.stop().catch(() => {});
   process.exit(0);
 }
 

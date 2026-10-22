@@ -1,0 +1,22 @@
+{
+ "hole": 4,
+ "cup": "s5",
+ "label": "AR",
+ "sets": [
+  2
+ ],
+ "par": 3,
+ "target": 1,
+ "winds": {
+  "0:8": {
+   "dir": 0,
+   "speedIdx": 8,
+   "mph": 16,
+   "solved": false,
+   "tries": 0,
+   "ms": 25794,
+   "strokes": null
+  }
+ },
+ "updated": "2026-10-22T14:17:20.806Z"
+}

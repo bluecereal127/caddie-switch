@@ -10,6 +10,7 @@ import { treesAlong } from "./trees.js";
 import { contourDataUrl } from "./relief.js";
 import { MAP_SCALES, mapScaleOf, mapFileUrl, loadMapIndex, preloadImage } from "./mapScale.js";
 import { scrollFor } from "./mapView.js";
+import { loadPlaybook, pinKeyOf, routesFor } from "./playbook.js";
 
 
 /* ============================================================
@@ -505,7 +506,77 @@ function useHoleMapSrc(n, scale) {
 // marks keep their fitted size on screen (each drawn at 1 / zoom about its
 // spot, so 4x shows more map around a pin, not a pin twice the size) and the
 // wind badge stays in the viewport's corner, where the fitted map has it.
-function HoleMap({ holeNum, line, onLine, markers, onMarkers, markerMode, aimPreview, cornerMode, onCorner, pins = [], curPinId = null, pinMode = false, onPins, distLabel = null, windBadge = null, teePos = null, teeOnlinePos = null, stopMarker = null, landMarker = null, treeMarker = null, overlaySrc = null, mapSrc = null, onMapError, zoom = 1 }) {
+// The playbook card: the route the Dolphin harness played in WSR itself to
+// the hole's target (an ace, an eagle, the albatross on 14) from the pin in
+// use, in the wind on the dial (src/playbook.js routesFor: calm, or WSR's
+// direction nearest the dial at the even speeds either side, WSR's wind
+// being 0-30 mph in steps of 2). Each stroke: the club, the bars, the aim off
+// the line from the ball to the pin, the yards before and left; tapping it
+// puts the solver's line on that stroke (the ball at its start, the target at
+// its rest), so the recs below read the same shot.
+const PB_CLUB = { driver: "Driver", spoon: "Spoon", "3iron": "3-iron", "5iron": "5-iron", "7iron": "7-iron", "9iron": "9-iron", wedge: "Wedge", putter: "Putter" };
+const PB_ARROW = ["↑", "↗", "→", "↘", "↓", "↙", "←", "↖"];
+const pbArrow = (deg) => PB_ARROW[Math.round((((deg % 360) + 360) % 360) / 45) % 8];
+const pbAt = (p) => ({ x: p[0], y: p[1] });
+function PlaybookCard({ hole, pb, pinKey, match, pick, onPick, show, onShow, onStroke, windSpeed, windDeg, line }) {
+  const goal = !pb ? "" : hole === 14 ? "albatross" : pb.par === 3 ? "hole-in-one" : `eagle in ${pb.target}`;
+  const box = "rounded-xl border-2 px-3 py-2 text-xs";
+  const boxStyle = { borderColor: T.turf, background: "#F4FAF5" };
+  const title = <div className="disp text-[11px] font-bold mb-1">📘 Solved in WSR{goal ? ` · ${goal}` : ""}</div>;
+  if (!pb) return null;
+  const pin = pinKey ? pb.pins[pinKey] : null;
+  if (!pin) return <div className={box} style={boxStyle}>{title}<span className="opacity-70">Pick one of WSR's pins under Today's pin to see the route the harness found for it.</span></div>;
+  const sp = Math.round(Number(windSpeed) || 0);
+  const calm = sp < 1;
+  const fallback = !calm && !match.routes.length ? routesFor(pb, pinKey, { mph: 0 }).routes : [];
+  const routes = match.routes.length ? match.routes : fallback;
+  const r = routes[Math.min(pick, routes.length - 1)] ?? null;
+  const failed = !calm && match.dir != null && (pin.unsolved ?? []).some(([d, m]) => d === match.dir && (m === 2 * Math.floor(sp / 2) || m === 2 * Math.ceil(sp / 2)));
+  const windTxt = (x) => (x.mph === 0 ? "calm" : `${x.mph} mph ${pbArrow(x.deg)}`);
+  const lineOn = (s) => ballOn(line.ball, pbAt(s.from)) && ballOn(line.target, pbAt(s.rest));
+  return (
+    <div className={box} style={boxStyle}>
+      {title}
+      <div className="opacity-75 mb-1">
+        Pin {pin.label}, wind {calm ? "calm" : `${sp} mph ${pbArrow(windDeg)}`}:{" "}
+        {calm ? "the calm route." : match.routes.length ? (match.exact && match.routes.some((x) => x.mph === sp) ? "solved in this wind." : `solved at ${match.routes.map(windTxt).join(" and ")}${sp % 2 ? " (WSR's wind runs in steps of 2 mph)" : ""}.`)
+          : failed ? "the harness found no route in this wind; the calm one for reference." : "not solved in this wind yet (the wind campaign is still running); the calm one for reference."}
+      </div>
+      {routes.length > 1 && (
+        <div className="flex gap-1 mb-1">
+          {routes.map((x, i) => (
+            <button key={i} onClick={() => onPick(i)} className="px-2 py-0.5 rounded-full border-2 text-[11px] font-bold"
+              style={i === pick ? { background: T.turf, color: "#fff", borderColor: T.turf } : { borderColor: T.line, background: "#fff", color: T.ink }}>{windTxt(x)}</button>
+          ))}
+        </div>
+      )}
+      {r && (
+        <div className="space-y-1">
+          {r.strokes.map((s, i) => {
+            const aim = Math.abs(s.aim) < 0.05 ? "at the pin" : `${Math.abs(s.aim).toFixed(1)}° ${s.aim > 0 ? "right" : "left"}`;
+            const end = s.holed ? (s.how === "flag" ? "in, off the flag" : s.how === "hop" ? "in, on the hop" : "in") : `${Math.round(s.left)} yd left`;
+            const on = lineOn(s);
+            return (
+              <button key={i} onClick={() => onStroke(s)} className="w-full text-left rounded-lg border-2 px-2 py-1"
+                style={on ? { background: T.turf, color: "#fff", borderColor: T.turf } : { borderColor: T.line, background: "#fff", color: T.ink }}>
+                <span className="mono font-bold">{i + 1}.</span> <b>{PB_CLUB[s.club] ?? s.club}</b> <span className="mono font-bold">{s.bars.toFixed(2)}</span> bars{s.bars > 4 ? " (past full, into the red)" : ""} · aim {aim} · {Math.round(s.yd)} yd → {end}
+              </button>
+            );
+          })}
+          {r.aceWindowYd != null && <div className="opacity-60">The ace holds over {r.aceWindowYd} yd of aim across the pin.</div>}
+          <div className="flex items-center gap-2 pt-0.5">
+            <button onClick={() => onShow(!show)} className="px-2 py-0.5 rounded-full border-2 text-[11px] font-bold"
+              style={show ? { background: T.turf, color: "#fff", borderColor: T.turf } : { borderColor: T.line, background: "#fff", color: T.ink }}>{show ? "Route shown on map" : "Show route on map"}</button>
+            <span className="opacity-60 text-[10px]">Tap a stroke to put it on the line.</span>
+          </div>
+        </div>
+      )}
+      <div className="opacity-60 text-[10px] mt-1">Played in WSR, the Wii original, from a savestate of this pin's tee. Aim is off the line from the ball to the pin.</div>
+    </div>
+  );
+}
+
+function HoleMap({ holeNum, line, onLine, markers, onMarkers, markerMode, aimPreview, cornerMode, onCorner, pins = [], curPinId = null, pinMode = false, onPins, distLabel = null, windBadge = null, teePos = null, teeOnlinePos = null, stopMarker = null, landMarker = null, treeMarker = null, route = null, overlaySrc = null, mapSrc = null, onMapError, zoom = 1 }) {
   const imgRef = useRef(null);
   const src = mapSrc ?? HOLE_MAPS[holeNum];
   const pinLabelList = pinLabels(pins);
@@ -813,6 +884,21 @@ function HoleMap({ holeNum, line, onLine, markers, onMarkers, markerMode, aimPre
             <circle r="2.6" fill="none" stroke={T.flag} strokeWidth="0.7" />
           </g>
         )}
+        {/* the playbook's route (PlaybookCard's "Show route on map"): each
+            stroke from its start to its rest, gold dashes over a dark edge,
+            and the stroke's number at its rest */}
+        {route && route.map((s, i) => (
+          <g key={i}>
+            <line x1={s.from[0] * 100} y1={s.from[1] * 100} x2={s.rest[0] * 100} y2={s.rest[1] * 100} stroke="rgba(20,48,29,0.6)" strokeWidth={1.3 * k} />
+            <line x1={s.from[0] * 100} y1={s.from[1] * 100} x2={s.rest[0] * 100} y2={s.rest[1] * 100} stroke="#FFD447" strokeWidth={0.7 * k} strokeDasharray={`${1.6 * k} ${1 * k}`} />
+            {!s.holed && (
+              <g transform={at(s.rest[0] * 100, s.rest[1] * 100)}>
+                <circle r="1.9" fill="#FFD447" stroke={T.ink} strokeWidth="0.35" />
+                <text y="0.9" textAnchor="middle" fontSize="2.6" fontWeight="700" fill={T.ink}>{i + 1}</text>
+              </g>
+            )}
+          </g>
+        ))}
         {!magnified && windMark}
         {pins.map((p, i) => {
           const cur = p.id === curPinId;
@@ -1128,6 +1214,29 @@ export default function App() {
     loadTerrain(hole).then((t) => { if (live) setTerrain(t); });
     return () => { live = false; };
   }, [hole]);
+  // the solver's hole's playbook (src/playbook.js: the routes the harness
+  // solved in WSR, per pin and wind); null while it loads or when missing,
+  // and PlaybookCard then shows nothing. pbPick: which of the matched routes
+  // (an odd speed has the even ones either side); pbShow: the route on the map
+  const [playbook, setPlaybook] = useState(null);
+  const [pbPick, setPbPick] = useState(0);
+  const [pbShow, setPbShow] = useState(false);
+  useEffect(() => {
+    let live = true;
+    setPlaybook(null);
+    loadPlaybook(hole).then((pb) => { if (live) setPlaybook(pb); });
+    return () => { live = false; };
+  }, [hole]);
+  const pbKey = pinKeyOf(hole, holesMeta[hole]?.curPin);
+  const pbMatch = useMemo(() => routesFor(playbook, pbKey, { mph: windSpeed, deg: windDeg }), [playbook, pbKey, windSpeed, windDeg]);
+  useEffect(() => { setPbPick(0); }, [hole, pbKey, windSpeed, windDeg]);
+  // the route the card shows, drawn on the map while pbShow (the calm one when
+  // the wind has none yet, as the card says)
+  const pbRoute = useMemo(() => {
+    if (!pbShow || !playbook || !pbKey) return null;
+    const rs = pbMatch.routes.length ? pbMatch.routes : (Number(windSpeed) >= 0.5 ? routesFor(playbook, pbKey, { mph: 0 }).routes : []);
+    return rs[Math.min(pbPick, rs.length - 1)]?.strokes ?? null;
+  }, [pbShow, playbook, pbKey, pbMatch, pbPick, windSpeed]);
   // and its green's heights (src/terrain.js loadGreenHeights: 0.5 yd over the
   // WSR green box) for the putt model while the lie is green: { hole, g } once
   // the load settles, g null when the file is missing; while they load or when
@@ -1611,6 +1720,7 @@ export default function App() {
                     teePos={holesMeta[hole].tee ?? null}
                     teeOnlinePos={holesMeta[hole].teeOnline ?? null}
                     stopMarker={stopPoint} landMarker={landPoint} treeMarker={treePoint}
+                    route={pbRoute}
                     zoom={mapScale / 2} />
                 </div>
                 <div className="grid grid-cols-2 gap-2 text-xs">
@@ -1714,6 +1824,10 @@ export default function App() {
               <div className="rounded-xl border-2 px-3 py-2 text-xs" style={{ borderColor: T.sand, background: "#FFFDF4" }}>
                 <span className="disp font-bold">Hole {hole} · Par {holesMeta[hole].par}: </span>{holesMeta[hole].note}
               </div>
+              <PlaybookCard hole={hole} pb={playbook} pinKey={pbKey} match={pbMatch}
+                pick={pbPick} onPick={setPbPick} show={pbShow} onShow={setPbShow}
+                windSpeed={windSpeed} windDeg={windDeg} line={line}
+                onStroke={(s) => { setLine({ ball: pbAt(s.from), target: pbAt(s.rest) }); setSelRec(null); }} />
               {activeWindRules.map((r, i) => (
                 <div key={i} className="rounded-xl border-2 px-3 py-2 text-xs font-semibold"
                   style={r.kind === "block" ? { borderColor: T.flag, background: "#FFF3F3", color: "#8C1C1C" }
