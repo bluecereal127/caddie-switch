@@ -97,6 +97,18 @@ const RULE = arg("--rule", "near") === "hole" ? "hole" : "near";
 // kept as the wind's `fallback`, not as solved)
 let target = RULE === "near" ? (par === 3 ? 1 : 2) : hole === 14 ? 2 : { 3: 1, 4: 2, 5: 3 }[par];
 const NEAR_YD = RULE === "near" ? 1 / 3 : 0;
+// --setups max (the near rule's default since 2026-10-22; the user: "prefer to
+// have a max power 4.00 club whenever possible on tee shots and approach
+// shots ... for the final shot in to the green, if a max power shot is not
+// optimal, then we can modulate power"): the strokes before the attempt (a
+// par 4's tee shot; a par 5's tee shot, and its first approach when it takes
+// three) at the lie's full power (4.00 bars from the tee or the fairway, 3.00
+// in the rough, a bunker's cap), every club, an aim every degree; only when
+// no route has them, setups at any power (the sweep's search order). The rule
+// is then "near-max" on par 4s and 5s (a par 3 has no setup, "near").
+const SETUPS = RULE === "near" ? (arg("--setups", "max") === "any" ? "any" : "max") : "any";
+const RULE_TAG = RULE === "near" && SETUPS === "max" && par !== 3 ? "near-max" : RULE;
+let SETUP_MODE = "any";   // the current search's setups: "max" (full power only) or "any"
 const YD = 9.144, DEG = Math.PI / 180, CALM = { dir: 0, speedIdx: 0 };
 // the wind the strokes are played and predicted in: calm, or the sweep's current one
 let WIND = CALM;
@@ -507,11 +519,17 @@ function holeability(rest, st) {
 }
 const LIE_OK = { fairway: 1, green: 6, fringe: 9, rough: 2 };
 async function rankSetups(st, k) {
-  const pl = await Planner.plan(hole, st);
+  // full power only: every club at the lie's cap, an aim every degree 30 either
+  // side of the pin (the aim is all a full-power setup can vary); else the
+  // planner's stroke and the fan of clubs, powers and aims
+  const maxOnly = SETUP_MODE === "max";
+  const pl = maxOnly ? null : await Planner.plan(hole, st);
   const toPin = Math.atan2(st.pin[0] - st.ball.pos[0], st.pin[2] - st.ball.pos[2]);
-  const cands = [{ club: pl.club, power: pl.power, heading: pl.heading, src: "the planner" }];
-  const clubs = st.player.lie === 3 ? ["3iron", "5iron", "7iron", "9iron", "wedge"] : ["driver", "spoon", "3iron", "5iron", "7iron"];
-  for (const d of [0, 2, -2, 4, -4, 6, -6, 9, -9, 12, -12, 16, -16, 20, -20, 25, -25, 30, -30]) for (const club of clubs) {
+  const cands = maxOnly ? [] : [{ club: pl.club, power: pl.power, heading: pl.heading, src: "the planner" }];
+  const clubs = st.player.lie === 3 ? ["3iron", "5iron", "7iron", "9iron", "wedge"] : maxOnly ? BAG : ["driver", "spoon", "3iron", "5iron", "7iron"];
+  if (maxOnly) {
+    for (let d = -30; d <= 30; d++) for (const club of clubs) cands.push({ club, power: capOf(club, st.player.lie), heading: toPin + d * DEG, src: "full power" });
+  } else for (const d of [0, 2, -2, 4, -4, 6, -6, 9, -9, 12, -12, 16, -16, 20, -20, 25, -25, 30, -30]) for (const club of clubs) {
     const cap = capOf(club, st.player.lie);
     for (const q of [cap, cap - 0.04, cap - 0.08, cap - 0.14]) cands.push({ club, power: +q.toFixed(3), heading: toPin + d * DEG, src: "fan" });
   }
@@ -746,7 +764,7 @@ if (WINDS) {
   };
   const saveSum = (i) => { const x = sumOf(i); x.updated = new Date().toISOString(); fs.writeFileSync(sumf(i), JSON.stringify(x, null, 1)); };
   // a wind is done once its entry is this rule's (a purged one is played again)
-  const todo = WINDS.filter((w) => { const e = sumOf(w.speedIdx).winds[`${w.dir}:${w.speedIdx}`]; return !e || e.rule !== RULE || (!e.solved && RETRY); });
+  const todo = WINDS.filter((w) => { const e = sumOf(w.speedIdx).winds[`${w.dir}:${w.speedIdx}`]; return !e || e.rule !== RULE_TAG || (!e.solved && RETRY); });
   log(`hole ${hole} (par ${par}) cup ${cupId} (${cup.label}): the wind sweep, ${todo.length} of ${WINDS.length} winds to solve (target ${target}${NEAR_YD ? `, or within ${(3 * NEAR_YD).toFixed(0)} ft` : ""}; rule ${RULE}); instance ${inst}; booting ${path.basename(teeFile)}`);
   if (!todo.length) process.exit(0);
   await s.start(teeFile);
@@ -769,21 +787,30 @@ if (WINDS) {
     if (stw.wind.speedIdx !== w.speedIdx || (w.speedIdx > 0 && stw.wind.dir !== w.dir)) log(`wind ${key}: the game reads dir ${stw.wind.dir} idx ${stw.wind.speedIdx}`);
     status(`wind ${w.dir}/${2 * w.speedIdx} mph (${nSolved} solved)`);
     const teeW = await saveHere(1);
-    let sol = null, why = null;
-    try { sol = await solveFrom(1, teeW); } catch (e) { if (!(e instanceof TriesOut)) throw e; why = e.message; }
-    let fb = null;
-    if (!sol && RULE === "near" && par === 5) {
-      log(`wind ${key}: nothing within 1 ft in 2 (${why ?? "the search ran out"}); the fallback: 3 strokes, the third holed or within 1 ft`);
-      target = 3; tryCap = tryNo + MAX_TRIES;
-      await loadBack(teeW);
-      try { fb = await solveFrom(1, teeW); } catch (e) { if (!(e instanceof TriesOut)) throw e; }
-      target = 2;
+    // the searches, each with its own MAX_TRIES, the first that finds a route
+    // ending: a par 3 its tee shot; a par 4 two strokes with a full-power tee
+    // shot, then with any; a par 5 two (the albatross attempt) with a
+    // full-power tee shot, three (the fallback) with both setups at full
+    // power, then two and three with any (full power before the score, the
+    // user's order)
+    const T0 = RULE === "near" ? (par === 3 ? 1 : 2) : target;
+    const plan = RULE !== "near" || par === 3 ? [{ t: T0, mode: "any" }]
+      : par === 5 ? (SETUPS === "max" ? [{ t: 2, mode: "max" }, { t: 3, mode: "max" }, { t: 2, mode: "any" }, { t: 3, mode: "any" }] : [{ t: 2, mode: "any" }, { t: 3, mode: "any" }])
+      : SETUPS === "max" ? [{ t: 2, mode: "max" }, { t: 2, mode: "any" }] : [{ t: 2, mode: "any" }];
+    let sol = null, fb = null, why = null, used = null;
+    for (const [i, P] of plan.entries()) {
+      if (i) { await loadBack(teeW); log(`wind ${key}: ${P.t} strokes with ${P.mode === "max" ? "full-power" : "any-power"} setups next (${why ?? "the search ran out"})`); }
+      target = P.t; SETUP_MODE = P.mode; tryCap = tryNo + MAX_TRIES; why = null;
+      let got = null;
+      try { got = await solveFrom(1, teeW); } catch (e) { if (!(e instanceof TriesOut)) throw e; why = e.message; }
+      if (got) { if (P.t === T0) sol = got; else fb = got; used = P; break; }
     }
+    target = T0; SETUP_MODE = "any";
     result.solved = !!sol; result.strokes = sol?.strokes ?? null; if (fb) result.fallback = fb.strokes; result.ms = Date.now() - tw; save();
     // each solved stroke with the spot it was struck from (its try's row)
     const rows = (ss) => ss.map((x) => { const t = result.tries.find((r) => r.k === x.k && r.gamePower === x.gamePower && r.heading === x.heading); return { k: x.k, club: x.club, power: x.power, gamePower: x.gamePower, heading: x.heading, from: t?.from ?? null, lie: t?.lie ?? null, rest: x.rest, holed: x.holed, toPin: x.toPin, ...(x.near ? { near: true } : {}), how: x.how ?? "roll" }; });
     const strokes = sol ? rows(sol.strokes) : null;
-    sumOf(w.speedIdx).winds[key] = { dir: w.dir, speedIdx: w.speedIdx, mph: 2 * w.speedIdx, rule: RULE, target, ...(NEAR_YD ? { nearYd: +NEAR_YD.toFixed(4) } : {}), solved: !!sol, tries: tryNo, ms: result.ms, strokes, ...(fb ? { fallback: { target: 3, strokes: rows(fb.strokes) } } : {}), ...(why ? { why } : {}) };
+    sumOf(w.speedIdx).winds[key] = { dir: w.dir, speedIdx: w.speedIdx, mph: 2 * w.speedIdx, rule: RULE_TAG, target, ...(used && par !== 3 ? { setups: used.mode } : {}), ...(NEAR_YD ? { nearYd: +NEAR_YD.toFixed(4) } : {}), solved: !!sol, tries: tryNo, ms: result.ms, strokes, ...(fb ? { fallback: { target: 3, strokes: rows(fb.strokes) } } : {}), ...(why ? { why } : {}) };
     saveSum(w.speedIdx);
     if (sol) nSolved++;
     log(`wind ${key} (${2 * w.speedIdx} mph): ${sol ? `SOLVED in ${sol.strokes.length}: ${sol.strokes.map((x) => `${x.club} ${x.gamePower.toFixed(4)} at ${(x.heading / DEG).toFixed(3)} deg`).join(", ")}` : `not solved (${why ?? "the search ran out"})${fb ? `; the fallback in ${fb.strokes.length}: ${fb.strokes.map((x) => `${x.club} ${x.gamePower.toFixed(4)}`).join(", ")}` : ""}`} after ${tryNo} tries, ${(result.ms / 60000).toFixed(1)} min`);

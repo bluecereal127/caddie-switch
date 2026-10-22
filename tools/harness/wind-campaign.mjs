@@ -38,13 +38,18 @@ const ROOT = path.resolve(HERE, "../..");
 const arg = (n, d) => { const i = process.argv.indexOf(n); return i >= 0 ? process.argv[i + 1] : d; };
 const range = (t) => t.split(",").flatMap((x) => { const [a, b] = x.split("-").map(Number); return Number.isFinite(b) ? Array.from({ length: b - a + 1 }, (_, i) => a + i) : [a]; });
 const INST = range(arg("--instances", "1-18"));
-const HOLES = range(arg("--holes", "1,10,2,4,8,11,13,17,3,5,9,12,14,18,6,7,15,16"));
+// (2026-10-22, later: holes 1 and 10 again with full-power setups, then the
+// par 5s, then the par 4s left; the par 3s, done, have no setup to change)
+const HOLES = range(arg("--holes", "1,10,3,5,9,12,14,18,6,7,15,16,2,4,8,11,13,17"));
 const SPEEDS = range(arg("--speeds", "0,8,15,4,12,2,6,10,14,1,3,5,7,9,11,13"));
 const DIRS = range(arg("--dirs", "0-7"));
 const MAX_TRIES = Number(arg("--max-tries", 40)), STALL_MIN = Number(arg("--stall", 15));
 const left = Number(arg("--left", 2560)), top = Number(arg("--top", -929)), COLS = Number(arg("--cols", 3));
 const W = Number(arg("--w", 480)), H = Number(arg("--h", 426));
 const RULE = "near";
+// the rule a wind's entry must be played under: a par 4's and 5's "near-max"
+// (hole-solve.mjs: the setups at full power first), a par 3's "near"
+const ruleOf = (c) => (PAR[c.hole] === 3 ? "near" : "near-max");
 const PAR = { 1: 4, 2: 3, 3: 5, 4: 3, 5: 5, 6: 4, 7: 4, 8: 3, 9: 5, 10: 4, 11: 3, 12: 5, 13: 3, 14: 5, 15: 4, 16: 4, 17: 3, 18: 5 };
 const COURSE = (h) => ["Resort A", "Resort B", "Resort C", "Classic A", "Classic B", "Classic C"][Math.floor((h - 1) / 3)];
 const OUTD = path.join(HERE, "results", "solve-wind");
@@ -64,14 +69,17 @@ const cups = P.cups({}).filter((c) => PAR[c.hole] && HOLES.includes(c.hole) && f
 const sumFile = (c, i) => path.join(OUTD, `h${P.hh(c.hole)}-${c.id}`, `i${String(i).padStart(2, "0")}.json`);
 const keyOf = (d, i) => `${d}:${i}`;
 const entry = (c, d, i, s = readJson(sumFile(c, i))) => s?.winds?.[keyOf(d, i)];
-const done = (c, d, i, s) => entry(c, d, i, s)?.rule === RULE;
+const done = (c, d, i, s) => entry(c, d, i, s)?.rule === ruleOf(c);
 // calm is played where results/solve's calm route does not stand under the near rule
 function calmStands(c) {
   if (PAR[c.hole] === 5) return false;
   const r = readJson(path.join(HERE, "results", "solve", `h${P.hh(c.hole)}-${c.id}.json`));
   if (!r?.solved) return false;
   const last = r.strokes[r.strokes.length - 1], t = r.tries.find((x) => x.k === last.k && x.gamePower === last.gamePower && x.heading === last.heading);
-  return last.holed && (t?.how ?? "roll") !== "flag";
+  if (!last.holed || (t?.how ?? "roll") === "flag") return false;
+  // a par 4's tee shot at full power (the lie's cap) or the calm route is played again
+  const capOf = (club, lie) => (lie === 2 ? 0.75 : lie === 3 || lie === 16 ? ({ driver: 0.25, spoon: 0.25, wedge: 0.75 }[club] ?? 0.5) : 1);
+  return r.strokes.slice(0, -1).every((x) => { const y = r.tries.find((z) => z.k === x.k && z.gamePower === x.gamePower && z.heading === x.heading); return x.gamePower >= capOf(x.club, y?.lie) - 0.0015; });
 }
 const dirsAt = (c, i) => (i === 0 ? (calmStands(c) ? [] : [0]) : DIRS);
 // the queue: per hole, per speed, every pin, its winds not yet played
@@ -159,7 +167,7 @@ function board() {
   for (const h of HOLES) for (const c of cups.filter((x) => x.hole === h)) {
     const cells = SPEEDS.map((i) => {
       const s = readJson(sumFile(c, i)), ds = dirsAt(c, i);
-      const es = ds.map((d) => entry(c, d, i, s)).filter((e) => e?.rule === RULE);
+      const es = ds.map((d) => entry(c, d, i, s)).filter((e) => e?.rule === ruleOf(c));
       const ok = es.filter((e) => e.solved).length;
       bySpeed[i].solved += ok; bySpeed[i].played += es.length; bySpeed[i].total += ds.length; solved += ok; played += es.length;
       return !ds.length ? "—" : es.length ? `${ok}/${es.length}` : "";

@@ -80,6 +80,8 @@ for (let hole = 1; hole <= 18; hole++) {
       const aimTo = toMap([s.from[0] + Math.sin(s.heading) * len, 0, s.from[2] + Math.cos(s.heading) * len]);
       return {
         aimTo,
+        // at the lie's full power (4.00 bars from the tee or fairway, 3.00 in the rough, a bunker's cap): a swing a human maxes
+        ...(s.club !== "putter" && s.gamePower >= (s.lie === 2 ? 0.75 : s.lie === 3 || s.lie === 16 ? ({ driver: 0.25, spoon: 0.25, wedge: 0.75 }[s.club] ?? 0.5) : 1) - 0.0015 ? { max: true } : {}),
         club: s.club, bars: r2(4 * s.gamePower), aim: r2(-angDiff(s.heading, h0) * R2D), heading: r1(bearingOf(Math.sin(s.heading), Math.cos(s.heading))),
         from: toMap(s.from), rest: s.holed ? pinMap : toMap(s.rest), yd: r1(toPin), left: r2(left),
         ...(s.holed ? { holed: true, how: s.how ?? "roll" } : left <= NEAR_YD + 1e-6 ? { near: true } : {}),
@@ -98,7 +100,7 @@ for (let hole = 1; hole <= 18; hole++) {
     // the sweep's entries under the near rule, every speed's file (i00 = calm)
     const dir = path.join(SWEEP, `h${hh(hole)}-${id}`);
     const entries = (fs.existsSync(dir) ? fs.readdirSync(dir).filter((f) => /^i\d\d\.json$/.test(f)) : [])
-      .flatMap((f) => Object.values(readJson(path.join(dir, f))?.winds ?? {})).filter((e) => e.rule === "near")
+      .flatMap((f) => Object.values(readJson(path.join(dir, f))?.winds ?? {})).filter((e) => /^near/.test(e.rule))   // "near", or "near-max" (full-power setups first)
       .sort((a, b) => a.speedIdx - b.speedIdx || a.dir - b.dir);
     // calm: the near rule's own, else the first campaign's when it stands (holed
     // within the target, not off the flag), else that one as legacy
@@ -109,7 +111,7 @@ for (let hole = 1; hole <= 18; hole++) {
     } else if (calmNear) {
       if (check("calm (fallback)", calmNear.fallback.strokes, 3)) routes.push({ dir: null, mph: 0, deg: null, fallback: true, strokes: calmNear.fallback.strokes.map(stroke) });
     } else if (calm?.solved) {
-      let ss = calm.strokes.map((x) => { const t = calm.tries.find((y) => y.k === x.k && y.gamePower === x.gamePower && y.heading === x.heading); return { ...x, from: t?.from, how: x.how ?? t?.how }; });
+      let ss = calm.strokes.map((x) => { const t = calm.tries.find((y) => y.k === x.k && y.gamePower === x.gamePower && y.heading === x.heading); return { ...x, from: t?.from, lie: x.lie ?? t?.lie, how: x.how ?? t?.how }; });
       // cut at its first finish within 1 ft (h12-s4: the second shot 0.23 yd from the cup, then a putt): the tap-in the near rule asks for
       const k = ss.findIndex((x) => lastOk(x, true));
       if (k >= 0 && k < ss.length - 1) ss = ss.slice(0, k + 1);

@@ -580,7 +580,7 @@ function PlaybookCard({ hole, pb, pinKey, match, pick, onPick, show, onShow, onS
             return (
               <button key={i} onClick={() => onStroke(s)} className="w-full text-left rounded-lg border-2 px-2 py-1"
                 style={on ? { background: T.turf, color: "#fff", borderColor: T.turf } : { borderColor: T.line, background: "#fff", color: T.ink }}>
-                <span className="mono font-bold">{i + 1}.</span> <b>{PB_CLUB[s.club] ?? s.club}</b> <span className="mono font-bold">{s.bars.toFixed(2)}</span> bars{s.bars > 4 ? " (past full, into the red)" : ""} · aim {aim} · {Math.round(s.yd)} yd → {end}
+                <span className="mono font-bold">{i + 1}.</span> <b>{PB_CLUB[s.club] ?? s.club}</b> <span className="mono font-bold">{s.bars.toFixed(2)}</span> bars{s.bars > 4 ? " (past full, into the red)" : s.max ? " (max)" : ""} · aim {aim} · {Math.round(s.yd)} yd → {end}
               </button>
             );
           })}
@@ -1730,7 +1730,7 @@ export default function App() {
                   <HoleMap holeNum={hole} line={line} onLine={setLine}
                     mapSrc={solverMap.src} onMapError={solverMap.onError}
                     markers={holesMeta[hole].markers} onMarkers={(m) => setMarkers(hole, m)}
-                    markerMode={markerMode} aimPreview={aimPreview}
+                    markerMode={markerMode} aimPreview={pbRoute ? null : aimPreview}
                     pins={holesMeta[hole].pins} curPinId={holesMeta[hole].curPin}
                     pinMode={false} onPins={(p) => setPins(hole, p)}
                     distLabel={geo ? (scale ? `${Math.round(geo.srcPx * scale)} yd` : "? yd") : null}
