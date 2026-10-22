@@ -83,7 +83,20 @@ const WX = Number(arg("--x", 0)), WY = Number(arg("--y", 0)), WW = Number(arg("-
 const LABEL = arg("--label", `H${hole}`);
 const PAR = { 1: 4, 2: 3, 3: 5, 4: 3, 5: 5, 6: 4, 7: 4, 8: 3, 9: 5, 10: 4, 11: 3, 12: 5, 13: 3, 14: 5, 15: 4, 16: 4, 17: 3, 18: 5 };
 const par = PAR[hole];
-const target = hole === 14 ? 2 : { 3: 1, 4: 2, 5: 3 }[par];
+// --rule near (the default since 2026-10-22; the user: "the goal is for a human
+// to be able to replicate these"; the tap-in made 1 ft on every par the same
+// day): the attempt stroke holes or rests within 1 ft of the cup, a par 3's
+// tee shot, a par 4's second, a par 5's second (the albatross attempt: a par
+// 5's target is 2), so -4 a 3-hole course at worst; no flag-cloth or hopping
+// cells ("avoid flag catches"). --rule hole: the first campaigns' (the last stroke holes, a
+// par 5 in 3, the flag and hop cells too).
+const RULE = arg("--rule", "near") === "hole" ? "hole" : "near";
+// (a par 5 the sweep cannot bring within 1 ft in 2, h03-s0 in calm: no second
+// shot reaches from where the drives rest, gets a fallback, 3 strokes, the
+// third holed or within 1 ft: an eagle chance, a tap-in birdie at worst,
+// kept as the wind's `fallback`, not as solved)
+let target = RULE === "near" ? (par === 3 ? 1 : 2) : hole === 14 ? 2 : { 3: 1, 4: 2, 5: 3 }[par];
+const NEAR_YD = RULE === "near" ? 1 / 3 : 0;
 const YD = 9.144, DEG = Math.PI / 180, CALM = { dir: 0, speedIdx: 0 };
 // the wind the strokes are played and predicted in: calm, or the sweep's current one
 let WIND = CALM;
@@ -91,9 +104,10 @@ let OUT = path.join(HERE, "results", "solve", `h${P.hh(hole)}-${cupId}.json`);
 // --winds d:i,... (the user, 2026-10-22: a solved hole for every wind and every
 // pin): one session; each wind set on a fresh load of the tee file and
 // solved. Each wind's full result goes to
-// state/solve-wind/hHH-<id>/dD-iI.json, the pin's summary to
-// results/solve-wind/hHH-<id>.json; a wind already in the summary is skipped
-// (a failed one too, unless --retry). At most --max-tries swings a wind; no
+// state/solve-wind/hHH-<id>/dD-iI.json, the pin's summary per speed to
+// results/solve-wind/hHH-<id>/iII.json (so runs on one pin at other speeds
+// never write the same file); a wind already there under this rule is
+// skipped (a failed one too, unless --retry). At most --max-tries swings a wind; no
 // edges, no screenshots. WSR's wind is an integer index of 2 mph.
 const WINDS = arg("--winds", null)?.split(",").filter(Boolean).map((t) => { const [dir, speedIdx] = t.split(":").map(Number); return { dir, speedIdx }; }) ?? null;
 const RETRY = process.argv.includes("--retry"), MAX_TRIES = Number(arg("--max-tries", 60));
@@ -140,7 +154,7 @@ async function readyState() {
   return s.state();
 }
 async function strike(st, c) {
-  if (WINDS && tryNo >= MAX_TRIES) throw new TriesOut(`${MAX_TRIES} tries`);
+  if (WINDS && tryNo >= tryCap) throw new TriesOut(`${MAX_TRIES} tries`);
   const gdb = s.gdb, dsu = s.dsu;
   if (![6, 10, 11].includes(st.player.lie)) await RP.dpadClub(gdb, dsu, CLUB_INDEX[c.club]);
   const aim = await RP.dpadAim(gdb, dsu, c.heading, {});
@@ -171,6 +185,28 @@ const holes = (p) => p.holed && !!p.cupPass && p.cupPass.h < 0.25 && (!p.flag ||
 // stick hits still out. h17-s3: a driver rests 0.10 yd from the pin, no cell rolls in
 const hopHoles = (p) => p.holed && (!p.flag || (p.flag.vn * 240) / YD <= 3.4);
 const MAX_HOP_CELLS = 8;
+// the near rule's model test: a roll-in hole, or (the cup in play, the ball
+// not dropping) a rest within NEAR_MARGIN of the tap-in distance, the margin
+// for the model's error (0.02 yd median on the 3D model's tests, its tail longer)
+const NEAR_MARGIN = 0.6;
+const nearPin = (st) => (p) => holes(p) || (!p.holed && Math.hypot(p.rest[0] - st.pin[0], p.rest[1] - st.pin[2]) / YD <= NEAR_MARGIN * NEAR_YD);
+const goal = (st) => (RULE === "near" ? nearPin(st) : holes);
+// a try that made the rule: holed, or at rest within the tap-in
+const made = (r) => r.holed || (NEAR_YD > 0 && r.toPin <= NEAR_YD);
+// the turn that puts a rest's bearing from the ball on the pin's (a wind's drift
+// taken out of the aim; t.rx, t.rz the rest, ball and pin [x, y, z])
+// how near a flight (the cup in play) comes to finishing at the pin: 0 for a
+// model roll-in, else the nearer of its rest and its pass over the cup low and
+// slow enough to drop (under 1 u up, under WSR's 4.45 yd/s cap): a green can
+// carry every rest past the pin (h04-s0 in a 16 mph crosswind: the nearest
+// no-cup rest 3.3 yd off), and the drop is then the only near finish
+const nearness = (p, pin) => {
+  if (holes(p)) return 0;
+  const r = Math.hypot(p.rest[0] - pin[0], p.rest[1] - pin[2]) / YD;
+  const c = p.cupPass && p.cupPass.h < 1 && p.cupPass.v < 4.45 ? p.cupPass.d : Infinity;
+  return Math.min(r, c);
+};
+const aimFix = (ball, pin, t) => angDiff(Math.atan2(pin[0] - ball[0], pin[2] - ball[2]), Math.atan2(t.rx - ball[0], t.rz - ball[2]));
 // the cells round (club, q0, h0) that the model holes, each with its robustness
 function holingCells(st, club, q0, h0, { dq = 0.05, sq = 0.005, da = 1.2 * DEG, sa = 0.06 * DEG, rule = holes } = {}) {
   const cap = capOf(club, st.player.lie), lo = club === "putter" ? 0.03 : 0.08, out = [];
@@ -195,7 +231,7 @@ function holingCells(st, club, q0, h0, { dq = 0.05, sq = 0.005, da = 1.2 * DEG, 
 function refineCells(st, coarse) {
   if (!coarse.length) return [];
   const b = coarse[0];
-  const fine = holingCells(st, b.club, b.power, b.heading, { dq: 0.006, sq: 0.0015, da: 0.12 * DEG, sa: 0.02 * DEG });
+  const fine = holingCells(st, b.club, b.power, b.heading, { dq: 0.006, sq: 0.0015, da: 0.12 * DEG, sa: 0.02 * DEG, rule: goal(st) });
   return fine.length ? fine : coarse;
 }
 // every club's own nearest approach to the pin (the no-cup rest: a power scan
@@ -218,13 +254,18 @@ function directCells(st, rule = holes, tag = "direct") {
   const out = [];
   for (const club of clubs) {
     const cap = capOf(club, st.player.lie), lo = club === "putter" ? 0.03 : 0.08, step = club === "putter" ? 0.02 : 0.01;
-    const at = (q, h) => { const p = pred(st, club, q, h, false); return { q, h, d: off(p), along: p.along ?? 0 }; };
+    // the pin line without the cup (its along), the grid and the seeds' refinement with it (nearness)
+    const at = (q, h, cup = true) => { const p = pred(st, club, q, h, cup); return { q, h, d: cup ? nearness(p, pin) : off(p), along: p.along ?? 0, rx: p.rest[0], rz: p.rest[1] }; };
     const line = [];
-    for (let q = lo; q <= cap + 1e-9; q += step) line.push(at(q, h0));
-    const qs = line.filter((t) => Math.abs(t.along - D) <= 15).map((t) => t.q);
+    for (let q = lo; q <= cap + 1e-9; q += step) line.push(at(q, h0, false));
+    const near = line.filter((t) => Math.abs(t.along - D) <= 15);
+    const qs = near.map((t) => t.q);
     if (!qs.length) { log(`  direct: ${club} does not come within 15 yd of the pin's distance (${Math.max(...line.map((t) => t.along)).toFixed(0)} yd at most)`); continue; }
+    // the aims 6 deg either side of each power's wind-corrected aim (the pin
+    // line turned by the angle from its rest to the pin, seen from the ball: in
+    // a 16 mph crosswind h04-s0's best rests sat on the old grid's 6 deg edge)
     const grid = [];
-    for (const q of qs) for (let a = -6; a <= 6 + 1e-9; a += 0.2) grid.push(at(q, h0 + a * DEG));
+    for (const t of near) { const hc = h0 + aimFix(ball, pin, t); for (let a = -6; a <= 6 + 1e-9; a += 0.2) grid.push(at(t.q, hc + a * DEG)); }
     grid.sort((x, y) => x.d - y.d);
     const seeds = [];
     for (const g of grid) {
@@ -237,9 +278,9 @@ function directCells(st, rule = holes, tag = "direct") {
       const scanA = (span, st0) => { const base = b; for (let a = -span; a <= span + 1e-9; a += st0) { const t = at(base.q, base.h + a * DEG); if (t.d < b.d) b = t; } };
       const scanQ = (span, st0) => { const base = b; for (let x = -span; x <= span + 1e-9; x += st0) { const q = base.q + x; if (q < lo || q > cap) continue; const t = at(q, base.h); if (t.d < b.d) b = t; } };
       scanA(0.2, 0.02); scanQ(0.006, 0.0005); scanA(0.03, 0.005); scanQ(0.001, 0.0002);
-      if (b.d > 2) { log(`  direct: ${club} near ${seed.q.toFixed(2)}, ${((seed.h - h0) / DEG).toFixed(1)} deg rests ${b.d.toFixed(2)} yd from the pin at best`); continue; }
+      if (b.d > 2) { log(`  direct: ${club} near ${seed.q.toFixed(2)}, ${((seed.h - h0) / DEG).toFixed(1)} deg comes within ${b.d.toFixed(2)} yd of the pin at best`); continue; }
       const cells = holingCells(st, club, b.q, b.h, { dq: 0.008, sq: 0.001, da: 0.3 * DEG, sa: 0.02 * DEG, rule });
-      log(`  direct: ${club} rests ${b.d.toFixed(2)} yd from the pin at ${b.q.toFixed(4)}, ${((b.h - h0) / DEG).toFixed(2)} deg off the pin line: ${cells.length} holing cells${cells[0] ? `, the best ${Math.round(100 * cells[0].robust)}% robust` : ""}`);
+      log(`  direct: ${club} comes within ${b.d.toFixed(2)} yd of the pin at ${b.q.toFixed(4)}, ${((b.h - h0) / DEG).toFixed(2)} deg off the pin line: ${cells.length} holing cells${cells[0] ? `, the best ${Math.round(100 * cells[0].robust)}% robust` : ""}`);
       out.push(...cells);
     }
   }
@@ -305,9 +346,9 @@ function logFlag(fl) {
 // rolling cells; list() is that whole order at once
 async function cellsFor(st) {
   const pl = await Planner.plan(hole, st);
-  let cells = refineCells(st, holingCells(st, pl.club, pl.power, pl.heading));
+  let cells = refineCells(st, holingCells(st, pl.club, pl.power, pl.heading, { rule: goal(st) }));
   if (!cells.length || cells[0].robust < 0.5) {
-    const d = directCells(st);
+    const d = directCells(st, goal(st), RULE === "near" ? "direct (near)" : "direct");
     if (d.length && (!cells.length || d[0].robust > cells[0].robust)) cells = d;
   }
   for (const c of cells) { c.how = "roll"; c.score = c.robust; }
@@ -322,6 +363,7 @@ async function cellsFor(st) {
     return hp;
   };
   function* order() {
+    if (RULE === "near") { yield* cells; return; }   // no flag or hop cells
     let i = 0, j = 0, F = null;
     for (;;) {
       const r = cells[i];
@@ -365,7 +407,7 @@ function solve2(J, v) {
 }
 
 // ---- the search ----
-let tryNo = 0;
+let tryNo = 0, tryCap = Infinity;   // the sweep: at most MAX_TRIES swings a search
 async function loadBack(saved) { await s.loadSlot(saved.slot, saved.expect); }
 async function saveHere(k) {
   const st = await s.state();
@@ -401,7 +443,7 @@ async function finalStroke(k, saved) {
       status(`stroke ${k} try ${tryNo + 1}`);
       const r = await strike(st, c);
       record(k, st, c, r, it === 0 ? `cell ${n}` : `cell ${n}, correction ${it}`);
-      if (r.holed) return { strokes: [{ k, ...r, how }] };
+      if (made(r)) return { strokes: [{ k, ...r, how, ...(r.holed ? {} : { near: true }) }] };
       if (how !== "roll") break;   // a flag or hop cell's miss: the next cell
       // the model's error at the power the game launched and the aim reached; the step to cancel it
       const at = { club: c.club, power: r.gamePower, heading: r.heading };
@@ -424,6 +466,7 @@ async function finalStroke(k, saved) {
 // along the line is the distance) found none from any of h15-s1's 100 rests
 // once a model hole had to roll in
 function holeability(rest, st) {
+  const rule = goal(st);
   const lie = rest.lie, pin = st.pin, ball = [rest[0], rest.y ?? st.ball.pos[1], rest[1]];
   const D = Math.hypot(rest[0] - pin[0], rest[1] - pin[2]) / YD;
   const h0 = Math.atan2(pin[0] - rest[0], pin[2] - rest[1]);
@@ -432,9 +475,10 @@ function holeability(rest, st) {
   let best = 0;
   for (const club of clubs) {
     const cap = capOf(club, lie), lo = club === "putter" ? 0.03 : 0.08;
-    const at = (q, h) => ({ q, h, d: off(RM.predict({ hole, ball, heading: h, club, power: q, lie, wind: WIND, pin: null })) });
+    const at = (q, h) => { const p = RM.predict({ hole, ball, heading: h, club, power: q, lie, wind: WIND, pin }); return { q, h, d: nearness(p, pin), rx: p.rest[0], rz: p.rest[1] }; };
     let b = null;
-    for (let q = lo; q <= cap + 1e-9; q += 0.02) { const t = at(q, h0); if (!b || t.d < b.d) b = t; }
+    // each power at the pin line, then at its wind-corrected aim
+    for (let q = lo; q <= cap + 1e-9; q += 0.02) { const t = at(q, h0); const t2 = WIND.speedIdx ? at(q, h0 + aimFix(ball, pin, t)) : t; for (const u of [t, t2]) if (!b || u.d < b.d) b = u; }
     if (!b || b.d > 12) continue;
     const scanQ = (span, step) => { const base = b; for (let x = -span; x <= span + 1e-9; x += step) { const q = base.q + x; if (q < lo || q > cap) continue; const t = at(q, base.h); if (t.d < b.d) b = t; } };
     const scanA = (span, step) => { const base = b; for (let a = -span; a <= span + 1e-9; a += step) { const t = at(base.q, base.h + a * DEG); if (t.d < b.d) b = t; } };
@@ -445,10 +489,10 @@ function holeability(rest, st) {
       const q = b.q + i * 0.001;
       if (q < lo || q > cap) continue;
       const p = RM.predict({ hole, ball, heading: b.h + j * 0.02 * DEG, club, power: q, lie, wind: WIND, pin });
-      if (holes(p)) n++;
+      if (rule(p)) n++;
     }
     best = Math.max(best, n);
-    if (best >= 12) break;
+    if (best >= (RULE === "near" ? 60 : 12)) break;
   }
   return best;
 }
@@ -557,6 +601,28 @@ async function edges(tee, ace) {
 }
 
 // ---- the flag's frame in RAM ----
+// the swept wind's flag (state/flagstick/yaw-probe.mjs, 2026-10-22): the pin
+// rebuilds its cloth's frame (+0xc0..0xef) every frame from its yaw matrix at
+// +0x0c (rows (cos t, 0, -sin t), (0, 1, 0), (sin t, 0, cos t), set from the
+// wind object's angle at the hole's start) and +0xb8 = speedIdx / 15; written
+// here, the frame follows on the next frame, as it would have had the hole
+// begun in this wind (a 90 deg yaw written on h04-s0 rebuilt the frame at
+// 90.00 deg, its extension from +0xb8). Read back against flagFrame()
+async function setFlagWind(w) {
+  const t = Number.isFinite(w.angle) ? w.angle : (w.dir * Math.PI) / 4;
+  const f = (v) => { const b = Buffer.alloc(4); b.writeFloatBE(v); return b; };
+  await s.paused(async (gdb) => {
+    const p = await pointers(gdb);
+    for (const [o, v] of [[0x0c, Math.cos(t)], [0x14, -Math.sin(t)], [0x24, Math.sin(t)], [0x2c, Math.cos(t)], [0xb8, w.speedIdx / 15]]) await gdb.writeMem(p.pin + o, f(v));
+  });
+  await sleep(300);
+  FLAG_WIND = flagWindOf({ angle: t, speedIdx: w.speedIdx, dir: w.dir });
+  FLAG_SRC = "written for the swept wind";
+  const fr = await readFlagFrame();
+  const d = fr?.sane ? frameDiff(fr, FLAG_WIND) : Infinity;
+  if (!(d < 0.01)) throw new Error(`the flag did not take the swept wind (frame ${fr?.sane ? `${d.toFixed(3)} u off` : "unreadable"})`);
+  log(`flag: turned to the swept wind (${flagDesc()}; the frame in RAM matches to ${d.toExponential(1)} u)`);
+}
 // pin+0xb8..0xef as 14 floats (state/flagstick/mlib.mjs readPinFrame): +0xb8
 // speedIdx / 15, +0xc0 across, +0xcc up, +0xd8 along, +0xe4 the cloth's
 // centre; with the pin's position: { raw, pin, sane } or null. Never throws
@@ -652,18 +718,27 @@ if (DRY) {
 
 // ---- the wind sweep ----
 if (WINDS) {
-  const SUMF = path.join(HERE, "results", "solve-wind", `h${P.hh(hole)}-${cupId}.json`);
+  const SDIR = path.join(HERE, "results", "solve-wind", `h${P.hh(hole)}-${cupId}`);
   const WDIR = path.join(HERE, "state", "solve-wind", `h${P.hh(hole)}-${cupId}`);
-  fs.mkdirSync(path.dirname(SUMF), { recursive: true }); fs.mkdirSync(WDIR, { recursive: true });
+  fs.mkdirSync(SDIR, { recursive: true }); fs.mkdirSync(WDIR, { recursive: true });
   // from here every save() goes to the sweep's own files, never over the calm result (flagFromRam saves at the boot)
   OUT = path.join(WDIR, "boot.json");
-  let sum = {};
-  try { sum = JSON.parse(fs.readFileSync(SUMF, "utf8")); } catch { /* new */ }
-  Object.assign(sum, { hole, cup: cupId, label: cup.label, sets: cup.sets, par, target });
-  sum.winds ??= {};
-  const saveSum = () => { sum.updated = new Date().toISOString(); fs.writeFileSync(SUMF, JSON.stringify(sum, null, 1)); };
-  const todo = WINDS.filter((w) => { const e = sum.winds[`${w.dir}:${w.speedIdx}`]; return !e || (!e.solved && RETRY); });
-  log(`hole ${hole} (par ${par}) cup ${cupId} (${cup.label}): the wind sweep, ${todo.length} of ${WINDS.length} winds to solve (target ${target}); instance ${inst}; booting ${path.basename(teeFile)}`);
+  const sumf = (i) => path.join(SDIR, `i${String(i).padStart(2, "0")}.json`);
+  const sums = new Map();
+  const sumOf = (i) => {
+    if (!sums.has(i)) {
+      let x = {};
+      try { x = JSON.parse(fs.readFileSync(sumf(i), "utf8")); } catch { /* new */ }
+      Object.assign(x, { hole, cup: cupId, label: cup.label, sets: cup.sets, par, speedIdx: i, mph: 2 * i });
+      x.winds ??= {};
+      sums.set(i, x);
+    }
+    return sums.get(i);
+  };
+  const saveSum = (i) => { const x = sumOf(i); x.updated = new Date().toISOString(); fs.writeFileSync(sumf(i), JSON.stringify(x, null, 1)); };
+  // a wind is done once its entry is this rule's (a purged one is played again)
+  const todo = WINDS.filter((w) => { const e = sumOf(w.speedIdx).winds[`${w.dir}:${w.speedIdx}`]; return !e || e.rule !== RULE || (!e.solved && RETRY); });
+  log(`hole ${hole} (par ${par}) cup ${cupId} (${cup.label}): the wind sweep, ${todo.length} of ${WINDS.length} winds to solve (target ${target}${NEAR_YD ? `, or within ${(3 * NEAR_YD).toFixed(0)} ft` : ""}; rule ${RULE}); instance ${inst}; booting ${path.basename(teeFile)}`);
   if (!todo.length) process.exit(0);
   await s.start(teeFile);
   status("booted");
@@ -674,25 +749,35 @@ if (WINDS) {
     const key = `${w.dir}:${w.speedIdx}`;
     if (!firstWind) await s.load();   // the tee file again (slots 1-4 are the only ones with hotkeys, and the strokes use them)
     firstWind = false;
-    WIND = w; tryNo = 0;
+    WIND = w; tryNo = 0; tryCap = MAX_TRIES; target = RULE === "near" ? (par === 3 ? 1 : 2) : target;
     OUT = path.join(WDIR, `d${w.dir}-i${w.speedIdx}.json`);
     result = { hole, cup: cupId, label: cup.label, sets: cup.sets, par, target, wind: { ...w, mph: 2 * w.speedIdx }, started: new Date().toISOString(), tries: [], strokes: null };
     const tw = Date.now();
     await s.paused(async (gdb) => RP.applyWind(gdb, hole, w));
     const stw = await s.state();
     if (stw.wind.speedIdx === w.speedIdx && Number.isFinite(stw.wind.angle)) WIND = { ...w, angle: stw.wind.angle };   // the angle as the game holds it
+    await setFlagWind(WIND);
     if (stw.wind.speedIdx !== w.speedIdx || (w.speedIdx > 0 && stw.wind.dir !== w.dir)) log(`wind ${key}: the game reads dir ${stw.wind.dir} idx ${stw.wind.speedIdx}`);
     status(`wind ${w.dir}/${2 * w.speedIdx} mph (${nSolved} solved)`);
     const teeW = await saveHere(1);
     let sol = null, why = null;
     try { sol = await solveFrom(1, teeW); } catch (e) { if (!(e instanceof TriesOut)) throw e; why = e.message; }
-    result.solved = !!sol; result.strokes = sol?.strokes ?? null; result.ms = Date.now() - tw; save();
+    let fb = null;
+    if (!sol && RULE === "near" && par === 5) {
+      log(`wind ${key}: nothing within 1 ft in 2 (${why ?? "the search ran out"}); the fallback: 3 strokes, the third holed or within 1 ft`);
+      target = 3; tryCap = tryNo + MAX_TRIES;
+      await loadBack(teeW);
+      try { fb = await solveFrom(1, teeW); } catch (e) { if (!(e instanceof TriesOut)) throw e; }
+      target = 2;
+    }
+    result.solved = !!sol; result.strokes = sol?.strokes ?? null; if (fb) result.fallback = fb.strokes; result.ms = Date.now() - tw; save();
     // each solved stroke with the spot it was struck from (its try's row)
-    const strokes = sol ? sol.strokes.map((x) => { const t = result.tries.find((r) => r.k === x.k && r.gamePower === x.gamePower && r.heading === x.heading); return { k: x.k, club: x.club, power: x.power, gamePower: x.gamePower, heading: x.heading, from: t?.from ?? null, lie: t?.lie ?? null, rest: x.rest, holed: x.holed, how: x.how ?? "roll" }; }) : null;
-    sum.winds[key] = { dir: w.dir, speedIdx: w.speedIdx, mph: 2 * w.speedIdx, solved: !!sol, tries: tryNo, ms: result.ms, strokes, ...(why ? { why } : {}) };
-    saveSum();
+    const rows = (ss) => ss.map((x) => { const t = result.tries.find((r) => r.k === x.k && r.gamePower === x.gamePower && r.heading === x.heading); return { k: x.k, club: x.club, power: x.power, gamePower: x.gamePower, heading: x.heading, from: t?.from ?? null, lie: t?.lie ?? null, rest: x.rest, holed: x.holed, toPin: x.toPin, ...(x.near ? { near: true } : {}), how: x.how ?? "roll" }; });
+    const strokes = sol ? rows(sol.strokes) : null;
+    sumOf(w.speedIdx).winds[key] = { dir: w.dir, speedIdx: w.speedIdx, mph: 2 * w.speedIdx, rule: RULE, target, ...(NEAR_YD ? { nearYd: +NEAR_YD.toFixed(4) } : {}), solved: !!sol, tries: tryNo, ms: result.ms, strokes, ...(fb ? { fallback: { target: 3, strokes: rows(fb.strokes) } } : {}), ...(why ? { why } : {}) };
+    saveSum(w.speedIdx);
     if (sol) nSolved++;
-    log(`wind ${key} (${2 * w.speedIdx} mph): ${sol ? `SOLVED in ${sol.strokes.length}: ${sol.strokes.map((x) => `${x.club} ${x.gamePower.toFixed(4)} at ${(x.heading / DEG).toFixed(3)} deg`).join(", ")}` : `not solved (${why ?? "the search ran out"})`} after ${tryNo} tries, ${(result.ms / 60000).toFixed(1)} min`);
+    log(`wind ${key} (${2 * w.speedIdx} mph): ${sol ? `SOLVED in ${sol.strokes.length}: ${sol.strokes.map((x) => `${x.club} ${x.gamePower.toFixed(4)} at ${(x.heading / DEG).toFixed(3)} deg`).join(", ")}` : `not solved (${why ?? "the search ran out"})${fb ? `; the fallback in ${fb.strokes.length}: ${fb.strokes.map((x) => `${x.club} ${x.gamePower.toFixed(4)}`).join(", ")}` : ""}`} after ${tryNo} tries, ${(result.ms / 60000).toFixed(1)} min`);
   }
   status(`the sweep: ${nSolved} of ${todo.length} winds solved`);
   await s.stop().catch(() => {});
@@ -720,7 +805,7 @@ save();
 if (sol) {
   log(`SOLVED: hole ${hole} cup ${cupId} in ${sol.strokes.length} (target ${target}) after ${tryNo} tries, ${(result.ms / 60000).toFixed(1)} min: ${sol.strokes.map((x) => `${x.club} ${x.gamePower.toFixed(4)} at ${(x.heading / DEG).toFixed(3)} deg${x.how === "flag" ? " (through the flag)" : ""}`).join(", ")}`);
   try { await sleep(2500); result.screenshot = path.relative(HERE, await P.screenshot(s, `solve-h${P.hh(hole)}-${cupId}.png`)); save(); } catch { /* no picture */ }
-  if (par === 3 && sol.strokes.length === 1) { result.edges = await edges(tee, sol.strokes[0]); save(); }
+  if (par === 3 && sol.strokes.length === 1 && sol.strokes[0].holed) { result.edges = await edges(tee, sol.strokes[0]); save(); }
 } else log(`not solved: hole ${hole} cup ${cupId} after ${tryNo} tries, ${(result.ms / 60000).toFixed(1)} min`);
 status(sol ? `SOLVED in ${sol.strokes.length}` : "not solved");
 await s.stop().catch(() => {});

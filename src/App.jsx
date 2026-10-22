@@ -518,14 +518,21 @@ const PB_CLUB = { driver: "Driver", spoon: "Spoon", "3iron": "3-iron", "5iron": 
 const PB_ARROW = ["↑", "↗", "→", "↘", "↓", "↙", "←", "↖"];
 const pbArrow = (deg) => PB_ARROW[Math.round((((deg % 360) + 360) % 360) / 45) % 8];
 const pbAt = (p) => ({ x: p[0], y: p[1] });
+// a route's score: the strokes, plus the tap-in when the last rests within 1 ft
+const PB_SCORE = { 1: "birdie", 2: "eagle", 3: "albatross" };
+function pbFinish(par, r) {
+  const last = r.strokes[r.strokes.length - 1], n = r.strokes.length + (last.holed ? 0 : 1);
+  if (par === 3 && n === 1) return "hole-in-one";
+  const name = PB_SCORE[par - n] ?? (n === par ? "par" : `${n} strokes`);
+  return last.holed ? name : `tap-in ${name}`;
+}
 function PlaybookCard({ hole, pb, pinKey, match, pick, onPick, show, onShow, onStroke, windSpeed, windDeg, line }) {
-  const goal = !pb ? "" : hole === 14 ? "albatross" : pb.par === 3 ? "hole-in-one" : `eagle in ${pb.target}`;
   const box = "rounded-xl border-2 px-3 py-2 text-xs";
   const boxStyle = { borderColor: T.turf, background: "#F4FAF5" };
-  const title = <div className="disp text-[11px] font-bold mb-1">📘 Solved in WSR{goal ? ` · ${goal}` : ""}</div>;
+  const title = (goal) => <div className="disp text-[11px] font-bold mb-1">📘 Solved in WSR{goal ? ` · ${goal}` : ""}</div>;
   if (!pb) return null;
   const pin = pinKey ? pb.pins[pinKey] : null;
-  if (!pin) return <div className={box} style={boxStyle}>{title}<span className="opacity-70">Pick one of WSR's pins under Today's pin to see the route the harness found for it.</span></div>;
+  if (!pin) return <div className={box} style={boxStyle}>{title("")}<span className="opacity-70">Pick one of WSR's pins under Today's pin to see the route the harness found for it.</span></div>;
   const sp = Math.round(Number(windSpeed) || 0);
   const calm = sp < 1;
   const fallback = !calm && !match.routes.length ? routesFor(pb, pinKey, { mph: 0 }).routes : [];
@@ -536,7 +543,7 @@ function PlaybookCard({ hole, pb, pinKey, match, pick, onPick, show, onShow, onS
   const lineOn = (s) => ballOn(line.ball, pbAt(s.from)) && ballOn(line.target, pbAt(s.rest));
   return (
     <div className={box} style={boxStyle}>
-      {title}
+      {title(r ? pbFinish(pb.par, r) : "")}
       <div className="opacity-75 mb-1">
         Pin {pin.label}, wind {calm ? "calm" : `${sp} mph ${pbArrow(windDeg)}`}:{" "}
         {calm ? "the calm route." : match.routes.length ? (match.exact && match.routes.some((x) => x.mph === sp) ? "solved in this wind." : `solved at ${match.routes.map(windTxt).join(" and ")}${sp % 2 ? " (WSR's wind runs in steps of 2 mph)" : ""}.`)
@@ -554,7 +561,8 @@ function PlaybookCard({ hole, pb, pinKey, match, pick, onPick, show, onShow, onS
         <div className="space-y-1">
           {r.strokes.map((s, i) => {
             const aim = Math.abs(s.aim) < 0.05 ? "at the pin" : `${Math.abs(s.aim).toFixed(1)}° ${s.aim > 0 ? "right" : "left"}`;
-            const end = s.holed ? (s.how === "flag" ? "in, off the flag" : s.how === "hop" ? "in, on the hop" : "in") : `${Math.round(s.left)} yd left`;
+            const end = s.holed ? (s.how === "flag" ? "in, off the flag" : s.how === "hop" ? "in, on the hop" : "in")
+              : s.near ? `${Math.max(1, Math.round(s.left * 36))} in from the cup, tap in` : `${Math.round(s.left)} yd left`;
             const on = lineOn(s);
             return (
               <button key={i} onClick={() => onStroke(s)} className="w-full text-left rounded-lg border-2 px-2 py-1"
@@ -564,6 +572,8 @@ function PlaybookCard({ hole, pb, pinKey, match, pick, onPick, show, onShow, onS
             );
           })}
           {r.aceWindowYd != null && <div className="opacity-60">The ace holds over {r.aceWindowYd} yd of aim across the pin.</div>}
+          {r.fallback && <div className="opacity-75">No route comes within 1 ft in two in this wind: this one gives an eagle chance, a tap-in birdie at worst.</div>}
+          {r.legacy && <div className="opacity-75">From the first campaign ({r.legacy}); the 1-ft route for this pin is still to be played.</div>}
           <div className="flex items-center gap-2 pt-0.5">
             <button onClick={() => onShow(!show)} className="px-2 py-0.5 rounded-full border-2 text-[11px] font-bold"
               style={show ? { background: T.turf, color: "#fff", borderColor: T.turf } : { borderColor: T.line, background: "#fff", color: T.ink }}>{show ? "Route shown on map" : "Show route on map"}</button>
@@ -571,7 +581,7 @@ function PlaybookCard({ hole, pb, pinKey, match, pick, onPick, show, onShow, onS
           </div>
         </div>
       )}
-      <div className="opacity-60 text-[10px] mt-1">Played in WSR, the Wii original, from a savestate of this pin's tee. Aim is off the line from the ball to the pin.</div>
+      <div className="opacity-60 text-[10px] mt-1">Played in WSR, the Wii original, from a savestate of this pin's tee: the last shot holes or stops within 1 ft. Aim is off the line from the ball to the pin.</div>
     </div>
   );
 }

@@ -1,22 +1,28 @@
-// The wind campaign: every WSR pin solved to its target (ace, eagle, the
-// albatross on 14) in every wind WSR can blow (the user, 2026-10-22: "our end
-// goal should be to get a hole solved for every one on the 32 values for wind
-// and for every one of the up to 6 pin locations per hole"). WSR's wind is an
-// integer index of 2 mph (0-15: 0-30 mph, even only; the Switch's odd speeds
-// lie between two of them), in 8 directions: 15 speeds x 8 = 120 winds a pin,
-// calm being results/solve. One supervisor, one worker per instance: a job is
-// one pin at one speed in all 8 directions, a hole-solve.mjs --winds run (one
-// boot, the tee file reloaded per wind). The speeds go in --speeds order, the
-// range bisected (the user: "start with 0, 16, 32 mph ... then 8mph and 24mph
-// ... then 4, 12, 20 and 28 ... then 2, 6, 10, 14, 18, 22, 26, 30"; WSR's top
-// is 30, so 30 stands in for 32 in the first round): 16, 30; 8, 24; 4, 12, 20,
-// 28; 2, 6, ... 26 mph, so every pin has a speed before any pin has the next. A pin runs on one instance at a time (its summary file is
-// hole-solve's). A wind already in results/solve-wind/hHH-<id>.json is not
-// played again; a job whose log stalls for --stall minutes has its Dolphin
-// and its run stopped (by the instance's user dir and the run's pid) and goes
-// back on the queue, at most twice. Dolphin's panic dialogs on the campaign's
-// instances are dismissed every 20 s. The board: results/solve-wind/BOARD.md.
-//   node tools/harness/wind-campaign.mjs [--instances 1-18] [--speeds 4,7,...] [--holes 2,4] [--max-tries 40]
+// The wind campaign: every WSR pin solved in every wind WSR can blow, by a
+// route a human can replay (the user, 2026-10-22: "our end goal should be to
+// get a hole solved for every one on the 32 values for wind and for every one
+// of the up to 6 pin locations per hole"; "the goal is for a human to be able
+// to replicate these"). Solved = hole-solve.mjs's near rule: the attempt
+// stroke (a par 3's tee shot, a par 4's or par 5's second) holes or rests
+// within 1 ft, no flag catches. WSR's wind is an integer index of 2 mph (0-15:
+// 0-30 mph, even only; the Switch's odd speeds lie between two of them), in 8
+// directions: 15 speeds x 8 = 120 winds a pin, plus calm where results/solve's
+// calm route does not stand (a par 5's, played to a holed third stroke; a flag
+// catch). A job is one pin at one speed in all 8 directions, a hole-solve.mjs
+// --winds run (one boot, the tee file reloaded per wind), its results in that
+// pin and speed's own file (results/solve-wind/hHH-<id>/iII.json), so jobs on
+// one pin at other speeds run side by side. The holes go one at a time in
+// --holes order ("let's focus on just hole 1 to start, then hole 10, then hole
+// 2, then hole 11 ..."), every instance on the hole until its jobs run out;
+// within a hole the speeds go bisected ("start with 0, 16, 32 mph ... then
+// 8mph and 24mph ... then 4, 12, 20 and 28 ... then 2, 6, 10, 14, 18, 22, 26,
+// 30"; WSR's top is 30, so 30 stands in for 32), then the pins. A wind already
+// in its file under the near rule is not played again; a job whose log stalls
+// for --stall minutes has its Dolphin and its run stopped (by the instance's
+// user dir and the run's pid) and goes back on the queue, at most twice.
+// Dolphin's panic dialogs on the campaign's instances are dismissed every 20 s.
+// The board: results/solve-wind/BOARD.md.
+//   node tools/harness/wind-campaign.mjs [--instances 1-18] [--holes 1,10,2,...] [--speeds 0,8,15,...] [--max-tries 40]
 //     [--left 2560 --top -929 --cols 3 --w 480 --h 426] [--stall 15]
 import fs from "node:fs";
 import path from "node:path";
@@ -27,14 +33,15 @@ import * as P from "./lib/pins.mjs";
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, "../..");
 const arg = (n, d) => { const i = process.argv.indexOf(n); return i >= 0 ? process.argv[i + 1] : d; };
-const range = (t) => t.split(",").flatMap((x) => { const [a, b] = x.split("-").map(Number); return b ? Array.from({ length: b - a + 1 }, (_, i) => a + i) : [a]; });
+const range = (t) => t.split(",").flatMap((x) => { const [a, b] = x.split("-").map(Number); return Number.isFinite(b) ? Array.from({ length: b - a + 1 }, (_, i) => a + i) : [a]; });
 const INST = range(arg("--instances", "1-18"));
-const SPEEDS = range(arg("--speeds", "8,15,4,12,2,6,10,14,1,3,5,7,9,11,13"));
+const HOLES = range(arg("--holes", "1,10,2,11,3,12,4,13,5,14,6,15,7,16,8,17,9,18"));
+const SPEEDS = range(arg("--speeds", "0,8,15,4,12,2,6,10,14,1,3,5,7,9,11,13"));
 const DIRS = range(arg("--dirs", "0-7"));
-const HOLES = arg("--holes", null) ? range(arg("--holes")) : null;
 const MAX_TRIES = Number(arg("--max-tries", 40)), STALL_MIN = Number(arg("--stall", 15));
 const left = Number(arg("--left", 2560)), top = Number(arg("--top", -929)), COLS = Number(arg("--cols", 3));
 const W = Number(arg("--w", 480)), H = Number(arg("--h", 426));
+const RULE = "near";
 const PAR = { 1: 4, 2: 3, 3: 5, 4: 3, 5: 5, 6: 4, 7: 4, 8: 3, 9: 5, 10: 4, 11: 3, 12: 5, 13: 3, 14: 5, 15: 4, 16: 4, 17: 3, 18: 5 };
 const COURSE = (h) => ["Resort A", "Resort B", "Resort C", "Classic A", "Classic B", "Classic C"][Math.floor((h - 1) / 3)];
 const OUTD = path.join(HERE, "results", "solve-wind");
@@ -42,29 +49,40 @@ const LOGD = path.join(HERE, "state", "wind-campaign");
 fs.mkdirSync(OUTD, { recursive: true }); fs.mkdirSync(LOGD, { recursive: true });
 const LOGF = path.join(LOGD, "campaign.log");
 const log = (m) => { const l = `[${new Date().toISOString().slice(0, 19).replace("T", " ")}] ${m}`; console.log(l); fs.appendFileSync(LOGF, l + "\n"); };
+const readJson = (f) => { try { return JSON.parse(fs.readFileSync(f, "utf8")); } catch { return null; } };
 
 // the windows: --cols across, as many rows as the instances need, on the portrait monitor
 const WINF = path.join(HERE, "state", "windows.json");
-let wins = {};
-try { wins = JSON.parse(fs.readFileSync(WINF, "utf8")); } catch { /* new */ }
+const wins = readJson(WINF) ?? {};
 INST.forEach((n, i) => { wins[n] = { x: left + (i % COLS) * W, y: top + Math.floor(i / COLS) * H, w: W, h: H }; });
 fs.writeFileSync(WINF, JSON.stringify(wins, null, 1));
 
-const cups = P.cups({}).filter((c) => PAR[c.hole] && (!HOLES || HOLES.includes(c.hole)) && fs.existsSync(P.savePath(P.teeName(c))));
-const sumOf = (c) => { try { return JSON.parse(fs.readFileSync(path.join(OUTD, `h${P.hh(c.hole)}-${c.id}.json`), "utf8")); } catch { return null; } };
+const cups = P.cups({}).filter((c) => PAR[c.hole] && HOLES.includes(c.hole) && fs.existsSync(P.savePath(P.teeName(c))));
+const sumFile = (c, i) => path.join(OUTD, `h${P.hh(c.hole)}-${c.id}`, `i${String(i).padStart(2, "0")}.json`);
 const keyOf = (d, i) => `${d}:${i}`;
-const done = (c, d, i, s = sumOf(c)) => !!s?.winds?.[keyOf(d, i)];
-// the queue: per speed, every pin, its winds not yet played
+const entry = (c, d, i, s = readJson(sumFile(c, i))) => s?.winds?.[keyOf(d, i)];
+const done = (c, d, i, s) => entry(c, d, i, s)?.rule === RULE;
+// calm is played where results/solve's calm route does not stand under the near rule
+function calmStands(c) {
+  if (PAR[c.hole] === 5) return false;
+  const r = readJson(path.join(HERE, "results", "solve", `h${P.hh(c.hole)}-${c.id}.json`));
+  if (!r?.solved) return false;
+  const last = r.strokes[r.strokes.length - 1], t = r.tries.find((x) => x.k === last.k && x.gamePower === last.gamePower && x.heading === last.heading);
+  return last.holed && (t?.how ?? "roll") !== "flag";
+}
+const dirsAt = (c, i) => (i === 0 ? (calmStands(c) ? [] : [0]) : DIRS);
+// the queue: per hole, per speed, every pin, its winds not yet played
 const queue = [];
-for (const i of SPEEDS) for (const c of cups) {
-  const s = sumOf(c), winds = DIRS.filter((d) => !done(c, d, i, s));
+for (const h of HOLES) for (const i of SPEEDS) for (const c of cups.filter((x) => x.hole === h)) {
+  const s = readJson(sumFile(c, i)), winds = dirsAt(c, i).filter((d) => !done(c, d, i, s));
   if (winds.length) queue.push({ c, speedIdx: i, winds, tries: 0 });
 }
-const total = cups.length * SPEEDS.length * DIRS.length;
-log(`the wind campaign: ${cups.length} pins x ${SPEEDS.length} speeds (${SPEEDS.map((i) => 2 * i).join(", ")} mph) x ${DIRS.length} directions = ${total} winds, ${queue.reduce((a, j) => a + j.winds.length, 0)} to play in ${queue.length} jobs on instances ${INST.join(", ")}; at most ${MAX_TRIES} tries a wind`);
+const total = cups.reduce((a, c) => a + SPEEDS.reduce((b, i) => b + dirsAt(c, i).length, 0), 0);
+log(`the wind campaign (rule ${RULE}: holed or within 1 ft): ${cups.length} pins, holes ${HOLES.join(", ")}; speeds ${SPEEDS.map((i) => 2 * i).join(", ")} mph x ${DIRS.length} directions (calm where results/solve's does not stand) = ${total} winds, ${queue.reduce((a, j) => a + j.winds.length, 0)} to play in ${queue.length} jobs on instances ${INST.join(", ")}; at most ${MAX_TRIES} tries a wind`);
 
-const busyCups = new Set();
-const running = new Map();   // instance -> { job, child, startedAt, logf }
+const busy = new Set();      // pin:speed
+const running = new Map();   // instance -> { job, child, startedAt }
+const busyKey = (j) => `${P.cupKey(j.c)}:${j.speedIdx}`;
 const solveLog = (c) => path.join(HERE, "state", "solve", `h${P.hh(c.hole)}-${c.id}.log`);
 const mtime = (f) => { try { return fs.statSync(f).mtimeMs; } catch { return 0; } };
 
@@ -75,36 +93,37 @@ function instancePids(n) {
 }
 const killAll = (pids) => { for (const pid of pids) try { execFileSync("taskkill", ["/F", "/T", "/PID", String(pid)], { stdio: "ignore" }); } catch { /* gone */ } };
 
+// the next job: the queue's order (the current hole first), skipping a pin and speed already running
 function nextJob() {
-  const k = queue.findIndex((j) => !busyCups.has(P.cupKey(j.c)));
+  const k = queue.findIndex((j) => !busy.has(busyKey(j)));
   return k < 0 ? null : queue.splice(k, 1)[0];
 }
 function start(n) {
   if (P.freeGB() < 6) { log(`only ${P.freeGB().toFixed(1)} GB free: instance ${n} takes no new job`); return false; }
   const job = nextJob();
   if (!job) return false;
-  const s = sumOf(job.c);
+  const s = readJson(sumFile(job.c, job.speedIdx));
   job.winds = job.winds.filter((d) => !done(job.c, d, job.speedIdx, s));
   if (!job.winds.length) return start(n);
-  busyCups.add(P.cupKey(job.c));
+  busy.add(busyKey(job));
   const w = wins[n], logf = path.join(LOGD, `i${n}.log`);
   const out = fs.openSync(logf, "a");
-  const label = `${COURSE(job.c.hole)} H${job.c.hole} ${2 * job.speedIdx} mph`;
+  const label = `${COURSE(job.c.hole)} H${job.c.hole} ${job.c.label} ${job.speedIdx ? `${2 * job.speedIdx} mph` : "calm"}`;
   const args = ["--max-old-space-size=7000", "tools/harness/hole-solve.mjs", "--instance", String(n), "--hole", String(job.c.hole), "--cup", job.c.id,
-    "--winds", job.winds.map((d) => keyOf(d, job.speedIdx)).join(","), "--max-tries", String(MAX_TRIES),
+    "--winds", job.winds.map((d) => keyOf(d, job.speedIdx)).join(","), "--max-tries", String(MAX_TRIES), "--rule", RULE,
     "--x", String(w.x), "--y", String(w.y), "--w", String(w.w), "--h", String(w.h), "--label", label];
   const child = spawn(process.execPath, args, { cwd: ROOT, stdio: ["ignore", out, out], windowsHide: true });
-  const r = { job, child, startedAt: Date.now(), out };
+  const r = { job, child, startedAt: Date.now() };
   running.set(n, r);
-  log(`instance ${n}: ${P.cupKey(job.c)} (${job.c.label}, par ${PAR[job.c.hole]}) at ${2 * job.speedIdx} mph, directions ${job.winds.join(",")}${job.tries ? ` (again, ${job.tries})` : ""}`);
+  log(`instance ${n}: ${P.cupKey(job.c)} (${job.c.label}, par ${PAR[job.c.hole]}) ${job.speedIdx ? `at ${2 * job.speedIdx} mph, directions ${job.winds.join(",")}` : "calm"}${job.tries ? ` (again, ${job.tries})` : ""}`);
   child.on("exit", (code) => {
     try { fs.closeSync(out); } catch { /* */ }
     running.delete(n);
-    busyCups.delete(P.cupKey(job.c));
-    const s2 = sumOf(job.c), left = job.winds.filter((d) => !done(job.c, d, job.speedIdx, s2));
-    const got = job.winds.filter((d) => s2?.winds?.[keyOf(d, job.speedIdx)]?.solved).length;
-    log(`instance ${n}: ${P.cupKey(job.c)} at ${2 * job.speedIdx} mph: ${got} of ${job.winds.length} solved${left.length ? `, ${left.length} unplayed` : ""} (exit ${r.stalled ? "stalled" : code}, ${((Date.now() - r.startedAt) / 60000).toFixed(1)} min)`);
-    if (left.length && job.tries < 2) queue.unshift({ ...job, winds: left, tries: job.tries + 1 });
+    busy.delete(busyKey(job));
+    const s2 = readJson(sumFile(job.c, job.speedIdx)), rest = job.winds.filter((d) => !done(job.c, d, job.speedIdx, s2));
+    const got = job.winds.filter((d) => entry(job.c, d, job.speedIdx, s2)?.solved).length;
+    log(`instance ${n}: ${P.cupKey(job.c)} ${job.speedIdx ? `at ${2 * job.speedIdx} mph` : "calm"}: ${got} of ${job.winds.length} solved${rest.length ? `, ${rest.length} unplayed` : ""} (exit ${r.stalled ? "stalled" : code}, ${((Date.now() - r.startedAt) / 60000).toFixed(1)} min)`);
+    if (rest.length && job.tries < 2) queue.unshift({ ...job, winds: rest, tries: job.tries + 1 });
     board();
     setTimeout(() => { if (!start(n) && !running.size) finish(); }, 3000);
   });
@@ -129,26 +148,26 @@ setInterval(() => {
   });
 }, 20000).unref();
 
-// the board: per pin, per speed, the directions solved
+// the board: per pin, per speed, the directions solved / played
 function board() {
-  const rows = [], bySpeed = Object.fromEntries(SPEEDS.map((i) => [i, { solved: 0, played: 0 }]));
+  const rows = [], bySpeed = Object.fromEntries(SPEEDS.map((i) => [i, { solved: 0, played: 0, total: 0 }]));
   let solved = 0, played = 0;
-  for (const c of cups) {
-    const s = sumOf(c);
+  for (const h of HOLES) for (const c of cups.filter((x) => x.hole === h)) {
     const cells = SPEEDS.map((i) => {
-      const es = DIRS.map((d) => s?.winds?.[keyOf(d, i)]).filter(Boolean);
+      const s = readJson(sumFile(c, i)), ds = dirsAt(c, i);
+      const es = ds.map((d) => entry(c, d, i, s)).filter((e) => e?.rule === RULE);
       const ok = es.filter((e) => e.solved).length;
-      bySpeed[i].solved += ok; bySpeed[i].played += es.length; solved += ok; played += es.length;
-      return es.length ? `${ok}/${es.length}` : "";
+      bySpeed[i].solved += ok; bySpeed[i].played += es.length; bySpeed[i].total += ds.length; solved += ok; played += es.length;
+      return !ds.length ? "—" : es.length ? `${ok}/${es.length}` : "";
     });
-    rows.push(`| ${c.hole} | ${c.id} ${c.label} | ${cells.join(" | ")} |`);
+    rows.push(`| ${h} | ${c.id} ${c.label} | ${cells.join(" | ")} |`);
   }
   const md = [
     "# The wind campaign: every pin in every wind", "",
-    `${solved} of ${total} winds solved, ${played} played (${cups.length} pins x ${SPEEDS.length} speeds x ${DIRS.length} directions; calm is results/solve). Each cell: the directions solved / played at that speed. Updated ${new Date().toISOString().slice(0, 16).replace("T", " ")} UTC.`, "",
-    `| Speed | ${SPEEDS.map((i) => `${2 * i} mph`).join(" | ")} |`, `|---|${SPEEDS.map(() => "---").join("|")}|`,
-    `| solved / played | ${SPEEDS.map((i) => `${bySpeed[i].solved}/${bySpeed[i].played}`).join(" | ")} |`, "",
-    `| Hole | Pin | ${SPEEDS.map((i) => `${2 * i}`).join(" | ")} |`, `|---|---|${SPEEDS.map(() => "---").join("|")}|`, ...rows, "",
+    `${solved} of ${total} winds solved, ${played} played: holed or within 1 ft of the cup with the attempt stroke (a par 3's tee shot, a par 4's or 5's second), no flag catches. Holes in the campaign's order; each cell is the directions solved / played at that speed (— : calm stands from results/solve). Updated ${new Date().toISOString().slice(0, 16).replace("T", " ")} UTC.`, "",
+    `| Speed | ${SPEEDS.map((i) => (i ? `${2 * i} mph` : "calm")).join(" | ")} |`, `|---|${SPEEDS.map(() => "---").join("|")}|`,
+    `| solved / played / all | ${SPEEDS.map((i) => `${bySpeed[i].solved}/${bySpeed[i].played}/${bySpeed[i].total}`).join(" | ")} |`, "",
+    `| Hole | Pin | ${SPEEDS.map((i) => (i ? `${2 * i}` : "0")).join(" | ")} |`, `|---|---|${SPEEDS.map(() => "---").join("|")}|`, ...rows, "",
   ].join("\n");
   fs.writeFileSync(path.join(OUTD, "BOARD.md"), md);
 }

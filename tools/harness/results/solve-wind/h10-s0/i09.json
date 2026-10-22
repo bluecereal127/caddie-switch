@@ -1,0 +1,68 @@
+{
+ "hole": 10,
+ "cup": "s0",
+ "label": "BL",
+ "sets": [
+  1
+ ],
+ "par": 4,
+ "speedIdx": 9,
+ "mph": 18,
+ "winds": {
+  "5:9": {
+   "dir": 5,
+   "speedIdx": 9,
+   "mph": 18,
+   "solved": true,
+   "tries": 2,
+   "ms": 48014,
+   "strokes": [
+    {
+     "k": 1,
+     "club": "driver",
+     "power": 0.92,
+     "gamePower": 0.9200960993766785,
+     "heading": 3.116002082824707,
+     "from": [
+      12.800000190734863,
+      194.9499969482422,
+      1968.5
+     ],
+     "lie": 15,
+     "rest": [
+      -115.94139862060547,
+      93.47705078125,
+      -673.2474365234375
+     ],
+     "holed": false,
+     "how": "roll"
+    },
+    {
+     "k": 2,
+     "club": "7iron",
+     "power": 0.5009000000000002,
+     "gamePower": 0.5009831190109253,
+     "heading": 2.9142110347747803,
+     "from": [
+      -115.94139862060547,
+      93.47564697265625,
+      -673.2474365234375
+     ],
+     "lie": 1,
+     "rest": [
+      -18.40108871459961,
+      134.66427612304688,
+      -1498.3492431640625
+     ],
+     "holed": true,
+     "how": "roll"
+    }
+   ],
+   "rule": "near",
+   "target": 2,
+   "nearYd": 0.3333,
+   "legacy": "holed under the first rule (before the 1-ft rule; the flag cloth as the tee state drew it)"
+  }
+ },
+ "updated": "2026-10-22T14:27:58.067Z"
+}

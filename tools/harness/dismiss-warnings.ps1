@@ -4,7 +4,8 @@
 # stopped at boot behind "IOS_FS: Failed to rename temporary FST file" on
 # 2026-10-22. The user's own Dolphin has no harness user dir: never touched.
 #   powershell -NoProfile -ExecutionPolicy Bypass -File tools/harness/dismiss-warnings.ps1 -Instance 17
-param([int[]]$Instance)
+# -Instance is one comma list ("1,2,3"): under -File a list arrives as a single string
+param([string]$Instance)
 Add-Type @'
 using System; using System.Text; using System.Runtime.InteropServices; using System.Collections.Generic;
 public class DW {
@@ -32,7 +33,7 @@ public class DW {
       return true; }, IntPtr.Zero);
     return o; } }
 '@
-$dirs = @($Instance | ForEach-Object { "state\user$_ " })
+$dirs = @($Instance -split "[,\s]+" | Where-Object { $_ } | ForEach-Object { "state\user$_ " })
 Get-CimInstance Win32_Process -Filter "name='Dolphin.exe'" | Where-Object { $cl = $_.CommandLine; $cl -and @($dirs | Where-Object { $cl.Contains($_) }).Count } | ForEach-Object {
   foreach ($m in [DW]::Dismiss([uint32]$_.ProcessId)) { "dismissed a Dolphin dialog (pid {0}): {1}" -f $_.ProcessId, $m }
 }

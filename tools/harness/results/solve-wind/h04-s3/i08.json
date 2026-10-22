@@ -1,0 +1,116 @@
+{
+ "hole": 4,
+ "cup": "s3",
+ "label": "AL",
+ "sets": [
+  2
+ ],
+ "par": 3,
+ "speedIdx": 8,
+ "mph": 16,
+ "winds": {
+  "3:8": {
+   "dir": 3,
+   "speedIdx": 8,
+   "mph": 16,
+   "solved": true,
+   "tries": 1,
+   "ms": 49539,
+   "strokes": [
+    {
+     "k": 1,
+     "club": "driver",
+     "power": 0.5203000000000002,
+     "gamePower": 0.5203957557678223,
+     "heading": -2.605705738067627,
+     "from": [
+      546.2000122070312,
+      0.949999988079071,
+      855.5
+     ],
+     "lie": 15,
+     "rest": [
+      -234.1517333984375,
+      -47.97136688232422,
+      -474.1350402832031
+     ],
+     "holed": true,
+     "how": "roll"
+    }
+   ],
+   "rule": "near",
+   "target": 1,
+   "nearYd": 0.3333,
+   "legacy": "holed under the first rule (before the 1-ft rule; the flag cloth as the tee state drew it)"
+  },
+  "4:8": {
+   "dir": 4,
+   "speedIdx": 8,
+   "mph": 16,
+   "solved": true,
+   "tries": 1,
+   "ms": 47437,
+   "strokes": [
+    {
+     "k": 1,
+     "club": "driver",
+     "power": 0.4975148259389713,
+     "gamePower": 0.4975588321685791,
+     "heading": -2.6344056129455566,
+     "from": [
+      546.2000122070312,
+      0.949999988079071,
+      855.5
+     ],
+     "lie": 15,
+     "rest": [
+      -234.4158172607422,
+      -47.97136688232422,
+      -474.77679443359375
+     ],
+     "holed": true,
+     "how": "roll"
+    }
+   ],
+   "rule": "near",
+   "target": 1,
+   "nearYd": 0.3333,
+   "legacy": "holed under the first rule (before the 1-ft rule; the flag cloth as the tee state drew it)"
+  },
+  "6:8": {
+   "dir": 6,
+   "speedIdx": 8,
+   "mph": 16,
+   "solved": true,
+   "tries": 1,
+   "ms": 36948,
+   "strokes": [
+    {
+     "k": 1,
+     "club": "3iron",
+     "power": 0.7070839483061031,
+     "gamePower": 0.7071281671524048,
+     "heading": -2.70265531539917,
+     "from": [
+      546.2000122070312,
+      0.949999988079071,
+      855.5
+     ],
+     "lie": 15,
+     "rest": [
+      -234.41021728515625,
+      -47.97136688232422,
+      -473.9718933105469
+     ],
+     "holed": true,
+     "how": "roll"
+    }
+   ],
+   "rule": "near",
+   "target": 1,
+   "nearYd": 0.3333,
+   "legacy": "holed under the first rule (before the 1-ft rule; the flag cloth as the tee state drew it)"
+  }
+ },
+ "updated": "2026-10-22T14:27:58.057Z"
+}

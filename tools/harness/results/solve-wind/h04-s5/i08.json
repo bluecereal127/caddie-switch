@@ -1,0 +1,82 @@
+{
+ "hole": 4,
+ "cup": "s5",
+ "label": "AR",
+ "sets": [
+  2
+ ],
+ "par": 3,
+ "speedIdx": 8,
+ "mph": 16,
+ "winds": {
+  "2:8": {
+   "dir": 2,
+   "speedIdx": 8,
+   "mph": 16,
+   "solved": true,
+   "tries": 1,
+   "ms": 45177,
+   "strokes": [
+    {
+     "k": 1,
+     "club": "3iron",
+     "power": 0.7619000000000005,
+     "gamePower": 0.7619507312774658,
+     "heading": -2.5353779792785645,
+     "from": [
+      546.2000122070312,
+      0.949999988079071,
+      855.5
+     ],
+     "lie": 15,
+     "rest": [
+      -154.09085083007812,
+      -45.82530975341797,
+      -429.3021545410156
+     ],
+     "holed": true,
+     "how": "roll"
+    }
+   ],
+   "rule": "near",
+   "target": 1,
+   "nearYd": 0.3333,
+   "legacy": "holed under the first rule (before the 1-ft rule; the flag cloth as the tee state drew it)"
+  },
+  "3:8": {
+   "dir": 3,
+   "speedIdx": 8,
+   "mph": 16,
+   "solved": true,
+   "tries": 1,
+   "ms": 42357,
+   "strokes": [
+    {
+     "k": 1,
+     "club": "3iron",
+     "power": 0.7389000000000004,
+     "gamePower": 0.7389491200447083,
+     "heading": -2.5395779609680176,
+     "from": [
+      546.2000122070312,
+      0.949999988079071,
+      855.5
+     ],
+     "lie": 15,
+     "rest": [
+      -154.17906188964844,
+      -45.82530975341797,
+      -429.333740234375
+     ],
+     "holed": true,
+     "how": "roll"
+    }
+   ],
+   "rule": "near",
+   "target": 1,
+   "nearYd": 0.3333,
+   "legacy": "holed under the first rule (before the 1-ft rule; the flag cloth as the tee state drew it)"
+  }
+ },
+ "updated": "2026-10-22T14:27:58.060Z"
+}

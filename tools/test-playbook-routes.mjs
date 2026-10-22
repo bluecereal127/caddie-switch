@@ -1,7 +1,8 @@
 // Acceptance for the solver's playbook: src/playbook.js (pinKeyOf, routesFor,
 // loadPlaybook through a fetch stand-in) and the committed public/playbook/
 // files (tools/build-playbook.mjs): every WSR pin of holes 1-18 with its calm
-// route, each route a holed one of at most the hole's target, each stroke
+// route, each route of at most the hole's target (a par 3's 1, else 2; a
+// fallback or legacy one 3) ending holed or within 1 ft, each stroke
 // from the last one's rest, the first from the hole's tee (derived.json's,
 // the WSR start the harness's tee states stand on), and the 8 WSR directions'
 // bearings 45 deg apart on every hole.
@@ -71,10 +72,13 @@ for (let h = 1; h <= 18; h++) {
     for (const r of p.routes) {
       routes++; if (r.mph) windy++;
       const ss = r.strokes, tag = `h${h}-${id} ${r.mph ? `${r.mph} mph dir ${r.dir}` : "calm"}`;
-      ok(ss.length >= 1 && ss.length <= f.target && ss[ss.length - 1].holed && ss.slice(0, -1).every((s) => !s.holed), `${tag}: holed in at most ${f.target}`);
+      const n = r.fallback || r.legacy ? 3 : f.target, last = ss[ss.length - 1];
+      ok(f.target === (f.par === 3 ? 1 : 2), `h${h}: the target`);
+      ok(ss.length >= 1 && ss.length <= n && (last.holed || (!r.legacy && last.near && last.left <= 1 / 3 + 1e-6)) && ss.slice(0, -1).every((s) => !s.holed && !s.near), `${tag}: holed or within 1 ft in at most ${n}`);
       ok(Math.hypot((ss[0].from[0] - tee.x) * 250, (ss[0].from[1] - tee.y) * 304) < 2, `${tag}: from the tee`);
       for (let k = 1; k < ss.length; k++) ok(Math.hypot((ss[k].from[0] - ss[k - 1].rest[0]) * 250, (ss[k].from[1] - ss[k - 1].rest[1]) * 304) < 0.1, `${tag}: stroke ${k + 1} from stroke ${k}'s rest`);
-      ok(Math.hypot((ss[ss.length - 1].rest[0] - p.pin[0]) * 250, (ss[ss.length - 1].rest[1] - p.pin[1]) * 304) < 1e-6, `${tag}: the last at the pin`);
+      if (last.holed) ok(Math.hypot((last.rest[0] - p.pin[0]) * 250, (last.rest[1] - p.pin[1]) * 304) < 1e-6, `${tag}: the holed last at the pin`);
+      else ok(Math.hypot((last.rest[0] - p.pin[0]) * 250, (last.rest[1] - p.pin[1]) * 304) < 1.5, `${tag}: the tap-in beside the pin on the map`);
       ok(ss.every((s) => s.bars > 0 && s.bars <= (s.club === "putter" ? 10 : 4) && Math.abs(s.aim) < 90 && s.yd > 0), `${tag}: bars (a putter to 2.5 power, past full), aim, yards`);
       ok(r.mph === 0 ? r.dir == null : r.dir >= 0 && r.dir < 8 && r.mph % 2 === 0 && r.mph <= 30 && r.deg === f.dirs[r.dir], `${tag}: the wind`);
     }

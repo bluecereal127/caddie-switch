@@ -1,0 +1,48 @@
+{
+ "hole": 4,
+ "cup": "s2",
+ "label": "BM",
+ "sets": [
+  1
+ ],
+ "par": 3,
+ "speedIdx": 8,
+ "mph": 16,
+ "winds": {
+  "5:8": {
+   "dir": 5,
+   "speedIdx": 8,
+   "mph": 16,
+   "solved": true,
+   "tries": 1,
+   "ms": 44909,
+   "strokes": [
+    {
+     "k": 1,
+     "club": "5iron",
+     "power": 0.8359000000000005,
+     "gamePower": 0.8360575437545776,
+     "heading": -2.7223453521728516,
+     "from": [
+      546.2000122070312,
+      0.949999988079071,
+      855.5
+     ],
+     "lie": 15,
+     "rest": [
+      -100.83921813964844,
+      -51.003761291503906,
+      -482.243896484375
+     ],
+     "holed": true,
+     "how": "roll"
+    }
+   ],
+   "rule": "near",
+   "target": 1,
+   "nearYd": 0.3333,
+   "legacy": "holed under the first rule (before the 1-ft rule; the flag cloth as the tee state drew it)"
+  }
+ },
+ "updated": "2026-10-22T14:27:58.056Z"
+}
