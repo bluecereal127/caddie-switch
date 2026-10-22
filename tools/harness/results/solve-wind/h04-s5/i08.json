@@ -76,7 +76,146 @@
    "target": 1,
    "nearYd": 0.3333,
    "legacy": "holed under the first rule (before the 1-ft rule; the flag cloth as the tee state drew it)"
+  },
+  "0:8": {
+   "dir": 0,
+   "speedIdx": 8,
+   "mph": 16,
+   "rule": "near",
+   "target": 1,
+   "nearYd": 0.3333,
+   "solved": false,
+   "tries": 0,
+   "ms": 13781,
+   "strokes": null
+  },
+  "1:8": {
+   "dir": 1,
+   "speedIdx": 8,
+   "mph": 16,
+   "rule": "near",
+   "target": 1,
+   "nearYd": 0.3333,
+   "solved": false,
+   "tries": 3,
+   "ms": 56869,
+   "strokes": null
+  },
+  "4:8": {
+   "dir": 4,
+   "speedIdx": 8,
+   "mph": 16,
+   "rule": "near",
+   "target": 1,
+   "nearYd": 0.3333,
+   "solved": true,
+   "tries": 1,
+   "ms": 22023,
+   "strokes": [
+    {
+     "k": 1,
+     "club": "5iron",
+     "power": 0.8210693376633553,
+     "gamePower": 0.8211377263069153,
+     "heading": -2.564077854156494,
+     "from": [
+      546.2000122070312,
+      0.949999988079071,
+      855.5
+     ],
+     "lie": 15,
+     "rest": [
+      -155.4874267578125,
+      -45.82530975341797,
+      -430.16217041015625
+     ],
+     "holed": true,
+     "toPin": 0.10806557410765091,
+     "how": "roll"
+    }
+   ]
+  },
+  "5:8": {
+   "dir": 5,
+   "speedIdx": 8,
+   "mph": 16,
+   "rule": "near",
+   "target": 1,
+   "nearYd": 0.3333,
+   "solved": true,
+   "tries": 1,
+   "ms": 30841,
+   "strokes": [
+    {
+     "k": 1,
+     "club": "5iron",
+     "power": 0.7980000000000005,
+     "gamePower": 0.7980753779411316,
+     "heading": -2.672227382659912,
+     "from": [
+      546.2000122070312,
+      0.949999988079071,
+      855.5
+     ],
+     "lie": 15,
+     "rest": [
+      -153.66062927246094,
+      -45.82530975341797,
+      -430.7435607910156
+     ],
+     "holed": true,
+     "toPin": 0.10936068905110141,
+     "how": "roll"
+    }
+   ]
+  },
+  "6:8": {
+   "dir": 6,
+   "speedIdx": 8,
+   "mph": 16,
+   "rule": "near",
+   "target": 1,
+   "nearYd": 0.3333,
+   "solved": false,
+   "tries": 3,
+   "ms": 64373,
+   "strokes": null
+  },
+  "7:8": {
+   "dir": 7,
+   "speedIdx": 8,
+   "mph": 16,
+   "rule": "near",
+   "target": 1,
+   "nearYd": 0.3333,
+   "solved": true,
+   "tries": 1,
+   "ms": 28409,
+   "strokes": [
+    {
+     "k": 1,
+     "club": "5iron",
+     "power": 0.9665000000000007,
+     "gamePower": 0.9665893912315369,
+     "heading": -2.7926268577575684,
+     "from": [
+      546.2000122070312,
+      0.949999988079071,
+      855.5
+     ],
+     "lie": 15,
+     "rest": [
+      -152.3720245361328,
+      -42.93998718261719,
+      -430.7500305175781
+     ],
+     "holed": false,
+     "toPin": 0.24036614522257865,
+     "near": true,
+     "how": "roll"
+    }
+   ]
   }
  },
- "updated": "2026-10-22T14:27:58.060Z"
+ "updated": "2026-10-22T17:30:47.546Z"
 }
