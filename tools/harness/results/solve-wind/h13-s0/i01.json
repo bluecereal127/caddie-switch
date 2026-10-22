@@ -41,7 +41,8 @@
      "toPin": 0.09555831234583072,
      "how": "roll"
     }
-   ]
+   ],
+   "sandChecked": true
   },
   "1:1": {
    "dir": 1,
@@ -75,13 +76,14 @@
      "toPin": 0.10080251766902694,
      "how": "roll"
     }
-   ]
+   ],
+   "sandChecked": true
   },
   "2:1": {
    "dir": 2,
    "speedIdx": 1,
    "mph": 2,
-   "rule": "near",
+   "rule": "near-sand",
    "target": 1,
    "nearYd": 0.3333,
    "solved": true,
@@ -107,15 +109,19 @@
      ],
      "holed": true,
      "toPin": 0.10161901276394465,
-     "how": "roll"
+     "how": "roll",
+     "sandRisk": true
     }
+   ],
+   "sandRisk": [
+    1
    ]
   },
   "3:1": {
    "dir": 3,
    "speedIdx": 1,
    "mph": 2,
-   "rule": "near",
+   "rule": "near-sand",
    "target": 1,
    "nearYd": 0.3333,
    "solved": true,
@@ -141,8 +147,12 @@
      ],
      "holed": true,
      "toPin": 0.08750820173671525,
-     "how": "roll"
+     "how": "roll",
+     "sandRisk": true
     }
+   ],
+   "sandRisk": [
+    1
    ]
   },
   "4:1": {
@@ -177,13 +187,14 @@
      "toPin": 0.099841053255644,
      "how": "roll"
     }
-   ]
+   ],
+   "sandChecked": true
   },
   "5:1": {
    "dir": 5,
    "speedIdx": 1,
    "mph": 2,
-   "rule": "near",
+   "rule": "near-sand",
    "target": 1,
    "nearYd": 0.3333,
    "solved": true,
@@ -209,15 +220,19 @@
      ],
      "holed": true,
      "toPin": 0.0680935548504012,
-     "how": "roll"
+     "how": "roll",
+     "sandRisk": true
     }
+   ],
+   "sandRisk": [
+    1
    ]
   },
   "6:1": {
    "dir": 6,
    "speedIdx": 1,
    "mph": 2,
-   "rule": "near",
+   "rule": "near-sand",
    "target": 1,
    "nearYd": 0.3333,
    "solved": true,
@@ -243,15 +258,19 @@
      ],
      "holed": true,
      "toPin": 0.10565868837242602,
-     "how": "roll"
+     "how": "roll",
+     "sandRisk": true
     }
+   ],
+   "sandRisk": [
+    1
    ]
   },
   "7:1": {
    "dir": 7,
    "speedIdx": 1,
    "mph": 2,
-   "rule": "near",
+   "rule": "near-sand",
    "target": 1,
    "nearYd": 0.3333,
    "solved": true,
@@ -277,8 +296,12 @@
      ],
      "holed": true,
      "toPin": 0.07812306941845666,
-     "how": "roll"
+     "how": "roll",
+     "sandRisk": true
     }
+   ],
+   "sandRisk": [
+    1
    ]
   }
  },

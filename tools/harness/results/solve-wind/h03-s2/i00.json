@@ -63,7 +63,8 @@
      "near": true,
      "how": "roll"
     }
-   ]
+   ],
+   "sandChecked": true
   }
  },
  "updated": "2026-10-22T21:07:17.031Z"

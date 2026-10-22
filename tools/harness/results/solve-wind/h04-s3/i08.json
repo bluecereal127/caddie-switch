@@ -35,13 +35,17 @@
       -474.1350402832031
      ],
      "holed": true,
-     "how": "roll"
+     "how": "roll",
+     "sandRisk": true
     }
    ],
-   "rule": "near",
+   "rule": "near-sand",
    "target": 1,
    "nearYd": 0.3333,
-   "legacy": "holed under the first rule (before the 1-ft rule; the flag cloth as the tee state drew it)"
+   "legacy": "holed under the first rule (before the 1-ft rule; the flag cloth as the tee state drew it)",
+   "sandRisk": [
+    1
+   ]
   },
   "4:8": {
    "dir": 4,
@@ -69,13 +73,17 @@
       -474.77679443359375
      ],
      "holed": true,
-     "how": "roll"
+     "how": "roll",
+     "sandRisk": true
     }
    ],
-   "rule": "near",
+   "rule": "near-sand",
    "target": 1,
    "nearYd": 0.3333,
-   "legacy": "holed under the first rule (before the 1-ft rule; the flag cloth as the tee state drew it)"
+   "legacy": "holed under the first rule (before the 1-ft rule; the flag cloth as the tee state drew it)",
+   "sandRisk": [
+    1
+   ]
   },
   "6:8": {
    "dir": 6,
@@ -109,7 +117,8 @@
    "rule": "near",
    "target": 1,
    "nearYd": 0.3333,
-   "legacy": "holed under the first rule (before the 1-ft rule; the flag cloth as the tee state drew it)"
+   "legacy": "holed under the first rule (before the 1-ft rule; the flag cloth as the tee state drew it)",
+   "sandChecked": true
   },
   "0:8": {
    "dir": 0,
@@ -127,7 +136,7 @@
    "dir": 1,
    "speedIdx": 8,
    "mph": 16,
-   "rule": "near",
+   "rule": "near-sand",
    "target": 1,
    "nearYd": 0.3333,
    "solved": true,
@@ -153,8 +162,12 @@
      ],
      "holed": true,
      "toPin": 0.102101027593657,
-     "how": "roll"
+     "how": "roll",
+     "sandRisk": true
     }
+   ],
+   "sandRisk": [
+    1
    ]
   },
   "2:8": {
@@ -201,7 +214,8 @@
      "toPin": 0.1046558434220326,
      "how": "roll"
     }
-   ]
+   ],
+   "sandChecked": true
   },
   "7:8": {
    "dir": 7,

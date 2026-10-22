@@ -41,7 +41,8 @@
      "toPin": 0.10935981204447554,
      "how": "roll"
     }
-   ]
+   ],
+   "sandChecked": true
   },
   "1:10": {
    "dir": 1,
@@ -75,7 +76,8 @@
      "toPin": 0.10813029728526002,
      "how": "roll"
     }
-   ]
+   ],
+   "sandChecked": true
   },
   "2:10": {
    "dir": 2,
@@ -109,7 +111,8 @@
      "toPin": 0.10925241030997386,
      "how": "roll"
     }
-   ]
+   ],
+   "sandChecked": true
   },
   "3:10": {
    "dir": 3,
@@ -143,7 +146,8 @@
      "toPin": 0.10936149320213188,
      "how": "roll"
     }
-   ]
+   ],
+   "sandChecked": true
   },
   "4:10": {
    "dir": 4,
@@ -177,7 +181,8 @@
      "toPin": 0.10935915142983206,
      "how": "roll"
     }
-   ]
+   ],
+   "sandChecked": true
   },
   "5:10": {
    "dir": 5,
@@ -224,7 +229,8 @@
      "near": true,
      "how": "roll"
     }
-   ]
+   ],
+   "sandChecked": true
   },
   "7:10": {
    "dir": 7,

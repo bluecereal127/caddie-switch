@@ -13,7 +13,7 @@
    "dir": 0,
    "speedIdx": 0,
    "mph": 0,
-   "rule": "near",
+   "rule": "near-sand",
    "target": 1,
    "nearYd": 0.3333,
    "solved": true,
@@ -39,8 +39,12 @@
      ],
      "holed": true,
      "toPin": 0.08034713158537428,
-     "how": "roll"
+     "how": "roll",
+     "sandRisk": true
     }
+   ],
+   "sandRisk": [
+    1
    ]
   }
  },

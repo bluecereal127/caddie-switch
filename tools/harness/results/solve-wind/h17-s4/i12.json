@@ -41,7 +41,8 @@
      "toPin": 0.10936078982015726,
      "how": "roll"
     }
-   ]
+   ],
+   "sandChecked": true
   },
   "1:12": {
    "dir": 1,
@@ -76,7 +77,8 @@
      "near": true,
      "how": "roll"
     }
-   ]
+   ],
+   "sandChecked": true
   },
   "2:12": {
    "dir": 2,
@@ -122,7 +124,8 @@
      "toPin": 0.1092593909590676,
      "how": "roll"
     }
-   ]
+   ],
+   "sandChecked": true
   },
   "4:12": {
    "dir": 4,
@@ -180,7 +183,8 @@
      "toPin": 0.10936233387311853,
      "how": "roll"
     }
-   ]
+   ],
+   "sandChecked": true
   },
   "7:12": {
    "dir": 7,

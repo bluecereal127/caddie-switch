@@ -87,7 +87,8 @@
       "how": "roll"
      }
     ]
-   }
+   },
+   "sandChecked": true
   }
  },
  "updated": "2026-10-22T21:09:52.180Z"

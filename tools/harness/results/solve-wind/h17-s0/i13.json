@@ -41,7 +41,8 @@
      "toPin": 0.10936000113271499,
      "how": "roll"
     }
-   ]
+   ],
+   "sandChecked": true
   },
   "1:13": {
    "dir": 1,
@@ -75,7 +76,8 @@
      "toPin": 0.10935999135493095,
      "how": "roll"
     }
-   ]
+   ],
+   "sandChecked": true
   },
   "2:13": {
    "dir": 2,
@@ -121,7 +123,8 @@
      "toPin": 0.07003529162463087,
      "how": "roll"
     }
-   ]
+   ],
+   "sandChecked": true
   },
   "4:13": {
    "dir": 4,
@@ -155,7 +158,8 @@
      "toPin": 0.10936460026097813,
      "how": "roll"
     }
-   ]
+   ],
+   "sandChecked": true
   },
   "5:13": {
    "dir": 5,
@@ -213,7 +217,8 @@
      "toPin": 0.08416423769757467,
      "how": "roll"
     }
-   ]
+   ],
+   "sandChecked": true
   }
  },
  "updated": "2026-10-22T21:08:36.013Z"

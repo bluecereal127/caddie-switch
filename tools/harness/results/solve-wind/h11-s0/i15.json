@@ -42,13 +42,14 @@
      "near": true,
      "how": "roll"
     }
-   ]
+   ],
+   "sandChecked": true
   },
   "1:15": {
    "dir": 1,
    "speedIdx": 15,
    "mph": 30,
-   "rule": "near",
+   "rule": "near-sand",
    "target": 1,
    "nearYd": 0.3333,
    "solved": true,
@@ -74,15 +75,19 @@
      ],
      "holed": true,
      "toPin": 0.10936056735467788,
-     "how": "roll"
+     "how": "roll",
+     "sandRisk": true
     }
+   ],
+   "sandRisk": [
+    1
    ]
   },
   "2:15": {
    "dir": 2,
    "speedIdx": 15,
    "mph": 30,
-   "rule": "near",
+   "rule": "near-sand",
    "target": 1,
    "nearYd": 0.3333,
    "solved": true,
@@ -108,15 +113,19 @@
      ],
      "holed": true,
      "toPin": 0.10808306647225294,
-     "how": "roll"
+     "how": "roll",
+     "sandRisk": true
     }
+   ],
+   "sandRisk": [
+    1
    ]
   },
   "3:15": {
    "dir": 3,
    "speedIdx": 15,
    "mph": 30,
-   "rule": "near",
+   "rule": "near-sand",
    "target": 1,
    "nearYd": 0.3333,
    "solved": true,
@@ -142,15 +151,19 @@
      ],
      "holed": true,
      "toPin": 0.08250998867363228,
-     "how": "roll"
+     "how": "roll",
+     "sandRisk": true
     }
+   ],
+   "sandRisk": [
+    1
    ]
   },
   "4:15": {
    "dir": 4,
    "speedIdx": 15,
    "mph": 30,
-   "rule": "near",
+   "rule": "near-sand",
    "target": 1,
    "nearYd": 0.3333,
    "solved": true,
@@ -177,15 +190,19 @@
      "holed": false,
      "toPin": 0.285243279490416,
      "near": true,
-     "how": "roll"
+     "how": "roll",
+     "sandRisk": true
     }
+   ],
+   "sandRisk": [
+    1
    ]
   },
   "5:15": {
    "dir": 5,
    "speedIdx": 15,
    "mph": 30,
-   "rule": "near",
+   "rule": "near-sand",
    "target": 1,
    "nearYd": 0.3333,
    "solved": true,
@@ -211,8 +228,12 @@
      ],
      "holed": true,
      "toPin": 0.06691055799719099,
-     "how": "roll"
+     "how": "roll",
+     "sandRisk": true
     }
+   ],
+   "sandRisk": [
+    1
    ]
   },
   "6:15": {
@@ -247,7 +268,8 @@
      "toPin": 0.10936222298734047,
      "how": "roll"
     }
-   ]
+   ],
+   "sandChecked": true
   },
   "7:15": {
    "dir": 7,
@@ -282,7 +304,8 @@
      "near": true,
      "how": "roll"
     }
-   ]
+   ],
+   "sandChecked": true
   }
  },
  "updated": "2026-10-22T19:06:25.302Z"

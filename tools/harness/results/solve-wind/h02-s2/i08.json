@@ -41,7 +41,8 @@
    "rule": "near",
    "target": 1,
    "nearYd": 0.3333,
-   "legacy": "holed under the first rule (before the 1-ft rule; the flag cloth as the tee state drew it)"
+   "legacy": "holed under the first rule (before the 1-ft rule; the flag cloth as the tee state drew it)",
+   "sandChecked": true
   },
   "2:8": {
    "dir": 2,
@@ -75,7 +76,8 @@
    "rule": "near",
    "target": 1,
    "nearYd": 0.3333,
-   "legacy": "holed under the first rule (before the 1-ft rule; the flag cloth as the tee state drew it)"
+   "legacy": "holed under the first rule (before the 1-ft rule; the flag cloth as the tee state drew it)",
+   "sandChecked": true
   },
   "3:8": {
    "dir": 3,
@@ -109,7 +111,8 @@
    "rule": "near",
    "target": 1,
    "nearYd": 0.3333,
-   "legacy": "holed under the first rule (before the 1-ft rule; the flag cloth as the tee state drew it)"
+   "legacy": "holed under the first rule (before the 1-ft rule; the flag cloth as the tee state drew it)",
+   "sandChecked": true
   },
   "5:8": {
    "dir": 5,
@@ -143,7 +146,8 @@
    "rule": "near",
    "target": 1,
    "nearYd": 0.3333,
-   "legacy": "holed under the first rule (before the 1-ft rule; the flag cloth as the tee state drew it)"
+   "legacy": "holed under the first rule (before the 1-ft rule; the flag cloth as the tee state drew it)",
+   "sandChecked": true
   },
   "6:8": {
    "dir": 6,
@@ -177,7 +181,8 @@
    "rule": "near",
    "target": 1,
    "nearYd": 0.3333,
-   "legacy": "holed under the first rule (before the 1-ft rule; the flag cloth as the tee state drew it)"
+   "legacy": "holed under the first rule (before the 1-ft rule; the flag cloth as the tee state drew it)",
+   "sandChecked": true
   },
   "7:8": {
    "dir": 7,
@@ -211,7 +216,8 @@
    "rule": "near",
    "target": 1,
    "nearYd": 0.3333,
-   "legacy": "holed under the first rule (before the 1-ft rule; the flag cloth as the tee state drew it)"
+   "legacy": "holed under the first rule (before the 1-ft rule; the flag cloth as the tee state drew it)",
+   "sandChecked": true
   },
   "0:8": {
    "dir": 0,
@@ -245,7 +251,8 @@
      "toPin": 0.10936059691385563,
      "how": "roll"
     }
-   ]
+   ],
+   "sandChecked": true
   },
   "4:8": {
    "dir": 4,
@@ -279,7 +286,8 @@
      "toPin": 0.08980760662674979,
      "how": "roll"
     }
-   ]
+   ],
+   "sandChecked": true
   }
  },
  "updated": "2026-10-22T16:43:26.621Z"

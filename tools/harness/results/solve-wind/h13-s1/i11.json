@@ -13,7 +13,7 @@
    "dir": 0,
    "speedIdx": 11,
    "mph": 22,
-   "rule": "near",
+   "rule": "near-sand",
    "target": 1,
    "nearYd": 0.3333,
    "solved": true,
@@ -40,15 +40,19 @@
      "holed": false,
      "toPin": 0.19426674620724085,
      "near": true,
-     "how": "roll"
+     "how": "roll",
+     "sandRisk": true
     }
+   ],
+   "sandRisk": [
+    1
    ]
   },
   "1:11": {
    "dir": 1,
    "speedIdx": 11,
    "mph": 22,
-   "rule": "near",
+   "rule": "near-sand",
    "target": 1,
    "nearYd": 0.3333,
    "solved": true,
@@ -74,8 +78,12 @@
      ],
      "holed": true,
      "toPin": 0.10936049171408378,
-     "how": "roll"
+     "how": "roll",
+     "sandRisk": true
     }
+   ],
+   "sandRisk": [
+    1
    ]
   },
   "2:11": {
@@ -110,13 +118,14 @@
      "toPin": 0.10936085057436817,
      "how": "roll"
     }
-   ]
+   ],
+   "sandChecked": true
   },
   "3:11": {
    "dir": 3,
    "speedIdx": 11,
    "mph": 22,
-   "rule": "near",
+   "rule": "near-sand",
    "target": 1,
    "nearYd": 0.3333,
    "solved": true,
@@ -143,15 +152,19 @@
      "holed": false,
      "toPin": 0.25432096877754107,
      "near": true,
-     "how": "roll"
+     "how": "roll",
+     "sandRisk": true
     }
+   ],
+   "sandRisk": [
+    1
    ]
   },
   "4:11": {
    "dir": 4,
    "speedIdx": 11,
    "mph": 22,
-   "rule": "near",
+   "rule": "near-sand",
    "target": 1,
    "nearYd": 0.3333,
    "solved": true,
@@ -178,8 +191,12 @@
      "holed": false,
      "toPin": 0.3274994295479842,
      "near": true,
-     "how": "roll"
+     "how": "roll",
+     "sandRisk": true
     }
+   ],
+   "sandRisk": [
+    1
    ]
   },
   "5:11": {
@@ -214,13 +231,14 @@
      "toPin": 0.08602112276321718,
      "how": "roll"
     }
-   ]
+   ],
+   "sandChecked": true
   },
   "6:11": {
    "dir": 6,
    "speedIdx": 11,
    "mph": 22,
-   "rule": "near",
+   "rule": "near-sand",
    "target": 1,
    "nearYd": 0.3333,
    "solved": true,
@@ -246,8 +264,12 @@
      ],
      "holed": true,
      "toPin": 0.10529937889762846,
-     "how": "roll"
+     "how": "roll",
+     "sandRisk": true
     }
+   ],
+   "sandRisk": [
+    1
    ]
   },
   "7:11": {
@@ -282,7 +304,8 @@
      "toPin": 0.10163108363151008,
      "how": "roll"
     }
-   ]
+   ],
+   "sandChecked": true
   }
  },
  "updated": "2026-10-22T20:21:09.900Z"

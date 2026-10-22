@@ -87,7 +87,8 @@
       "how": "roll"
      }
     ]
-   }
+   },
+   "sandChecked": true
   },
   "1:15": {
    "dir": 1,
@@ -168,7 +169,8 @@
       "how": "roll"
      }
     ]
-   }
+   },
+   "sandChecked": true
   }
  },
  "updated": "2026-10-22T21:21:05.857Z"

@@ -573,14 +573,17 @@ function PlaybookCard({ hole, pb, pinKey, match, pick, onPick, show, onShow, onS
       {r && (
         <div className="space-y-1">
           {r.strokes.map((s, i) => {
-            const aim = Math.abs(s.aim) < 0.05 ? "at the pin" : `${Math.abs(s.aim).toFixed(1)}° ${s.aim > 0 ? "right" : "left"}`;
+            // the aim as a human sets it: the game's own left alone, or degrees off it
+            // (the flag's line beside it); else degrees off the flag's line
+            const flagTxt = Math.abs(s.aim) < 0.05 ? "at the pin" : `${Math.abs(s.aim).toFixed(1)}° ${s.aim > 0 ? "right" : "left"} of the flag`;
+            const aim = s.keepAim ? "keep the game's aim (no D-pad)" : s.aimGame != null ? `${Math.abs(s.aimGame).toFixed(1)}° ${s.aimGame > 0 ? "right" : "left"} of the game's aim (${flagTxt})` : flagTxt;
             const end = s.holed ? (s.how === "flag" ? "in, off the flag" : s.how === "hop" ? "in, on the hop" : "in")
               : s.near ? `${Math.max(1, Math.round(s.left * 36))} in from the cup, tap in` : `${Math.round(s.left)} yd left`;
             const on = lineOn(s);
             return (
               <button key={i} onClick={() => onStroke(s)} className="w-full text-left rounded-lg border-2 px-2 py-1"
                 style={on ? { background: T.turf, color: "#fff", borderColor: T.turf } : { borderColor: T.line, background: "#fff", color: T.ink }}>
-                <span className="mono font-bold">{i + 1}.</span> <b>{PB_CLUB[s.club] ?? s.club}</b> <span className="mono font-bold">{s.bars.toFixed(2)}</span> bars{s.bars > 4 ? " (past full, into the red)" : s.max ? " (max)" : ""} · aim {aim} · {Math.round(s.yd)} yd → {end}
+                <span className="mono font-bold">{i + 1}.</span> <b>{PB_CLUB[s.club] ?? s.club}</b> <span className="mono font-bold">{s.bars.toFixed(2)}</span> bars{s.bars > 4 ? " (past full, into the red)" : s.max ? " (max)" : ""} · aim {aim} · {Math.round(s.yd)} yd → {end}{s.sandRisk ? " · ⚠ 0.1 bar off can find sand or water" : ""}
               </button>
             );
           })}

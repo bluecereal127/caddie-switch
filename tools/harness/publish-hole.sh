@@ -21,7 +21,7 @@ const fs = require("fs"), path = require("path"), D = "tools/harness/results/sol
 let ok = 0, n = 0;
 for (const d of fs.readdirSync(D).filter((x) => x.startsWith(`h${h}-`)))
   for (const f of fs.readdirSync(path.join(D, d)).filter((x) => /^i\d\d\.json$/.test(x)))
-    for (const e of Object.values(JSON.parse(fs.readFileSync(path.join(D, d, f), "utf8")).winds ?? {})) if (e.rule === "near") { n++; if (e.solved) ok++; }
+    for (const e of Object.values(JSON.parse(fs.readFileSync(path.join(D, d, f), "utf8")).winds ?? {})) if (/^near/.test(e.rule)) { n++; if (e.solved) ok++; }
 console.log(`${ok} of ${n} winds solved`);' "$HOLE")
 git commit -q -m "Playbook: hole $HOLE finished in the wind campaign ($SUM)" -m "Built by tools/harness/publish-hole.sh when the hole's last job ended; tools/test-playbook-routes.mjs passed." -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>" || { echo "commit failed"; exit 4; }
 git push -q origin main || { echo "push failed"; exit 5; }

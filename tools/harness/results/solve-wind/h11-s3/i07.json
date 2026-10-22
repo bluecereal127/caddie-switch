@@ -13,7 +13,7 @@
    "dir": 0,
    "speedIdx": 7,
    "mph": 14,
-   "rule": "near",
+   "rule": "near-sand",
    "target": 1,
    "nearYd": 0.3333,
    "solved": true,
@@ -40,8 +40,12 @@
      "holed": false,
      "toPin": 0.26549471300969707,
      "near": true,
-     "how": "roll"
+     "how": "roll",
+     "sandRisk": true
     }
+   ],
+   "sandRisk": [
+    1
    ]
   },
   "1:7": {
@@ -76,13 +80,14 @@
      "toPin": 0.091264219662038,
      "how": "roll"
     }
-   ]
+   ],
+   "sandChecked": true
   },
   "2:7": {
    "dir": 2,
    "speedIdx": 7,
    "mph": 14,
-   "rule": "near",
+   "rule": "near-sand",
    "target": 1,
    "nearYd": 0.3333,
    "solved": true,
@@ -108,15 +113,19 @@
      ],
      "holed": true,
      "toPin": 0.0973930599276175,
-     "how": "roll"
+     "how": "roll",
+     "sandRisk": true
     }
+   ],
+   "sandRisk": [
+    1
    ]
   },
   "3:7": {
    "dir": 3,
    "speedIdx": 7,
    "mph": 14,
-   "rule": "near",
+   "rule": "near-sand",
    "target": 1,
    "nearYd": 0.3333,
    "solved": true,
@@ -142,15 +151,19 @@
      ],
      "holed": true,
      "toPin": 0.10202929197172597,
-     "how": "roll"
+     "how": "roll",
+     "sandRisk": true
     }
+   ],
+   "sandRisk": [
+    1
    ]
   },
   "4:7": {
    "dir": 4,
    "speedIdx": 7,
    "mph": 14,
-   "rule": "near",
+   "rule": "near-sand",
    "target": 1,
    "nearYd": 0.3333,
    "solved": true,
@@ -176,15 +189,19 @@
      ],
      "holed": true,
      "toPin": 0.10476242407975639,
-     "how": "roll"
+     "how": "roll",
+     "sandRisk": true
     }
+   ],
+   "sandRisk": [
+    1
    ]
   },
   "5:7": {
    "dir": 5,
    "speedIdx": 7,
    "mph": 14,
-   "rule": "near",
+   "rule": "near-sand",
    "target": 1,
    "nearYd": 0.3333,
    "solved": true,
@@ -210,8 +227,12 @@
      ],
      "holed": true,
      "toPin": 0.08912185418215611,
-     "how": "roll"
+     "how": "roll",
+     "sandRisk": true
     }
+   ],
+   "sandRisk": [
+    1
    ]
   },
   "6:7": {
@@ -247,7 +268,8 @@
      "near": true,
      "how": "roll"
     }
-   ]
+   ],
+   "sandChecked": true
   },
   "7:7": {
    "dir": 7,

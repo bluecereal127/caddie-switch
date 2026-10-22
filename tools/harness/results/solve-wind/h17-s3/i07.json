@@ -53,7 +53,8 @@
      "toPin": 0.10564011107277355,
      "how": "roll"
     }
-   ]
+   ],
+   "sandChecked": true
   },
   "2:7": {
    "dir": 2,
@@ -88,7 +89,8 @@
      "near": true,
      "how": "roll"
     }
-   ]
+   ],
+   "sandChecked": true
   },
   "3:7": {
    "dir": 3,

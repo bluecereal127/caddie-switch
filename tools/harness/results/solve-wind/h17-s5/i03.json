@@ -41,7 +41,8 @@
      "toPin": 0.1035117016610188,
      "how": "roll"
     }
-   ]
+   ],
+   "sandChecked": true
   },
   "1:3": {
    "dir": 1,
@@ -99,7 +100,8 @@
      "toPin": 0.1041571933366056,
      "how": "roll"
     }
-   ]
+   ],
+   "sandChecked": true
   },
   "4:3": {
    "dir": 4,
@@ -169,7 +171,8 @@
      "toPin": 0.10836598265209936,
      "how": "roll"
     }
-   ]
+   ],
+   "sandChecked": true
   }
  },
  "updated": "2026-10-22T20:52:59.396Z"

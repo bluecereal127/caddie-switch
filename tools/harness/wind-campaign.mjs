@@ -71,8 +71,10 @@ const keyOf = (d, i) => `${d}:${i}`;
 const entry = (c, d, i, s = readJson(sumFile(c, i))) => s?.winds?.[keyOf(d, i)];
 const done = (c, d, i, s) => entry(c, d, i, s)?.rule === ruleOf(c);
 // calm is played where results/solve's calm route does not stand under the near rule
+// calm routes a tenth of a bar puts in the sand (flag-sand-risk.mjs) are played again
+const CALM_RISK = readJson(path.join(OUTD, "calm-sand-risk.json")) ?? {};
 function calmStands(c) {
-  if (PAR[c.hole] === 5) return false;
+  if (PAR[c.hole] === 5 || CALM_RISK[P.cupKey(c)]) return false;
   const r = readJson(path.join(HERE, "results", "solve", `h${P.hh(c.hole)}-${c.id}.json`));
   if (!r?.solved) return false;
   const last = r.strokes[r.strokes.length - 1], t = r.tries.find((x) => x.k === last.k && x.gamePower === last.gamePower && x.heading === last.heading);

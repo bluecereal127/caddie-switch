@@ -41,7 +41,8 @@
      "toPin": 0.1087434768509596,
      "how": "roll"
     }
-   ]
+   ],
+   "sandChecked": true
   },
   "1:6": {
    "dir": 1,
@@ -75,7 +76,8 @@
      "toPin": 0.09659461157911273,
      "how": "roll"
     }
-   ]
+   ],
+   "sandChecked": true
   },
   "2:6": {
    "dir": 2,
@@ -109,7 +111,8 @@
      "toPin": 0.07775951814652335,
      "how": "roll"
     }
-   ]
+   ],
+   "sandChecked": true
   },
   "3:6": {
    "dir": 3,
@@ -143,7 +146,8 @@
      "toPin": 0.10480257996017842,
      "how": "roll"
     }
-   ]
+   ],
+   "sandChecked": true
   },
   "4:6": {
    "dir": 4,
@@ -177,7 +181,8 @@
      "toPin": 0.10162979656366274,
      "how": "roll"
     }
-   ]
+   ],
+   "sandChecked": true
   },
   "5:6": {
    "dir": 5,
@@ -211,7 +216,8 @@
      "toPin": 0.07346436366385807,
      "how": "roll"
     }
-   ]
+   ],
+   "sandChecked": true
   },
   "6:6": {
    "dir": 6,
@@ -245,7 +251,8 @@
      "toPin": 0.10125512510832912,
      "how": "roll"
     }
-   ]
+   ],
+   "sandChecked": true
   },
   "7:6": {
    "dir": 7,
@@ -279,7 +286,8 @@
      "toPin": 0.07429180837088102,
      "how": "roll"
     }
-   ]
+   ],
+   "sandChecked": true
   }
  },
  "updated": "2026-10-22T17:02:20.574Z"

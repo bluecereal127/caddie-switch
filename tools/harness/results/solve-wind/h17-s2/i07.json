@@ -65,7 +65,8 @@
      "toPin": 0.10936032318798883,
      "how": "roll"
     }
-   ]
+   ],
+   "sandChecked": true
   },
   "3:7": {
    "dir": 3,
@@ -99,7 +100,8 @@
      "toPin": 0.10936058840926693,
      "how": "roll"
     }
-   ]
+   ],
+   "sandChecked": true
   },
   "4:7": {
    "dir": 4,
@@ -117,7 +119,7 @@
    "dir": 5,
    "speedIdx": 7,
    "mph": 14,
-   "rule": "near",
+   "rule": "near-sand",
    "target": 1,
    "nearYd": 0.3333,
    "solved": true,
@@ -143,8 +145,12 @@
      ],
      "holed": true,
      "toPin": 0.10523534943606534,
-     "how": "roll"
+     "how": "roll",
+     "sandRisk": true
     }
+   ],
+   "sandRisk": [
+    1
    ]
   },
   "6:7": {
@@ -179,7 +185,8 @@
      "toPin": 0.10904612971793481,
      "how": "roll"
     }
-   ]
+   ],
+   "sandChecked": true
   },
   "7:7": {
    "dir": 7,

@@ -13,7 +13,7 @@
    "dir": 0,
    "speedIdx": 5,
    "mph": 10,
-   "rule": "near",
+   "rule": "near-sand",
    "target": 1,
    "nearYd": 0.3333,
    "solved": true,
@@ -39,15 +39,19 @@
      ],
      "holed": true,
      "toPin": 0.10865314161186149,
-     "how": "roll"
+     "how": "roll",
+     "sandRisk": true
     }
+   ],
+   "sandRisk": [
+    1
    ]
   },
   "1:5": {
    "dir": 1,
    "speedIdx": 5,
    "mph": 10,
-   "rule": "near",
+   "rule": "near-sand",
    "target": 1,
    "nearYd": 0.3333,
    "solved": true,
@@ -73,15 +77,19 @@
      ],
      "holed": true,
      "toPin": 0.0991692149343129,
-     "how": "roll"
+     "how": "roll",
+     "sandRisk": true
     }
+   ],
+   "sandRisk": [
+    1
    ]
   },
   "2:5": {
    "dir": 2,
    "speedIdx": 5,
    "mph": 10,
-   "rule": "near",
+   "rule": "near-sand",
    "target": 1,
    "nearYd": 0.3333,
    "solved": true,
@@ -107,8 +115,12 @@
      ],
      "holed": true,
      "toPin": 0.10936098051404224,
-     "how": "roll"
+     "how": "roll",
+     "sandRisk": true
     }
+   ],
+   "sandRisk": [
+    1
    ]
   },
   "3:5": {
@@ -143,7 +155,8 @@
      "toPin": 0.10194891654059912,
      "how": "roll"
     }
-   ]
+   ],
+   "sandChecked": true
   },
   "4:5": {
    "dir": 4,
@@ -177,7 +190,8 @@
      "toPin": 0.10284016981313172,
      "how": "roll"
     }
-   ]
+   ],
+   "sandChecked": true
   },
   "5:5": {
    "dir": 5,
@@ -211,7 +225,8 @@
      "toPin": 0.10907030402469935,
      "how": "roll"
     }
-   ]
+   ],
+   "sandChecked": true
   },
   "6:5": {
    "dir": 6,
@@ -245,13 +260,14 @@
      "toPin": 0.10336023779707273,
      "how": "roll"
     }
-   ]
+   ],
+   "sandChecked": true
   },
   "7:5": {
    "dir": 7,
    "speedIdx": 5,
    "mph": 10,
-   "rule": "near",
+   "rule": "near-sand",
    "target": 1,
    "nearYd": 0.3333,
    "solved": true,
@@ -277,8 +293,12 @@
      ],
      "holed": true,
      "toPin": 0.09451126779683182,
-     "how": "roll"
+     "how": "roll",
+     "sandRisk": true
     }
+   ],
+   "sandRisk": [
+    1
    ]
   }
  },

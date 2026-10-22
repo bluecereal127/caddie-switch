@@ -41,13 +41,14 @@
      "toPin": 0.10737237015885516,
      "how": "roll"
     }
-   ]
+   ],
+   "sandChecked": true
   },
   "1:2": {
    "dir": 1,
    "speedIdx": 2,
    "mph": 4,
-   "rule": "near",
+   "rule": "near-sand",
    "target": 1,
    "nearYd": 0.3333,
    "solved": true,
@@ -73,15 +74,19 @@
      ],
      "holed": true,
      "toPin": 0.10936055340103717,
-     "how": "roll"
+     "how": "roll",
+     "sandRisk": true
     }
+   ],
+   "sandRisk": [
+    1
    ]
   },
   "2:2": {
    "dir": 2,
    "speedIdx": 2,
    "mph": 4,
-   "rule": "near",
+   "rule": "near-sand",
    "target": 1,
    "nearYd": 0.3333,
    "solved": true,
@@ -107,15 +112,19 @@
      ],
      "holed": true,
      "toPin": 0.09221058833015679,
-     "how": "roll"
+     "how": "roll",
+     "sandRisk": true
     }
+   ],
+   "sandRisk": [
+    1
    ]
   },
   "3:2": {
    "dir": 3,
    "speedIdx": 2,
    "mph": 4,
-   "rule": "near",
+   "rule": "near-sand",
    "target": 1,
    "nearYd": 0.3333,
    "solved": true,
@@ -141,15 +150,19 @@
      ],
      "holed": true,
      "toPin": 0.10832256041420578,
-     "how": "roll"
+     "how": "roll",
+     "sandRisk": true
     }
+   ],
+   "sandRisk": [
+    1
    ]
   },
   "4:2": {
    "dir": 4,
    "speedIdx": 2,
    "mph": 4,
-   "rule": "near",
+   "rule": "near-sand",
    "target": 1,
    "nearYd": 0.3333,
    "solved": true,
@@ -176,8 +189,12 @@
      "holed": false,
      "toPin": 0.3268915493586799,
      "near": true,
-     "how": "roll"
+     "how": "roll",
+     "sandRisk": true
     }
+   ],
+   "sandRisk": [
+    1
    ]
   },
   "5:2": {
@@ -196,7 +213,7 @@
    "dir": 6,
    "speedIdx": 2,
    "mph": 4,
-   "rule": "near",
+   "rule": "near-sand",
    "target": 1,
    "nearYd": 0.3333,
    "solved": true,
@@ -222,8 +239,12 @@
      ],
      "holed": true,
      "toPin": 0.10203934928660323,
-     "how": "roll"
+     "how": "roll",
+     "sandRisk": true
     }
+   ],
+   "sandRisk": [
+    1
    ]
   },
   "7:2": {
@@ -258,7 +279,8 @@
      "toPin": 0.06988021651925654,
      "how": "roll"
     }
-   ]
+   ],
+   "sandChecked": true
   }
  },
  "updated": "2026-10-22T18:25:04.633Z"

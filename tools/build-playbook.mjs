@@ -43,6 +43,10 @@ const hh = (n) => String(n).padStart(2, "0");
 const r4 = (v) => Math.round(v * 1e4) / 1e4, r2 = (v) => Math.round(v * 100) / 100, r1 = (v) => Math.round(v * 10) / 10;
 const angDiff = (a, b) => Math.atan2(Math.sin(a - b), Math.cos(a - b));
 const readJson = (f) => { try { return JSON.parse(fs.readFileSync(f, "utf8")); } catch { return null; } };
+// each hole's tee aim (the game's own on the tee; flag-sand-risk.mjs) and the
+// calm routes a tenth of a bar puts in the sand
+const TEE_AIM = readJson(path.join(HERE, "harness", "results", "tee-aims.json")) ?? {};
+const CALM_RISK = readJson(path.join(HERE, "harness", "results", "solve-wind", "calm-sand-risk.json")) ?? {};
 
 let bad = 0;
 const fail = (m) => { console.error(`  ${m}`); bad++; };
@@ -80,6 +84,10 @@ for (let hole = 1; hole <= 18; hole++) {
       const aimTo = toMap([s.from[0] + Math.sin(s.heading) * len, 0, s.from[2] + Math.cos(s.heading) * len]);
       return {
         aimTo,
+        // the aim against the game's own at the address (+ right; the tee's from
+        // tee-aims.json when the stroke has none): keepAim, no D-pad at all
+        ...(() => { const a0 = s.aim0 ?? (s.k === 1 ? TEE_AIM[hole]?.heading : null); if (a0 == null) return {}; const d = -angDiff(s.heading, a0); return Math.abs(d) < 0.0006 ? { keepAim: true, aimGame: 0 } : { aimGame: r2(d * R2D) }; })(),
+        ...(s.sandRisk ? { sandRisk: true } : {}),
         // at the lie's full power (4.00 bars from the tee or fairway, 3.00 in the rough, a bunker's cap): a swing a human maxes
         ...(s.club !== "putter" && s.gamePower >= (s.lie === 2 ? 0.75 : s.lie === 3 || s.lie === 16 ? ({ driver: 0.25, spoon: 0.25, wedge: 0.75 }[s.club] ?? 0.5) : 1) - 0.0015 ? { max: true } : {}),
         club: s.club, bars: r2(4 * s.gamePower), aim: r2(-angDiff(s.heading, h0) * R2D), heading: r1(bearingOf(Math.sin(s.heading), Math.cos(s.heading))),
@@ -111,7 +119,8 @@ for (let hole = 1; hole <= 18; hole++) {
     } else if (calmNear) {
       if (check("calm (fallback)", calmNear.fallback.strokes, 3)) routes.push({ dir: null, mph: 0, deg: null, fallback: true, strokes: calmNear.fallback.strokes.map(stroke) });
     } else if (calm?.solved) {
-      let ss = calm.strokes.map((x) => { const t = calm.tries.find((y) => y.k === x.k && y.gamePower === x.gamePower && y.heading === x.heading); return { ...x, from: t?.from, lie: x.lie ?? t?.lie, how: x.how ?? t?.how }; });
+      const risk = CALM_RISK[`h${hh(hole)}-${id}`] ?? [];
+      let ss = calm.strokes.map((x) => { const t = calm.tries.find((y) => y.k === x.k && y.gamePower === x.gamePower && y.heading === x.heading); return { ...x, from: t?.from, lie: x.lie ?? t?.lie, how: x.how ?? t?.how, ...(risk.includes(x.k) ? { sandRisk: true } : {}) }; });
       // cut at its first finish within 1 ft (h12-s4: the second shot 0.23 yd from the cup, then a putt): the tap-in the near rule asks for
       const k = ss.findIndex((x) => lastOk(x, true));
       if (k >= 0 && k < ss.length - 1) ss = ss.slice(0, k + 1);

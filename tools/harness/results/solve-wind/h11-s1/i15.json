@@ -42,13 +42,14 @@
      "near": true,
      "how": "roll"
     }
-   ]
+   ],
+   "sandChecked": true
   },
   "1:15": {
    "dir": 1,
    "speedIdx": 15,
    "mph": 30,
-   "rule": "near",
+   "rule": "near-sand",
    "target": 1,
    "nearYd": 0.3333,
    "solved": true,
@@ -74,15 +75,19 @@
      ],
      "holed": true,
      "toPin": 0.10867341972934495,
-     "how": "roll"
+     "how": "roll",
+     "sandRisk": true
     }
+   ],
+   "sandRisk": [
+    1
    ]
   },
   "2:15": {
    "dir": 2,
    "speedIdx": 15,
    "mph": 30,
-   "rule": "near",
+   "rule": "near-sand",
    "target": 1,
    "nearYd": 0.3333,
    "solved": true,
@@ -108,15 +113,19 @@
      ],
      "holed": true,
      "toPin": 0.10936154463663396,
-     "how": "roll"
+     "how": "roll",
+     "sandRisk": true
     }
+   ],
+   "sandRisk": [
+    1
    ]
   },
   "3:15": {
    "dir": 3,
    "speedIdx": 15,
    "mph": 30,
-   "rule": "near",
+   "rule": "near-sand",
    "target": 1,
    "nearYd": 0.3333,
    "solved": true,
@@ -142,15 +151,19 @@
      ],
      "holed": true,
      "toPin": 0.0822070220962553,
-     "how": "roll"
+     "how": "roll",
+     "sandRisk": true
     }
+   ],
+   "sandRisk": [
+    1
    ]
   },
   "4:15": {
    "dir": 4,
    "speedIdx": 15,
    "mph": 30,
-   "rule": "near",
+   "rule": "near-sand",
    "target": 1,
    "nearYd": 0.3333,
    "solved": true,
@@ -176,15 +189,19 @@
      ],
      "holed": true,
      "toPin": 0.08357185710724635,
-     "how": "roll"
+     "how": "roll",
+     "sandRisk": true
     }
+   ],
+   "sandRisk": [
+    1
    ]
   },
   "5:15": {
    "dir": 5,
    "speedIdx": 15,
    "mph": 30,
-   "rule": "near",
+   "rule": "near-sand",
    "target": 1,
    "nearYd": 0.3333,
    "solved": true,
@@ -210,15 +227,19 @@
      ],
      "holed": true,
      "toPin": 0.07267977285715126,
-     "how": "roll"
+     "how": "roll",
+     "sandRisk": true
     }
+   ],
+   "sandRisk": [
+    1
    ]
   },
   "6:15": {
    "dir": 6,
    "speedIdx": 15,
    "mph": 30,
-   "rule": "near",
+   "rule": "near-sand",
    "target": 1,
    "nearYd": 0.3333,
    "solved": true,
@@ -244,8 +265,12 @@
      ],
      "holed": true,
      "toPin": 0.10549628808322739,
-     "how": "roll"
+     "how": "roll",
+     "sandRisk": true
     }
+   ],
+   "sandRisk": [
+    1
    ]
   },
   "7:15": {
@@ -281,7 +306,8 @@
      "near": true,
      "how": "roll"
     }
-   ]
+   ],
+   "sandChecked": true
   }
  },
  "updated": "2026-10-22T19:05:53.436Z"

@@ -89,13 +89,14 @@
      "toPin": 0.10935525819369633,
      "how": "roll"
     }
-   ]
+   ],
+   "sandChecked": true
   },
   "5:8": {
    "dir": 5,
    "speedIdx": 8,
    "mph": 16,
-   "rule": "near",
+   "rule": "near-sand",
    "target": 1,
    "nearYd": 0.3333,
    "solved": true,
@@ -121,8 +122,12 @@
      ],
      "holed": true,
      "toPin": 0.09110565615410833,
-     "how": "roll"
+     "how": "roll",
+     "sandRisk": true
     }
+   ],
+   "sandRisk": [
+    1
    ]
   },
   "6:8": {

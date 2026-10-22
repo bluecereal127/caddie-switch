@@ -41,7 +41,8 @@
    "rule": "near",
    "target": 1,
    "nearYd": 0.3333,
-   "legacy": "holed under the first rule (before the 1-ft rule; the flag cloth as the tee state drew it)"
+   "legacy": "holed under the first rule (before the 1-ft rule; the flag cloth as the tee state drew it)",
+   "sandChecked": true
   },
   "2:8": {
    "dir": 2,
@@ -75,7 +76,8 @@
    "rule": "near",
    "target": 1,
    "nearYd": 0.3333,
-   "legacy": "holed under the first rule (before the 1-ft rule; the flag cloth as the tee state drew it)"
+   "legacy": "holed under the first rule (before the 1-ft rule; the flag cloth as the tee state drew it)",
+   "sandChecked": true
   },
   "3:8": {
    "dir": 3,
@@ -103,13 +105,17 @@
       -511.9760437011719
      ],
      "holed": true,
-     "how": "roll"
+     "how": "roll",
+     "sandRisk": true
     }
    ],
-   "rule": "near",
+   "rule": "near-sand",
    "target": 1,
    "nearYd": 0.3333,
-   "legacy": "holed under the first rule (before the 1-ft rule; the flag cloth as the tee state drew it)"
+   "legacy": "holed under the first rule (before the 1-ft rule; the flag cloth as the tee state drew it)",
+   "sandRisk": [
+    1
+   ]
   },
   "4:8": {
    "dir": 4,
@@ -143,7 +149,8 @@
    "rule": "near",
    "target": 1,
    "nearYd": 0.3333,
-   "legacy": "holed under the first rule (before the 1-ft rule; the flag cloth as the tee state drew it)"
+   "legacy": "holed under the first rule (before the 1-ft rule; the flag cloth as the tee state drew it)",
+   "sandChecked": true
   },
   "6:8": {
    "dir": 6,
@@ -177,7 +184,8 @@
    "rule": "near",
    "target": 1,
    "nearYd": 0.3333,
-   "legacy": "holed under the first rule (before the 1-ft rule; the flag cloth as the tee state drew it)"
+   "legacy": "holed under the first rule (before the 1-ft rule; the flag cloth as the tee state drew it)",
+   "sandChecked": true
   },
   "7:8": {
    "dir": 7,
@@ -211,7 +219,8 @@
    "rule": "near",
    "target": 1,
    "nearYd": 0.3333,
-   "legacy": "holed under the first rule (before the 1-ft rule; the flag cloth as the tee state drew it)"
+   "legacy": "holed under the first rule (before the 1-ft rule; the flag cloth as the tee state drew it)",
+   "sandChecked": true
   },
   "0:8": {
    "dir": 0,
@@ -245,7 +254,8 @@
      "toPin": 0.10877204481273688,
      "how": "roll"
     }
-   ]
+   ],
+   "sandChecked": true
   },
   "5:8": {
    "dir": 5,
@@ -279,7 +289,8 @@
      "toPin": 0.10587822362611088,
      "how": "roll"
     }
-   ]
+   ],
+   "sandChecked": true
   }
  },
  "updated": "2026-10-22T17:25:07.784Z"

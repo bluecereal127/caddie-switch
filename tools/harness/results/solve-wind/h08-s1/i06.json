@@ -13,7 +13,7 @@
    "dir": 0,
    "speedIdx": 6,
    "mph": 12,
-   "rule": "near",
+   "rule": "near-sand",
    "target": 1,
    "nearYd": 0.3333,
    "solved": true,
@@ -39,15 +39,19 @@
      ],
      "holed": true,
      "toPin": 0.10806879495703653,
-     "how": "roll"
+     "how": "roll",
+     "sandRisk": true
     }
+   ],
+   "sandRisk": [
+    1
    ]
   },
   "1:6": {
    "dir": 1,
    "speedIdx": 6,
    "mph": 12,
-   "rule": "near",
+   "rule": "near-sand",
    "target": 1,
    "nearYd": 0.3333,
    "solved": true,
@@ -73,15 +77,19 @@
      ],
      "holed": true,
      "toPin": 0.10936103668485463,
-     "how": "roll"
+     "how": "roll",
+     "sandRisk": true
     }
+   ],
+   "sandRisk": [
+    1
    ]
   },
   "2:6": {
    "dir": 2,
    "speedIdx": 6,
    "mph": 12,
-   "rule": "near",
+   "rule": "near-sand",
    "target": 1,
    "nearYd": 0.3333,
    "solved": true,
@@ -108,8 +116,12 @@
      "holed": false,
      "toPin": 0.21912806949024421,
      "near": true,
-     "how": "roll"
+     "how": "roll",
+     "sandRisk": true
     }
+   ],
+   "sandRisk": [
+    1
    ]
   },
   "3:6": {
@@ -144,7 +156,8 @@
      "toPin": 0.10359392165844969,
      "how": "roll"
     }
-   ]
+   ],
+   "sandChecked": true
   },
   "4:6": {
    "dir": 4,
@@ -178,7 +191,8 @@
      "toPin": 0.10026180930161614,
      "how": "roll"
     }
-   ]
+   ],
+   "sandChecked": true
   },
   "5:6": {
    "dir": 5,
@@ -212,7 +226,8 @@
      "toPin": 0.10122467539680058,
      "how": "roll"
     }
-   ]
+   ],
+   "sandChecked": true
   },
   "6:6": {
    "dir": 6,
@@ -246,13 +261,14 @@
      "toPin": 0.10051998170003808,
      "how": "roll"
     }
-   ]
+   ],
+   "sandChecked": true
   },
   "7:6": {
    "dir": 7,
    "speedIdx": 6,
    "mph": 12,
-   "rule": "near",
+   "rule": "near-sand",
    "target": 1,
    "nearYd": 0.3333,
    "solved": true,
@@ -278,8 +294,12 @@
      ],
      "holed": true,
      "toPin": 0.10063769359032902,
-     "how": "roll"
+     "how": "roll",
+     "sandRisk": true
     }
+   ],
+   "sandRisk": [
+    1
    ]
   }
  },

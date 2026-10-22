@@ -41,7 +41,8 @@
      "toPin": 0.07946236838251122,
      "how": "roll"
     }
-   ]
+   ],
+   "sandChecked": true
   },
   "1:6": {
    "dir": 1,
@@ -75,7 +76,8 @@
      "toPin": 0.10922081458557856,
      "how": "roll"
     }
-   ]
+   ],
+   "sandChecked": true
   },
   "2:6": {
    "dir": 2,
@@ -109,7 +111,8 @@
      "toPin": 0.06658344483717074,
      "how": "roll"
     }
-   ]
+   ],
+   "sandChecked": true
   },
   "3:6": {
    "dir": 3,
@@ -143,7 +146,8 @@
      "toPin": 0.07219505335133083,
      "how": "roll"
     }
-   ]
+   ],
+   "sandChecked": true
   },
   "4:6": {
    "dir": 4,
@@ -189,13 +193,14 @@
      "toPin": 0.07135258912388485,
      "how": "roll"
     }
-   ]
+   ],
+   "sandChecked": true
   },
   "6:6": {
    "dir": 6,
    "speedIdx": 6,
    "mph": 12,
-   "rule": "near",
+   "rule": "near-sand",
    "target": 1,
    "nearYd": 0.3333,
    "solved": true,
@@ -221,8 +226,12 @@
      ],
      "holed": true,
      "toPin": 0.1092047168485929,
-     "how": "roll"
+     "how": "roll",
+     "sandRisk": true
     }
+   ],
+   "sandRisk": [
+    1
    ]
   },
   "7:6": {
@@ -257,7 +266,8 @@
      "toPin": 0.1093618260491349,
      "how": "roll"
     }
-   ]
+   ],
+   "sandChecked": true
   }
  },
  "updated": "2026-10-22T17:44:21.450Z"

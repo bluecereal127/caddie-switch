@@ -55,19 +55,23 @@
       -1498.3492431640625
      ],
      "holed": true,
-     "how": "roll"
+     "how": "roll",
+     "sandRisk": true
     }
    ],
-   "rule": "near",
+   "rule": "near-sand",
    "target": 2,
    "nearYd": 0.3333,
-   "legacy": "holed under the first rule (before the 1-ft rule; the flag cloth as the tee state drew it)"
+   "legacy": "holed under the first rule (before the 1-ft rule; the flag cloth as the tee state drew it)",
+   "sandRisk": [
+    2
+   ]
   },
   "0:9": {
    "dir": 0,
    "speedIdx": 9,
    "mph": 18,
-   "rule": "near",
+   "rule": "near-sand",
    "target": 2,
    "nearYd": 0.3333,
    "solved": true,
@@ -114,8 +118,12 @@
      ],
      "holed": true,
      "toPin": 0.07218117006176833,
-     "how": "roll"
+     "how": "roll",
+     "sandRisk": true
     }
+   ],
+   "sandRisk": [
+    2
    ]
   },
   "1:9": {
@@ -172,7 +180,8 @@
      "near": true,
      "how": "roll"
     }
-   ]
+   ],
+   "sandChecked": true
   },
   "2:9": {
    "dir": 2,
@@ -227,7 +236,8 @@
      "toPin": 0.08096906038443832,
      "how": "roll"
     }
-   ]
+   ],
+   "sandChecked": true
   },
   "3:9": {
    "dir": 3,
@@ -282,7 +292,8 @@
      "toPin": 0.10472918236146793,
      "how": "roll"
     }
-   ]
+   ],
+   "sandChecked": true
   },
   "4:9": {
    "dir": 4,
@@ -337,13 +348,14 @@
      "toPin": 0.09193383660348291,
      "how": "roll"
     }
-   ]
+   ],
+   "sandChecked": true
   },
   "6:9": {
    "dir": 6,
    "speedIdx": 9,
    "mph": 18,
-   "rule": "near",
+   "rule": "near-sand",
    "target": 2,
    "nearYd": 0.3333,
    "solved": true,
@@ -391,8 +403,12 @@
      "holed": false,
      "toPin": 0.18967633175157933,
      "near": true,
-     "how": "roll"
+     "how": "roll",
+     "sandRisk": true
     }
+   ],
+   "sandRisk": [
+    2
    ]
   },
   "7:9": {
@@ -449,7 +465,8 @@
      "near": true,
      "how": "roll"
     }
-   ]
+   ],
+   "sandChecked": true
   }
  },
  "updated": "2026-10-22T16:34:56.003Z"

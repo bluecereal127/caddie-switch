@@ -41,7 +41,8 @@
      "toPin": 0.07531511708625974,
      "how": "roll"
     }
-   ]
+   ],
+   "sandChecked": true
   },
   "1:14": {
    "dir": 1,
@@ -76,13 +77,14 @@
      "near": true,
      "how": "roll"
     }
-   ]
+   ],
+   "sandChecked": true
   },
   "2:14": {
    "dir": 2,
    "speedIdx": 14,
    "mph": 28,
-   "rule": "near",
+   "rule": "near-sand",
    "target": 1,
    "nearYd": 0.3333,
    "solved": true,
@@ -108,15 +110,19 @@
      ],
      "holed": true,
      "toPin": 0.10601575961492173,
-     "how": "roll"
+     "how": "roll",
+     "sandRisk": true
     }
+   ],
+   "sandRisk": [
+    1
    ]
   },
   "3:14": {
    "dir": 3,
    "speedIdx": 14,
    "mph": 28,
-   "rule": "near",
+   "rule": "near-sand",
    "target": 1,
    "nearYd": 0.3333,
    "solved": true,
@@ -142,15 +148,19 @@
      ],
      "holed": true,
      "toPin": 0.10936375466776493,
-     "how": "roll"
+     "how": "roll",
+     "sandRisk": true
     }
+   ],
+   "sandRisk": [
+    1
    ]
   },
   "4:14": {
    "dir": 4,
    "speedIdx": 14,
    "mph": 28,
-   "rule": "near",
+   "rule": "near-sand",
    "target": 1,
    "nearYd": 0.3333,
    "solved": true,
@@ -176,8 +186,12 @@
      ],
      "holed": true,
      "toPin": 0.10884326045767981,
-     "how": "roll"
+     "how": "roll",
+     "sandRisk": true
     }
+   ],
+   "sandRisk": [
+    1
    ]
   },
   "5:14": {
@@ -212,13 +226,14 @@
      "toPin": 0.07585012326178438,
      "how": "roll"
     }
-   ]
+   ],
+   "sandChecked": true
   },
   "6:14": {
    "dir": 6,
    "speedIdx": 14,
    "mph": 28,
-   "rule": "near",
+   "rule": "near-sand",
    "target": 1,
    "nearYd": 0.3333,
    "solved": true,
@@ -245,8 +260,12 @@
      "holed": false,
      "toPin": 0.2161210939413488,
      "near": true,
-     "how": "roll"
+     "how": "roll",
+     "sandRisk": true
     }
+   ],
+   "sandRisk": [
+    1
    ]
   },
   "7:14": {
@@ -281,7 +300,8 @@
      "toPin": 0.08697248213724063,
      "how": "roll"
     }
-   ]
+   ],
+   "sandChecked": true
   }
  },
  "updated": "2026-10-22T20:04:57.006Z"

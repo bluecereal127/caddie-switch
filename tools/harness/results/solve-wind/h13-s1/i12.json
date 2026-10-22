@@ -41,7 +41,8 @@
      "toPin": 0.10137133259601375,
      "how": "roll"
     }
-   ]
+   ],
+   "sandChecked": true
   },
   "1:12": {
    "dir": 1,
@@ -75,7 +76,8 @@
      "toPin": 0.10832475530348983,
      "how": "roll"
     }
-   ]
+   ],
+   "sandChecked": true
   },
   "2:12": {
    "dir": 2,
@@ -109,13 +111,14 @@
      "toPin": 0.10909733385048939,
      "how": "roll"
     }
-   ]
+   ],
+   "sandChecked": true
   },
   "3:12": {
    "dir": 3,
    "speedIdx": 12,
    "mph": 24,
-   "rule": "near",
+   "rule": "near-sand",
    "target": 1,
    "nearYd": 0.3333,
    "solved": true,
@@ -141,15 +144,19 @@
      ],
      "holed": true,
      "toPin": 0.07015307041170603,
-     "how": "roll"
+     "how": "roll",
+     "sandRisk": true
     }
+   ],
+   "sandRisk": [
+    1
    ]
   },
   "4:12": {
    "dir": 4,
    "speedIdx": 12,
    "mph": 24,
-   "rule": "near",
+   "rule": "near-sand",
    "target": 1,
    "nearYd": 0.3333,
    "solved": true,
@@ -175,8 +182,12 @@
      ],
      "holed": true,
      "toPin": 0.08944267071610383,
-     "how": "roll"
+     "how": "roll",
+     "sandRisk": true
     }
+   ],
+   "sandRisk": [
+    1
    ]
   },
   "5:12": {
@@ -211,7 +222,8 @@
      "toPin": 0.10888856747285265,
      "how": "roll"
     }
-   ]
+   ],
+   "sandChecked": true
   },
   "6:12": {
    "dir": 6,
@@ -245,7 +257,8 @@
      "toPin": 0.08797956633306066,
      "how": "roll"
     }
-   ]
+   ],
+   "sandChecked": true
   },
   "7:12": {
    "dir": 7,
@@ -279,7 +292,8 @@
      "toPin": 0.08573693729169143,
      "how": "roll"
     }
-   ]
+   ],
+   "sandChecked": true
   }
  },
  "updated": "2026-10-22T19:52:27.489Z"

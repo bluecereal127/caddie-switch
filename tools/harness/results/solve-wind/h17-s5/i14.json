@@ -53,7 +53,8 @@
      "toPin": 0.07654559715569617,
      "how": "roll"
     }
-   ]
+   ],
+   "sandChecked": true
   },
   "2:14": {
    "dir": 2,
@@ -87,7 +88,8 @@
      "toPin": 0.07036214975181923,
      "how": "roll"
     }
-   ]
+   ],
+   "sandChecked": true
   },
   "3:14": {
    "dir": 3,
@@ -157,7 +159,8 @@
      "toPin": 0.09953992639671116,
      "how": "roll"
     }
-   ]
+   ],
+   "sandChecked": true
   },
   "7:14": {
    "dir": 7,
@@ -191,7 +194,8 @@
      "toPin": 0.10936101068421415,
      "how": "roll"
     }
-   ]
+   ],
+   "sandChecked": true
   }
  },
  "updated": "2026-10-22T20:48:32.262Z"

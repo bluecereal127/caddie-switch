@@ -212,6 +212,24 @@ const nearPin = (st) => (p) => holes(p) || (!p.holed && Math.hypot(p.rest[0] - s
 const goal = (st) => (RULE === "near" ? nearPin(st) : holes);
 // a try that made the rule: holed, or at rest within the tap-in
 const made = (r) => r.holed || (NEAR_YD > 0 && r.toPin <= NEAR_YD);
+// a human's power is good to about a tenth of a bar (the user, 2026-10-22:
+// shots that bounce just short of a bunker and over it "will sometimes come
+// up short and end up in the sand"): a stroke is sand-safe when its ball, 0.05
+// and 0.1 bar (0.0125, 0.025 of power) either way, rests on fairway, rough,
+// fringe or green (or drops), never in sand, water, out of bounds or the
+// woods; a full-power swing is exact (the bars maxed), so only its own flight counts
+const POWER_ERR = [-0.025, -0.0125, 0.0125, 0.025];
+const SAFE_LIES = new Set(["fairway", "rough", "green", "fringe", "cup"]);
+function sandSafe(st, c) {
+  const cap = capOf(c.club, st.player.lie);
+  for (const dq of c.power >= cap - 0.0015 ? [0] : POWER_ERR) {
+    const q = c.power + dq;
+    if (q < 0.03 || q > cap + 1e-9) continue;
+    const p = pred(st, c.club, q, c.heading);
+    if (p.hazard || !SAFE_LIES.has(p.restLie)) return false;
+  }
+  return true;
+}
 // the turn that puts a rest's bearing from the ball on the pin's (a wind's drift
 // taken out of the aim; t.rx, t.rz the rest, ball and pin [x, y, z])
 // how near a flight (the cup in play) comes to finishing at the pin: 0 for a
@@ -382,7 +400,14 @@ async function cellsFor(st) {
     return hp;
   };
   function* order() {
-    if (RULE === "near") { yield* cells; return; }   // no flag or hop cells
+    // the near rule: no flag or hop cells; a cell a 0.05-0.1 bar miss puts in
+    // the sand (or water, out of bounds) only after every cell that is safe
+    if (RULE === "near") {
+      const later = [];
+      for (const c of cells) { if (sandSafe(st, c)) yield c; else later.push({ ...c, sandRisk: true }); }
+      yield* later;
+      return;
+    }
     let i = 0, j = 0, F = null;
     for (;;) {
       const r = cells[i];
@@ -436,7 +461,8 @@ async function saveHere(k) {
 function record(k, st, c, r, why) {
   tryNo++;
   const how = c.how ?? "roll";
-  const row = { n: tryNo, k, why, how, from: st.ball.pos, lie: st.player.lie, club: c.club, plannedPower: c.power, ...r };
+  // aim0: the game's own aim at the address (the heading before any D-pad)
+  const row = { n: tryNo, k, why, how, from: st.ball.pos, lie: st.player.lie, aim0: st.player.heading, club: c.club, plannedPower: c.power, ...r, ...(c.sandRisk ? { sandRisk: true } : {}) };
   if (how === "flag" && c.route) row.flag = { route: c.route, robust: c.robust, score: +c.score.toFixed(3), aimOffDeg: c.aimOffDeg, height: c.height, offset: c.offset, speed: c.speed, marginU: c.marginU,
     holedEst: c.holedEst, kclHoled: c.kcl?.holed ?? null, verified: c.verified ?? null, wind: FLAG_WIND, src: FLAG_SRC };
   result.tries.push(row); save();
@@ -462,7 +488,7 @@ async function finalStroke(k, saved) {
       status(`stroke ${k} try ${tryNo + 1}`);
       const r = await strike(st, c);
       record(k, st, c, r, it === 0 ? `cell ${n}` : `cell ${n}, correction ${it}`);
-      if (made(r)) return { strokes: [{ k, ...r, how, ...(r.holed ? {} : { near: true }) }] };
+      if (made(r)) return { strokes: [{ k, ...r, how, ...(r.holed ? {} : { near: true }), ...(cell.sandRisk ? { sandRisk: true } : {}) }] };
       if (how !== "roll") break;   // a flag or hop cell's miss: the next cell
       // the model's error at the power the game launched and the aim reached; the step to cancel it
       const at = { club: c.club, power: r.gamePower, heading: r.heading };
@@ -528,6 +554,10 @@ async function rankSetups(st, k) {
   const cands = maxOnly ? [] : [{ club: pl.club, power: pl.power, heading: pl.heading, src: "the planner" }];
   const clubs = st.player.lie === 3 ? ["3iron", "5iron", "7iron", "9iron", "wedge"] : maxOnly ? BAG : ["driver", "spoon", "3iron", "5iron", "7iron"];
   if (maxOnly) {
+    // the game's own aim first: no D-pad, so a human repeats it exactly (on a
+    // long hole the minimap zooms only onto the green, and the aim line cannot
+    // be lined up there); then an aim every degree
+    for (const club of clubs) cands.push({ club, power: capOf(club, st.player.lie), heading: st.player.heading, src: "full power, the game's aim", keep: true });
     for (let d = -30; d <= 30; d++) for (const club of clubs) cands.push({ club, power: capOf(club, st.player.lie), heading: toPin + d * DEG, src: "full power" });
   } else for (const d of [0, 2, -2, 4, -4, 6, -6, 9, -9, 12, -12, 16, -16, 20, -20, 25, -25, 30, -30]) for (const club of clubs) {
     const cap = capOf(club, st.player.lie);
@@ -539,6 +569,7 @@ async function rankSetups(st, k) {
     if (holes(p)) { rests.push({ ...c, rest: Object.assign([p.rest[0], p.rest[1]], { lie: 6, y: p.restY }), restLie: "cup", toPin: 0, score: 1e6 }); continue; }
     if (p.hazard || !(p.restLie in LIE_OK)) continue;
     if (p.tree) continue;
+    if (!maxOnly && !sandSafe(st, c)) continue;   // a part-power setup a tenth of a bar puts in the sand
     const rest = Object.assign([p.rest[0], p.rest[1]], { lie: LIE_OK[p.restLie], y: p.restY });
     if (rests.some((r) => Math.hypot(r.rest[0] - rest[0], r.rest[1] - rest[1]) / YD < 6)) continue;
     rests.push({ ...c, rest, restLie: p.restLie, toPin: p.toPin });
@@ -548,8 +579,11 @@ async function rankSetups(st, k) {
   const pick = rests.slice(0, 14);
   const planned = rests.find((r) => r.src === "the planner");
   if (planned && !pick.includes(planned)) pick.push(planned);
+  for (const r of rests) if (r.keep && !pick.includes(r)) pick.push(r);   // the game's-aim rests valued too
   for (const r of pick) if (r.score == null) r.score = k + 1 === target ? holeability(r.rest, st) : -r.toPin / 50;
   pick.sort((a, b) => b.score - a.score || a.toPin - b.toPin);
+  // the game's-aim setups first while they leave the next stroke a finish
+  if (maxOnly) { const first = pick.filter((r) => r.keep && (k + 1 !== target || r.score > 0)); pick.splice(0, pick.length, ...first, ...pick.filter((r) => !first.includes(r))); }
   log(`stroke ${k} (a setup): ${rests.length} distinct rests in play; the best: ${pick.slice(0, 5).map((r) => `${r.club} ${r.power.toFixed(2)} ${(angDiff(r.heading, toPin) / DEG).toFixed(0)} deg -> ${r.restLie} ${r.toPin.toFixed(0)} yd (${k + 1 === target ? `${r.score} holing cells` : "next a setup"})`).join("; ")}`);
   return pick;
 }
@@ -808,9 +842,9 @@ if (WINDS) {
     target = T0; SETUP_MODE = "any";
     result.solved = !!sol; result.strokes = sol?.strokes ?? null; if (fb) result.fallback = fb.strokes; result.ms = Date.now() - tw; save();
     // each solved stroke with the spot it was struck from (its try's row)
-    const rows = (ss) => ss.map((x) => { const t = result.tries.find((r) => r.k === x.k && r.gamePower === x.gamePower && r.heading === x.heading); return { k: x.k, club: x.club, power: x.power, gamePower: x.gamePower, heading: x.heading, from: t?.from ?? null, lie: t?.lie ?? null, rest: x.rest, holed: x.holed, toPin: x.toPin, ...(x.near ? { near: true } : {}), how: x.how ?? "roll" }; });
+    const rows = (ss) => ss.map((x) => { const t = result.tries.find((r) => r.k === x.k && r.gamePower === x.gamePower && r.heading === x.heading); return { k: x.k, club: x.club, power: x.power, gamePower: x.gamePower, heading: x.heading, aim0: t?.aim0 ?? null, ...(x.sandRisk ? { sandRisk: true } : {}), from: t?.from ?? null, lie: t?.lie ?? null, rest: x.rest, holed: x.holed, toPin: x.toPin, ...(x.near ? { near: true } : {}), how: x.how ?? "roll" }; });
     const strokes = sol ? rows(sol.strokes) : null;
-    sumOf(w.speedIdx).winds[key] = { dir: w.dir, speedIdx: w.speedIdx, mph: 2 * w.speedIdx, rule: RULE_TAG, target, ...(used && par !== 3 ? { setups: used.mode } : {}), ...(NEAR_YD ? { nearYd: +NEAR_YD.toFixed(4) } : {}), solved: !!sol, tries: tryNo, ms: result.ms, strokes, ...(fb ? { fallback: { target: 3, strokes: rows(fb.strokes) } } : {}), ...(why ? { why } : {}) };
+    sumOf(w.speedIdx).winds[key] = { dir: w.dir, speedIdx: w.speedIdx, mph: 2 * w.speedIdx, rule: RULE_TAG, target, sandChecked: true, ...(used && par !== 3 ? { setups: used.mode } : {}), ...(NEAR_YD ? { nearYd: +NEAR_YD.toFixed(4) } : {}), solved: !!sol, tries: tryNo, ms: result.ms, strokes, ...(fb ? { fallback: { target: 3, strokes: rows(fb.strokes) } } : {}), ...(why ? { why } : {}) };
     saveSum(w.speedIdx);
     if (sol) nSolved++;
     log(`wind ${key} (${2 * w.speedIdx} mph): ${sol ? `SOLVED in ${sol.strokes.length}: ${sol.strokes.map((x) => `${x.club} ${x.gamePower.toFixed(4)} at ${(x.heading / DEG).toFixed(3)} deg`).join(", ")}` : `not solved (${why ?? "the search ran out"})${fb ? `; the fallback in ${fb.strokes.length}: ${fb.strokes.map((x) => `${x.club} ${x.gamePower.toFixed(4)}`).join(", ")}` : ""}`} after ${tryNo} tries, ${(result.ms / 60000).toFixed(1)} min`);

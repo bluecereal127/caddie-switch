@@ -77,7 +77,8 @@
      "toPin": 0.10936270098989084,
      "how": "roll"
     }
-   ]
+   ],
+   "sandChecked": true
   },
   "4:13": {
    "dir": 4,
@@ -135,7 +136,8 @@
      "toPin": 0.10935864277624484,
      "how": "roll"
     }
-   ]
+   ],
+   "sandChecked": true
   },
   "7:13": {
    "dir": 7,

@@ -41,7 +41,8 @@
    "rule": "near",
    "target": 1,
    "nearYd": 0.3333,
-   "legacy": "holed under the first rule (before the 1-ft rule; the flag cloth as the tee state drew it)"
+   "legacy": "holed under the first rule (before the 1-ft rule; the flag cloth as the tee state drew it)",
+   "sandChecked": true
   },
   "3:8": {
    "dir": 3,
@@ -75,7 +76,8 @@
    "rule": "near",
    "target": 1,
    "nearYd": 0.3333,
-   "legacy": "holed under the first rule (before the 1-ft rule; the flag cloth as the tee state drew it)"
+   "legacy": "holed under the first rule (before the 1-ft rule; the flag cloth as the tee state drew it)",
+   "sandChecked": true
   },
   "0:8": {
    "dir": 0,
@@ -133,13 +135,14 @@
      "toPin": 0.10806557410765091,
      "how": "roll"
     }
-   ]
+   ],
+   "sandChecked": true
   },
   "5:8": {
    "dir": 5,
    "speedIdx": 8,
    "mph": 16,
-   "rule": "near",
+   "rule": "near-sand",
    "target": 1,
    "nearYd": 0.3333,
    "solved": true,
@@ -165,8 +168,12 @@
      ],
      "holed": true,
      "toPin": 0.10936068905110141,
-     "how": "roll"
+     "how": "roll",
+     "sandRisk": true
     }
+   ],
+   "sandRisk": [
+    1
    ]
   },
   "6:8": {
@@ -214,7 +221,8 @@
      "near": true,
      "how": "roll"
     }
-   ]
+   ],
+   "sandChecked": true
   }
  },
  "updated": "2026-10-22T17:30:47.546Z"
