@@ -353,7 +353,7 @@ function GreenCanvas({ mapSrc, green, mode, onGrid, ball, cup, onTap, path, aimP
    derived.json's greenBox and on the 9x9 slope grid directly. Pins are
    stored map-fractional, so they convert through the box.
 */
-function GreenView({ holeNum, pins = [], curPinId = null, greenBox = null, greenPoly = null, grid = null, meta = null, onPick }) {
+function GreenView({ holeNum, pins = [], curPinId = null, greenBox = null, greenPoly = null, grid = null, meta = null, route = null, onPick }) {
   const src = GREEN_VIEWS[holeNum];
   if (!src || !greenBox) return null;
   const bw = greenBox.x1 - greenBox.x0, bh = greenBox.y1 - greenBox.y0;
@@ -403,6 +403,19 @@ function GreenView({ holeNum, pins = [], curPinId = null, greenBox = null, green
         <img src={src} alt="" className="absolute inset-0 w-full h-full rounded-lg"
           style={{ objectFit: "fill", imageRendering: "auto" }} />
         <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="absolute inset-0 w-full h-full">
+          {/* the playbook route (PlaybookCard's "Show route on map"): each stroke's aim
+              line in white and the ball's path in gold, clipped to the green's view,
+              so a putt's or an approach's line onto the cup reads at this zoom */}
+          {route && route.map((st, i) => {
+            const a = toLocal(pbAt(st.from)), r = toLocal(pbAt(st.rest)), t = st.aimTo ? toLocal(pbAt(st.aimTo)) : null;
+            return (
+              <g key={`r${i}`} pointerEvents="none">
+                {t && <line x1={a.x} y1={a.y} x2={t.x} y2={t.y} stroke="#fff" strokeWidth="0.7" />}
+                <line x1={a.x} y1={a.y} x2={r.x} y2={r.y} stroke="#FFD447" strokeWidth="0.9" strokeDasharray="1.6 1" />
+                <circle cx={a.x} cy={a.y} r="1.3" fill="#fff" stroke={T.ink} strokeWidth="0.4" />
+              </g>
+            );
+          })}
           {/* downhill slope arrows, length by magnitude */}
           {cells.map((c, i) => {
             const L = 2.6 + c.mag * 1.9;
@@ -532,7 +545,7 @@ function PlaybookCard({ hole, pb, pinKey, match, pick, onPick, show, onShow, onS
   const title = (goal) => <div className="disp text-[11px] font-bold mb-1">📘 Solved in WSR{goal ? ` · ${goal}` : ""}</div>;
   if (!pb) return null;
   const pin = pinKey ? pb.pins[pinKey] : null;
-  if (!pin) return <div className={box} style={boxStyle}>{title("")}<span className="opacity-70">Pick one of WSR's pins under Today's pin to see the route the harness found for it.</span></div>;
+  if (!pin) return <div className={box} style={boxStyle}>{title("")}<span className="opacity-70">Tap one of WSR's pins on the green to see the route the harness found for it.</span></div>;
   const sp = Math.round(Number(windSpeed) || 0);
   const calm = sp < 1;
   const fallback = !calm && !match.routes.length ? routesFor(pb, pinKey, { mph: 0 }).routes : [];
@@ -581,7 +594,7 @@ function PlaybookCard({ hole, pb, pinKey, match, pick, onPick, show, onShow, onS
           </div>
         </div>
       )}
-      <div className="opacity-60 text-[10px] mt-1">Played in WSR, the Wii original, from a savestate of this pin's tee: the last shot holes or stops within 1 ft. Aim is off the line from the ball to the pin.</div>
+      <div className="opacity-60 text-[10px] mt-1">Played in WSR, the Wii original, from a savestate of this pin's tee: the last shot holes or stops within 1 ft. Aim is in degrees off the straight line from your ball to the flag; on the map and the green the white line is that aim and the gold dashes the ball's path (the gap between them is the wind and the spin), so line the game's aim line up with the white one.</div>
     </div>
   );
 }
@@ -899,6 +912,7 @@ function HoleMap({ holeNum, line, onLine, markers, onMarkers, markerMode, aimPre
             and the stroke's number at its rest */}
         {route && route.map((s, i) => (
           <g key={i}>
+            {s.aimTo && <line x1={s.from[0] * 100} y1={s.from[1] * 100} x2={s.aimTo[0] * 100} y2={s.aimTo[1] * 100} stroke="#fff" strokeWidth={0.6 * k} opacity="0.95" />}
             <line x1={s.from[0] * 100} y1={s.from[1] * 100} x2={s.rest[0] * 100} y2={s.rest[1] * 100} stroke="rgba(20,48,29,0.6)" strokeWidth={1.3 * k} />
             <line x1={s.from[0] * 100} y1={s.from[1] * 100} x2={s.rest[0] * 100} y2={s.rest[1] * 100} stroke="#FFD447" strokeWidth={0.7 * k} strokeDasharray={`${1.6 * k} ${1 * k}`} />
             {!s.holed && (
@@ -1647,13 +1661,12 @@ export default function App() {
       `}</style>
 
       <header className="px-5 pt-6 pb-4" style={{ background: `linear-gradient(135deg, ${T.turfDeep}, ${T.turf})` }}>
-        <div className="max-w-[1500px] mx-auto flex items-center justify-between flex-wrap gap-2">
+        <div className="max-w-[1900px] mx-auto flex items-center justify-between flex-wrap gap-2">
           <div>
             <div className="disp text-2xl font-bold text-white tracking-tight">Caddie<span style={{ color: T.sand }}>·</span>Switch</div>
-            <div className="text-xs text-white/80 mt-0.5">{shots.length} shots · {rounds.length} rounds</div>
           </div>
           <div className="flex gap-1 rounded-full p-1 flex-wrap" style={{ background: "rgba(0,0,0,0.25)" }}>
-            {["solver", "holes", "rounds", "log", "clubs", "guide"].map((t) => (
+            {["solver", "holes"].map((t) => (
               <button key={t} onClick={() => setTab(t)}
                 className="disp px-3.5 py-1.5 rounded-full text-sm font-semibold capitalize"
                 style={tab === t ? { background: T.cream, color: T.turfDeep } : { color: "#fff" }}>
@@ -1664,12 +1677,12 @@ export default function App() {
         </div>
       </header>
 
-      <main className="max-w-[1500px] mx-auto px-5 py-6">
+      <main className="max-w-[1900px] mx-auto px-5 py-6">
         {saveState && <div className="mb-3 text-xs font-semibold" style={{ color: T.turfDeep }}>{saveState}</div>}
 
         {/* ================= SOLVER ================= */}
         {tab === "solver" && (
-          <div className="grid md:grid-cols-2 xl:grid-cols-[1.15fr_1fr_1.1fr] gap-6">
+          <div className="grid md:grid-cols-[1.6fr_1fr] xl:grid-cols-[2.2fr_1fr_1fr] gap-6">
             <section className="space-y-3">
               <div className="flex gap-3">
                 <div className="flex-1">
@@ -1678,12 +1691,6 @@ export default function App() {
                     {COURSES.map((c) => c.holes.map((n) => (
                       <option key={n} value={n}>Hole {n} · {c.name} · Par {holesMeta[n].par}</option>
                     )))}
-                  </select>
-                </div>
-                <div className="w-24">
-                  <label className="disp text-sm font-semibold">Stroke</label>
-                  <select className={inputCls} style={inputStyle} value={stroke} onChange={(e) => setStroke(Number(e.target.value))}>
-                    {[1, 2, 3, 4].map((s) => <option key={s} value={s}>{s}</option>)}
                   </select>
                 </div>
                 <div className="self-end">
@@ -1750,32 +1757,6 @@ export default function App() {
                       </div>
                     )}
                   </div>
-                  <div className="rounded-xl border-2 p-2" style={{ borderColor: T.line, background: "#fff" }}>
-                    <div className="disp text-[11px] font-bold mb-1">Today's pin</div>
-                    <div className="flex flex-wrap gap-1">
-                      {holesMeta[hole].pins.map((p, i, all) => {
-                        const on = holesMeta[hole].curPin === p.id;
-                        const lab = pinLabels(all)[i]; // under 10 pins: recomputing per chip is fine
-                        return (
-                          <button key={p.id} onClick={() => setCurPin(hole, p.id)} title={pinTitle(p)}
-                            className="h-7 px-1 rounded-full border-2 text-[11px] font-bold"
-                            style={{ ...chip(on), minWidth: "1.75rem",
-                              ...(!on && p.set === "A" ? { color: T.flag } : {}),
-                              ...(p.src === "switch" ? { borderStyle: "dashed" } : {}) }}>{lab}</button>
-                        );
-                      })}
-                      {holesMeta[hole].pins.length === 0 && <span className="text-[10px] opacity-60 self-center">none yet — add via ⚙ on the Holes tab</span>}
-                    </div>
-                    {holesMeta[hole].curPin != null && line.ball && (
-                      <button onClick={() => {
-                          const p = holesMeta[hole].pins.find((x) => x.id === holesMeta[hole].curPin);
-                          if (p) setLine({ ...line, target: { x: p.x, y: p.y } });
-                        }}
-                        className="disp w-full mt-1.5 py-1 rounded-lg text-[11px] font-bold text-white" style={{ background: T.turf }}>
-                        🎯 Target = pin
-                      </button>
-                    )}
-                  </div>
                   <div className="flex gap-2">
                     {holesMeta[hole].tee && (
                       <button onClick={() => setLine({ ball: { ...holesMeta[hole].tee }, target: null })}
@@ -1785,9 +1766,6 @@ export default function App() {
                     )}
                     <button onClick={() => setLine({ ball: holesMeta[hole].tee ? { ...holesMeta[hole].tee } : null, target: null })} className="flex-1 py-1.5 rounded-xl border-2 font-bold" style={chip(false)}>
                       Clear line
-                    </button>
-                    <button onClick={() => setMarkerMode(!markerMode)} className="flex-1 py-1.5 rounded-xl border-2 font-bold" style={chip(markerMode)}>
-                      🌲 {markerMode ? "tap: add / remove" : "Edit trees"}
                     </button>
                   </div>
                   {/* the online platform's two tiers; a single chip while none
@@ -1830,10 +1808,8 @@ export default function App() {
                 greenPoly={holesMeta[hole].green?.poly ?? null}
                 grid={holesMeta[hole].green?.grid ?? null}
                 meta={holesMeta[hole].green?.view ?? null}
+                route={pbRoute}
                 onPick={(id) => setCurPin(hole, id)} />
-              <div className="rounded-xl border-2 px-3 py-2 text-xs" style={{ borderColor: T.sand, background: "#FFFDF4" }}>
-                <span className="disp font-bold">Hole {hole} · Par {holesMeta[hole].par}: </span>{holesMeta[hole].note}
-              </div>
               <PlaybookCard hole={hole} pb={playbook} pinKey={pbKey} match={pbMatch}
                 pick={pbPick} onPick={setPbPick} show={pbShow} onShow={setPbShow}
                 windSpeed={windSpeed} windDeg={windDeg} line={line}

@@ -146,7 +146,14 @@ function place(t) {
   const ps = `Add-Type @'\nusing System; using System.Runtime.InteropServices;\npublic class HS { [DllImport("user32.dll")] public static extern bool SetWindowPos(IntPtr h, IntPtr a, int x, int y, int cx, int cy, uint f); [DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern bool SetWindowText(IntPtr h, string s); }\n'@\n$p = Get-Process -Id ${pid} -ErrorAction SilentlyContinue; if ($p -and $p.MainWindowHandle -ne 0) { [HS]::SetWindowPos($p.MainWindowHandle, [IntPtr](-1), ${WX}, ${WY}, ${WW}, ${WH}, 0x0040) | Out-Null; [HS]::SetWindowText($p.MainWindowHandle, '${title.replace(/'/g, "")}') | Out-Null }`;
   try { execFileSync("powershell", ["-NoProfile", "-Command", ps], { timeout: 20000, stdio: "ignore" }); } catch { /* the title can wait */ }
 }
-const status = (m) => place(`${LABEL} | H${hole} ${cup.label} (${cupId}) | target ${target} | ${m}`);
+// the window's title: the hole, the pin and the wind being solved, rewritten
+// only when that changes (the user: "way fewer updates"; each one starts a
+// PowerShell); the wind's direction is the way it blows on the map (WSR dir d
+// moves the air toward bearing 180 - 45 d, north up)
+const COMPASS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
+const windTitle = () => (!WIND.speedIdx ? "calm" : `${2 * WIND.speedIdx} mph toward ${COMPASS[Math.round((((180 - 45 * WIND.dir) % 360) + 360) % 360 / 45) % 8]}`);
+let shownTitle = "";
+const status = () => { const t = `Hole ${hole} | pin ${cup.label} | ${windTitle()}`; if (t !== shownTitle) { shownTitle = t; place(t); } };
 
 async function readyState() {
   const w = await waitStroke(s, hole, { maxSteps: 200 });

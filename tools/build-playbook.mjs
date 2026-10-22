@@ -74,7 +74,12 @@ for (let hole = 1; hole <= 18; hole++) {
       const h0 = Math.atan2(pin[0] - s.from[0], pin[2] - s.from[2]);
       const toPin = Math.hypot(s.from[0] - pin[0], s.from[2] - pin[2]) / YD;
       const left = s.holed ? 0 : Math.hypot(s.rest[0] - pin[0], s.rest[2] - pin[2]) / YD;
+      // the aim line: the swing's heading from the ball, as long as the shot went
+      // (its rest, or the pin when holed), so the map shows the aim beside the path
+      const end = s.holed ? pin : s.rest, len = Math.hypot(end[0] - s.from[0], end[2] - s.from[2]);
+      const aimTo = toMap([s.from[0] + Math.sin(s.heading) * len, 0, s.from[2] + Math.cos(s.heading) * len]);
       return {
+        aimTo,
         club: s.club, bars: r2(4 * s.gamePower), aim: r2(-angDiff(s.heading, h0) * R2D), heading: r1(bearingOf(Math.sin(s.heading), Math.cos(s.heading))),
         from: toMap(s.from), rest: s.holed ? pinMap : toMap(s.rest), yd: r1(toPin), left: r2(left),
         ...(s.holed ? { holed: true, how: s.how ?? "roll" } : left <= NEAR_YD + 1e-6 ? { near: true } : {}),
