@@ -131,9 +131,12 @@ export class Gdb {
   }
 
   // wait out the duplicates of a break and drop them, so the next c / s
-  // cannot return a stale stop
+  // cannot return a stale stop. settle(0), go()'s, only yields to the event
+  // loop: a 0 ms timer waits for Windows' timer tick, about 12 ms a
+  // breakpoint stop (measured on a per-tick breakpoint: 30 ms a stop with it,
+  // 17.7 without), and a stop at a breakpoint sends no duplicates
   async settle(ms = 30) {
-    await new Promise((r) => setTimeout(r, ms));
+    await new Promise((r) => (ms > 0 ? setTimeout(r, ms) : setImmediate(r)));
     this._drainStrays();
   }
 

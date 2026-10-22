@@ -417,13 +417,211 @@ function spin() {
   return out.join("\n");
 }
 
-const SECTIONS = { sweep, wind, windpower, trees, cup, cupedge, cupwindow, puttread, assist, spin, plan, puttwind };
+// 2d at every cup (run-pinputts.mjs, results/pins/*.json; --dir another
+// folder, e.g. results/pins-dev): per cup the spots used, the read in WSR
+// against the model, the roll's rest, WSR's line at the cup against the
+// app's and the window's edges, then the same pooled by the slope at the cup.
+// The app's side is flown again here from every putt's injected heading and
+// power with src/putt.js as it stands (lib/green.mjs predict), so a model
+// change shows without a Dolphin re-run; WSR's side is the run's.
+// a window row's half-width: in WSR's own frame (see pins()) and in the app's
+// offsets as 5.2 has it, with k = how far WSR's pass moves per yd of the
+// app's offset between the two shift putts. Only where both edges are near
+// misses (the first missed putt passing within 0.3 yd): a slow ball across a
+// steep cup can drop in rolling back down from above it, and the putt beside
+// that one roll yards away, an edge of something other than the window
+function windowHalf(w) {
+  const [A, B] = w.shiftPutts ?? [];
+  if (!A?.wsr || !B?.wsr || A.wsr.holed || B.wsr.holed || A.skipped || B.skipped) return null;
+  if (!(w.sides.right.missedPass < 0.3 && w.sides.left.missedPass < 0.3)) return null;
+  const hA = Number(A.inj[0]), hB = Number(B.inj[0]);
+  if (hA === hB) return null;
+  // WSR's line: the traced first approach where there is one (a slow ball on
+  // a steep cup can roll back past the cup, and the look-ahead's closest
+  // approach be that one), else the look-ahead's closest approach
+  const off = (x) => x.wsr.trace?.first?.offset ?? x.wsr.offset;
+  const oA = off(A), oB = off(B), k = (oA - oB) / (A.o - B.o);
+  // a line that does not move with the aim (0.5-1.5 yd per yd of the app's)
+  // is not a line through the cup: no half-width
+  if (!(k > 0.5 && k < 1.5)) return null;
+  const pAt = (h) => oB + ((h - hB) * (oA - oB)) / (hA - hB);
+  const edge = (s) => {
+    const at = (o) => (Math.abs(o - w.c) < 1e-9 ? w.centre2 ?? w.centre : s.putts.find((p) => !p.skipped && Math.abs(p.o - o) < 1e-9));
+    const a = at(s.holedAt), b = at(s.missedAt);
+    return a && b ? (Number(a.inj[0]) + Number(b.inj[0])) / 2 : null;
+  };
+  const hR = edge(w.sides.right), hL = edge(w.sides.left);
+  if (hR == null || hL == null) return null;
+  const mid = (x) => (x.holedTo + x.missedFrom) / 2;
+  return { wsr: Math.abs(pAt(hR) - pAt(hL)) / 2, app: (mid(w.sides.right) + mid(w.sides.left)) / 2, k };
+}
+
+async function pins() {
+  const i = process.argv.indexOf("--dir");
+  const dirArg = i >= 0 ? process.argv[i + 1] : "results/pins";
+  const dir = path.resolve(HARNESS, dirArg);
+  const files = fs.existsSync(dir) ? fs.readdirSync(dir).filter((f) => f.endsWith(".json")).sort() : [];
+  if (!files.length) return `No cup measured yet (${dirArg} holds no results).`;
+  const { greenModel, P } = await import("./lib/green.mjs");
+  const deg = (r) => (r * 180) / Math.PI;
+  const rms = (a) => { const v = a.filter(Number.isFinite); return v.length ? Math.sqrt(v.reduce((s, x) => s + x * x, 0) / v.length) : null; };
+  const mx = (a) => { const v = a.filter(Number.isFinite); return v.length ? v.reduce((m, x) => (Math.abs(x) > Math.abs(m) ? x : m), 0) : null; };
+  const mean = (a) => { const v = a.filter(Number.isFinite); return v.length ? v.reduce((s, x) => s + x, 0) / v.length : null; };
+  const f2 = (v) => (v == null || !Number.isFinite(v) ? "–" : v.toFixed(2)), f3 = (v) => (v == null || !Number.isFinite(v) ? "–" : v.toFixed(3));
+  const s3 = (v) => (v == null || !Number.isFinite(v) ? "–" : (v >= 0 ? "+" : "") + v.toFixed(3));
+  const SPEEDS = [1, 2, 3];
+  const cups = [];
+  // one cup's spots may come from several files (a cup split over instances
+  // with --spots and its own --out, or a spot made again in a later run):
+  // merged by hole, cup and green state; of a spot two files hold, the one
+  // that was made (usable), then the finished one, else the file updated last
+  const byCup = new Map();
+  for (const f of files) {
+    const r = JSON.parse(fs.readFileSync(path.join(dir, f), "utf8"));
+    if (r.kind !== "pinputts") continue;
+    const key = `${r.hole}|${r.id}|${r.green}`, have = byCup.get(key);
+    if (!have) { byCup.set(key, { ...r, spots: { ...r.spots }, files: [f] }); continue; }
+    const newer = (r.updatedAt ?? "") > (have.updatedAt ?? "");
+    for (const [n, sp] of Object.entries(r.spots)) {
+      const old = have.spots[n];
+      const sameUse = !!sp.usable === !!old?.usable;
+      if (!old || (sp.usable && !old.usable) || (sameUse && sp.done && !old.done) || (sameUse && !!sp.done === !!old.done && newer)) have.spots[n] = sp;
+    }
+    have.files.push(f);
+    if (newer) have.updatedAt = r.updatedAt;
+  }
+  for (const r of byCup.values()) {
+    const f = r.files.join(", ");
+    const pin = r.cup.pin, g0 = greenModel(r.hole, r.ball0, pin), gr = new Float64Array(2);
+    g0.field.grad(g0.fCup.x * g0.W, g0.fCup.y * g0.H, gr);
+    const c = { f, r, appSlope: deg(Math.atan(Math.hypot(gr[0], gr[1]))), spots: 0, used: 0, read0: [0, 0, 0], reads: [0, 0, 0], agree: [0, 0], widthW: [], widthM: [], widthMc: [],
+      along: [], across: [], line: [], win: Object.fromEntries(SPEEDS.map((v) => [v, { w: [], app: [] }])), checks: [], detail: [] };
+    for (const sp of Object.values(r.spots)) {
+      c.spots++;
+      if (!sp.usable || !sp.ball) { c.detail.push({ name: sp.name, why: sp.why ?? (sp.done ? "not used" : "not finished") }); continue; }
+      c.used++;
+      const d = { name: sp.name, D: sp.D, model: sp.model, off: sp.off, read: sp.read, pat: "", patM: "", along: [], across: [], line: [], win: {} };
+      c.detail.push(d);
+      const g = greenModel(r.hole, sp.ball, pin);
+      const app = (p) => g.predict(Number(p.inj[0]), Number(p.inj[1]));
+      // the look-ahead against the real ball: in the same putt (its records
+      // against where the real ball stopped), and across two runs of one putt
+      // (the look-ahead-only run's rest against the real ball's)
+      const all = [...(sp.read?.putts ?? []), ...(sp.roll ?? [])].filter((p) => p.wsr);
+      for (const p of all.filter((p) => p.wsr.check)) {
+        const la = all.find((q) => q !== p && !q.wsr.check && q.inj[0] === p.inj[0] && q.inj[1] === p.inj[1]);
+        const cross = la ? (la.wsr.rest && p.wsr.pos ? Math.hypot(la.wsr.rest[0] - p.wsr.pos[0], la.wsr.rest[1] - p.wsr.pos[1], la.wsr.rest[2] - p.wsr.pos[2]) : null) : undefined;
+        c.checks.push({ restDelta: p.wsr.check.restDelta, cross, same: la ? la.wsr.holed === p.wsr.holed : null, inCup: p.wsr.check.inCup === p.wsr.holed });
+      }
+      // the read: the 9 putts round its power, the model's verdict on each, its
+      // holing range at the read's aim (a fine scan of the strength, 0.004)
+      const rp = (sp.read?.putts ?? []).filter((p) => p.role === "read" && !p.skipped);
+      if (rp.length) {
+        const p0 = rp.find((p) => p.dq === 0);
+        let nW = 0, nM = 0;
+        for (const p of rp) {
+          const m = app(p).holed;
+          d.pat += p.wsr.holed ? "o" : "."; d.patM += m ? "o" : ".";
+          nW += p.wsr.holed ? 1 : 0; nM += m ? 1 : 0;
+          c.agree[0] += m === p.wsr.holed ? 1 : 0; c.agree[1]++;
+          if (p === p0) { c.read0[0] += p.wsr.holed ? 1 : 0; c.read0[1] += m ? 1 : 0; c.read0[2]++; }
+        }
+        c.reads[0] += nW; c.reads[1] += nM; c.reads[2] += rp.length;
+        c.widthW.push(0.02 * nW);
+        if (p0) {
+          // the model's holing strengths at the read's aim (0.004 steps over
+          // +-0.24): the run through the read's own power (else the widest),
+          // whole and clipped to the putts' +-0.09 (WSR's 9 putts cover that)
+          const a = app(p0).angDeg, vD = P.vFlat(g.D), q0 = Number(p0.inj[1]);
+          const holes = (q) => q >= 0.05 && P.simPutt(g.field, g.fBall, g.fCup, a, P.wsrPuttV0(q) / vD, { trace: false }).holed;
+          const runs = [];
+          let cur = null;
+          for (let k = -60; k <= 60; k++) {
+            const q = q0 + 0.004 * k;
+            if (holes(q)) { if (!cur) runs.push((cur = { lo: q, hi: q })); else cur.hi = q; } else cur = null;
+          }
+          const run = runs.find((x) => x.lo <= q0 + 1e-9 && x.hi >= q0 - 1e-9) ?? runs.reduce((b, x) => (!b || x.hi - x.lo > b.hi - b.lo ? x : b), null);
+          c.widthM.push(run ? run.hi - run.lo + 0.004 : 0);
+          c.widthMc.push(run ? Math.max(0, Math.min(run.hi + 0.002, q0 + 0.09) - Math.max(run.lo - 0.002, q0 - 0.09)) : 0);
+        }
+      }
+      // the roll: the rest of the putts that miss on purpose, WSR - app, and the
+      // line at the cup (the first approach where traced, else the look-ahead's
+      // closest, signed by the app's own travel direction) on the ones passing
+      // it beyond the rim funnel's reach (0.22 yd) at 0.3 yd/s or more
+      for (const p of (sp.roll ?? []).filter((p) => p.role === "roll" && !p.skipped)) {
+        const a = app(p);
+        if (!p.wsr.holed && p.wsr.restFromCup != null) { for (const x of [c, d]) { x.along.push(p.wsr.restAlong - a.rest[0]); x.across.push(p.wsr.restAcross - a.rest[1]); } }
+        const tr = p.wsr.trace?.first;
+        if (tr ? tr.pass > 0.22 && tr.speed > 0.3 && a.first.speed > 0.3 : p.wsr.pass > 0.22 && a.speed > 0.3) for (const x of [c, d]) x.line.push(tr ? tr.offset - a.first.offset : p.wsr.offset - a.offset);
+      }
+      // the window: the half-width between the two sides' edges, in WSR's
+      // own frame: each edge is the aim halfway between its last holed and
+      // first missed putt, and WSR's line there is read off the two putts the
+      // app passes 0.25 yd either side (their look-ahead passes, signed,
+      // linear in the aim between them), so neither the app's line nor how
+      // its offsets map to WSR's enters; against the app's window at its speed
+      // there. (5.2 took the half-width in the app's offsets, (right + left) /
+      // 2 of the brackets' middles, which is WSR's only while WSR's pass moves
+      // one for one with the app's: 0.99-1.01 on hole 2, 0.78-1.09 on hole 20.)
+      for (const w of sp.window ?? []) {
+        const R = w.sides?.right, L = w.sides?.left;
+        if (!R || !L || R.failed || L.failed || !c.win[w.v]) continue;
+        const hw = windowHalf(w);
+        if (hw == null) continue;
+        const sp0 = w.centre && !w.centre.skipped ? app(w.centre).first.v : w.speed;
+        c.win[w.v].w.push(hw.wsr); c.win[w.v].app.push(P.cupWindow(sp0));
+        d.win[w.v] = { w: hw.wsr, appFrame: hw.app, k: hw.k, app: P.cupWindow(sp0), c: w.c };
+      }
+    }
+    cups.push(c);
+  }
+  cups.sort((a, b) => a.r.hole - b.r.hole || a.r.id.localeCompare(b.r.id));
+  const out = [];
+  out.push(`${cups.length} cup${cups.length === 1 ? "" : "s"} (${dirArg}). Per cup: the spots used of those tried; the read's own putt (dq 0) holed in WSR / by the model, over the spots; the read's 9 putts holed in WSR / by the model and how many verdicts agree; the strength that holes at the read's aim, mean over the spots in WSR putter power (x4 = bars): WSR's (0.02 x its putts holed, within the putts' +-0.09) against the model's range clipped to the same +-0.09, and the model's whole range in brackets (a 0.004 scan); the roll's rest, WSR - app along / across the putt (rms, worst; the putts that miss on purpose); WSR's line at the cup minus the app's (mean / rms, putts passing 0.22 yd or more away); the window's half-width at 1 / 2 / 3 yd/s at the cup, WSR's in its own frame (the edges' aims put on WSR's line through the putts 0.25 yd either side; mean over the 3 yd spots) with the app's cupWindow at its speed there in brackets.`, "");
+  out.push("| hole | cup | set | slope at the cup: KCL / app (deg) | spots | read: dq 0 holed WSR / model | read putts holed WSR / model (agree) | holing strength WSR / model | roll rest along / across: rms (worst) | line at the cup (mean / rms) | window 1 / 2 / 3 yd/s |");
+  out.push("|---|---|---|---|---|---|---|---|---|---|---|");
+  const winCell = (c, v) => (c.win[v].w.length ? `${f3(mean(c.win[v].w))} (${f3(mean(c.win[v].app))})` : "–");
+  for (const c of cups) {
+    const r = c.r;
+    out.push(`| ${r.hole} | ${r.label} (${r.id}) | ${r.sets.join("/")} | ${f2(r.cup.kcl.slopeDeg)} / ${f2(c.appSlope)} | ${c.used} of ${c.spots} | ${c.read0[0]} / ${c.read0[1]} of ${c.read0[2]} | ${c.reads[0]} / ${c.reads[1]} of ${c.reads[2]} (${c.agree[0]}) | ${f3(mean(c.widthW))} / ${f3(mean(c.widthMc))} (${f3(mean(c.widthM))}) | ${f2(rms(c.along))} (${f2(mx(c.along))}) / ${f2(rms(c.across))} (${f2(mx(c.across))}) | ${s3(mean(c.line))} / ${f3(rms(c.line))} | ${SPEEDS.map((v) => winCell(c, v)).join(" / ")} |`);
+  }
+  // pooled by the slope at the cup (the KCL triangle under the pin)
+  const BINS = [[0, 2], [2, 4], [4, 6], [6, 8], [8, 10], [10, 14]];
+  out.push("", "By the slope at the cup (KCL), pooled over the cups and their spots:", "");
+  out.push("| slope (deg) | cups | spots | read: dq 0 holed WSR / model | read verdicts agree | holing strength WSR / model | roll rest along / across rms | line at the cup (mean / rms) | window 1 / 2 / 3 yd/s |");
+  out.push("|---|---|---|---|---|---|---|---|---|");
+  for (const [lo, hi] of BINS) {
+    const cs = cups.filter((c) => c.r.cup.kcl.slopeDeg >= lo && (c.r.cup.kcl.slopeDeg < hi || (hi === 14 && c.r.cup.kcl.slopeDeg <= 90)));
+    if (!cs.length) { out.push(`| ${lo}-${hi} | 0 | | | | | | | |`); continue; }
+    const sum = (k, j) => cs.reduce((s, c) => s + c[k][j], 0), cat = (k) => cs.flatMap((c) => c[k]);
+    const win = (v) => { const w = cs.flatMap((c) => c.win[v].w), a = cs.flatMap((c) => c.win[v].app); return w.length ? `${f3(mean(w))} (${f3(mean(a))}, ${w.length})` : "–"; };
+    out.push(`| ${lo}-${hi} | ${cs.length} | ${cs.reduce((s, c) => s + c.used, 0)} | ${sum("read0", 0)} / ${sum("read0", 1)} of ${sum("read0", 2)} | ${sum("agree", 0)} of ${sum("agree", 1)} | ${f3(mean(cat("widthW")))} / ${f3(mean(cat("widthMc")))} (${f3(mean(cat("widthM")))}) | ${f2(rms(cat("along")))} / ${f2(rms(cat("across")))} | ${s3(mean(cat("line")))} / ${f3(rms(cat("line")))} | ${SPEEDS.map(win).join(" / ")} |`);
+  }
+  // --detail: every spot of every cup (not written to REPORT.md)
+  if (process.argv.includes("--detail")) for (const c of cups) {
+    out.push("", `Hole ${c.r.hole} ${c.r.label} (${c.r.id}), ${c.f}: per spot (read: o = holed, . = missed, from -0.08 to +0.08; WSR over the model)`, "");
+    out.push("| spot | D (yd) | slope at the ball KCL / app | read aim / power | read WSR / model | roll rest along / across rms | line at the cup | window 1 / 2 / 3 yd/s (app) |", "|---|---|---|---|---|---|---|---|");
+    for (const d of c.detail) {
+      if (d.why) { out.push(`| ${d.name} | – | – | – | ${d.why} | | | |`); continue; }
+      out.push(`| ${d.name} | ${f2(d.D)}${d.off ? ` (${f2(d.off)} off)` : ""} | ${f2(d.model?.kclSlopeDeg)} / ${f2(d.model?.slopeDeg)} | ${d.read ? `${d.read.a.toFixed(2)} / ${d.read.q0.toFixed(4)}` : "–"} | ${d.pat || "–"} / ${d.patM || "–"} | ${f2(rms(d.along))} / ${f2(rms(d.across))} | ${s3(mean(d.line))} | ${SPEEDS.map((v) => (d.win[v] ? `${f3(d.win[v].w)} (${f3(d.win[v].app)}; app frame ${f3(d.win[v].appFrame)}, k ${f2(d.win[v].k)})` : "–")).join(" / ")} |`);
+    }
+  }
+  const ch = cups.flatMap((c) => c.checks), rd = ch.map((x) => x.restDelta).filter(Number.isFinite), cr = ch.map((x) => x.cross).filter(Number.isFinite);
+  out.push("", `The look-ahead against the real ball (the read's putt waited for and traced, the roll putts traced on cups of 6 deg or more, one roll putt per spot in the other mode): ${ch.length} putts that waited for the real ball; the look-ahead's records in the same putt put the rest ${rd.length ? `within ${Math.max(...rd).toFixed(4)} u of the real ball's on all ${rd.length}` : "–"}; a look-ahead-only run of the same putt ${cr.length ? `within ${Math.max(...cr).toFixed(4)} u on all ${cr.length}` : "–"}, the same verdict on ${ch.filter((x) => x.same).length} of ${ch.filter((x) => x.same != null).length}; the real ball in the cup exactly when the look-ahead holed it on ${ch.filter((x) => x.inCup).length} of ${ch.length}.`);
+  return out.join("\n");
+}
+
+const SECTIONS = { sweep, wind, windpower, trees, cup, cupedge, cupwindow, puttread, assist, spin, plan, puttwind, pins };
 if (process.argv.includes("--write")) {
   // REPORT.md's tables live between <!-- begin:NAME --> and <!-- end:NAME -->;
-  // the prose around them is written by hand and left alone
+  // the prose around them is written by hand and left alone. A section name
+  // before --write fills only that section (report.mjs pins --write)
   const file = path.join(HARNESS, "REPORT.md");
   let text = fs.readFileSync(file, "utf8");
+  const only = SECTIONS[process.argv[2]] ? process.argv[2] : null;
   for (const [name, fn] of Object.entries(SECTIONS)) {
+    if (only && name !== only) continue;
     const re = new RegExp(`(<!-- begin:${name} -->)[\\s\\S]*?(<!-- end:${name} -->)`);
     if (!re.test(text)) continue;
     const body = await fn();

@@ -1,0 +1,191 @@
+{
+ "course": "Classic A",
+ "slug": "classic-a",
+ "instance": 20,
+ "window": {
+  "x": 3280,
+  "y": -57,
+  "w": 720,
+  "h": 436
+ },
+ "started": "2026-10-22T06:57:23.504Z",
+ "cups": {
+  "h12-s0": {
+   "hole": 12,
+   "id": "s0",
+   "label": "BL",
+   "par": 5,
+   "target": 3,
+   "status": "solved",
+   "strokes": [
+    {
+     "club": "driver",
+     "power": 0.96,
+     "aimDeg": 176.054
+    },
+    {
+     "club": "3iron",
+     "power": 0.96,
+     "aimDeg": 172.139
+    },
+    {
+     "club": "putter",
+     "power": 1.1628,
+     "aimDeg": -101.458
+    }
+   ],
+   "tries": 28,
+   "min": 3.7,
+   "edges": null,
+   "exit": 0
+  },
+  "h12-s1": {
+   "hole": 12,
+   "id": "s1",
+   "label": "BM",
+   "par": 5,
+   "target": 3,
+   "status": "solved",
+   "strokes": [
+    {
+     "club": "driver",
+     "power": 0.96,
+     "aimDeg": 175.349
+    },
+    {
+     "club": "3iron",
+     "power": 1,
+     "aimDeg": 177.401
+    },
+    {
+     "club": "putter",
+     "power": 0.3348,
+     "aimDeg": 114.027
+    }
+   ],
+   "tries": 28,
+   "min": 3.5,
+   "edges": null,
+   "exit": 0
+  },
+  "h12-s2": {
+   "hole": 12,
+   "id": "s2",
+   "label": "BR",
+   "par": 5,
+   "target": 3,
+   "status": "solved",
+   "strokes": [
+    {
+     "club": "driver",
+     "power": 0.96,
+     "aimDeg": 175.289
+    },
+    {
+     "club": "3iron",
+     "power": 1,
+     "aimDeg": 177.308
+    },
+    {
+     "club": "putter",
+     "power": 0.2986,
+     "aimDeg": 42.297
+    }
+   ],
+   "tries": 28,
+   "min": 3.6,
+   "edges": null,
+   "exit": 0
+  },
+  "h12-s3": {
+   "hole": 12,
+   "id": "s3",
+   "label": "AR",
+   "par": 5,
+   "target": 3,
+   "status": "solved",
+   "strokes": [
+    {
+     "club": "driver",
+     "power": 0.96,
+     "aimDeg": 176.034
+    },
+    {
+     "club": "3iron",
+     "power": 1,
+     "aimDeg": 176.038
+    },
+    {
+     "club": "putter",
+     "power": 0.2983,
+     "aimDeg": -134.761
+    }
+   ],
+   "tries": 3,
+   "min": 1.1,
+   "edges": null,
+   "exit": 0
+  },
+  "h12-s4": {
+   "hole": 12,
+   "id": "s4",
+   "label": "AM",
+   "par": 5,
+   "target": 3,
+   "status": "solved",
+   "strokes": [
+    {
+     "club": "driver",
+     "power": 0.96,
+     "aimDeg": 176.254
+    },
+    {
+     "club": "3iron",
+     "power": 0.9201,
+     "aimDeg": 176.25
+    },
+    {
+     "club": "putter",
+     "power": 0.05,
+     "aimDeg": 141.055
+    }
+   ],
+   "tries": 3,
+   "min": 1.2,
+   "edges": null,
+   "exit": 0
+  },
+  "h12-s5": {
+   "hole": 12,
+   "id": "s5",
+   "label": "AL",
+   "par": 5,
+   "target": 3,
+   "status": "solved",
+   "strokes": [
+    {
+     "club": "driver",
+     "power": 0.96,
+     "aimDeg": 174.767
+    },
+    {
+     "club": "3iron",
+     "power": 0.9201,
+     "aimDeg": 179.143
+    },
+    {
+     "club": "putter",
+     "power": 0.3509,
+     "aimDeg": 174.199
+    }
+   ],
+   "tries": 3,
+   "min": 1,
+   "edges": null,
+   "exit": 0
+  }
+ },
+ "updated": "2026-10-22T07:14:31.576Z",
+ "solved": 6,
+ "total": 6
+}

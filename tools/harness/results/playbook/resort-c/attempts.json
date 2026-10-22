@@ -1,0 +1,152 @@
+[
+ {
+  "n": 1,
+  "instance": 17,
+  "holes": {
+   "7": 3,
+   "8": 1,
+   "9": 3
+  },
+  "strokes": 7,
+  "toPar": -5,
+  "complete": true,
+  "why": "played",
+  "card": "results/playbook/resort-c/card-1.png",
+  "ended": "2026-10-22T08:00:54.722Z"
+ },
+ {
+  "n": 2,
+  "instance": 17,
+  "holes": {
+   "7": 3,
+   "8": 1,
+   "9": 4
+  },
+  "strokes": 8,
+  "toPar": -4,
+  "complete": true,
+  "why": "played",
+  "card": "results/playbook/resort-c/card-2.png",
+  "ended": "2026-10-22T08:04:46.480Z"
+ },
+ {
+  "n": 3,
+  "instance": 17,
+  "holes": {
+   "7": 3,
+   "8": 1,
+   "9": 4
+  },
+  "strokes": 8,
+  "toPar": -4,
+  "complete": true,
+  "why": "played",
+  "card": "results/playbook/resort-c/card-3.png",
+  "ended": "2026-10-22T08:08:37.872Z"
+ },
+ {
+  "n": 4,
+  "instance": 17,
+  "holes": {
+   "7": 3,
+   "8": 1,
+   "9": 4
+  },
+  "strokes": 8,
+  "toPar": -4,
+  "complete": true,
+  "why": "played",
+  "card": "results/playbook/resort-c/card-4.png",
+  "ended": "2026-10-22T08:12:28.613Z"
+ },
+ {
+  "n": 5,
+  "instance": 17,
+  "holes": {
+   "7": 3,
+   "8": 1,
+   "9": 4
+  },
+  "strokes": 8,
+  "toPar": -4,
+  "complete": true,
+  "why": "played",
+  "card": "results/playbook/resort-c/card-5.png",
+  "ended": "2026-10-22T08:16:17.923Z"
+ },
+ {
+  "n": 6,
+  "instance": 17,
+  "holes": {
+   "7": 3,
+   "8": 1,
+   "9": 4
+  },
+  "strokes": 8,
+  "toPar": -4,
+  "complete": true,
+  "why": "played",
+  "card": "results/playbook/resort-c/card-6.png",
+  "ended": "2026-10-22T08:20:10.811Z"
+ },
+ {
+  "n": 7,
+  "instance": 17,
+  "holes": {
+   "7": 2,
+   "8": 1,
+   "9": 4
+  },
+  "strokes": 7,
+  "toPar": -5,
+  "complete": true,
+  "why": "played",
+  "card": "results/playbook/resort-c/card-7.png",
+  "ended": "2026-10-22T08:23:41.604Z"
+ },
+ {
+  "n": 8,
+  "instance": 17,
+  "holes": {
+   "7": 3,
+   "8": 1,
+   "9": 4
+  },
+  "strokes": 8,
+  "toPar": -4,
+  "complete": true,
+  "why": "played",
+  "card": "results/playbook/resort-c/card-8.png",
+  "ended": "2026-10-22T08:27:31.281Z"
+ },
+ {
+  "n": 9,
+  "instance": 17,
+  "holes": {
+   "7": 3,
+   "8": 1,
+   "9": 4
+  },
+  "strokes": 8,
+  "toPar": -4,
+  "complete": true,
+  "why": "played",
+  "card": "results/playbook/resort-c/card-9.png",
+  "ended": "2026-10-22T08:31:29.651Z"
+ },
+ {
+  "n": 10,
+  "instance": 17,
+  "holes": {
+   "7": 2,
+   "8": 1,
+   "9": 3
+  },
+  "strokes": 6,
+  "toPar": -6,
+  "complete": true,
+  "why": "played",
+  "card": "results/playbook/resort-c/card-10.png",
+  "ended": "2026-10-22T08:35:02.373Z"
+ }
+]

@@ -163,7 +163,7 @@ function windOf(wind) {
   return { x: Math.cos(r), z: Math.sin(r), mag0: 15.0 * Math.pow(idx / 15.0, Math.log2(1 / 0.6)) };
 }
 
-// run({ club, q, surface, back, side, slopeDeg, wind, spinStart, maxTicks, profile, ballLift, trace })
+// run({ club, q, surface, back, side, slopeDeg, wind, spinStart, maxTicks, profile, ground, ballLift, trace })
 //   club      an id of CLUBS
 //   q         launch power 0-1 (= gauge bars / 4; the Python's `power`)
 //   surface   the plane's attribute: fairway | rough | bunker | green | fringe | tee
@@ -176,6 +176,11 @@ function windOf(wind) {
 //             the reference; the real game attaches them 72-100 ticks after launch)
 //   profile   null (the plane above), or { heightAt(x), surfaceAt(x) }: the shot
 //             line's ground (profileGround), which replaces surface and slopeDeg
+//   ground    null, or a ground object of profileGround's interface (heightAt(x) in
+//             units, query(x, y, z, r, hit) -> depth filling hit.attr / n0 n1 n2 in
+//             the line frame), used instead of profile / the plane: the harness
+//             flies a hole's own KCL triangles in 3D through it
+//             (tools/harness/lib/kclshot.mjs); the app never passes it
 //   ballLift  how far the ball sits above its ground at launch, yd (0; the online
 //             platform's upper tier stands above the course); y below is
 //             measured from there, and so is the wind's ramp
@@ -193,12 +198,12 @@ function windOf(wind) {
 // little: the solver flies dozens of shots per input change. Each formula
 // keeps the Python's operations in its order, so the results are the same to
 // the bit (tools/test-solver.mjs holds the reference numbers).
-export function run({ club, q, surface = "fairway", back = 0, side = 0, slopeDeg = 0, wind = null, spinStart = 0, maxTicks = 8000, profile = null, ballLift = 0, trace = true }) {
+export function run({ club, q, surface = "fairway", back = 0, side = 0, slopeDeg = 0, wind = null, spinStart = 0, maxTicks = 8000, profile = null, ground = null, ballLift = 0, trace = true }) {
   const c = CLUBS[club];
   if (!c) throw new Error(`unknown club ${club}`);
   const attr = SURFACE_ATTR[surface];
   if (attr == null) throw new Error(`unknown surface ${surface}`);
-  const surf = profile ? profileGround(profile) : plane(attr, slopeDeg);
+  const surf = ground ?? (profile ? profileGround(profile) : plane(attr, slopeDeg));
   const W = windOf(wind);
   const { vel, lift } = launch(club, q);
   const y0 = surf.heightAt(0, 0) + ballLift * YD;

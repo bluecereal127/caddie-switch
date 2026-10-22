@@ -1,0 +1,332 @@
+[
+ {
+  "n": 1,
+  "instance": 18,
+  "holes": {
+   "1": 3,
+   "2": 2,
+   "3": 3
+  },
+  "strokes": 8,
+  "toPar": -4,
+  "complete": true,
+  "why": "played",
+  "card": "results/courses/resort-a/card-1.png",
+  "ended": "2026-10-22T04:21:22.373Z"
+ },
+ {
+  "n": 2,
+  "instance": 18,
+  "holes": {
+   "1": 3,
+   "2": 2,
+   "3": 4
+  },
+  "strokes": 9,
+  "toPar": -3,
+  "complete": true,
+  "why": "played",
+  "card": "results/courses/resort-a/card-2.png",
+  "ended": "2026-10-22T04:25:21.633Z"
+ },
+ {
+  "n": 3,
+  "instance": 18,
+  "holes": {
+   "1": 3,
+   "2": 2,
+   "3": 3
+  },
+  "strokes": 8,
+  "toPar": -4,
+  "complete": true,
+  "why": "played",
+  "card": "results/courses/resort-a/card-3.png",
+  "ended": "2026-10-22T04:29:15.204Z"
+ },
+ {
+  "n": 4,
+  "instance": 18,
+  "holes": {
+   "1": 3,
+   "2": 2,
+   "3": 3
+  },
+  "strokes": 8,
+  "toPar": -4,
+  "complete": true,
+  "why": "played",
+  "card": "results/courses/resort-a/card-4.png",
+  "ended": "2026-10-22T04:32:51.091Z"
+ },
+ {
+  "n": 5,
+  "instance": 18,
+  "holes": {
+   "1": 2,
+   "2": 2,
+   "3": 4
+  },
+  "strokes": 8,
+  "toPar": -4,
+  "complete": true,
+  "why": "played",
+  "card": "results/courses/resort-a/card-5.png",
+  "ended": "2026-10-22T04:36:34.332Z"
+ },
+ {
+  "n": 6,
+  "instance": 18,
+  "holes": {
+   "1": 3,
+   "2": 2,
+   "3": 4
+  },
+  "strokes": 9,
+  "toPar": -3,
+  "complete": true,
+  "why": "played",
+  "card": "results/courses/resort-a/card-6.png",
+  "ended": "2026-10-22T04:40:16.094Z"
+ },
+ {
+  "n": 7,
+  "instance": 18,
+  "holes": {
+   "1": 3,
+   "2": 2,
+   "3": 3
+  },
+  "strokes": 8,
+  "toPar": -4,
+  "complete": true,
+  "why": "hole 3 counted by the harness: 3 strokes struck (driver, driver, a 14.7 yd putt holed), no penalty; the game's own record of it still read 0 during the eagle putt's replay (round-play.mjs now re-reads it for up to 30 s)",
+  "card": null,
+  "ended": "2026-10-22T04:43:54.651Z"
+ },
+ {
+  "n": 8,
+  "instance": 18,
+  "holes": {
+   "1": 3,
+   "2": 2,
+   "3": 3
+  },
+  "strokes": 8,
+  "toPar": -4,
+  "complete": true,
+  "why": "played",
+  "card": "results/courses/resort-a/card-8.png",
+  "ended": "2026-10-22T04:47:44.710Z"
+ },
+ {
+  "n": 9,
+  "instance": 18,
+  "holes": {
+   "1": 3,
+   "2": 2,
+   "3": 3
+  },
+  "strokes": 8,
+  "toPar": -4,
+  "complete": true,
+  "why": "played",
+  "card": "results/courses/resort-a/card-9.png",
+  "ended": "2026-10-22T04:51:17.442Z"
+ },
+ {
+  "n": 10,
+  "instance": 18,
+  "holes": {
+   "1": 3,
+   "2": 2,
+   "3": 4
+  },
+  "strokes": 9,
+  "toPar": -3,
+  "complete": true,
+  "why": "played",
+  "card": "results/courses/resort-a/card-10.png",
+  "ended": "2026-10-22T04:55:29.755Z"
+ },
+ {
+  "n": 11,
+  "instance": 18,
+  "holes": {
+   "1": 3,
+   "2": 2,
+   "3": 3
+  },
+  "strokes": 8,
+  "toPar": -4,
+  "complete": true,
+  "why": "played",
+  "card": "results/courses/resort-a/card-11.png",
+  "ended": "2026-10-22T04:59:45.211Z"
+ },
+ {
+  "n": 12,
+  "instance": 18,
+  "holes": {
+   "1": 3,
+   "2": 2,
+   "3": 3
+  },
+  "strokes": 8,
+  "toPar": -4,
+  "complete": true,
+  "why": "played",
+  "card": "results/courses/resort-a/card-12.png",
+  "ended": "2026-10-22T05:03:31.557Z"
+ },
+ {
+  "n": 13,
+  "instance": 18,
+  "holes": {
+   "1": 3,
+   "2": 2,
+   "3": 3
+  },
+  "strokes": 8,
+  "toPar": -4,
+  "complete": true,
+  "why": "played",
+  "card": "results/courses/resort-a/card-13.png",
+  "ended": "2026-10-22T05:07:32.644Z"
+ },
+ {
+  "n": 14,
+  "instance": 18,
+  "holes": {
+   "1": 3,
+   "2": 2,
+   "3": 4
+  },
+  "strokes": 9,
+  "toPar": -3,
+  "complete": true,
+  "why": "played",
+  "card": "results/courses/resort-a/card-14.png",
+  "ended": "2026-10-22T05:11:58.653Z"
+ },
+ {
+  "n": 15,
+  "instance": 18,
+  "holes": {
+   "1": 3,
+   "2": 2,
+   "3": 4
+  },
+  "strokes": 9,
+  "toPar": -3,
+  "complete": true,
+  "why": "played",
+  "card": "results/courses/resort-a/card-15.png",
+  "ended": "2026-10-22T05:16:44.012Z"
+ },
+ {
+  "n": 16,
+  "instance": 18,
+  "holes": {
+   "1": 3,
+   "2": 2,
+   "3": 3
+  },
+  "strokes": 8,
+  "toPar": -4,
+  "complete": true,
+  "why": "played",
+  "card": "results/courses/resort-a/card-16.png",
+  "ended": "2026-10-22T05:21:18.399Z"
+ },
+ {
+  "n": 17,
+  "instance": 18,
+  "holes": {
+   "1": 3,
+   "2": 2,
+   "3": 4
+  },
+  "strokes": 9,
+  "toPar": -3,
+  "complete": true,
+  "why": "played",
+  "card": "results/courses/resort-a/card-17.png",
+  "ended": "2026-10-22T05:25:17.425Z"
+ },
+ {
+  "n": 18,
+  "instance": 18,
+  "holes": {
+   "1": 3,
+   "2": 2,
+   "3": 4
+  },
+  "strokes": 9,
+  "toPar": -3,
+  "complete": true,
+  "why": "played",
+  "card": "results/courses/resort-a/card-18.png",
+  "ended": "2026-10-22T05:29:07.902Z"
+ },
+ {
+  "n": 19,
+  "instance": 18,
+  "holes": {
+   "1": 3,
+   "2": 2,
+   "3": 3
+  },
+  "strokes": 8,
+  "toPar": -4,
+  "complete": true,
+  "why": "played",
+  "card": "results/courses/resort-a/card-19.png",
+  "ended": "2026-10-22T05:33:24.530Z"
+ },
+ {
+  "n": 20,
+  "instance": 18,
+  "holes": {
+   "1": 3,
+   "2": 2,
+   "3": 3
+  },
+  "strokes": 8,
+  "toPar": -4,
+  "complete": true,
+  "why": "played",
+  "card": "results/courses/resort-a/card-20.png",
+  "ended": "2026-10-22T05:37:57.651Z"
+ },
+ {
+  "n": 21,
+  "instance": 18,
+  "holes": {
+   "1": 3,
+   "2": 2,
+   "3": 4
+  },
+  "strokes": 9,
+  "toPar": -3,
+  "complete": true,
+  "why": "played",
+  "card": "results/courses/resort-a/card-21.png",
+  "ended": "2026-10-22T05:42:58.170Z"
+ },
+ {
+  "n": 22,
+  "instance": 18,
+  "holes": {
+   "1": 3,
+   "2": 2,
+   "3": 3
+  },
+  "strokes": 8,
+  "toPar": -4,
+  "complete": true,
+  "why": "played",
+  "card": "results/courses/resort-a/card-22.png",
+  "ended": "2026-10-22T05:47:22.084Z"
+ }
+]

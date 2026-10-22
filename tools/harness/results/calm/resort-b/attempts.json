@@ -1,0 +1,47 @@
+[
+ {
+  "n": 1,
+  "instance": 19,
+  "holes": {
+   "4": 2,
+   "5": 4,
+   "6": 3
+  },
+  "strokes": 9,
+  "toPar": -3,
+  "complete": true,
+  "why": "played",
+  "card": "results/calm/resort-b/card-1.png",
+  "ended": "2026-10-22T05:52:12.099Z"
+ },
+ {
+  "n": 2,
+  "instance": 19,
+  "holes": {
+   "4": 2,
+   "5": 3,
+   "6": 3
+  },
+  "strokes": 8,
+  "toPar": -4,
+  "complete": true,
+  "why": "played",
+  "card": "results/calm/resort-b/card-2.png",
+  "ended": "2026-10-22T05:56:28.327Z"
+ },
+ {
+  "n": 3,
+  "instance": 19,
+  "holes": {
+   "4": 2,
+   "5": 3,
+   "6": 3
+  },
+  "strokes": 8,
+  "toPar": -4,
+  "complete": true,
+  "why": "played",
+  "card": "results/calm/resort-b/card-3.png",
+  "ended": "2026-10-22T06:00:18.158Z"
+ }
+]

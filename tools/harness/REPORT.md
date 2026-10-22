@@ -1149,6 +1149,115 @@ either way (`run-puttread.mjs`, `results/puttread-*.json`):
 In all: the robust read holed 41 of 54 putts in WSR, the committed one 22 of 54 (o = holed, . = missed, from -0.08 to +0.08 of putter power in 0.02 steps).
 <!-- end:puttread -->
 
+### 5.4 Every cup on every green
+
+Sections 5.1-5.3 come from the greens of holes 2, 11 and 20 as 3-hole
+rounds reached them, and a 3-hole round draws set-1 pins only: cups of 1.2
+to 8.1 deg. WSR's 118 cup locations (`tools/wsr-pins.json`, every hole's
+spots) run to 13.1 deg under the cup, 15 of them over 8. `run-pinputts.mjs`
+puts the whole battery to each one, from a green state of its hole whose pin
+slot was forced through WSR's own choosePin result at hole start
+(GlfConfig+0x38 written at 0x803f8e60, after the draw and before the game
+derives the pin, the cup and its decal from it; the tee, the ball and every
+outcome are the game's own). Real putts take the ball to spots on rings
+round the cup, 3 and 8 yd out in 8 directions from up the fall line of the
+KCL triangle under the pin and 15 yd out in 4, where the KCL is green; each
+spot is saved as a temporary state. From every spot: the app's read at its
+aim with the strength moved by up to 0.08 of putter power (0.32 bars)
+either way, as in 5.3; six putts that miss on purpose, the app's roll
+passing 0.3 yd right and left of the cup at 0.5, 2 and 4 yd of excess, for
+the roll's rest and WSR's line at the cup (traced tick by tick on cups of 6
+deg or more); and on the four 3 yd spots up, across and down the fall line
+the capture window at 1, 2 and 3 yd/s at the cup, bisected as in 5.2 from
+the app's line when its putt holes, else from WSR's own line (or the
+nearest of the app's offsets that holes), an edge 0.35 yd out where none
+misses within 0.2 (WSR's line runs 0.04-0.09 yd off the app's on hole
+20's cup).
+The speed at the cup is the app's roll's, interpolated between its 0.1 s
+path points; 5.2 took the mean speed of the 0.1 s segment the closest
+approach fell in, which runs up to 0.1 yd/s either side of it and jumps
+from one segment to the next. Outcomes are the look-ahead's records; on
+every spot the read's putt is also waited for and traced, and one roll putt
+is run in the other mode, against the real ball. The tables fly the app's
+side again from each putt's heading and power with `src/putt.js` as it
+stands (`node tools/harness/report.mjs pins --write`):
+
+<!-- begin:pins -->
+7 cups (results/pins). Per cup: the spots used of those tried; the read's own putt (dq 0) holed in WSR / by the model, over the spots; the read's 9 putts holed in WSR / by the model and how many verdicts agree; the strength that holes at the read's aim, mean over the spots in WSR putter power (x4 = bars): WSR's (0.02 x its putts holed, within the putts' +-0.09) against the model's range clipped to the same +-0.09, and the model's whole range in brackets (a 0.004 scan); the roll's rest, WSR - app along / across the putt (rms, worst; the putts that miss on purpose); WSR's line at the cup minus the app's (mean / rms, putts passing 0.22 yd or more away); the window's half-width at 1 / 2 / 3 yd/s at the cup, WSR's in its own frame (the edges' aims put on WSR's line through the putts 0.25 yd either side; mean over the 3 yd spots) with the app's cupWindow at its speed there in brackets.
+
+| hole | cup | set | slope at the cup: KCL / app (deg) | spots | read: dq 0 holed WSR / model | read putts holed WSR / model (agree) | holing strength WSR / model | roll rest along / across: rms (worst) | line at the cup (mean / rms) | window 1 / 2 / 3 yd/s |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 2 | BM (s0) | 1 | 0.94 / 0.98 | 19 of 21 | 19 / 19 of 19 | 171 / 171 of 171 (171) | 0.180 / 0.180 (0.252) | 0.08 (-0.24) / 0.03 (-0.11) | +0.001 / 0.012 | 0.138 (0.138) / 0.119 (0.118) / 0.093 (0.091) |
+| 3 | BM (s1) | 1 | 1.54 / 1.56 | 18 of 21 | 18 / 18 of 18 | 150 / 148 of 162 (158) | 0.167 / 0.166 (0.219) | 0.05 (-0.13) / 0.06 (0.39) | +0.006 / 0.050 | 0.136 (0.138) / 0.120 (0.118) / 0.092 (0.091) |
+| 8 | AM (s4) | 2 | 9.39 / 8.83 | 15 of 21 | 10 / 15 of 15 | 66 / 81 of 135 (102) | 0.088 / 0.109 (0.115) | 0.44 (-1.55) / 0.31 (-2.08) | -0.029 / 0.150 | 0.147 (0.138) / 0.117 (0.118) / 0.094 (0.091) |
+| 8 | AL (s5) | 2 | 7.31 / 7.32 | 19 of 21 | 14 / 19 of 19 | 89 / 107 of 171 (131) | 0.094 / 0.112 (0.132) | 0.27 (-1.76) / 0.30 (2.14) | -0.009 / 0.087 | 0.140 (0.138) / 0.116 (0.118) / 0.086 (0.091) |
+| 21 | 4 (s3) | 1 | 13.08 / 12.56 | 8 of 21 | 4 / 8 of 8 | 16 / 40 of 71 (31) | 0.040 / 0.104 (0.171) | 0.70 (-2.06) / 0.14 (-0.40) | -0.011 / 0.076 | 0.175 (0.138) / 0.123 (0.118) / 0.110 (0.091) |
+| 21 | 5 (s4) | 1 | 12.32 / 12.49 | 7 of 21 | 4 / 7 of 7 | 22 / 31 of 62 (51) | 0.063 / 0.086 (0.102) | 1.30 (4.36) / 0.14 (0.37) | +0.030 / 0.154 | 0.151 (0.137) / 0.116 (0.118) / 0.089 (0.091) |
+| 21 | 6 (s5) | 1 | 12.88 / 13.05 | 9 of 21 | 7 / 9 of 9 | 38 / 45 of 79 (70) | 0.084 / 0.099 (0.124) | 1.67 (4.52) / 0.17 (0.44) | +0.002 / 0.131 | 0.158 (0.138) / 0.120 (0.118) / 0.100 (0.091) |
+
+By the slope at the cup (KCL), pooled over the cups and their spots:
+
+| slope (deg) | cups | spots | read: dq 0 holed WSR / model | read verdicts agree | holing strength WSR / model | roll rest along / across rms | line at the cup (mean / rms) | window 1 / 2 / 3 yd/s |
+|---|---|---|---|---|---|---|---|---|
+| 0-2 | 2 | 37 | 37 / 37 of 37 | 329 of 333 | 0.174 / 0.173 (0.236) | 0.07 / 0.05 | +0.003 / 0.035 | 0.137 (0.138, 8) / 0.120 (0.118, 8) / 0.093 (0.091, 8) |
+| 2-4 | 0 | | | | | | | |
+| 4-6 | 0 | | | | | | | |
+| 6-8 | 1 | 19 | 14 / 19 of 19 | 131 of 171 | 0.094 / 0.112 (0.132) | 0.27 / 0.30 | -0.009 / 0.087 | 0.140 (0.138, 3) / 0.116 (0.118, 4) / 0.086 (0.091, 4) |
+| 8-10 | 1 | 15 | 10 / 15 of 15 | 102 of 135 | 0.088 / 0.109 (0.115) | 0.44 / 0.31 | -0.029 / 0.150 | 0.147 (0.138, 1) / 0.117 (0.118, 4) / 0.094 (0.091, 4) |
+| 10-14 | 3 | 24 | 15 / 24 of 24 | 152 of 212 | 0.063 / 0.097 (0.133) | 1.30 / 0.15 | +0.006 / 0.124 | 0.161 (0.138, 3) / 0.121 (0.118, 11) / 0.103 (0.091, 11) |
+
+The look-ahead against the real ball (the read's putt waited for and traced, the roll putts traced on cups of 6 deg or more, one roll putt per spot in the other mode): 575 putts that waited for the real ball; the look-ahead's records in the same putt put the rest within 0.0000 u of the real ball's on all 575; a look-ahead-only run of the same putt within 0.0000 u on all 285, the same verdict on 285 of 285; the real ball in the cup exactly when the look-ahead holed it on 575 of 575.
+<!-- end:pins -->
+
+The steep cups first (hole 8's AL and AM, 7.3 and 9.4 deg, and hole 21's
+three, 12.3-13.1 deg; 58 spots, 1,832 putts). Hole 21's faces hold few
+spots: no putt rested 3 yd above s3 or on its right (r3-a000 to a090,
+15.5-17 deg; three more 3 yd spots there were made in a second run, each
+first probed with a putt planned by the tick port below), and from the
+green state's ball none on most of the 12-14 deg faces round s4 and s5.
+Against the two cups under 2 deg:
+
+- **The read** holes what the model says it holes on the gentle cups (all
+  37 own putts, 329 of 333 verdicts agree). On hole 8 its own putt holes
+  on 24 of 34 spots in WSR, on hole 21 on 15 of 24 (the model: all), and of
+  the 9 strengths WSR holes 155 of 306 and 76 of 212 (the model 188 and
+  116); WSR's holing strength there is 0.04-0.09 of putter power, the
+  model's 0.09-0.11 (0.17-0.18 for both on the gentle cups).
+- **The roll**: the rests of the putts that miss on purpose are 0.05-0.08
+  yd rms off along and 0.03-0.06 across on the gentle cups, 0.27-0.44 /
+  0.30-0.31 on hole 8's and 0.70-1.67 / 0.14-0.17 on hole 21's; WSR's line
+  at the cup 0.01-0.05 yd rms off the app's on the gentle cups and
+  0.08-0.15 on the steep ones, up to 0.34 yd from 8-15 yd out.
+- **Past 12 deg** WSR's ball rests on faces to 15.6 deg under the ball (36
+  of hole 21 s3's 266 rests off the cup lie on faces over 12 deg, 27 over
+  13), where src/putt.js rests nothing (CREEP_DEG 12): its ball rolls on, a
+  median 1.3-3.8 yd from WSR's rest on hole 21's three cups. The port of
+  WSR's ball on a plane (src/wsrsim.js) rests an uphill putt up to 15.5
+  deg and none at 16.
+  No WSR ball failed to rest (every look-ahead had a rest, no trace was
+  cut). The launch hop holds: WSR's speed 0.8-1.5 yd out puts its hop within
+  1 point of v0 of LAUNCH_HOP on average at rises of -14 to +14 deg (641
+  traced putts on holes 8, 20 and 21).
+- **The window** in WSR's own frame, against cupWindow at WSR's own speed
+  at the cup: at 2 yd/s within 0.01 yd of it from every side; at 3 yd/s
+  0.08-0.10 across (0.09), 0.076-0.089 from above (up to 0.016 narrower)
+  and 0.094-0.137 from below (0.003-0.036 wider, most on hole 21's s3 and
+  s5); at 1 yd/s 0.131-0.175 against 0.136-0.147, wider on 6 of 7.
+- **The slope field** is not where it goes wrong: at the cups the app's
+  slope is within 0.56 deg of the KCL triangle's (fall lines 0.7-5 deg
+  apart), along WSR's traced paths within 0.5-1.0 deg rms.
+
+The error is the roll's model of the facets: WSR's tick (src/wsrsim.js's
+contact routine) run over the green's own KCL triangles follows WSR's
+traced paths to 0.025 yd (median of each path's largest gap, 570 traced
+putts; the outliers pass within 0.13 yd of the cup, which it lacks, but
+one ball it rests on a 13.8 deg face that WSR's rolls on from), and a
+read made with it (the aim whose holing strengths span the widest range,
+as solvePutt picks it, the cup by cupWindow) putted in WSR at every steep
+spot (`run-pinputts.mjs --read-file`, results/pins-portread) holes its own
+putt on 56 of 58 spots and 345 of 522 of the 9 strengths, against the
+app's read's 39 and 231 of 518.
+
 
 ## 6. The hidden pin-power assist (2e)
 

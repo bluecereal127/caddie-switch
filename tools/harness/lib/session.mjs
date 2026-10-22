@@ -7,7 +7,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { DsuServer, sleep } from "./dsu.mjs";
 import { Gdb } from "./gdb.mjs";
-import { writeUserDir, launch, kill, stateSlotPath, HOTKEY_MAP, STATE, portsFor, INSTANCE } from "./dolphin.mjs";
+import { writeUserDir, launch, kill, stateSlotPath, HOTKEY_MAP, STATE, portsFor, INSTANCE, windowSpot, placeWindow } from "./dolphin.mjs";
 import { pointers, readBall, state as readState } from "./wsr.mjs";
 import { shoot } from "./shot.mjs";
 
@@ -35,6 +35,8 @@ export class Session {
     this.dsu = await new DsuServer({ port: this.dsuPort }).start();
     writeUserDir({ instance: this.instance, gdbPort: this.gdbPort, dsuPort: this.dsuPort, speed: this.speed });
     this.child = launch({ instance: this.instance, batch: true, saveState: saveFile });
+    const spot = windowSpot(this.instance);
+    if (spot) placeWindow(this.child.pid, spot);
     this.gdb = new Gdb({ port: this.gdbPort });
     await this.gdb.connect({ timeoutMs: 120000 });
     await this.gdb.go();
@@ -87,30 +89,73 @@ export class Session {
 
   // load a savestate file: copied into slot 4, the slot-4 hotkey pressed
   // (retried if Dolphin missed it), done when the ball sits at the file's
-  // start; `expect` = { pos } of that start (default: the session's first)
+  // start; `expect` = { pos } of that start (default: the session's first).
+  // The 45 MB copy is skipped when slot 4 still holds this file from this
+  // session's last copy: the same path, the file's size and mtime unchanged
+  // since, and the slot file's own size and mtime as the copy left them
+  // (Dolphin only reads a slot to load it; nothing here saves to slot 4, and
+  // saveSlot(4) drops the record). A run putting 500 times from one state
+  // copies it once.
   async load(file = this.saveFile, expect = this.start0) {
-    fs.copyFileSync(file, stateSlotPath(4, this.instance));
+    const slot = stateSlotPath(4, this.instance);
+    const key = path.resolve(file);
+    const st = (f) => { try { const x = fs.statSync(f); return `${x.size}:${x.mtimeMs}`; } catch { return null; } };
+    const held = this.slot4 && this.slot4.file === key && this.slot4.src === st(file) && this.slot4.slot === st(slot);
+    if (!held) {
+      this.slot4 = null;
+      fs.copyFileSync(file, slot);
+      this.slot4 = { file: key, src: st(file), slot: st(slot) };
+      this.copies = (this.copies ?? 0) + 1;
+    }
+    await this.loadSlot(4, expect, file);
+  }
+
+  // load what a state slot holds by its hotkey, no copy (a temporary state
+  // saved with saveSlot, or slot 4 after load): retried if Dolphin missed
+  // the press, done when the ball sits at `expect`
+  async loadSlot(slot, expect, what = `slot ${slot}`) {
     for (let attempt = 0; attempt < 4; attempt++) {
       await this.gdb.halt(); await this.gdb.clearBreaks(); await this.gdb.go();
       // make the current state differ from the target, so a missed load shows
-      await this.dsu.tap(1, hotkey("Load State Slot 4"), 150);
+      await this.dsu.tap(1, hotkey(`Load State Slot ${slot}`), 150);
       try { await this.waitLoaded(expect, 6000); return; } catch { this.log(`load: retry ${attempt + 1}`); }
     }
-    throw new Error(`could not load ${file}`);
+    throw new Error(`could not load ${what}`);
+  }
+
+  // save the running state into a slot (its hotkey, retried) and return the
+  // slot file's path, without copying it anywhere: a temporary state that
+  // loadSlot reads back (Dolphin moves the slot's previous file to
+  // lastState.sav, its undo copy). Done once the file has been rewritten and
+  // its size has held for 0.4 s after the 0.8 s the copy always waited.
+  async saveSlot(slot = 3) {
+    const file = stateSlotPath(slot, this.instance);
+    if (slot === 4) this.slot4 = null;
+    const before = fs.existsSync(file) ? fs.statSync(file).mtimeMs : 0;
+    for (let a = 0; a < 4; a++) {
+      await this.dsu.tap(1, hotkey(`Save State Slot ${slot}`), 200);
+      for (let i = 0; i < 30; i++) {
+        await sleep(200);
+        if (fs.existsSync(file) && fs.statSync(file).mtimeMs > before) {
+          await sleep(800);
+          for (let k = 0, size = -1; k < 25; k++) {
+            const now = fs.statSync(file).size;
+            if (now === size && now > 0) break;
+            size = now; await sleep(200);
+          }
+          return file;
+        }
+      }
+    }
+    throw new Error(`save to slot ${slot} failed`);
   }
 
   // save the running state as SAVES/<name> (slot 3 + its hotkey, retried)
   async saveState(name) {
-    const slot = stateSlotPath(3, this.instance);
-    const before = fs.existsSync(slot) ? fs.statSync(slot).mtimeMs : 0;
-    for (let a = 0; a < 4; a++) {
-      await this.dsu.tap(1, hotkey("Save State Slot 3"), 200);
-      for (let i = 0; i < 30; i++) {
-        await sleep(200);
-        if (fs.existsSync(slot) && fs.statSync(slot).mtimeMs > before) { await sleep(800); fs.copyFileSync(slot, path.join(SAVES, name)); return path.join(SAVES, name); }
-      }
-    }
-    throw new Error(`save ${name} failed`);
+    let slot;
+    try { slot = await this.saveSlot(3); } catch { throw new Error(`save ${name} failed`); }
+    fs.copyFileSync(slot, path.join(SAVES, name));
+    return path.join(SAVES, name);
   }
 
   async shoot(opts) {

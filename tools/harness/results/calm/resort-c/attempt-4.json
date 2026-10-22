@@ -1,0 +1,57 @@
+{
+ "kind": "natural-round",
+ "course": "Resort C calm",
+ "label": "Resort C calm #4",
+ "wind": {
+  "dir": 0,
+  "speedIdx": 0
+ },
+ "holes": {},
+ "errors": [
+  {
+   "hole": 7,
+   "at": "2026-10-22T06:02:14.511Z",
+   "error": "error: gdb socket closed"
+  },
+  {
+   "hole": 7,
+   "at": "2026-10-22T06:02:14.518Z",
+   "error": "error: gdb socket closed"
+  },
+  {
+   "hole": 7,
+   "at": "2026-10-22T06:02:14.522Z",
+   "error": "error: gdb socket closed"
+  },
+  {
+   "hole": 8,
+   "at": "2026-10-22T06:02:14.526Z",
+   "error": "error: gdb socket closed"
+  },
+  {
+   "hole": 8,
+   "at": "2026-10-22T06:02:14.529Z",
+   "error": "error: gdb socket closed"
+  },
+  {
+   "hole": 8,
+   "at": "2026-10-22T06:02:14.531Z",
+   "error": "error: gdb socket closed"
+  },
+  {
+   "hole": 9,
+   "at": "2026-10-22T06:02:14.534Z",
+   "error": "error: gdb socket closed"
+  },
+  {
+   "hole": 9,
+   "at": "2026-10-22T06:02:14.538Z",
+   "error": "error: gdb socket closed"
+  },
+  {
+   "hole": 9,
+   "at": "2026-10-22T06:02:14.543Z",
+   "error": "error: gdb socket closed"
+  }
+ ]
+}

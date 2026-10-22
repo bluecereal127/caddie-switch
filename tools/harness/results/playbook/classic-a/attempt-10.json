@@ -1,0 +1,632 @@
+{
+ "kind": "natural-round",
+ "course": "Classic A playbook",
+ "label": "Classic A playbook #10",
+ "wind": {
+  "dir": 0,
+  "speedIdx": 0
+ },
+ "holes": {
+  "10": {
+   "hole": 10,
+   "strokes": [
+    {
+     "k": 1,
+     "lie": 15,
+     "from": [
+      12.800000190734863,
+      194.9499969482422,
+      1968.5
+     ],
+     "toPin": 379.15,
+     "wind": {
+      "dir": 0,
+      "speedIdx": 0,
+      "mph": 0
+     },
+     "pin": [
+      -19.200000762939453,
+      137.10000610351562,
+      -1498.300048828125
+     ],
+     "plan": {
+      "club": "driver",
+      "power": 1,
+      "heading": 3.1857293908575426,
+      "expect": {
+       "src": "playbook",
+       "restLie": "fairway",
+       "toPin": 95.8,
+       "aimDeg": -2,
+       "distance": 379.15,
+       "playbook": {
+        "cup": "h10-s0",
+        "k": 1,
+        "of": 2,
+        "target": 2,
+        "power": 1,
+        "gamePower": 1,
+        "heading": 3.1857293908575426,
+        "reached": 3.1856517791748047,
+        "holed": false,
+        "rest": [
+         -104.42074584960938,
+         96.88587188720703,
+         -626.1298217773438
+        ]
+       }
+      },
+      "why": "[playbook h10-s0 1] driver 1.0000, aim 182.5288 deg (2.00 deg left of the pin line), 379.2 yd: stroke 1 of 2 of the calm-wind solution (target 2, par 4; results/solve/h10-s0.json); there the game launched 1.0000, the D-pad reached 182.5244 deg, and it rested 95.8 yd from the pin on the fairway",
+      "ms": 37,
+      "ahead": true
+     },
+     "club": "driver",
+     "aim": {
+      "heading": 3.18617844581604,
+      "errDeg": -0.026,
+      "passes": 3
+     },
+     "readyToStrikeMs": 2088,
+     "raw": 1,
+     "gamePower": 1,
+     "curveC": 0,
+     "rest": [
+      -105.81289672851562,
+      96.80369567871094,
+      -626.1402587890625
+     ],
+     "holed": false,
+     "hazard": 0,
+     "placed": {
+      "from": [
+       -43.27759552001953,
+       395.6996765136719,
+       711.5781860351562
+      ],
+      "to": [
+       -46.031402587890625,
+       399.06719970703125,
+       649.854248046875
+      ]
+     },
+     "after": 95.85,
+     "playbook": {
+      "cup": "h10-s0",
+      "k": 1,
+      "of": 2,
+      "startHeading": 3.103578805923462,
+      "aimSame": false,
+      "aimOffDeg": 0.0302,
+      "gamePower": 1,
+      "powerSame": true,
+      "holed": false,
+      "restOffU": 1.392
+     }
+    },
+    {
+     "k": 2,
+     "lie": 1,
+     "from": [
+      -105.81289672851562,
+      96.80175018310547,
+      -626.1402587890625
+     ],
+     "toPin": 95.85,
+     "wind": {
+      "dir": 0,
+      "speedIdx": 0,
+      "mph": 0
+     },
+     "pin": [
+      -19.200000762939453,
+      137.10000610351562,
+      -1498.300048828125
+     ],
+     "plan": {
+      "club": "9iron",
+      "power": 0.87,
+      "heading": 3.0426086837862205,
+      "expect": {
+       "carry": 83.7,
+       "stop": 95.6,
+       "lateral": 0.4,
+       "restLie": "green",
+       "toPin": 0.5,
+       "model": "kcl3d",
+       "port2d": {
+        "carry": 83.7,
+        "stop": 95.9,
+        "lateral": 0,
+        "restLie": "green",
+        "toPin": 0,
+        "rel": false
+       },
+       "search": {
+        "n2d": 6762,
+        "rel": 0,
+        "n3d": 150,
+        "rej3d": 0,
+        "robustFlights": 4,
+        "notRobust": 0
+       }
+      },
+      "why": "9iron 0.87 +0.0 deg off the pin line, wind calm: 3D over the KCL carry 83.7, rest 95.6 yd, drift 0.4, on green, 0.5 yd from the pin (2D: rest 95.9 on green); trees clear",
+      "ms": 1746,
+      "ahead": true
+     },
+     "club": "9iron",
+     "aim": {
+      "heading": 3.0427026748657227,
+      "errDeg": -0.005,
+      "passes": 1
+     },
+     "readyToStrikeMs": 922,
+     "raw": 0.8510855250338247,
+     "gamePower": 0.8701730966567993,
+     "curveC": 0,
+     "rest": [
+      -15.65884780883789,
+      137.67750549316406,
+      -1497.283447265625
+     ],
+     "holed": false,
+     "hazard": 0,
+     "placed": null,
+     "after": 0.4
+    },
+    {
+     "k": 3,
+     "lie": 6,
+     "from": [
+      -15.65884780883789,
+      137.67738342285156,
+      -1497.283447265625
+     ],
+     "toPin": 0.4,
+     "wind": {
+      "dir": 0,
+      "speedIdx": 0,
+      "mph": 0
+     },
+     "pin": [
+      -19.200000762939453,
+      137.10000610351562,
+      -1498.300048828125
+     ],
+     "plan": {
+      "club": "putter",
+      "power": 0.060012210012210014,
+      "heading": -1.9321724033988938,
+      "expect": {
+       "src": "round-short",
+       "distance": 0.4,
+       "lie": 6,
+       "aimDeg": 4.688,
+       "launchDeg": 4.688,
+       "holeP": 0.996,
+       "E": 1.004,
+       "swung": {
+        "power": 0.06,
+        "holeP": 0.994,
+        "holed": true,
+        "leave": 0,
+        "leaveAttr": 6
+       },
+       "pulled": {
+        "power": 0.03,
+        "holeP": 1,
+        "weight": 0.34
+       },
+       "holes": [
+        0.05,
+        0.2077
+       ],
+       "others": [],
+       "sims": 6796,
+       "ms": 633
+      },
+      "why": "short game (WSR's ball over the KCL, 6796 strokes flown, 633 ms): putter 0.0600 aimed +4.69 deg right of the cup, 0.40 yd; holes 99% as swung (holing powers 0.050-0.208 on this line), 100% if the assist pulls it to 0.0300; 1.00 strokes to hole out [round-short.mjs]",
+      "ms": 643,
+      "ahead": true
+     },
+     "club": "putter",
+     "aim": {
+      "heading": -1.931872844696045,
+      "errDeg": -0.017,
+      "passes": 4
+     },
+     "readyToStrikeMs": 2326,
+     "raw": 0.060012210012210014,
+     "gamePower": 0.03000648319721222,
+     "curveC": 0,
+     "rest": [
+      -19.073549270629883,
+      134.66427612304688,
+      -1498.5240478515625
+     ],
+     "holed": true,
+     "hazard": 0,
+     "placed": null,
+     "after": 0
+    }
+   ],
+   "started": "2026-10-22T08:26:54.367Z",
+   "next": 11,
+   "game": {
+    "windDir": 0,
+    "windIdx": 0,
+    "strokes": 3
+   },
+   "ended": "2026-10-22T08:27:54.955Z"
+  },
+  "11": {
+   "hole": 11,
+   "strokes": [
+    {
+     "k": 1,
+     "lie": 15,
+     "from": [
+      -284.70001220703125,
+      36.95000076293945,
+      787.5
+     ],
+     "toPin": 139.4,
+     "wind": {
+      "dir": 0,
+      "speedIdx": 0,
+      "mph": 0
+     },
+     "pin": [
+      225.60000610351562,
+      -5.5,
+      -380.6000061035156
+     ],
+     "plan": {
+      "club": "7iron",
+      "power": 0.9079000000000006,
+      "heading": 2.734080074196306,
+      "expect": {
+       "src": "playbook",
+       "restLie": "cup",
+       "toPin": 0,
+       "aimDeg": -0.25,
+       "distance": 139.4,
+       "playbook": {
+        "cup": "h11-s2",
+        "k": 1,
+        "of": 1,
+        "target": 1,
+        "power": 0.9079000000000006,
+        "gamePower": 0.9080888628959656,
+        "heading": 2.734080074196306,
+        "reached": 2.734140157699585,
+        "holed": true,
+        "rest": [
+         224.6027374267578,
+         -8.011316299438477,
+         -380.60906982421875
+        ]
+       }
+      },
+      "why": "[playbook h11-s2 1] 7iron 0.9079, aim 156.6512 deg (0.25 deg left of the pin line), 139.4 yd: stroke 1 of 1 of the calm-wind solution (target 1, par 3; results/solve/h11-s2.json); there the game launched 0.9081, the D-pad reached 156.6547 deg, and it holed",
+      "ms": 9,
+      "ahead": true
+     },
+     "club": "7iron",
+     "aim": {
+      "heading": 2.734140157699585,
+      "errDeg": -0.003,
+      "passes": 3
+     },
+     "readyToStrikeMs": 2338,
+     "raw": 0.8941142321191885,
+     "gamePower": 0.9080888628959656,
+     "curveC": 0,
+     "rest": [
+      224.6027374267578,
+      -8.011316299438477,
+      -380.60906982421875
+     ],
+     "holed": true,
+     "hazard": 0,
+     "placed": null,
+     "after": 0,
+     "playbook": {
+      "cup": "h11-s2",
+      "k": 1,
+      "of": 1,
+      "startHeading": 2.7925899028778076,
+      "aimSame": true,
+      "aimOffDeg": 0,
+      "gamePower": 0.9080888628959656,
+      "powerSame": true,
+      "holed": true,
+      "restOffU": null
+     }
+    }
+   ],
+   "started": "2026-10-22T08:27:55.022Z",
+   "next": 12,
+   "game": {
+    "windDir": 0,
+    "windIdx": 0,
+    "strokes": 1
+   },
+   "ended": "2026-10-22T08:28:33.920Z"
+  },
+  "12": {
+   "hole": 12,
+   "strokes": [
+    {
+     "k": 1,
+     "lie": 15,
+     "from": [
+      -756,
+      18.650001525878906,
+      2149.800048828125
+     ],
+     "toPin": 461.96,
+     "wind": {
+      "dir": 0,
+      "speedIdx": 0,
+      "mph": 0
+     },
+     "pin": [
+      -409.20001220703125,
+      -47.900001525878906,
+      -2060.10009765625
+     ],
+     "plan": {
+      "club": "driver",
+      "power": 0.96,
+      "heading": 3.0594009883395925,
+      "expect": {
+       "src": "playbook",
+       "restLie": "fairway",
+       "toPin": 207.1,
+       "aimDeg": 0,
+       "distance": 461.96,
+       "playbook": {
+        "cup": "h12-s2",
+        "k": 1,
+        "of": 3,
+        "target": 3,
+        "power": 0.96,
+        "gamePower": 0.9600369930267334,
+        "heading": 3.0594009883395925,
+        "reached": 3.0593655109405518,
+        "holed": false,
+        "rest": [
+         -564.6588745117188,
+         99.69528198242188,
+         -172.72076416015625
+        ]
+       }
+      },
+      "why": "[playbook h12-s2 1] driver 0.9600, aim 175.2908 deg (0.00 deg right of the pin line), 462.0 yd: stroke 1 of 3 of the calm-wind solution (target 3, par 5; results/solve/h12-s2.json); there the game launched 0.9600, the D-pad reached 175.2887 deg, and it rested 207.1 yd from the pin on the fairway",
+      "ms": 6,
+      "ahead": true
+     },
+     "club": "driver",
+     "aim": {
+      "heading": 3.0593655109405518,
+      "errDeg": 0.002,
+      "passes": 4
+     },
+     "readyToStrikeMs": 4178,
+     "raw": 0.9461580485713418,
+     "gamePower": 0.9600369930267334,
+     "curveC": 0,
+     "rest": [
+      -564.6588745117188,
+      99.69528198242188,
+      -172.72076416015625
+     ],
+     "holed": false,
+     "hazard": 0,
+     "placed": {
+      "from": [
+       -659.7412109375,
+       204.21066284179688,
+       981.7874755859375
+      ],
+      "to": [
+       -654.58837890625,
+       208.12054443359375,
+       919.26171875
+      ]
+     },
+     "after": 207.11,
+     "playbook": {
+      "cup": "h12-s2",
+      "k": 1,
+      "of": 3,
+      "startHeading": 2.3387186527252197,
+      "aimSame": true,
+      "aimOffDeg": 0,
+      "gamePower": 0.9600369930267334,
+      "powerSame": true,
+      "holed": false,
+      "restOffU": 0
+     }
+    },
+    {
+     "k": 2,
+     "lie": 1,
+     "from": [
+      -564.6588745117188,
+      99.69518280029297,
+      -172.72076416015625
+     ],
+     "toPin": 207.11,
+     "wind": {
+      "dir": 0,
+      "speedIdx": 0,
+      "mph": 0
+     },
+     "pin": [
+      -409.20001220703125,
+      -47.900001525878906,
+      -2060.10009765625
+     ],
+     "plan": {
+      "club": "3iron",
+      "power": 1,
+      "heading": 3.0943171791983226,
+      "expect": {
+       "src": "playbook",
+       "restLie": "green",
+       "toPin": 7.6,
+       "aimDeg": -2,
+       "distance": 207.11,
+       "playbook": {
+        "cup": "h12-s2",
+        "k": 2,
+        "of": 3,
+        "target": 3,
+        "power": 1,
+        "gamePower": 1,
+        "heading": 3.0943171791983226,
+        "reached": 3.094614267349243,
+        "holed": false,
+        "rest": [
+         -457.7451477050781,
+         -42.958740234375,
+         -2109.6279296875
+        ]
+       }
+      },
+      "why": "[playbook h12-s2 2] 3iron 1.0000, aim 177.2913 deg (2.00 deg left of the pin line), 207.1 yd: stroke 2 of 3 of the calm-wind solution (target 3, par 5; results/solve/h12-s2.json); there the game launched 1.0000, the D-pad reached 177.3083 deg, and it rested 7.6 yd from the pin on the green",
+      "ms": 7,
+      "ahead": true
+     },
+     "club": "3iron",
+     "aim": {
+      "heading": 3.094160556793213,
+      "errDeg": 0.009,
+      "passes": 3
+     },
+     "readyToStrikeMs": 2265,
+     "raw": 1,
+     "gamePower": 1,
+     "curveC": 0,
+     "rest": [
+      -454.05072021484375,
+      -43.20222854614258,
+      -2109.810791015625
+     ],
+     "holed": false,
+     "hazard": 0,
+     "placed": {
+      "from": [
+       -548.095703125,
+       215.33212280273438,
+       -521.6370239257812
+      ],
+      "to": [
+       -545.1859130859375,
+       234.07476806640625,
+       -582.9365234375
+      ]
+     },
+     "after": 7.32,
+     "playbook": {
+      "cup": "h12-s2",
+      "k": 2,
+      "of": 3,
+      "startHeading": 3.0560107231140137,
+      "aimSame": false,
+      "aimOffDeg": -0.026,
+      "gamePower": 1,
+      "powerSame": true,
+      "holed": false,
+      "restOffU": 3.699
+     }
+    },
+    {
+     "k": 3,
+     "lie": 6,
+     "from": [
+      -454.05072021484375,
+      -43.2034797668457,
+      -2109.810791015625
+     ],
+     "toPin": 7.32,
+     "wind": {
+      "dir": 0,
+      "speedIdx": 0,
+      "mph": 0
+     },
+     "pin": [
+      -409.20001220703125,
+      -47.900001525878906,
+      -2060.10009765625
+     ],
+     "plan": {
+      "club": "putter",
+      "power": 0.3004882969000401,
+      "heading": 0.7156465331022535,
+      "expect": {
+       "src": "round-short",
+       "distance": 7.32,
+       "lie": 6,
+       "aimDeg": 1.054,
+       "launchDeg": 1.054,
+       "holeP": 1,
+       "E": 1,
+       "swung": {
+        "power": 0.3005,
+        "holeP": 1,
+        "holed": true,
+        "leave": 0,
+        "leaveAttr": 6
+       },
+       "pulled": {
+        "power": 0.3005,
+        "holeP": 1,
+        "weight": 0.34
+       },
+       "holes": [
+        0.2883,
+        0.4775
+       ],
+       "others": [],
+       "sims": 5031,
+       "ms": 1114
+      },
+      "why": "short game (WSR's ball over the KCL, 5031 strokes flown, 1114 ms): putter 0.3005 aimed +1.05 deg right of the cup, 7.32 yd; holes 100% as swung (holing powers 0.288-0.477 on this line), out of the assist's reach; 1.00 strokes to hole out [round-short.mjs]",
+      "ms": 1125,
+      "ahead": true
+     },
+     "club": "putter",
+     "aim": {
+      "heading": 0.716168224811554,
+      "errDeg": -0.03,
+      "passes": 12
+     },
+     "readyToStrikeMs": 3348,
+     "raw": 0.3004882969000401,
+     "gamePower": 0.3005301058292389,
+     "curveC": 0,
+     "rest": [
+      -408.77520751953125,
+      -50.469398498535156,
+      -2059.96240234375
+     ],
+     "holed": true,
+     "hazard": 0,
+     "placed": null,
+     "after": 0
+    }
+   ],
+   "started": "2026-10-22T08:28:33.970Z",
+   "game": {
+    "windDir": 0,
+    "windIdx": 0,
+    "strokes": 3
+   },
+   "ended": "2026-10-22T08:29:34.895Z"
+  }
+ },
+ "finalScreenshot": "C:\\Users\\Stephen\\Desktop\\caddie-switch-web\\caddie-web\\tools\\harness\\state\\user18\\ScreenShots\\RZTE01\\RZTE01_2026-10-22_04-29-38.png"
+}

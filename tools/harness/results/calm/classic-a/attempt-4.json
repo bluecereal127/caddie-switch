@@ -1,0 +1,57 @@
+{
+ "kind": "natural-round",
+ "course": "Classic A calm",
+ "label": "Classic A calm #4",
+ "wind": {
+  "dir": 0,
+  "speedIdx": 0
+ },
+ "holes": {},
+ "errors": [
+  {
+   "hole": 10,
+   "at": "2026-10-22T06:02:11.318Z",
+   "error": "error: gdb: go() while running"
+  },
+  {
+   "hole": 10,
+   "at": "2026-10-22T06:02:11.323Z",
+   "error": "error: gdb socket closed"
+  },
+  {
+   "hole": 10,
+   "at": "2026-10-22T06:02:11.326Z",
+   "error": "error: gdb socket closed"
+  },
+  {
+   "hole": 11,
+   "at": "2026-10-22T06:02:11.329Z",
+   "error": "error: gdb socket closed"
+  },
+  {
+   "hole": 11,
+   "at": "2026-10-22T06:02:11.331Z",
+   "error": "error: gdb socket closed"
+  },
+  {
+   "hole": 11,
+   "at": "2026-10-22T06:02:11.333Z",
+   "error": "error: gdb socket closed"
+  },
+  {
+   "hole": 12,
+   "at": "2026-10-22T06:02:11.335Z",
+   "error": "error: gdb socket closed"
+  },
+  {
+   "hole": 12,
+   "at": "2026-10-22T06:02:11.337Z",
+   "error": "error: gdb socket closed"
+  },
+  {
+   "hole": 12,
+   "at": "2026-10-22T06:02:11.341Z",
+   "error": "error: gdb socket closed"
+  }
+ ]
+}

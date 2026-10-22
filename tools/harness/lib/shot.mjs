@@ -259,6 +259,13 @@ async function shoot1(gdb, opts) {
   const sw = await gdb.readMem(p.swing, 0xe8);
   out.swingAtHandoff = { raw: sw.readFloatBE(SWING.raw), p1: sw.readFloatBE(SWING.p1), p2: sw.readFloatBE(SWING.p2), p3: sw.readFloatBE(SWING.p3), power: sw.readFloatBE(SWING.power), s7c: sw.readFloatBE(SWING.backspin),
     m: sw.readFloatBE(0xc0), coin: sw.readUInt32BE(0xd8) };
+  // the curve tracker's value ((swing+0xb4)+4, frozen in swing states 1-2):
+  // the input of the rough / sand launch yaw (wsr-swing-redzone-spin.md 4.1),
+  // 2.000 deg when it is 0
+  try {
+    const cp = sw.readUInt32BE(0xb4);
+    if (cp >= 0x80000000 && cp < 0x81800000) out.swingAtHandoff.curveC = (await gdb.readMem(cp + 4, 4)).readFloatBE(0);
+  } catch { /* not readable: left out */ }
   await gdb.removeBreak(RAW_STORE);
   if (mode === "hold" || hold) await gdb.removeBreak(CODE.powerStored);
   if (hold) await gdb.removeBreak(WINDOW_HOLD);

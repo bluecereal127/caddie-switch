@@ -1,0 +1,202 @@
+{
+ "kind": "natural-round",
+ "course": "Resort B calm",
+ "label": "Resort B calm #4",
+ "wind": {
+  "dir": 0,
+  "speedIdx": 0
+ },
+ "holes": {
+  "4": {
+   "hole": 4,
+   "strokes": [
+    {
+     "k": 1,
+     "lie": 15,
+     "from": [
+      546.2000122070312,
+      0.949999988079071,
+      855.5
+     ],
+     "toPin": 162.52,
+     "wind": {
+      "dir": 0,
+      "speedIdx": 0,
+      "mph": 0
+     },
+     "pin": [
+      -100,
+      -48.400001525878906,
+      -482.70001220703125
+     ],
+     "plan": {
+      "club": "3iron",
+      "power": 0.74,
+      "heading": -2.6742752610116667,
+      "expect": {
+       "carry": 148.8,
+       "stop": 163.2,
+       "lateral": 3.9,
+       "restLie": "green",
+       "toPin": 1.2,
+       "model": "kcl3d",
+       "port2d": {
+        "carry": 148.8,
+        "stop": 162.8,
+        "lateral": 0,
+        "restLie": "green",
+        "toPin": 2.9,
+        "rel": false
+       },
+       "search": {
+        "n2d": 7406,
+        "rel": 114,
+        "n3d": 150,
+        "rej3d": 0,
+        "robustFlights": 4,
+        "notRobust": 0
+       }
+      },
+      "why": "3iron 0.74 +1.0 deg off the pin line, wind calm: 3D over the KCL carry 148.8, rest 163.2 yd, drift 3.9, on green, 1.2 yd from the pin (2D: rest 162.8 on green); trees clear",
+      "ms": 7389,
+      "ahead": true
+     },
+     "club": "3iron",
+     "aim": {
+      "heading": -2.6745266914367676,
+      "errDeg": 0.014,
+      "passes": 3
+     },
+     "readyToStrikeMs": 2468,
+     "raw": 0.7061429999926849,
+     "gamePower": 0.7400678992271423,
+     "curveC": 0,
+     "rest": [
+      -97.27933502197266,
+      -47.98332214355469,
+      -492.81622314453125
+     ],
+     "holed": false,
+     "hazard": 0,
+     "placed": null,
+     "after": 1.15
+    },
+    {
+     "k": 2,
+     "lie": 6,
+     "from": [
+      -97.27933502197266,
+      -47.98395919799805,
+      -492.81622314453125
+     ],
+     "toPin": 1.15,
+     "wind": {
+      "dir": 0,
+      "speedIdx": 0,
+      "mph": 0
+     },
+     "pin": [
+      -100,
+      -48.400001525878906,
+      -482.70001220703125
+     ],
+     "plan": {
+      "club": "putter",
+      "power": 0.16086345046916334,
+      "heading": -0.2899953974579328,
+      "expect": {
+       "src": "round-short",
+       "distance": 1.15,
+       "lie": 6,
+       "aimDeg": 1.563,
+       "launchDeg": 1.563,
+       "holeP": 0.994,
+       "E": 1.006,
+       "swung": {
+        "power": 0.1609,
+        "holeP": 0.994,
+        "holed": true,
+        "leave": 0,
+        "leaveAttr": 6
+       },
+       "pulled": {
+        "power": 0.0806,
+        "holeP": 0.994,
+        "weight": 0.34
+       },
+       "holes": [
+        0.062,
+        0.2388
+       ],
+       "others": [],
+       "sims": 6735,
+       "ms": 863
+      },
+      "why": "short game (WSR's ball over the KCL, 6735 strokes flown, 863 ms): putter 0.1609 aimed +1.56 deg right of the cup, 1.15 yd; holes 99% as swung (holing powers 0.062-0.239 on this line), 99% if the assist pulls it to 0.0806; 1.01 strokes to hole out [round-short.mjs]",
+      "ms": 863,
+      "ahead": true
+     },
+     "club": "putter",
+     "aim": {
+      "heading": -0.29032042622566223,
+      "errDeg": 0.019,
+      "passes": 3
+     },
+     "readyToStrikeMs": 1824,
+     "raw": 0.16086345046916334,
+     "gamePower": 0.0806061252951622,
+     "curveC": 0,
+     "rest": [
+      -99.91539001464844,
+      -51.003761291503906,
+      -481.7603759765625
+     ],
+     "holed": true,
+     "hazard": 0,
+     "placed": null,
+     "after": 0
+    }
+   ],
+   "started": "2026-10-22T06:01:01.856Z",
+   "next": 5,
+   "game": {
+    "windDir": 0,
+    "windIdx": 0,
+    "strokes": 2
+   },
+   "ended": "2026-10-22T06:01:51.660Z"
+  }
+ },
+ "errors": [
+  {
+   "hole": 5,
+   "at": "2026-10-22T06:02:22.332Z",
+   "error": "error: gdb: go() while running"
+  },
+  {
+   "hole": 5,
+   "at": "2026-10-22T06:02:22.336Z",
+   "error": "error: gdb socket closed"
+  },
+  {
+   "hole": 5,
+   "at": "2026-10-22T06:02:22.338Z",
+   "error": "error: gdb socket closed"
+  },
+  {
+   "hole": 6,
+   "at": "2026-10-22T06:02:22.340Z",
+   "error": "error: gdb socket closed"
+  },
+  {
+   "hole": 6,
+   "at": "2026-10-22T06:02:22.343Z",
+   "error": "error: gdb socket closed"
+  },
+  {
+   "hole": 6,
+   "at": "2026-10-22T06:02:22.345Z",
+   "error": "error: gdb socket closed"
+  }
+ ]
+}

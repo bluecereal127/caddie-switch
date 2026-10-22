@@ -1,0 +1,161 @@
+{
+ "course": "Classic B",
+ "slug": "classic-b",
+ "instance": 20,
+ "window": {
+  "x": 3280,
+  "y": -57,
+  "w": 720,
+  "h": 436
+ },
+ "started": "2026-10-22T06:47:59.472Z",
+ "cups": {
+  "h14-s0": {
+   "hole": 14,
+   "id": "s0",
+   "label": "BL",
+   "par": 5,
+   "target": 2,
+   "status": "solved",
+   "strokes": [
+    {
+     "club": "spoon",
+     "power": 0.96,
+     "aimDeg": -145.319
+    },
+    {
+     "club": "3iron",
+     "power": 0.9152,
+     "aimDeg": 145.651
+    }
+   ],
+   "tries": 2,
+   "min": 1,
+   "edges": null,
+   "exit": 0
+  },
+  "h14-s1": {
+   "hole": 14,
+   "id": "s1",
+   "label": "BR",
+   "par": 5,
+   "target": 2,
+   "status": "solved",
+   "strokes": [
+    {
+     "club": "driver",
+     "power": 0.9201,
+     "aimDeg": -157.211
+    },
+    {
+     "club": "3iron",
+     "power": 0.633,
+     "aimDeg": 145.075
+    }
+   ],
+   "tries": 2,
+   "min": 1,
+   "edges": null,
+   "exit": 0
+  },
+  "h14-s2": {
+   "hole": 14,
+   "id": "s2",
+   "label": "BM",
+   "par": 5,
+   "target": 2,
+   "status": "solved",
+   "strokes": [
+    {
+     "club": "driver",
+     "power": 0.8601,
+     "aimDeg": -156.389
+    },
+    {
+     "club": "3iron",
+     "power": 0.6986,
+     "aimDeg": 152.317
+    }
+   ],
+   "tries": 2,
+   "min": 1,
+   "edges": null,
+   "exit": 0
+  },
+  "h14-s3": {
+   "hole": 14,
+   "id": "s3",
+   "label": "AL",
+   "par": 5,
+   "target": 2,
+   "status": "solved",
+   "strokes": [
+    {
+     "club": "driver",
+     "power": 1,
+     "aimDeg": -163.748
+    },
+    {
+     "club": "spoon",
+     "power": 0.5202,
+     "aimDeg": 153.878
+    }
+   ],
+   "tries": 3,
+   "min": 1.1,
+   "edges": null,
+   "exit": 0
+  },
+  "h14-s4": {
+   "hole": 14,
+   "id": "s4",
+   "label": "AM",
+   "par": 5,
+   "target": 2,
+   "status": "solved",
+   "strokes": [
+    {
+     "club": "driver",
+     "power": 0.8601,
+     "aimDeg": -151.195
+    },
+    {
+     "club": "3iron",
+     "power": 0.8102,
+     "aimDeg": 147.632
+    }
+   ],
+   "tries": 2,
+   "min": 1.1,
+   "edges": null,
+   "exit": 0
+  },
+  "h14-s5": {
+   "hole": 14,
+   "id": "s5",
+   "label": "AR",
+   "par": 5,
+   "target": 2,
+   "status": "solved",
+   "strokes": [
+    {
+     "club": "driver",
+     "power": 0.96,
+     "aimDeg": -161.161
+    },
+    {
+     "club": "5iron",
+     "power": 0.6561,
+     "aimDeg": 145.727
+    }
+   ],
+   "tries": 2,
+   "min": 1,
+   "edges": null,
+   "exit": 0
+  }
+ },
+ "updated": "2026-10-22T06:57:03.325Z",
+ "solved": 6,
+ "total": 6
+}

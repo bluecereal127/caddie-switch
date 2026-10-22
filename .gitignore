@@ -11,3 +11,6 @@ tools/netlify.json
 __pycache__/
 # Dolphin harness: savestates, generated Dolphin user dir, logs, screenshots
 tools/harness/state/
+# the harness's result screenshots (scorecards, highlights: ~0.6 MB each, over
+# 100 MB on 2026-10-22) stay local; their JSON results are committed
+tools/harness/results/**/*.png

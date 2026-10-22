@@ -84,7 +84,7 @@ export async function waitStroke(s, hole, { maxSteps = 80 } = {}) {
         const f = await gdb.readMem(pm + 0x674, 2), tut = (await gdb.readMem(pm + 0x8a8, 1))[0];
         const h = (await gdb.readMem(cfg + 0xc, 4)).readInt32BE(0) + 1;
         const p = await pointers(gdb);
-        const b = await readBall(gdb, p.ball);
+        const b = await readBall(gdb, p.ball, { records: false });
         const swState = await gdb.u32(p.swing + 0x30);
         return { hole: h, ready: f[0] === 1 && f[1] === 1 && !tut && !b.moving && (swState === 0 || swState === 3), tut,
           fields: { hole: h, f674: f[0], f675: f[1], tut, moving: b.moving, life: b.life, swState } };

@@ -1,0 +1,17 @@
+[
+ {
+  "n": 1,
+  "instance": 19,
+  "holes": {
+   "13": 1,
+   "14": 2,
+   "15": 2
+  },
+  "strokes": 5,
+  "toPar": -7,
+  "complete": true,
+  "why": "played",
+  "card": "results/playbook/classic-b/card-1.png",
+  "ended": "2026-10-22T08:00:09.270Z"
+ }
+]

@@ -146,16 +146,49 @@ map point.
 - `run-puttwind.mjs`: wind on putts, from the green and from the fringe.
 - `run-puttread.mjs`: the app's putt read in WSR, each read putted at its aim
   with the strength moved up and down, against the read at a base commit.
+- `make-pinstates.mjs`: a tee state per WSR cup location (`lib/pins.mjs`:
+  the 118 spots of `tools/wsr-pins.json`), the pin slot written over
+  choosePin's result at hole start (wsr-harness-decodes.md section 2), the
+  game deriving the pin, the cup and the tee from it; a course's first hole
+  from the course-select state, any other by replaying the previous hole's
+  holing stroke from its pre state (`SAVES/pins/hHH-pre.sav`, played out
+  once); the pin, the cup prism and the tee checked against WSR's data;
+  `--green` plays on to the green state.
+- `make-pingreen.mjs`: a forced cup's green state by real strokes from its
+  tee state (`lib/pins.mjs searchPlan`: the port's flight over the KCL, no OB
+  or water on the roll, the app's tree check clear), then the tee state
+  deleted.
+- `run-pinputts.mjs`: the putting battery at one cup (REPORT.md 5.4): real
+  putts to spots 3, 8 and 15 yd round the cup, and from each the app's read
+  with the strength moved by up to 0.08 of putter power, six putts that miss
+  on purpose, the capture window at 1, 2 and 3 yd/s on the 3 yd spots;
+  resumable per spot; `--spots` and `--out` split a cup over instances,
+  `--plan` gives putts to try first for spots the app's roll cannot plan.
+- `campaign.mjs`: every WSR cup (or `--cups h8s4,h21s3`, `--holes`, `--steep
+  8`) through pre state, tee state, green state and battery over
+  `--instances 1-16`, one step per instance at a time, a hole's pre state
+  before its tee states, `--order steep-first`, the battery in `--parts`
+  (`--battery` adds run-pinputts options, `--plans <dir>` a cup's `--plan`);
+  an instance in use and a cup another run's step tools work on are left
+  alone; resumable from the outputs, one retry per step, no state step under
+  5 GB free, a log per step and `status.json` under `state/campaign/`; Ctrl+C or
+  a file `state/campaign/STOP` stops its own steps by PID (`DRAIN` lets them
+  finish); `--dry-run` shows what would start, `--project` the wall time from
+  the step times measured so far.
 - `run-assist.mjs`: 2e, partial swings around the aim table's pin power,
   with and without backspin.
 - `run-spin.mjs`: 2f, backspin, and the red zone on a full and a rough lie.
 - `run-plan.mjs`: 3, every hole played out with each of its first two strokes
   also flown at +-0.05 bar and +-0.3 / 1.1 deg.
 - `diag-shot.mjs`: one traced shot with every tree contact, to `state/raw`.
-- `report.mjs [sweep|wind|windpower|trees|cup|cupedge|cupwindow|puttread|assist|spin|plan|puttwind]`:
+- `report.mjs [sweep|wind|windpower|trees|cup|cupedge|cupwindow|puttread|assist|spin|plan|puttwind|pins]`:
   one REPORT.md table set from `results/*.json`, the port flown again from
   each row's inputs; `--write` fills every one between its markers in
-  REPORT.md.
+  REPORT.md, `pins --write` (any section name before `--write`) only that
+  one. `pins` reads `results/pins/*.json` (`--dir results/pins-dev` another
+  folder), merging the files of one cup and green state, the app's side
+  flown again with `src/putt.js` as it stands; `--detail` adds a row per
+  spot.
 
 ## The one-time walk (done 2026-10-21)
 

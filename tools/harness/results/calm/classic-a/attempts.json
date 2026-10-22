@@ -1,0 +1,47 @@
+[
+ {
+  "n": 1,
+  "instance": 15,
+  "holes": {
+   "10": 3,
+   "11": 2,
+   "12": 3
+  },
+  "strokes": 8,
+  "toPar": -4,
+  "complete": true,
+  "why": "played",
+  "card": "results/calm/classic-a/card-1.png",
+  "ended": "2026-10-22T05:53:06.923Z"
+ },
+ {
+  "n": 2,
+  "instance": 15,
+  "holes": {
+   "10": 3,
+   "11": 2,
+   "12": 3
+  },
+  "strokes": 8,
+  "toPar": -4,
+  "complete": true,
+  "why": "played",
+  "card": "results/calm/classic-a/card-2.png",
+  "ended": "2026-10-22T05:57:04.254Z"
+ },
+ {
+  "n": 3,
+  "instance": 15,
+  "holes": {
+   "10": 3,
+   "11": 2,
+   "12": 3
+  },
+  "strokes": 8,
+  "toPar": -4,
+  "complete": true,
+  "why": "played",
+  "card": "results/calm/classic-a/card-3.png",
+  "ended": "2026-10-22T06:01:16.144Z"
+ }
+]

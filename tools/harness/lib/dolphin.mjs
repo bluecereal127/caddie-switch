@@ -40,8 +40,23 @@ export const USER = userDir();
 // failed to bind). No Windows port exclusion covers 46000-47999 here
 // (netsh interface ipv4 show excludedportrange).
 export const portsFor = (i = INSTANCE) => ({ gdb: 47020 + i, dsu: 46020 + i });
-export const DOLPHIN = process.env.HARNESS_DOLPHIN ||
-  "C:/Users/Stephen/Downloads/dolphin-2609a-x64/Dolphin-x64/Dolphin.exe";
+// The stock build's GDB stub costs the harness most of its time:
+// - it polls its socket every 100,000 emulated cycles (GDBStub.cpp
+//   GDB_UPDATE_CYCLES, ~7,300 times an emulated second) with a 20 us
+//   select(), which on Windows waits about half a millisecond: an attached
+//   game ran at a quarter of real time (14.6 frames a second, Dolphin on 13%
+//   of a core);
+// - every memory write ('M') resets the instruction cache, which throws away
+//   the JIT's blocks: the frame after a write took 290-435 ms (a putt's state-1
+//   frames write the power every frame).
+// make-fast-dolphin.mjs copies the stock install to state/dolphin-fast-v2
+// with the poll every 5,000,000 cycles and the reset call nopped (the harness
+// writes data, never code); the same putts give bit-identical look-ahead
+// records and rests on the stock build and the copy. The newest copy that
+// exists is used (dolphin-fast: the poll alone).
+export const STOCK_DOLPHIN = "C:/Users/Stephen/Downloads/dolphin-2609a-x64/Dolphin-x64/Dolphin.exe";
+export const FAST_DOLPHIN = ["dolphin-fast-v2", "dolphin-fast"].map((d) => path.join(STATE, d, "Dolphin.exe")).find((f) => fs.existsSync(f)) ?? null;
+export const DOLPHIN = process.env.HARNESS_DOLPHIN || FAST_DOLPHIN || STOCK_DOLPHIN;
 export const DISC = process.env.HARNESS_DISC ||
   "C:/Users/Stephen/Desktop/Wii Sports Resort (USA) (En,Fr,Es) (Rev 1).rvz";
 export const GAME_ID = "RZTE01";
@@ -78,9 +93,31 @@ function ini(sections) {
   return out;
 }
 
+// where an instance's render window opens: state/windows.json
+// { "<instance>": { x, y, w, h } } when it names the instance (solve-course.mjs
+// writes it, so every Dolphin of a campaign's instance, the tee-state maker's
+// too, opens on its spot), else 40,40 640x480
+export function windowSpot(instance = INSTANCE) {
+  try { return JSON.parse(fs.readFileSync(path.join(STATE, "windows.json"), "utf8"))[instance] ?? null; } catch { return null; }
+}
+export const windowFor = (instance = INSTANCE) => windowSpot(instance) ?? { x: 40, y: 40, w: 640, h: 480 };
+// Dolphin's Qt settings restore the render window's last geometry over the
+// ini's position, so a spot from windows.json is set on the window itself
+// once it shows (topmost), from a background PowerShell
+export function placeWindow(pid, w) {
+  const ps = `Add-Type @'
+using System; using System.Runtime.InteropServices;
+public class PW { [DllImport("user32.dll")] public static extern bool SetWindowPos(IntPtr h, IntPtr a, int x, int y, int cx, int cy, uint f); }
+'@
+$p = Get-Process -Id ${pid} -ErrorAction SilentlyContinue; for ($i = 0; $i -lt 120 -and $p -and $p.MainWindowHandle -eq 0; $i++) { Start-Sleep -Milliseconds 500; $p.Refresh() }; Start-Sleep 1; $p.Refresh(); if ($p -and $p.MainWindowHandle -ne 0) { [PW]::SetWindowPos($p.MainWindowHandle, [IntPtr](-1), ${w.x}, ${w.y}, ${w.w}, ${w.h}, 0x0040) | Out-Null }`;
+  const ch = spawn("powershell", ["-NoProfile", "-Command", ps], { stdio: "ignore", windowsHide: true });
+  ch.on("error", () => { /* the window stays where Dolphin put it */ });
+  ch.unref();
+}
+
 export function writeUserDir({
   instance = INSTANCE, gdbPort = portsFor(instance).gdb, dsuPort = portsFor(instance).dsu, backend = "D3D", speed = 1.0, cheats = false,
-  cpuCore = 1, logTypes = ["GDB_STUB", "CI", "OSREPORT"], window = { x: 40, y: 40, w: 640, h: 480 },
+  cpuCore = 1, logTypes = ["GDB_STUB", "CI", "OSREPORT"], window = windowFor(instance),
 } = {}) {
   const dir = userDir(instance);
   const cfg = path.join(dir, "Config");

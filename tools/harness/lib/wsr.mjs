@@ -116,7 +116,21 @@ export async function pointers(gdb) {
   return out;
 }
 
-export async function readBall(gdb, addr) {
+// { records: false }: the ball's own state only (below its look-ahead records
+// at +0xf0..+0x158), for reads before a stroke, where the records hold the
+// last stroke's look-ahead and a natural round must not read them (the
+// fair-play audit of 2026-10-22: they were read, never used)
+export async function readBall(gdb, addr, { records = true } = {}) {
+  if (!records) {
+    const b = await gdb.readMem(addr, 0xf0);
+    return {
+      pos: vec3(b, BALL.pos), life: b.readInt32BE(BALL.life), frames: b.readInt32BE(BALL.frames),
+      spinStart: b.readInt32BE(BALL.spinStart), moving: b[BALL.moving], vel: vec3(b, BALL.vel),
+      lift: b.readFloatBE(BALL.lift), side: b.readFloatBE(BALL.side), back: b.readFloatBE(BALL.back),
+      attrMax: b.readUInt16BE(BALL.attrMax), attrGround: b.readUInt16BE(BALL.attrGround), water: b.readInt32BE(BALL.water),
+      dropSpot: vec3(b, 0xd0), waterTicks: b.readInt32BE(0xc0),
+    };
+  }
   const b = await gdb.readMem(addr, 0x180);
   return {
     pos: vec3(b, BALL.pos), life: b.readInt32BE(BALL.life), frames: b.readInt32BE(BALL.frames),
@@ -133,7 +147,7 @@ export async function readBall(gdb, addr) {
   };
 }
 
-export async function state(gdb) {
+export async function state(gdb, { records = true } = {}) {
   const p = await pointers(gdb);
   const pl = await gdb.readMem(p.player, 0xc0);
   const cfg = await gdb.readMem(p.glfConfig, 0x10);
@@ -151,6 +165,6 @@ export async function state(gdb) {
       aim: [pl.readFloatBE(PLAYER.aim), pl.readFloatBE(PLAYER.aim + 4)], pos: vec3(pl, PLAYER.pos), lie: pl.readUInt16BE(PLAYER.lie) },
     swing: { state: sw.readInt32BE(SWING.state), timer: sw.readInt32BE(SWING.timer), power: sw.readFloatBE(SWING.power),
       raw: sw.readFloatBE(SWING.raw), fired: sw[SWING.fired] },
-    ball: await readBall(gdb, p.ball),
+    ball: await readBall(gdb, p.ball, { records }),
   };
 }

@@ -1,0 +1,614 @@
+{
+ "kind": "natural-round",
+ "course": "Resort A",
+ "label": "Resort A #22",
+ "holes": {
+  "1": {
+   "hole": 1,
+   "strokes": [
+    {
+     "k": 1,
+     "lie": 15,
+     "from": [
+      -493.20001220703125,
+      150.9499969482422,
+      1986
+     ],
+     "toPin": 395.52,
+     "wind": {
+      "dir": 3,
+      "speedIdx": 2,
+      "mph": 4
+     },
+     "pin": [
+      240.3000030517578,
+      -58.20000076293945,
+      -1555.5
+     ],
+     "plan": {
+      "club": "driver",
+      "power": 1,
+      "heading": 2.9024580096221793,
+      "expect": {
+       "carry": 266.7,
+       "stop": 299.9,
+       "lateral": 15.6,
+       "restLie": "fairway",
+       "toPin": 99.8,
+       "model": "kcl3d",
+       "port2d": {
+        "carry": 266,
+        "stop": 292.8,
+        "lateral": 6.1,
+        "restLie": "fairway",
+        "toPin": 104.4,
+        "rel": false
+       },
+       "search": {
+        "n2d": 8372,
+        "rel": 121,
+        "n3d": 150,
+        "rej3d": 0,
+        "robustFlights": 3,
+        "notRobust": 0
+       }
+      },
+      "why": "driver 1.00 -2.0 deg off the pin line, wind 4 mph at 31 deg: 3D over the KCL carry 266.7, rest 299.9 yd, drift 15.6, on fairway, 99.8 yd from the pin (2D: rest 292.8 on fairway), the best second shot from there 0.1; trees clear",
+      "ms": 5724,
+      "ahead": true
+     },
+     "club": "driver",
+     "aim": {
+      "heading": 2.9021878242492676,
+      "errDeg": 0.015,
+      "passes": 3
+     },
+     "readyToStrikeMs": 2297,
+     "raw": 1,
+     "gamePower": 1,
+     "curveC": 0,
+     "rest": [
+      294.77288818359375,
+      -40.312721252441406,
+      -643.6273803710938
+     ],
+     "holed": false,
+     "hazard": 0,
+     "placed": {
+      "from": [
+       -289.6330871582031,
+       304.0088806152344,
+       1158.5733642578125
+      ],
+      "to": [
+       -273.52294921875,
+       314.03863525390625,
+       1094.2069091796875
+      ]
+     },
+     "after": 99.9
+    },
+    {
+     "k": 2,
+     "lie": 1,
+     "from": [
+      294.77288818359375,
+      -40.31698989868164,
+      -643.6273803710938
+     ],
+     "toPin": 99.9,
+     "wind": {
+      "dir": 3,
+      "speedIdx": 2,
+      "mph": 4
+     },
+     "pin": [
+      240.3000030517578,
+      -58.20000076293945,
+      -1555.5
+     ],
+     "plan": {
+      "club": "9iron",
+      "power": 0.82,
+      "heading": -3.047019591183638,
+      "expect": {
+       "carry": 85.2,
+       "stop": 99.9,
+       "lateral": 4.4,
+       "restLie": "green",
+       "toPin": 1,
+       "model": "kcl3d",
+       "port2d": {
+        "carry": 85.2,
+        "stop": 99.9,
+        "lateral": 4.4,
+        "restLie": "green",
+        "toPin": 0.9,
+        "rel": false
+       },
+       "search": {
+        "n2d": 6762,
+        "rel": 24,
+        "n3d": 150,
+        "rej3d": 0,
+        "robustFlights": 4,
+        "notRobust": 0
+       }
+      },
+      "why": "9iron 0.82 +2.0 deg off the pin line, wind 4 mph at 50 deg: 3D over the KCL carry 85.2, rest 99.9 yd, drift 4.4, on green, 1.0 yd from the pin (2D: rest 99.9 on green); trees clear",
+      "ms": 2200,
+      "ahead": true
+     },
+     "club": "9iron",
+     "aim": {
+      "heading": -3.047062397003174,
+      "errDeg": 0.002,
+      "passes": 3
+     },
+     "readyToStrikeMs": 2015,
+     "raw": 0.7948364791022242,
+     "gamePower": 0.8200848698616028,
+     "curveC": 0,
+     "rest": [
+      248.5945281982422,
+      -57.889827728271484,
+      -1558.6224365234375
+     ],
+     "holed": false,
+     "hazard": 0,
+     "placed": null,
+     "after": 0.97
+    },
+    {
+     "k": 3,
+     "lie": 6,
+     "from": [
+      248.5945281982422,
+      -57.889923095703125,
+      -1558.6224365234375
+     ],
+     "toPin": 0.97,
+     "wind": {
+      "dir": 3,
+      "speedIdx": 2,
+      "mph": 4
+     },
+     "pin": [
+      240.3000030517578,
+      -58.20000076293945,
+      -1555.5
+     ],
+     "plan": {
+      "club": "putter",
+      "power": 0.18000000000000013,
+      "heading": -1.207704660367708,
+      "expect": {
+       "distance": 0.97,
+       "aimDeg": -0.175,
+       "holes": [
+        0.054,
+        0.306
+       ],
+       "src": "kcl-port",
+       "app": {
+        "aimDeg": -0.925,
+        "power": 0.1746
+       }
+      },
+      "why": "putt 0.97 yd (WSR's tick over the green's KCL, 918 ms): aim -0.17 deg right of the cup, putter 0.1800 (holes 0.054-0.306; the app's read -0.93 deg 0.1746)",
+      "ms": 1092,
+      "ahead": true
+     },
+     "club": "putter",
+     "aim": {
+      "heading": -1.2072715759277344,
+      "errDeg": -0.025,
+      "passes": 1
+     },
+     "readyToStrikeMs": 1065,
+     "raw": 0.18000000000000013,
+     "gamePower": 0.1800098866224289,
+     "curveC": 0,
+     "rest": [
+      239.74432373046875,
+      -60.79845428466797,
+      -1555.284912109375
+     ],
+     "holed": true,
+     "hazard": 0,
+     "placed": null,
+     "after": 0
+    }
+   ],
+   "started": "2026-10-22T05:43:42.992Z",
+   "next": 2,
+   "game": {
+    "windDir": 3,
+    "windIdx": 2,
+    "strokes": 3
+   },
+   "ended": "2026-10-22T05:44:57.597Z"
+  },
+  "2": {
+   "hole": 2,
+   "strokes": [
+    {
+     "k": 1,
+     "lie": 15,
+     "from": [
+      500.1000061035156,
+      -3.450000047683716,
+      548.7000122070312
+     ],
+     "toPin": 152.2,
+     "wind": {
+      "dir": 4,
+      "speedIdx": 4,
+      "mph": 8
+     },
+     "pin": [
+      173.8000030517578,
+      -176.5,
+      -804.2000122070312
+     ],
+     "plan": {
+      "club": "7iron",
+      "power": 0.78,
+      "heading": -2.852567069314177,
+      "expect": {
+       "carry": 120.6,
+       "stop": 152.1,
+       "lateral": 8,
+       "restLie": "green",
+       "toPin": 0.2,
+       "model": "kcl3d",
+       "port2d": {
+        "carry": 120.5,
+        "stop": 147.3,
+        "lateral": 3.3,
+        "restLie": "green",
+        "toPin": 6.6,
+        "rel": false
+       },
+       "search": {
+        "n2d": 6118,
+        "rel": 198,
+        "n3d": 150,
+        "rej3d": 0,
+        "robustFlights": 4,
+        "notRobust": 0
+       }
+      },
+      "why": "7iron 0.78 +3.0 deg off the pin line, wind 8 mph at 17 deg: 3D over the KCL carry 120.6, rest 152.1 yd, drift 8.0, on green, 0.2 yd from the pin (2D: rest 147.3 on green); trees clear; lines that failed from here before, not tried: 6.1 deg (rested 16 yd from the port's rest, round-r7 h2 k1)",
+      "ms": 3395,
+      "ahead": true
+     },
+     "club": "7iron",
+     "aim": {
+      "heading": -2.852700710296631,
+      "errDeg": 0.008,
+      "passes": 3
+     },
+     "readyToStrikeMs": 2489,
+     "raw": 0.7502816899234002,
+     "gamePower": 0.7801582217216492,
+     "curveC": 0,
+     "rest": [
+      171.0269012451172,
+      -175.9273681640625,
+      -804.9422607421875
+     ],
+     "holed": false,
+     "hazard": 0,
+     "placed": null,
+     "after": 0.31
+    },
+    {
+     "k": 2,
+     "lie": 6,
+     "from": [
+      171.0269012451172,
+      -175.92855834960938,
+      -804.9422607421875
+     ],
+     "toPin": 0.31,
+     "wind": {
+      "dir": 4,
+      "speedIdx": 4,
+      "mph": 8
+     },
+     "pin": [
+      173.8000030517578,
+      -176.5,
+      -804.2000122070312
+     ],
+     "plan": {
+      "club": "putter",
+      "power": 0.11700000000000008,
+      "heading": 1.4576197295978806,
+      "expect": {
+       "distance": 0.31,
+       "aimDeg": -8.5,
+       "holes": [
+        0.02,
+        0.214
+       ],
+       "src": "kcl-port",
+       "app": {
+        "aimDeg": -14.7,
+        "power": 0.0934
+       }
+      },
+      "why": "putt 0.31 yd (WSR's tick over the green's KCL, 529 ms): aim -8.50 deg right of the cup, putter 0.1170 (holes 0.020-0.214; the app's read -14.70 deg 0.0934)",
+      "ms": 622,
+      "ahead": true
+     },
+     "club": "putter",
+     "aim": {
+      "heading": 1.4573718309402466,
+      "errDeg": 0.014,
+      "passes": 3
+     },
+     "readyToStrikeMs": 2512,
+     "raw": 0.11700000000000008,
+     "gamePower": 0.11701033264398575,
+     "curveC": 0,
+     "rest": [
+      174.36688232421875,
+      -179.0587158203125,
+      -803.376220703125
+     ],
+     "holed": true,
+     "hazard": 0,
+     "placed": null,
+     "after": 0
+    }
+   ],
+   "started": "2026-10-22T05:44:57.667Z",
+   "next": 3,
+   "game": {
+    "windDir": 4,
+    "windIdx": 4,
+    "strokes": 2
+   },
+   "ended": "2026-10-22T05:45:59.470Z"
+  },
+  "3": {
+   "hole": 3,
+   "strokes": [
+    {
+     "k": 1,
+     "lie": 15,
+     "from": [
+      628.2000122070312,
+      -337.04998779296875,
+      2469.800048828125
+     ],
+     "toPin": 521.63,
+     "wind": {
+      "dir": 6,
+      "speedIdx": 1,
+      "mph": 2
+     },
+     "pin": [
+      719.7000122070312,
+      -417.20001220703125,
+      -2299.10009765625
+     ],
+     "plan": {
+      "club": "driver",
+      "power": 1,
+      "heading": 3.471474043927146,
+      "expect": {
+       "carry": 264.6,
+       "stop": 294.4,
+       "lateral": -10.3,
+       "restLie": "fairway",
+       "toPin": 271.9,
+       "model": "kcl3d",
+       "port2d": {
+        "carry": 264.3,
+        "stop": 292.8,
+        "lateral": -6.9,
+        "restLie": "fairway",
+        "toPin": 270.7,
+        "rel": false
+       },
+       "search": {
+        "n2d": 6762,
+        "rel": 40,
+        "n3d": 150,
+        "rej3d": 6,
+        "robustFlights": 3,
+        "notRobust": 0
+       }
+      },
+      "why": "driver 1.00 +20.0 deg off the pin line, wind 2 mph at -71 deg: 3D over the KCL carry 264.6, rest 294.4 yd, drift -10.3, on fairway, 271.9 yd from the pin (2D: rest 292.8 on fairway), the best second shot from there 8.1; trees clear; lines that failed from here before, not tried: 11.8 deg (rested 28 yd from the port's rest, round-r12 h3 k1); 16.2 deg (rested 29 yd from the port's rest, resort-a/attempt-5 h3 k1)",
+      "ms": 9342,
+      "ahead": true
+     },
+     "club": "driver",
+     "aim": {
+      "heading": -2.8115391731262207,
+      "errDeg": -0.01,
+      "passes": 3
+     },
+     "readyToStrikeMs": 1969,
+     "raw": 1,
+     "gamePower": 1,
+     "curveC": 0,
+     "rest": [
+      -333.1653137207031,
+      -536.9999389648438,
+      -46.60255813598633
+     ],
+     "holed": false,
+     "hazard": 0,
+     "placed": {
+      "from": [
+       295.8913879394531,
+       -160.2764434814453,
+       1508.78466796875
+      ],
+      "to": [
+       275.5071105957031,
+       -152.815673828125,
+       1451.0594482421875
+      ]
+     },
+     "after": 271.92
+    },
+    {
+     "k": 2,
+     "lie": 1,
+     "from": [
+      -333.1653137207031,
+      -537.0001220703125,
+      -46.60255813598633
+     ],
+     "toPin": 271.92,
+     "wind": {
+      "dir": 6,
+      "speedIdx": 1,
+      "mph": 2
+     },
+     "pin": [
+      719.7000122070312,
+      -417.20001220703125,
+      -2299.10009765625
+     ],
+     "plan": {
+      "club": "driver",
+      "power": 1,
+      "heading": 2.686892700645472,
+      "expect": {
+       "carry": 218.9,
+       "stop": 267.9,
+       "lateral": -6.8,
+       "restLie": "green",
+       "toPin": 4.5,
+       "model": "kcl3d",
+       "port2d": {
+        "carry": 218.8,
+        "stop": 260.8,
+        "lateral": -5.3,
+        "restLie": "fairway",
+        "toPin": 11.1,
+        "rel": false
+       },
+       "search": {
+        "n2d": 6762,
+        "rel": 235,
+        "n3d": 150,
+        "rej3d": 0,
+        "robustFlights": 3,
+        "notRobust": 0
+       }
+      },
+      "why": "driver 1.00 -1.0 deg off the pin line, wind 2 mph at -116 deg: 3D over the KCL carry 218.9, rest 267.9 yd, drift -6.8, on green, 4.5 yd from the pin (2D: rest 260.8 on fairway); trees under by 7.3 yd",
+      "ms": 2514,
+      "ahead": true
+     },
+     "club": "driver",
+     "aim": {
+      "heading": 2.6872942447662354,
+      "errDeg": -0.023,
+      "passes": 3
+     },
+     "readyToStrikeMs": 1730,
+     "raw": 1,
+     "gamePower": 1,
+     "curveC": 0,
+     "rest": [
+      685.3342895507812,
+      -417.9923095703125,
+      -2271.958984375
+     ],
+     "holed": false,
+     "hazard": 0,
+     "placed": {
+      "from": [
+       106.12957000732422,
+       -361.4538269042969,
+       -952.2487182617188
+      ],
+      "to": [
+       132.49972534179688,
+       -353.8662414550781,
+       -1007.4736938476562
+      ]
+     },
+     "after": 4.79
+    },
+    {
+     "k": 3,
+     "lie": 6,
+     "from": [
+      685.3342895507812,
+      -417.99249267578125,
+      -2271.958984375
+     ],
+     "toPin": 4.79,
+     "wind": {
+      "dir": 6,
+      "speedIdx": 1,
+      "mph": 2
+     },
+     "pin": [
+      719.7000122070312,
+      -417.20001220703125,
+      -2299.10009765625
+     ],
+     "plan": {
+      "club": "putter",
+      "power": 0.38421820899058523,
+      "heading": 2.2493056345250624,
+      "expect": {
+       "distance": 4.79,
+       "aimDeg": -0.575,
+       "holes": [
+        0.2632,
+        0.5052
+       ],
+       "src": "kcl-port",
+       "app": {
+        "aimDeg": -0.525,
+        "power": 0.3812
+       }
+      },
+      "why": "putt 4.79 yd (WSR's tick over the green's KCL, 1826 ms): aim -0.58 deg right of the cup, putter 0.3842 (holes 0.263-0.505; the app's read -0.53 deg 0.3812)",
+      "ms": 2060,
+      "ahead": true
+     },
+     "club": "putter",
+     "aim": {
+      "heading": 2.2490122318267822,
+      "errDeg": 0.017,
+      "passes": 1
+     },
+     "readyToStrikeMs": 1224,
+     "raw": 0.38421820899058523,
+     "gamePower": 0.38424932956695557,
+     "curveC": 0,
+     "rest": [
+      719.874267578125,
+      -419.7617492675781,
+      -2299.977783203125
+     ],
+     "holed": true,
+     "hazard": 0,
+     "placed": null,
+     "after": 0
+    }
+   ],
+   "started": "2026-10-22T05:45:59.520Z",
+   "game": {
+    "windDir": 6,
+    "windIdx": 1,
+    "strokes": 3
+   },
+   "ended": "2026-10-22T05:47:11.989Z"
+  }
+ },
+ "finalScreenshot": "C:\\Users\\Stephen\\Desktop\\caddie-switch-web\\caddie-web\\tools\\harness\\state\\user18\\ScreenShots\\RZTE01\\RZTE01_2026-10-22_01-47-16.png"
+}

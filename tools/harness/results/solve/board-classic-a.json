@@ -1,0 +1,359 @@
+{
+ "course": "Classic A",
+ "slug": "classic-a",
+ "instance": 18,
+ "window": {
+  "x": 3280,
+  "y": -493,
+  "w": 720,
+  "h": 436
+ },
+ "started": "2026-10-22T06:27:24.648Z",
+ "cups": {
+  "h11-s0": {
+   "hole": 11,
+   "id": "s0",
+   "label": "BL",
+   "par": 3,
+   "target": 1,
+   "status": "solved",
+   "strokes": [
+    {
+     "club": "3iron",
+     "power": 0.5339,
+     "aimDeg": 161.447
+    }
+   ],
+   "tries": 13,
+   "min": 0.5,
+   "edges": {
+    "v": 2,
+    "left": {
+     "aimDeg": 161.5277,
+     "offDeg": 0.08,
+     "power": 0.5361,
+     "acrossYd": 0.19
+    },
+    "right": {
+     "aimDeg": 161.3873,
+     "offDeg": -0.06,
+     "power": 0.5328,
+     "acrossYd": 0.14
+    },
+    "widthDeg": 0.14,
+    "widthYd": 0.33
+   },
+   "exit": 0
+  },
+  "h11-s1": {
+   "hole": 11,
+   "id": "s1",
+   "label": "BM",
+   "par": 3,
+   "target": 1,
+   "status": "solved",
+   "strokes": [
+    {
+     "club": "3iron",
+     "power": 0.5275,
+     "aimDeg": 158.439
+    }
+   ],
+   "tries": 17,
+   "min": 0.5,
+   "edges": {
+    "v": 2,
+    "left": {
+     "aimDeg": 158.5598,
+     "offDeg": 0.12,
+     "power": 0.5259,
+     "acrossYd": 0.29
+    },
+    "right": {
+     "aimDeg": 158.3793,
+     "offDeg": -0.06,
+     "power": 0.5257,
+     "acrossYd": 0.15
+    },
+    "widthDeg": 0.18,
+    "widthYd": 0.43
+   },
+   "exit": 0
+  },
+  "h11-s2": {
+   "hole": 11,
+   "id": "s2",
+   "label": "BR",
+   "par": 3,
+   "target": 1,
+   "status": "solved",
+   "strokes": [
+    {
+     "club": "7iron",
+     "power": 0.9081,
+     "aimDeg": 156.655
+    }
+   ],
+   "tries": 12,
+   "min": 0.5,
+   "edges": {
+    "v": 2,
+    "left": {
+     "aimDeg": 156.6547,
+     "offDeg": 0,
+     "power": 0.9081,
+     "acrossYd": 0
+    },
+    "right": {
+     "aimDeg": 156.5745,
+     "offDeg": -0.08,
+     "power": 0.9133,
+     "acrossYd": 0.2
+    },
+    "widthDeg": 0.08,
+    "widthYd": 0.19
+   },
+   "exit": 0
+  },
+  "h11-s3": {
+   "hole": 11,
+   "id": "s3",
+   "label": "AR",
+   "par": 3,
+   "target": 1,
+   "status": "solved",
+   "strokes": [
+    {
+     "club": "5iron",
+     "power": 0.7461,
+     "aimDeg": 157.477
+    }
+   ],
+   "tries": 9,
+   "min": 0.6,
+   "edges": {
+    "v": 2,
+    "left": {
+     "aimDeg": 157.4769,
+     "offDeg": 0,
+     "power": 0.7461,
+     "acrossYd": 0
+    },
+    "right": {
+     "aimDeg": 157.4167,
+     "offDeg": -0.06,
+     "power": 0.7464,
+     "acrossYd": 0.15
+    },
+    "widthDeg": 0.06,
+    "widthYd": 0.15
+   },
+   "exit": 0
+  },
+  "h11-s4": {
+   "hole": 11,
+   "id": "s4",
+   "label": "AM",
+   "par": 3,
+   "target": 1,
+   "status": "solved",
+   "strokes": [
+    {
+     "club": "5iron",
+     "power": 0.7575,
+     "aimDeg": 159.442
+    }
+   ],
+   "tries": 15,
+   "min": 1.2,
+   "edges": {
+    "v": 2,
+    "left": {
+     "aimDeg": 159.5825,
+     "offDeg": 0.14,
+     "power": 0.7581,
+     "acrossYd": 0.36
+    },
+    "right": {
+     "aimDeg": 159.4421,
+     "offDeg": 0,
+     "power": 0.7575,
+     "acrossYd": 0
+    },
+    "widthDeg": 0.14,
+    "widthYd": 0.35
+   },
+   "exit": 0
+  },
+  "h11-s5": {
+   "hole": 11,
+   "id": "s5",
+   "label": "AL",
+   "par": 3,
+   "target": 1,
+   "status": "solved",
+   "strokes": [
+    {
+     "club": "3iron",
+     "power": 0.5197,
+     "aimDeg": 158.7
+    }
+   ],
+   "tries": 9,
+   "min": 0.5,
+   "edges": {
+    "v": 2,
+    "left": {
+     "aimDeg": 158.7001,
+     "offDeg": 0,
+     "power": 0.5178,
+     "acrossYd": 0
+    },
+    "right": {
+     "aimDeg": 158.7001,
+     "offDeg": 0,
+     "power": 0.5218,
+     "acrossYd": 0
+    },
+    "widthDeg": 0,
+    "widthYd": 0
+   },
+   "exit": 0
+  },
+  "h10-s0": {
+   "hole": 10,
+   "id": "s0",
+   "label": "BL",
+   "par": 4,
+   "target": 2,
+   "status": "solved",
+   "strokes": [
+    {
+     "club": "driver",
+     "power": 1,
+     "aimDeg": 182.524
+    },
+    {
+     "club": "9iron",
+     "power": 0.8641,
+     "aimDeg": 174.592
+    }
+   ],
+   "tries": 2,
+   "min": 1,
+   "edges": null,
+   "exit": 0
+  },
+  "h10-s1": {
+   "hole": 10,
+   "id": "s1",
+   "label": "BM",
+   "par": 4,
+   "target": 2,
+   "status": "solved",
+   "strokes": [
+    {
+     "club": "driver",
+     "power": 0.9201,
+     "aimDeg": 181.66
+    },
+    {
+     "club": "9iron",
+     "power": 0.9517,
+     "aimDeg": 174.907
+    }
+   ],
+   "tries": 2,
+   "min": 1,
+   "edges": null,
+   "exit": 0
+  },
+  "h10-s2": {
+   "hole": 10,
+   "id": "s2",
+   "label": "BR",
+   "par": 4,
+   "target": 2,
+   "status": "solved",
+   "strokes": [
+    {
+     "club": "driver",
+     "power": 1,
+     "aimDeg": 169.764
+    },
+    {
+     "club": "spoon",
+     "power": 0.3301,
+     "aimDeg": -164.082
+    }
+   ],
+   "tries": 2,
+   "min": 1,
+   "edges": null,
+   "exit": 0
+  },
+  "h10-s3": {
+   "hole": 10,
+   "id": "s3",
+   "label": "AL",
+   "par": 4,
+   "target": 2,
+   "status": "solved",
+   "strokes": [
+    {
+     "club": "driver",
+     "power": 0.9201,
+     "aimDeg": 177.068
+    },
+    {
+     "club": "9iron",
+     "power": 1,
+     "aimDeg": -171.721
+    }
+   ],
+   "tries": 2,
+   "min": 1,
+   "edges": null,
+   "exit": 0
+  },
+  "h10-s4": {
+   "hole": 10,
+   "id": "s4",
+   "label": "AM",
+   "par": 4,
+   "target": 2,
+   "status": "solved",
+   "strokes": [
+    {
+     "club": "driver",
+     "power": 0.9201,
+     "aimDeg": 181.43
+    },
+    {
+     "club": "9iron",
+     "power": 0.8762,
+     "aimDeg": 174.266
+    }
+   ],
+   "tries": 2,
+   "min": 1,
+   "edges": null,
+   "exit": 0
+  },
+  "h10-s5": {
+   "hole": 10,
+   "id": "s5",
+   "label": "AR",
+   "par": 4,
+   "target": null,
+   "status": "running",
+   "strokes": null,
+   "tries": 0,
+   "min": null,
+   "edges": null
+  }
+ },
+ "updated": "2026-10-22T06:57:05.244Z",
+ "solved": 11,
+ "total": 18
+}

@@ -1,0 +1,317 @@
+[
+ {
+  "n": 1,
+  "instance": 17,
+  "holes": {
+   "16": 3,
+   "17": 4,
+   "18": 4
+  },
+  "strokes": 11,
+  "toPar": -1,
+  "complete": true,
+  "why": "played",
+  "card": "results/courses/classic-c/card-1.png",
+  "ended": "2026-10-22T04:21:35.532Z"
+ },
+ {
+  "n": 2,
+  "instance": 17,
+  "holes": {
+   "16": 3,
+   "17": 3,
+   "18": 3
+  },
+  "strokes": 9,
+  "toPar": -3,
+  "complete": true,
+  "why": "played",
+  "card": "results/courses/classic-c/card-2.png",
+  "ended": "2026-10-22T04:25:50.075Z"
+ },
+ {
+  "n": 3,
+  "instance": 17,
+  "holes": {
+   "16": 4,
+   "17": 3,
+   "18": 4
+  },
+  "strokes": 11,
+  "toPar": -1,
+  "complete": true,
+  "why": "played",
+  "card": "results/courses/classic-c/card-3.png",
+  "ended": "2026-10-22T04:30:11.797Z"
+ },
+ {
+  "n": 4,
+  "instance": 17,
+  "holes": {
+   "16": 3,
+   "17": 3,
+   "18": 4
+  },
+  "strokes": 10,
+  "toPar": -2,
+  "complete": true,
+  "why": "played",
+  "card": "results/courses/classic-c/card-4.png",
+  "ended": "2026-10-22T04:33:46.442Z"
+ },
+ {
+  "n": 5,
+  "instance": 17,
+  "holes": {
+   "16": 3,
+   "17": 3,
+   "18": 4
+  },
+  "strokes": 10,
+  "toPar": -2,
+  "complete": true,
+  "why": "played",
+  "card": "results/courses/classic-c/card-5.png",
+  "ended": "2026-10-22T04:37:37.631Z"
+ },
+ {
+  "n": 6,
+  "instance": 17,
+  "holes": {
+   "16": 3,
+   "17": 3,
+   "18": 3
+  },
+  "strokes": 9,
+  "toPar": -3,
+  "complete": true,
+  "why": "played",
+  "card": "results/courses/classic-c/card-6.png",
+  "ended": "2026-10-22T04:41:17.163Z"
+ },
+ {
+  "n": 7,
+  "instance": 17,
+  "holes": {
+   "16": 3,
+   "17": 2,
+   "18": 4
+  },
+  "strokes": 9,
+  "toPar": -3,
+  "complete": true,
+  "why": "played",
+  "card": "results/courses/classic-c/card-7.png",
+  "ended": "2026-10-22T04:45:15.962Z"
+ },
+ {
+  "n": 8,
+  "instance": 17,
+  "holes": {
+   "16": 3,
+   "17": 3,
+   "18": 3
+  },
+  "strokes": 9,
+  "toPar": -3,
+  "complete": true,
+  "why": "played",
+  "card": "results/courses/classic-c/card-8.png",
+  "ended": "2026-10-22T04:49:22.287Z"
+ },
+ {
+  "n": 9,
+  "instance": 17,
+  "holes": {
+   "16": 3,
+   "17": 3,
+   "18": 4
+  },
+  "strokes": 10,
+  "toPar": -2,
+  "complete": true,
+  "why": "played",
+  "card": "results/courses/classic-c/card-9.png",
+  "ended": "2026-10-22T04:53:24.328Z"
+ },
+ {
+  "n": 10,
+  "instance": 17,
+  "holes": {
+   "16": 3,
+   "17": 3,
+   "18": 4
+  },
+  "strokes": 10,
+  "toPar": -2,
+  "complete": true,
+  "why": "played",
+  "card": "results/courses/classic-c/card-10.png",
+  "ended": "2026-10-22T04:57:26.835Z"
+ },
+ {
+  "n": 11,
+  "instance": 17,
+  "holes": {
+   "16": 4,
+   "17": 2,
+   "18": 4
+  },
+  "strokes": 10,
+  "toPar": -2,
+  "complete": true,
+  "why": "played",
+  "card": "results/courses/classic-c/card-11.png",
+  "ended": "2026-10-22T05:01:39.985Z"
+ },
+ {
+  "n": 12,
+  "instance": 17,
+  "holes": {
+   "16": 4,
+   "17": 3,
+   "18": 4
+  },
+  "strokes": 11,
+  "toPar": -1,
+  "complete": true,
+  "why": "played",
+  "card": "results/courses/classic-c/card-12.png",
+  "ended": "2026-10-22T05:05:49.178Z"
+ },
+ {
+  "n": 13,
+  "instance": 17,
+  "holes": {
+   "16": 3,
+   "17": 2,
+   "18": 4
+  },
+  "strokes": 9,
+  "toPar": -3,
+  "complete": true,
+  "why": "played",
+  "card": "results/courses/classic-c/card-13.png",
+  "ended": "2026-10-22T05:09:56.342Z"
+ },
+ {
+  "n": 14,
+  "instance": 17,
+  "holes": {
+   "16": 3,
+   "17": 3,
+   "18": 3
+  },
+  "strokes": 9,
+  "toPar": -3,
+  "complete": true,
+  "why": "played",
+  "card": "results/courses/classic-c/card-14.png",
+  "ended": "2026-10-22T05:14:06.087Z"
+ },
+ {
+  "n": 15,
+  "instance": 17,
+  "holes": {
+   "16": 4,
+   "17": 2,
+   "18": 3
+  },
+  "strokes": 9,
+  "toPar": -3,
+  "complete": true,
+  "why": "played",
+  "card": "results/courses/classic-c/card-15.png",
+  "ended": "2026-10-22T05:18:13.595Z"
+ },
+ {
+  "n": 16,
+  "instance": 17,
+  "holes": {
+   "16": 3,
+   "17": 3,
+   "18": 5
+  },
+  "strokes": 11,
+  "toPar": -1,
+  "complete": true,
+  "why": "played",
+  "card": "results/courses/classic-c/card-16.png",
+  "ended": "2026-10-22T05:23:11.558Z"
+ },
+ {
+  "n": 17,
+  "instance": 17,
+  "holes": {
+   "16": 4,
+   "17": 3,
+   "18": 4
+  },
+  "strokes": 11,
+  "toPar": -1,
+  "complete": true,
+  "why": "played",
+  "card": "results/courses/classic-c/card-17.png",
+  "ended": "2026-10-22T05:27:59.683Z"
+ },
+ {
+  "n": 18,
+  "instance": 17,
+  "holes": {
+   "16": 4,
+   "17": 3,
+   "18": 5
+  },
+  "strokes": 12,
+  "toPar": 0,
+  "complete": true,
+  "why": "played",
+  "card": "results/courses/classic-c/card-18.png",
+  "ended": "2026-10-22T05:33:02.434Z"
+ },
+ {
+  "n": 19,
+  "instance": 17,
+  "holes": {
+   "16": 3,
+   "17": 3,
+   "18": 5
+  },
+  "strokes": 11,
+  "toPar": -1,
+  "complete": true,
+  "why": "played",
+  "card": "results/courses/classic-c/card-19.png",
+  "ended": "2026-10-22T05:38:05.981Z"
+ },
+ {
+  "n": 20,
+  "instance": 17,
+  "holes": {
+   "16": 5,
+   "17": 3,
+   "18": 3
+  },
+  "strokes": 11,
+  "toPar": -1,
+  "complete": true,
+  "why": "played",
+  "card": "results/courses/classic-c/card-20.png",
+  "ended": "2026-10-22T05:42:12.924Z"
+ },
+ {
+  "n": 21,
+  "instance": 17,
+  "holes": {
+   "16": 3,
+   "17": 2,
+   "18": 3
+  },
+  "strokes": 8,
+  "toPar": -4,
+  "complete": true,
+  "why": "played",
+  "card": "results/courses/classic-c/card-21.png",
+  "ended": "2026-10-22T05:45:55.234Z"
+ }
+]
