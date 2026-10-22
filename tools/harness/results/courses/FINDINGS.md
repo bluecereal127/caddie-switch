@@ -22,11 +22,15 @@ The full account is in tools/harness/FLAGSTICK.md (measured in WSR 2026-10-22, 1
 
 ## Every pin solved with savestates, then played for real (2026-10-22)
 
-- **The savestate campaign** (`hole-solve.mjs`, run per course by `solve-course.mjs`): every WSR cup on holes 1–18 was played to its target in calm wind from its own tee state. Targets: an ace on a par 3; an eagle on a par 4 or par 5; an albatross on hole 14. Each try is a real swing, and a miss is reloaded. **98 of the 100 cups made it, in 704 swings** (results/solve/SUMMARY.md has every stroke).
+- **The savestate campaign** (`hole-solve.mjs`, run per course by `solve-course.mjs`): every WSR cup on holes 1–18 was played to its target in calm wind from its own tee state. Targets: an ace on a par 3; an eagle on a par 4 or par 5; an albatross on hole 14. Each try is a real swing, and a miss is reloaded. **All 100 cups made it, in calm air**: 719 swings in the cups' result files, 737 with hole 17's experiments (results/solve/SUMMARY.md has every stroke).
   - **Par 3s:** every ace's window was mapped, meaning the aims either side that still hole it. They run from 0 (a knife edge) to 1.88 yd across at the pin (h04-s2).
   - **Hole 14:** all six pins albatrossed. A spoon or driver to the left fairway sets up a straight second shot, which holes from about 190 yd.
   - **Hole 17 s5:** aced through the flag cloth, the only ace found that way. A driver at 0.99 bounces off the 10° upslope and is still rising when the cloth takes it, on the first try.
-  - **Left:** hole 17 s3 and s4, set A. The model finds no route there: not rolling in, not hopping in, not through the cloth. Neither pin is drawn in 3-hole rounds.
+  - **Hole 17 s4 and s3 (set A):** in calm air the model finds no route on either, so both were aced by rolling slowly into the stick, which the model bounces out but WSR holds.
+    - **s4:** a spoon at 0.9536 reached the stick at about 3.7–3.9 yd/s, the third of three tries (`try-cells.mjs`).
+    - **s3:** its holing strokes fall between the aims the D-pad can reach (0.02–0.06° apart from that tee). A power sweep in the game on a reachable aim holed it on the third stroke: a spoon at 0.9578 at 166.355° (`aim-lattice.mjs`, then `try-cells.mjs`).
+    - **Windows:** both are knife edges.
+    - **Rounds:** neither pin is drawn in 3-hole rounds.
 - **The solver needed four fixes.**
   - **Search wider than the planner's plan.** It searches each club's own nearest approach, up to 6° off the pin line, as well as round the planner's plan. The planner plays safe lines: on h11-s0 its 7-iron goes 4° right and rests 9.8 yd off, while a part-power 3-iron rests 0.01 yd from the pin.
   - **A hole must roll in.** A model hole counts only when the ball's centre is under 0.25 u above the cup's level (see the cup section above).

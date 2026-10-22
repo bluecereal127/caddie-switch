@@ -1,6 +1,6 @@
 # Savestate campaign: every WSR pin played to its target
 
-98 of 100 cups made their target, in 704 real swings from the cups' savestates (calm wind; every swing through the game's own pipeline). Per hole: the target, the cups that made it, the tries per cup, and for each par 3 ace the window of aims that still hole it.
+100 of 100 cups made their target, in 719 real swings from the cups' savestates (calm wind; every swing through the game's own pipeline). Per hole: the target, the cups that made it, the tries per cup, and for each par 3 ace the window of aims that still hole it.
 
 | Hole | Course | Par | Target | Made | Tries per cup | Ace windows (yd across at the pin) |
 |---|---|---|---|---|---|---|
@@ -20,7 +20,7 @@
 | 14 | Classic B | 5 | albatross | 6 of 6 | 2, 2, 2, 3, 2, 2 |  |
 | 15 | Classic B | 4 | eagle | 6 of 6 | 5, 4, 2, 2, 2, 2 |  |
 | 16 | Classic C | 4 | eagle | 6 of 6 | 2, 2, 2, 2, 2, 2 |  |
-| 17 | Classic C | 3 | ace | 4 of 6 | 7, 8, 10, 0, 0, 11 | 0.00, 0.00, 0.45, -, -, 0.36 |
+| 17 | Classic C | 3 | ace | 6 of 6 | 7, 8, 10, 7, 8, 11 | 0.00, 0.00, 0.45, 0.00, 0.00, 0.36 |
 | 18 | Classic C | 5 | eagle | 1 of 1 | 3 |  |
 
 ## The strokes
@@ -171,8 +171,8 @@
 - s0 (BM): driver 0.8412 at 168.44 deg (7 tries); the ace holes from 0.00 deg left to 0.00 deg right of that aim (0 yd across)
 - s1 (BL): driver 0.8442 at 170.16 deg (8 tries); the ace holes from 0.00 deg left to 0.00 deg right of that aim (0 yd across)
 - s2 (BR): spoon 0.9082 at 163.77 deg (10 tries); the ace holes from 0.06 deg left to 0.06 deg right of that aim (0.45 yd across)
-- s3 (AM): not made yet, 0 tries
-- s4 (AR): not made yet, 0 tries
+- s3 (AM): spoon 0.9579 at 166.35 deg (7 tries); the ace holes from 0.00 deg left to 0.00 deg right of that aim (0 yd across)
+- s4 (AR): spoon 0.9536 at 166.41 deg (8 tries); the ace holes from 0.00 deg left to 0.00 deg right of that aim (0 yd across)
 - s5 (AL): driver 0.9898 at 166.54 deg (11 tries); the ace holes from 0.10 deg left to 0.00 deg right of that aim (0.36 yd across)
 
 ### Hole 18 (Classic C, par 5, eagle)

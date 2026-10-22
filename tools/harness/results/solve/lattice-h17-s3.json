@@ -1,0 +1,809 @@
+{
+ "hole": 17,
+ "cup": "s3",
+ "club": "spoon",
+ "started": "2026-10-22T09:19:24.154Z",
+ "lattice": [
+  {
+   "requested": 166.05,
+   "reached": 2.8978376388549805
+  },
+  {
+   "requested": 166.055,
+   "reached": 2.8978376388549805
+  },
+  {
+   "requested": 166.06,
+   "reached": 2.8978376388549805
+  },
+  {
+   "requested": 166.065,
+   "reached": 2.8978376388549805
+  },
+  {
+   "requested": 166.07,
+   "reached": 2.8981876373291016
+  },
+  {
+   "requested": 166.075,
+   "reached": 2.8981876373291016
+  },
+  {
+   "requested": 166.08,
+   "reached": 2.8981876373291016
+  },
+  {
+   "requested": 166.085,
+   "reached": 2.899237632751465
+  },
+  {
+   "requested": 166.09,
+   "reached": 2.899237632751465
+  },
+  {
+   "requested": 166.095,
+   "reached": 2.899237632751465
+  },
+  {
+   "requested": 166.1,
+   "reached": 2.899237632751465
+  },
+  {
+   "requested": 166.105,
+   "reached": 2.899237632751465
+  },
+  {
+   "requested": 166.11,
+   "reached": 2.899237632751465
+  },
+  {
+   "requested": 166.115,
+   "reached": 2.899237632751465
+  },
+  {
+   "requested": 166.12,
+   "reached": 2.899237632751465
+  },
+  {
+   "requested": 166.125,
+   "reached": 2.899237632751465
+  },
+  {
+   "requested": 166.13,
+   "reached": 2.899237632751465
+  },
+  {
+   "requested": 166.135,
+   "reached": 2.899237632751465
+  },
+  {
+   "requested": 166.14,
+   "reached": 2.899237632751465
+  },
+  {
+   "requested": 166.145,
+   "reached": 2.900287628173828
+  },
+  {
+   "requested": 166.15,
+   "reached": 2.900287628173828
+  },
+  {
+   "requested": 166.155,
+   "reached": 2.900287628173828
+  },
+  {
+   "requested": 166.16,
+   "reached": 2.900287628173828
+  },
+  {
+   "requested": 166.165,
+   "reached": 2.900287628173828
+  },
+  {
+   "requested": 166.17,
+   "reached": 2.900287628173828
+  },
+  {
+   "requested": 166.175,
+   "reached": 2.900287628173828
+  },
+  {
+   "requested": 166.18,
+   "reached": 2.900287628173828
+  },
+  {
+   "requested": 166.185,
+   "reached": 2.900287628173828
+  },
+  {
+   "requested": 166.19,
+   "reached": 2.900287628173828
+  },
+  {
+   "requested": 166.195,
+   "reached": 2.900287628173828
+  },
+  {
+   "requested": 166.2,
+   "reached": 2.900287628173828
+  },
+  {
+   "requested": 166.205,
+   "reached": 2.900287628173828
+  },
+  {
+   "requested": 166.21,
+   "reached": 2.9013376235961914
+  },
+  {
+   "requested": 166.215,
+   "reached": 2.9013376235961914
+  },
+  {
+   "requested": 166.22,
+   "reached": 2.9013376235961914
+  },
+  {
+   "requested": 166.225,
+   "reached": 2.9013376235961914
+  },
+  {
+   "requested": 166.23,
+   "reached": 2.9013376235961914
+  },
+  {
+   "requested": 166.235,
+   "reached": 2.9013376235961914
+  },
+  {
+   "requested": 166.24,
+   "reached": 2.9013376235961914
+  },
+  {
+   "requested": 166.245,
+   "reached": 2.9013376235961914
+  },
+  {
+   "requested": 166.25,
+   "reached": 2.9013376235961914
+  },
+  {
+   "requested": 166.255,
+   "reached": 2.9013376235961914
+  },
+  {
+   "requested": 166.26,
+   "reached": 2.9013376235961914
+  },
+  {
+   "requested": 166.265,
+   "reached": 2.9023876190185547
+  },
+  {
+   "requested": 166.27,
+   "reached": 2.9023876190185547
+  },
+  {
+   "requested": 166.275,
+   "reached": 2.9023876190185547
+  },
+  {
+   "requested": 166.28,
+   "reached": 2.9023876190185547
+  },
+  {
+   "requested": 166.285,
+   "reached": 2.9023876190185547
+  },
+  {
+   "requested": 166.29,
+   "reached": 2.9023876190185547
+  },
+  {
+   "requested": 166.295,
+   "reached": 2.9023876190185547
+  },
+  {
+   "requested": 166.3,
+   "reached": 2.9023876190185547
+  },
+  {
+   "requested": 166.305,
+   "reached": 2.9023876190185547
+  },
+  {
+   "requested": 166.31,
+   "reached": 2.9023876190185547
+  },
+  {
+   "requested": 166.315,
+   "reached": 2.9023876190185547
+  },
+  {
+   "requested": 166.32,
+   "reached": 2.9023876190185547
+  },
+  {
+   "requested": 166.325,
+   "reached": 2.9023876190185547
+  },
+  {
+   "requested": 166.33,
+   "reached": 2.903437614440918
+  },
+  {
+   "requested": 166.335,
+   "reached": 2.903437614440918
+  },
+  {
+   "requested": 166.34,
+   "reached": 2.903437614440918
+  },
+  {
+   "requested": 166.345,
+   "reached": 2.903087615966797
+  },
+  {
+   "requested": 166.35,
+   "reached": 2.903087615966797
+  },
+  {
+   "requested": 166.355,
+   "reached": 2.903087615966797
+  },
+  {
+   "requested": 166.36,
+   "reached": 2.903087615966797
+  },
+  {
+   "requested": 166.365,
+   "reached": 2.90413761138916
+  },
+  {
+   "requested": 166.37,
+   "reached": 2.903437614440918
+  },
+  {
+   "requested": 166.375,
+   "reached": 2.903437614440918
+  },
+  {
+   "requested": 166.38,
+   "reached": 2.903437614440918
+  },
+  {
+   "requested": 166.385,
+   "reached": 2.9044876098632812
+  },
+  {
+   "requested": 166.39,
+   "reached": 2.9044876098632812
+  },
+  {
+   "requested": 166.395,
+   "reached": 2.9044876098632812
+  },
+  {
+   "requested": 166.4,
+   "reached": 2.9044876098632812
+  },
+  {
+   "requested": 166.405,
+   "reached": 2.9044876098632812
+  },
+  {
+   "requested": 166.41,
+   "reached": 2.9044876098632812
+  },
+  {
+   "requested": 166.415,
+   "reached": 2.9044876098632812
+  },
+  {
+   "requested": 166.42,
+   "reached": 2.9044876098632812
+  },
+  {
+   "requested": 166.425,
+   "reached": 2.9044876098632812
+  },
+  {
+   "requested": 166.43,
+   "reached": 2.9044876098632812
+  },
+  {
+   "requested": 166.435,
+   "reached": 2.9044876098632812
+  },
+  {
+   "requested": 166.44,
+   "reached": 2.9044876098632812
+  },
+  {
+   "requested": 166.445,
+   "reached": 2.9055376052856445
+  },
+  {
+   "requested": 166.45,
+   "reached": 2.9055376052856445
+  }
+ ],
+ "candidates": [
+  {
+   "heading": 2.9013376235961914,
+   "requested": 166.21,
+   "power": 0.9792,
+   "modelHoles": true,
+   "stickVn": 0.351,
+   "rest": 0
+  },
+  {
+   "heading": 2.903437614440918,
+   "requested": 166.33,
+   "power": 0.9595,
+   "modelHoles": true,
+   "stickVn": 0.294,
+   "rest": 0
+  },
+  {
+   "heading": 2.903437614440918,
+   "requested": 166.33,
+   "power": 0.9631,
+   "modelHoles": false,
+   "stickVn": 3.045,
+   "rest": 1.9888319093248221
+  },
+  {
+   "heading": 2.903437614440918,
+   "requested": 166.33,
+   "power": 0.963,
+   "modelHoles": false,
+   "stickVn": 3.139,
+   "rest": 2.094586399039977
+  },
+  {
+   "heading": 2.90413761138916,
+   "requested": 166.365,
+   "power": 0.9569,
+   "modelHoles": false,
+   "stickVn": 3.148,
+   "rest": 2.1049869744643512
+  },
+  {
+   "heading": 2.903437614440918,
+   "requested": 166.33,
+   "power": 0.9582,
+   "modelHoles": false,
+   "stickVn": 3.158,
+   "rest": 1.587196697377238
+  },
+  {
+   "heading": 2.899237632751465,
+   "requested": 166.085,
+   "power": 0.9872,
+   "modelHoles": false,
+   "stickVn": 2.832,
+   "rest": 1.3082490951765353
+  },
+  {
+   "heading": 2.903437614440918,
+   "requested": 166.33,
+   "power": 0.9632,
+   "modelHoles": false,
+   "stickVn": 3.18,
+   "rest": 2.1429056903855774
+  },
+  {
+   "heading": 2.899237632751465,
+   "requested": 166.085,
+   "power": 0.9873,
+   "modelHoles": false,
+   "stickVn": 3.244,
+   "rest": 1.7316976040428864
+  },
+  {
+   "heading": 2.9013376235961914,
+   "requested": 166.21,
+   "power": 0.9702,
+   "modelHoles": false,
+   "stickVn": 3.246,
+   "rest": 1.7061474459714079
+  },
+  {
+   "heading": 2.9013376235961914,
+   "requested": 166.21,
+   "power": 0.9704,
+   "modelHoles": false,
+   "stickVn": 2.751,
+   "rest": 1.2288403104212908
+  },
+  {
+   "heading": 2.903437614440918,
+   "requested": 166.33,
+   "power": 0.9599,
+   "modelHoles": false,
+   "stickVn": 3.337,
+   "rest": 1.7618925742012803
+  },
+  {
+   "heading": 2.903437614440918,
+   "requested": 166.33,
+   "power": 0.9597,
+   "modelHoles": false,
+   "stickVn": 2.542,
+   "rest": 1.0788219729762816
+  },
+  {
+   "heading": 2.9013376235961914,
+   "requested": 166.21,
+   "power": 0.9703,
+   "modelHoles": false,
+   "stickVn": 2.529,
+   "rest": 1.0740382413022151
+  },
+  {
+   "heading": 2.903437614440918,
+   "requested": 166.33,
+   "power": 0.9628,
+   "modelHoles": false,
+   "stickVn": 3.506,
+   "rest": 2.563362049273837
+  },
+  {
+   "heading": 2.899237632751465,
+   "requested": 166.085,
+   "power": 0.9874,
+   "modelHoles": false,
+   "stickVn": 3.524,
+   "rest": 2.025846311363881
+  },
+  {
+   "heading": 2.90413761138916,
+   "requested": 166.365,
+   "power": 0.9571,
+   "modelHoles": false,
+   "stickVn": 2.471,
+   "rest": 1.3813809767372496
+  },
+  {
+   "heading": 2.903437614440918,
+   "requested": 166.33,
+   "power": 0.9633,
+   "modelHoles": false,
+   "stickVn": 2.46,
+   "rest": 1.3692292526371639
+  },
+  {
+   "heading": 2.903437614440918,
+   "requested": 166.33,
+   "power": 0.96,
+   "modelHoles": false,
+   "stickVn": 3.589,
+   "rest": 2.0134451560796833
+  },
+  {
+   "heading": 2.90413761138916,
+   "requested": 166.365,
+   "power": 0.9539,
+   "modelHoles": false,
+   "stickVn": 2.398,
+   "rest": 1.3075279656331533
+  },
+  {
+   "heading": 2.90413761138916,
+   "requested": 166.365,
+   "power": 0.954,
+   "modelHoles": false,
+   "stickVn": 2.266,
+   "rest": 1.1802835814604458
+  },
+  {
+   "heading": 2.903437614440918,
+   "requested": 166.33,
+   "power": 0.9596,
+   "modelHoles": false,
+   "stickVn": 2.228,
+   "rest": 0.8749913003100143
+  },
+  {
+   "heading": 2.9013376235961914,
+   "requested": 166.21,
+   "power": 0.9791,
+   "modelHoles": false,
+   "stickVn": 2.078,
+   "rest": 1.0006142666719413
+  },
+  {
+   "heading": 2.90413761138916,
+   "requested": 166.365,
+   "power": 0.957,
+   "modelHoles": false,
+   "stickVn": 3.613,
+   "rest": 2.6997789108178285
+  },
+  {
+   "heading": 2.90413761138916,
+   "requested": 166.365,
+   "power": 0.9568,
+   "modelHoles": false,
+   "stickVn": 3.852,
+   "rest": 3.0162723215178913
+  }
+ ],
+ "tries": [
+  {
+   "n": 1,
+   "k": 1,
+   "why": "lattice cell 1",
+   "from": [
+    -55.20000076293945,
+    0.949999988079071,
+    1142.800048828125
+   ],
+   "lie": 15,
+   "club": "spoon",
+   "plannedPower": 0.9792,
+   "power": 0.9792,
+   "gamePower": 0.9794051051139832,
+   "heading": 2.9013376235961914,
+   "aimErrDeg": -0.024400774577598056,
+   "rest": [
+    481.63238525390625,
+    200.8211212158203,
+    -873.2504272460938
+   ],
+   "holed": false,
+   "hazard": 0,
+   "toPin": 13.882856831029752,
+   "cand": {
+    "heading": 2.9013376235961914,
+    "requested": 166.21,
+    "power": 0.9792,
+    "modelHoles": true,
+    "stickVn": 0.351,
+    "rest": 0
+   },
+   "aimAsMapped": true
+  },
+  {
+   "n": 2,
+   "k": 1,
+   "why": "lattice cell 2",
+   "from": [
+    -55.20000076293945,
+    0.949999988079071,
+    1142.800048828125
+   ],
+   "lie": 15,
+   "club": "spoon",
+   "plannedPower": 0.9595,
+   "power": 0.9595,
+   "gamePower": 0.9595468044281006,
+   "heading": 2.903437614440918,
+   "aimErrDeg": -0.024721386996550142,
+   "rest": [
+    444.8127136230469,
+    205.4036407470703,
+    -746.2190551757812
+   ],
+   "holed": false,
+   "hazard": 0,
+   "toPin": 1.5418216559884548,
+   "cand": {
+    "heading": 2.903437614440918,
+    "requested": 166.33,
+    "power": 0.9595,
+    "modelHoles": true,
+    "stickVn": 0.294,
+    "rest": 0
+   },
+   "aimAsMapped": true
+  },
+  {
+   "n": 3,
+   "k": 1,
+   "why": "lattice cell 3",
+   "from": [
+    -55.20000076293945,
+    0.949999988079071,
+    1142.800048828125
+   ],
+   "lie": 15,
+   "club": "spoon",
+   "plannedPower": 0.9631,
+   "power": 0.9631,
+   "gamePower": 0.9631263613700867,
+   "heading": 2.903437614440918,
+   "aimErrDeg": -0.024721386996550142,
+   "rest": [
+    475.8464050292969,
+    200.918212890625,
+    -835.732177734375
+   ],
+   "holed": false,
+   "hazard": 0,
+   "toPin": 9.885940228184152,
+   "cand": {
+    "heading": 2.903437614440918,
+    "requested": 166.33,
+    "power": 0.9631,
+    "modelHoles": false,
+    "stickVn": 3.045,
+    "rest": 1.9888319093248221
+   },
+   "aimAsMapped": true
+  },
+  {
+   "n": 4,
+   "k": 1,
+   "why": "lattice cell 4",
+   "from": [
+    -55.20000076293945,
+    0.949999988079071,
+    1142.800048828125
+   ],
+   "lie": 15,
+   "club": "spoon",
+   "plannedPower": 0.9569,
+   "power": 0.9569,
+   "gamePower": 0.9569914937019348,
+   "heading": 2.90413761138916,
+   "aimErrDeg": -0.029828257802867193,
+   "rest": [
+    466.5946044921875,
+    200.29150390625,
+    -845.26171875
+   ],
+   "holed": false,
+   "hazard": 0,
+   "toPin": 10.43617457096627,
+   "cand": {
+    "heading": 2.90413761138916,
+    "requested": 166.365,
+    "power": 0.9569,
+    "modelHoles": false,
+    "stickVn": 3.148,
+    "rest": 2.1049869744643512
+   },
+   "aimAsMapped": true
+  },
+  {
+   "n": 5,
+   "k": 1,
+   "why": "lattice cell 5",
+   "from": [
+    -55.20000076293945,
+    0.949999988079071,
+    1142.800048828125
+   ],
+   "lie": 15,
+   "club": "spoon",
+   "plannedPower": 0.9582,
+   "power": 0.9582,
+   "gamePower": 0.9582701325416565,
+   "heading": 2.903437614440918,
+   "aimErrDeg": -0.024721386996550142,
+   "rest": [
+    444.0553283691406,
+    205.41226196289062,
+    -745.1854858398438
+   ],
+   "holed": false,
+   "hazard": 0,
+   "toPin": 1.5601399271880028,
+   "cand": {
+    "heading": 2.903437614440918,
+    "requested": 166.33,
+    "power": 0.9582,
+    "modelHoles": false,
+    "stickVn": 3.158,
+    "rest": 1.587196697377238
+   },
+   "aimAsMapped": true
+  },
+  {
+   "n": 6,
+   "k": 1,
+   "why": "lattice cell 6",
+   "from": [
+    -55.20000076293945,
+    0.949999988079071,
+    1142.800048828125
+   ],
+   "lie": 15,
+   "club": "spoon",
+   "plannedPower": 0.9872,
+   "power": 0.9872,
+   "gamePower": 0.9873831272125244,
+   "heading": 2.899237632751465,
+   "aimErrDeg": -0.029080162158671114,
+   "rest": [
+    447.5359191894531,
+    205.2093963623047,
+    -749.5435791015625
+   ],
+   "holed": false,
+   "hazard": 0,
+   "toPin": 1.5972946288004428,
+   "cand": {
+    "heading": 2.899237632751465,
+    "requested": 166.085,
+    "power": 0.9872,
+    "modelHoles": false,
+    "stickVn": 2.832,
+    "rest": 1.3082490951765353
+   },
+   "aimAsMapped": true
+  },
+  {
+   "n": 7,
+   "k": 1,
+   "why": "lattice cell 7",
+   "from": [
+    -55.20000076293945,
+    0.949999988079071,
+    1142.800048828125
+   ],
+   "lie": 15,
+   "club": "spoon",
+   "plannedPower": 0.9702,
+   "power": 0.9702,
+   "gamePower": 0.9703423380851746,
+   "heading": 2.9013376235961914,
+   "aimErrDeg": -0.024400774577598056,
+   "rest": [
+    446.07025146484375,
+    205.31874084472656,
+    -747.8530883789062
+   ],
+   "holed": false,
+   "hazard": 0,
+   "toPin": 1.5441952886787325,
+   "cand": {
+    "heading": 2.9013376235961914,
+    "requested": 166.21,
+    "power": 0.9702,
+    "modelHoles": false,
+    "stickVn": 3.246,
+    "rest": 1.7061474459714079
+   },
+   "aimAsMapped": true
+  },
+  {
+   "n": 8,
+   "k": 1,
+   "why": "lattice cell 8",
+   "from": [
+    -55.20000076293945,
+    0.949999988079071,
+    1142.800048828125
+   ],
+   "lie": 15,
+   "club": "spoon",
+   "plannedPower": 0.9539,
+   "power": 0.9539,
+   "gamePower": 0.9540331363677979,
+   "heading": 2.90413761138916,
+   "aimErrDeg": -0.029828257802867193,
+   "rest": [
+    467.3172302246094,
+    201.9005889892578,
+    -807.2479248046875
+   ],
+   "holed": false,
+   "hazard": 0,
+   "toPin": 6.718914687927404,
+   "cand": {
+    "heading": 2.90413761138916,
+    "requested": 166.365,
+    "power": 0.9539,
+    "modelHoles": false,
+    "stickVn": 2.398,
+    "rest": 1.3075279656331533
+   },
+   "aimAsMapped": true
+  }
+ ],
+ "ace": null
+}
