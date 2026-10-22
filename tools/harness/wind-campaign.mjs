@@ -12,8 +12,8 @@
 // --winds run (one boot, the tee file reloaded per wind), its results in that
 // pin and speed's own file (results/solve-wind/hHH-<id>/iII.json), so jobs on
 // one pin at other speeds run side by side. The holes go one at a time in
-// --holes order ("let's focus on just hole 1 to start, then hole 10, then hole
-// 2, then hole 11 ..."), every instance on the hole until its jobs run out;
+// --holes order (the user: hole 1, then 10, then every par 3, every par 5, and
+// the par 4s left), every instance on the hole until its jobs run out;
 // within a hole the speeds go bisected ("start with 0, 16, 32 mph ... then
 // 8mph and 24mph ... then 4, 12, 20 and 28 ... then 2, 6, 10, 14, 18, 22, 26,
 // 30"; WSR's top is 30, so 30 stands in for 32), then the pins. A wind already
@@ -21,7 +21,10 @@
 // for --stall minutes has its Dolphin and its run stopped (by the instance's
 // user dir and the run's pid) and goes back on the queue, at most twice.
 // Dolphin's panic dialogs on the campaign's instances are dismissed every 20 s.
-// The board: results/solve-wind/BOARD.md.
+// The board: results/solve-wind/BOARD.md. A hole none of whose jobs is queued
+// or running is published once (publish-hole.sh: the playbook rebuilt, tested,
+// committed and pushed: "update caddie switch for a completed hole whenever
+// it is fully finished"; state/wind-campaign/published.json).
 //   node tools/harness/wind-campaign.mjs [--instances 1-18] [--holes 1,10,2,...] [--speeds 0,8,15,...] [--max-tries 40]
 //     [--left 2560 --top -929 --cols 3 --w 480 --h 426] [--stall 15]
 import fs from "node:fs";
@@ -35,7 +38,7 @@ const ROOT = path.resolve(HERE, "../..");
 const arg = (n, d) => { const i = process.argv.indexOf(n); return i >= 0 ? process.argv[i + 1] : d; };
 const range = (t) => t.split(",").flatMap((x) => { const [a, b] = x.split("-").map(Number); return Number.isFinite(b) ? Array.from({ length: b - a + 1 }, (_, i) => a + i) : [a]; });
 const INST = range(arg("--instances", "1-18"));
-const HOLES = range(arg("--holes", "1,10,2,11,3,12,4,13,5,14,6,15,7,16,8,17,9,18"));
+const HOLES = range(arg("--holes", "1,10,2,4,8,11,13,17,3,5,9,12,14,18,6,7,15,16"));
 const SPEEDS = range(arg("--speeds", "0,8,15,4,12,2,6,10,14,1,3,5,7,9,11,13"));
 const DIRS = range(arg("--dirs", "0-7"));
 const MAX_TRIES = Number(arg("--max-tries", 40)), STALL_MIN = Number(arg("--stall", 15));
@@ -125,6 +128,7 @@ function start(n) {
     log(`instance ${n}: ${P.cupKey(job.c)} ${job.speedIdx ? `at ${2 * job.speedIdx} mph` : "calm"}: ${got} of ${job.winds.length} solved${rest.length ? `, ${rest.length} unplayed` : ""} (exit ${r.stalled ? "stalled" : code}, ${((Date.now() - r.startedAt) / 60000).toFixed(1)} min)`);
     if (rest.length && job.tries < 2) queue.unshift({ ...job, winds: rest, tries: job.tries + 1 });
     board();
+    maybePublish(job.c.hole);
     setTimeout(() => { if (!start(n) && !running.size) finish(); }, 3000);
   });
   return true;
@@ -173,17 +177,36 @@ function board() {
 }
 setInterval(board, 120000).unref();
 
+// a hole with no job queued or running: published once, one at a time
+const PUBF = path.join(LOGD, "published.json");
+const published = new Set(readJson(PUBF) ?? []);
+let publishing = Promise.resolve();
+const BASH = "C:/Program Files/Git/bin/bash.exe";
+function maybePublish(h) {
+  if (published.has(h) || queue.some((j) => j.c.hole === h) || [...running.values()].some((r) => r.job.c.hole === h)) return;
+  published.add(h);
+  fs.writeFileSync(PUBF, JSON.stringify([...published]));
+  publishing = publishing.then(() => new Promise((res) => {
+    log(`hole ${h}: no job left; publishing it to Caddie Switch`);
+    let out = "";
+    const ch = spawn(BASH, ["tools/harness/publish-hole.sh", String(h)], { cwd: ROOT, windowsHide: true });
+    ch.stdout.on("data", (d) => (out += d)); ch.stderr.on("data", (d) => (out += d));
+    ch.on("exit", (code) => { log(`hole ${h}: publish ${code === 0 ? "done" : `FAILED (exit ${code})`}: ${out.trim().split(/\r?\n/).slice(-1)[0] ?? ""}`); res(); });
+    ch.on("error", (e) => { log(`hole ${h}: publish FAILED: ${e.message}`); res(); });
+  }));
+}
 let finished = false;
 function finish() {
   if (finished) return;
   finished = true;
   board();
   log(`the wind campaign: done (${queue.length} jobs left)`);
-  process.exit(0);
+  publishing.then(() => process.exit(0));
 }
 
 // the instances free of earlier runs, then a staggered start (boots 20 s apart)
 board();
+for (const h of HOLES) maybePublish(h);   // the holes finished before this start
 for (const n of INST) {
   for (let pids = instancePids(n), said = false; pids.length; pids = instancePids(n)) {
     if (!said) { log(`instance ${n} is busy (pids ${pids.join(", ")}): waiting`); said = true; }
