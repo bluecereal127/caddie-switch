@@ -1,0 +1,152 @@
+{
+ "hole": 17,
+ "cup": "s3",
+ "label": "AM",
+ "sets": [
+  2
+ ],
+ "par": 3,
+ "speedIdx": 8,
+ "mph": 16,
+ "winds": {
+  "0:8": {
+   "dir": 0,
+   "speedIdx": 8,
+   "mph": 16,
+   "rule": "near",
+   "target": 1,
+   "nearYd": 0.3333,
+   "solved": false,
+   "tries": 0,
+   "ms": 12000,
+   "strokes": null
+  },
+  "1:8": {
+   "dir": 1,
+   "speedIdx": 8,
+   "mph": 16,
+   "rule": "near",
+   "target": 1,
+   "nearYd": 0.3333,
+   "solved": true,
+   "tries": 1,
+   "ms": 30964,
+   "strokes": [
+    {
+     "k": 1,
+     "club": "spoon",
+     "power": 0.9710000000000006,
+     "gamePower": 0.9711515307426453,
+     "heading": 2.984987258911133,
+     "from": [
+      -55.20000076293945,
+      0.949999988079071,
+      1142.800048828125
+     ],
+     "lie": 15,
+     "rest": [
+      433.95428466796875,
+      202.04014587402344,
+      -754.5349731445312
+     ],
+     "holed": true,
+     "toPin": 0.10890427540647543,
+     "how": "roll"
+    }
+   ]
+  },
+  "2:8": {
+   "dir": 2,
+   "speedIdx": 8,
+   "mph": 16,
+   "rule": "near",
+   "target": 1,
+   "nearYd": 0.3333,
+   "solved": true,
+   "tries": 2,
+   "ms": 52992,
+   "strokes": [
+    {
+     "k": 1,
+     "club": "spoon",
+     "power": 0.894037908471212,
+     "gamePower": 0.8941106200218201,
+     "heading": 3.0140371322631836,
+     "from": [
+      -55.20000076293945,
+      0.949999988079071,
+      1142.800048828125
+     ],
+     "lie": 15,
+     "rest": [
+      433.4136962890625,
+      202.04014587402344,
+      -755.6738891601562
+     ],
+     "holed": true,
+     "toPin": 0.08807017767210394,
+     "how": "roll"
+    }
+   ]
+  },
+  "3:8": {
+   "dir": 3,
+   "speedIdx": 8,
+   "mph": 16,
+   "rule": "near",
+   "target": 1,
+   "nearYd": 0.3333,
+   "solved": true,
+   "tries": 2,
+   "ms": 47704,
+   "strokes": [
+    {
+     "k": 1,
+     "club": "3iron",
+     "power": 1,
+     "gamePower": 1,
+     "heading": 2.9832372665405273,
+     "from": [
+      -55.20000076293945,
+      0.949999988079071,
+      1142.800048828125
+     ],
+     "lie": 15,
+     "rest": [
+      433.4952087402344,
+      202.04014587402344,
+      -754.9354858398438
+     ],
+     "holed": true,
+     "toPin": 0.0987541990727002,
+     "how": "roll"
+    }
+   ]
+  },
+  "4:8": {
+   "dir": 4,
+   "speedIdx": 8,
+   "mph": 16,
+   "rule": "near",
+   "target": 1,
+   "nearYd": 0.3333,
+   "solved": false,
+   "tries": 3,
+   "ms": 68096,
+   "strokes": null
+  },
+  "5:8": {
+   "dir": 5,
+   "speedIdx": 8,
+   "mph": 16,
+   "rule": "near",
+   "target": 1,
+   "nearYd": 0.3333,
+   "solved": false,
+   "tries": 0,
+   "ms": 10961,
+   "strokes": null
+  }
+ },
+ "updated": "2026-10-22T20:24:25.663Z"
+}
