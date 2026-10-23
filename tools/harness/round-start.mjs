@@ -39,9 +39,15 @@ const COURSES = {
   "Classic B": { tile: [0.254, -0.099], first: 13 }, "Classic C": { tile: [0.254, -0.444], first: 16 },
 };
 const course = arg("--course", null);
+// --nine Resort|Classic: Nine Holes (0.004, -0.164 on "Number of Holes"), then that course's tile on its
+// "Select Course" (measured on the 834x456 screens, 2026-10-23)
+const NINE = { Resort: { tile: [-0.279, -0.185], first: 1 }, Classic: { tile: [0.273, -0.185], first: 10 } };
+const nine = arg("--nine", null);
+if (nine && !NINE[nine]) { console.log(`no nine-hole course ${nine}`); process.exit(2); }
 if (course && !COURSES[course]) { console.log(`no course ${course}`); process.exit(2); }
-const first = course ? COURSES[course].first : 1;
-const [px, py] = course ? COURSES[course].tile : [0.004, -0.552];
+const first = course ? COURSES[course].first : nine ? NINE[nine].first : 1;
+const [px, py] = course ? COURSES[course].tile : nine ? NINE[nine].tile : [0.004, -0.552];
+if (nine) { await post("point", ["0.004", "-0.164"]); await post("wait", ["700"]); await post("press", ["A", "200"]); await post("wait", ["2500"]); }
 const PIN = arg("--pin", null);
 await post("point", [String(px), String(py)]);
 await post("wait", ["700"]);

@@ -56,7 +56,11 @@ const OUTD = path.join(HERE, "results", "solve-wind");
 const LOGD = path.join(HERE, "state", "wind-campaign");
 fs.mkdirSync(OUTD, { recursive: true }); fs.mkdirSync(LOGD, { recursive: true });
 const LOGF = path.join(LOGD, "campaign.log");
-const log = (m) => { const l = `[${new Date().toISOString().slice(0, 19).replace("T", " ")}] ${m}`; console.log(l); fs.appendFileSync(LOGF, l + "\n"); };
+const log = (m) => { const l = `[${new Date().toISOString().slice(0, 19).replace("T", " ")}] ${m}`; console.log(l); try { fs.appendFileSync(LOGF, l + "\n"); } catch { /* a locked log: the line is on stdout */ } };
+// an error nothing caught is logged and the campaign goes on (the runs are the
+// supervisor's children: when it dies they all do)
+process.on("uncaughtException", (e) => log(`supervisor error, kept going: ${e?.stack ?? e}`));
+process.on("unhandledRejection", (e) => log(`supervisor error, kept going: ${e?.stack ?? e}`));
 const readJson = (f) => { try { return JSON.parse(fs.readFileSync(f, "utf8")); } catch { return null; } };
 
 // the windows: --cols across, as many rows as the instances need, on the portrait monitor
@@ -183,7 +187,9 @@ function board() {
     `| solved / played / all | ${SPEEDS.map((i) => `${bySpeed[i].solved}/${bySpeed[i].played}/${bySpeed[i].total}`).join(" | ")} |`, "",
     `| Hole | Pin | ${SPEEDS.map((i) => (i ? `${2 * i}` : "0")).join(" | ")} |`, `|---|---|${SPEEDS.map(() => "---").join("|")}|`, ...rows, "",
   ].join("\n");
-  fs.writeFileSync(path.join(OUTD, "BOARD.md"), md);
+  // a transient Windows lock on the file (UNKNOWN -4094 on open, 2026-10-23 04:03, which killed the
+  // supervisor and with it every run) skips this board; the next one writes
+  try { fs.writeFileSync(path.join(OUTD, "BOARD.md"), md); } catch (e) { log(`the board was not written (${e.code ?? e.message})`); }
 }
 setInterval(board, 120000).unref();
 
@@ -195,7 +201,7 @@ const BASH = "C:/Program Files/Git/bin/bash.exe";
 function maybePublish(h) {
   if (published.has(h) || queue.some((j) => j.c.hole === h) || [...running.values()].some((r) => r.job.c.hole === h)) return;
   published.add(h);
-  fs.writeFileSync(PUBF, JSON.stringify([...published]));
+  try { fs.writeFileSync(PUBF, JSON.stringify([...published])); } catch (e) { log(`published.json was not written (${e.code ?? e.message})`); }
   publishing = publishing.then(() => new Promise((res) => {
     log(`hole ${h}: no job left; publishing it to Caddie Switch`);
     let out = "";
