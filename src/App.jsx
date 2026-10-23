@@ -626,6 +626,8 @@ function LiveSolveCard({ hole, line, pinKey, pin, windSpeed, windDeg, onTee, onS
   const show = (i) => { const r = st.res.recs[i]; setSt((x) => ({ ...x, sel: i })); onShow([{ from: [line.ball.x, line.ball.y], rest: r.rest, aimTo: r.aimTo, holed: r.holed }]); };
   const off = (d) => (Math.abs(d) < 0.05 ? "straight at" : `${Math.abs(d).toFixed(1)}° ${d > 0 ? "right" : "left"} of`);
   const toWhat = line.target ? "the target" : "the pin";
+  // a miss as a golfer says it: in, within a few yards, or so far short or long and left or right
+  const where = (r) => r.holed ? "in" : r.miss < 3 ? `${r.miss.toFixed(1)} yd from ${toWhat}` : `${Math.round(Math.abs(r.long))} yd ${r.long < 0 ? "short" : "long"}${Math.abs(r.right) >= 3 ? ` and ${Math.round(Math.abs(r.right))} yd ${r.right > 0 ? "right" : "left"}` : ""}`;
   return (
     <div className="rounded-xl border-2 px-3 py-2 text-xs" style={{ borderColor: T.flag, background: "#FFF7F4" }}>
       <div className="disp text-[11px] font-bold mb-1">🎯 Live solve · WSR's own physics</div>
@@ -637,12 +639,12 @@ function LiveSolveCard({ hole, line, pinKey, pin, windSpeed, windDeg, onTee, onS
       {st.err && <div className="mt-1 font-semibold" style={{ color: T.flag }}>{st.err}</div>}
       {st.res && (
         <div className="space-y-1 mt-1.5" style={stale ? { opacity: 0.45 } : null}>
-          <div className="opacity-60 text-[10px]">{Math.round(st.res.D)} yd to {toWhat} · lie {({ 1: "fairway", 2: "rough", 3: "bunker", 6: "green", 9: "fringe", 15: "tee", 16: "bunker" })[st.res.lie] ?? st.res.lie} · tap one to see it on the map</div>
+          <div className="opacity-60 text-[10px]">Each club's best shot, the best first (a club that cannot get there shows the nearest it can) · {Math.round(st.res.D)} yd to {toWhat} · lie {({ 1: "fairway", 2: "rough", 3: "bunker", 6: "green", 9: "fringe", 15: "tee", 16: "bunker" })[st.res.lie] ?? st.res.lie} · tap one to see it on the map</div>
           {st.res.recs.slice(0, 5).map((r, i) => (
             <button key={i} onClick={() => show(i)} className="w-full text-left rounded-lg border-2 px-2 py-1"
               style={st.sel === i ? { background: T.flag, color: "#fff", borderColor: T.flag } : { borderColor: T.line, background: "#fff", color: T.ink }}>
-              <b>{PB_CLUB[r.club] ?? r.club}</b> <span className="mono font-bold">{r.bars.toFixed(2)}</span> bars{r.max ? " (max)" : ""} · aim {off(r.aimOffTarget)} {toWhat}{line.target && pin ? ` (${off(r.aimOffFlag)} the flag)` : ""} → {r.holed ? "in" : `${r.miss < 3 ? r.miss.toFixed(1) : Math.round(r.miss)} yd from ${toWhat}`}, {r.restLie}{r.safe ? "" : " · ⚠ 0.1 bar off can find sand or water"}
-              {r.full && <div className="opacity-70 text-[10px]">at full power (4.00 max): aim {off(r.full.aimOffTarget)} {toWhat} → {r.full.holed ? "in" : `${Math.round(r.full.miss)} yd from ${toWhat}`}, {r.full.restLie}</div>}
+              <b>{PB_CLUB[r.club] ?? r.club}</b> <span className="mono font-bold">{r.bars.toFixed(2)}</span> bars{r.max ? " (max)" : ""} · aim {off(r.aimOffTarget)} {toWhat}{line.target && pin ? ` (${off(r.aimOffFlag)} the flag)` : ""} {i === 0 ? " · ◀ best" : ""} → {where(r)}, {r.holed ? "in the cup" : `in the ${r.restLie}`}{r.safe ? "" : " · ⚠ 0.1 bar off can find sand or water"}
+              {r.full && <div className="opacity-70 text-[10px]">at full power (4.00 max): aim {off(r.full.aimOffTarget)} {toWhat} → {where(r.full)}, {r.full.holed ? "in the cup" : `in the ${r.full.restLie}`}</div>}
             </button>
           ))}
         </div>

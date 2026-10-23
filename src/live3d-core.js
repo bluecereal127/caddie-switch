@@ -119,9 +119,13 @@ export function solveFrom(C, { ball, target = null, pinKey = null, pinFrac = nul
     for (const dq of POWER_ERR) { const q = t.q + dq; if (q < 0.03 || q > capOf(club, lie) + 1e-9) continue; const u = at(club, q, t.h); if (u.p.hazard || !DRY.has(u.p.restLie)) return false; }
     return true;
   };
+  const ux = Math.sin(h0), uz = Math.cos(h0);
   const row = (club, t) => {
     const len = Math.hypot(t.p.rest[0] - ballPos[0], t.p.rest[1] - ballPos[2]);
+    // where the rest is from the target: long (+) or short along the line, right (+) or left across it
+    const dx = t.p.rest[0] - tgt[0], dz = t.p.rest[1] - tgt[1];
     return {
+      long: (dx * ux + dz * uz) / YD, right: (dz * ux - dx * uz) / YD,
       club, power: t.q, bars: 4 * t.q, max: t.q >= capOf(club, lie) - 0.0015, heading: t.h, bearing: mapBearing(meta, t.h),
       aimOffTarget: -angDiff(t.h, h0) / DEG, aimOffFlag: -angDiff(t.h, hPin) / DEG,
       rest: toMap(meta, t.p.rest[0], t.p.rest[1]), aimTo: toMap(meta, ballPos[0] + Math.sin(t.h) * len, ballPos[2] + Math.cos(t.h) * len),
