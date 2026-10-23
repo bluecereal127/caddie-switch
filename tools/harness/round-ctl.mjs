@@ -24,6 +24,10 @@ const WINDPLAN = arg("--wind-plan", null);
 // --perfect (the user, 2026-10-23): the round ends at the first hole off a perfect score (a par 3
 // not aced, a par 4 not eagled, a par 5 not albatrossed: no -42 left), exit 3
 const PERFECT = process.argv.includes("--perfect");
+// --beat-file f (the user, 2026-10-23): the round ends once it cannot beat the record in f ({ record }, to par,
+// read after every hole): its strokes so far and a perfect score on every hole left (an ace, an eagle on a
+// par 4, an albatross) no better than the record
+const BEAT = arg("--beat-file", null);
 const PERFECT_AT = { 3: 1, 4: 2, 5: 2 }, PAR_OF = { 1: 4, 2: 3, 3: 5, 4: 3, 5: 5, 6: 4, 7: 4, 8: 3, 9: 5, 10: 4, 11: 3, 12: 5, 13: 3, 14: 5, 15: 4, 16: 4, 17: 3, 18: 5 };
 const WIND = arg("--wind", null), windSet = WIND ? { dir: Number(WIND.split(":")[0]), speedIdx: Number(WIND.split(":")[1]) } : null;
 // --pins 1:0,2:3,3:3: the WSR slot each hole's pin is forced to (round-play.mjs
@@ -47,6 +51,7 @@ for (let hole = from; hole <= to; hole++) {
       const prev = round.holes[hole];
       round.holes[hole] = prev ? { ...rec, strokes: [...prev.strokes, ...rec.strokes], calls: (prev.calls ?? 1) + 1 } : rec;
       if (PERFECT) { const got = round.holes[hole]?.game?.strokes ?? round.holes[hole]?.strokes?.length; if (got && got > PERFECT_AT[PAR_OF[hole]]) { save(); console.log(`hole ${hole}: ${got} strokes, off a perfect round (${PERFECT_AT[PAR_OF[hole]]} on a par ${PAR_OF[hole]}): the round ends here`); process.exit(3); } }
+      if (BEAT) { let rec = null; try { rec = JSON.parse(fs.readFileSync(path.resolve(HERE, BEAT), "utf8")).record; } catch { /* no record yet */ } if (Number.isFinite(rec)) { let so = 0, par = 0; for (let h = from; h <= to; h++) { par += PAR_OF[h]; if (h <= hole) so += round.holes[h]?.game?.strokes ?? round.holes[h]?.strokes?.length ?? 0; else so += PERFECT_AT[PAR_OF[h]]; } if (so - par >= rec) { save(); console.log(`hole ${hole}: the best finish left is ${so - par}, no better than the record ${rec}: the round ends here`); process.exit(3); } } }
       save();
       console.log(`hole ${hole}: ${round.holes[hole].strokes.length} strokes, the game counts ${rec.game?.strokes}`);
       if (rec.next !== hole || hole === to) break;

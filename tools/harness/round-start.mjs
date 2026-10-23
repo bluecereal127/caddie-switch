@@ -51,7 +51,7 @@ if (nine) { await post("point", ["0.004", "-0.164"]); await post("wait", ["700"]
 const PIN = arg("--pin", null);
 await post("point", [String(px), String(py)]);
 await post("wait", ["700"]);
-if (PIN != null && course) {
+if (PIN != null) {
   const pins = new URL("./lib/pins.mjs", import.meta.url).href;
   const r = await post("eval", [`const P = await import(${JSON.stringify(pins)}); await gdb.haltSafe(); await gdb.addBreak(P.FORCE_PC); await gdb.go(); await dsu.tap(0, "Cross", 250); let out; try { out = await P.forceAtStart({ gdb, dsu }, { hole: ${first}, slot: ${Number(PIN)}, menu: true }); } catch (e) { out = { error: String(e.message ?? e) }; } try { await gdb.haltSafe(); } catch { /* the wrapper resumes a halted CPU */ } return JSON.stringify(out);`]);
   console.log(`hole ${first}: the pin forced to slot ${PIN}: ${r}`);

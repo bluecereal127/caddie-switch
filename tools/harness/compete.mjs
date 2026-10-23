@@ -41,6 +41,13 @@ const ALL18 = Number(arg("--eighteen", 0));
 const WINDPLAN = arg("--wind-plan", null);
 // --perfect: a round ends at its first hole off a perfect score, and the next one starts (round-ctl.mjs --perfect)
 const PERFECT = process.argv.includes("--perfect");
+// --pin-plan: every hole's pin forced to its most forgiving perfect route's (results/compete/pin-plan.json,
+// route-robust.mjs); --beat: a round ends once it cannot beat the record (results/compete/record.json, the
+// best round of any player, from --record at the start)
+const PINPLAN = process.argv.includes("--pin-plan"), BEATREC = process.argv.includes("--beat");
+const RECF = path.join(HERE, "results", "compete", "record.json");
+if (BEATREC && arg("--record", null) != null) fs.writeFileSync(RECF, JSON.stringify({ record: Number(arg("--record")), at: new Date().toISOString() }));
+const pinPlan = () => { try { return JSON.parse(fs.readFileSync(path.join(HERE, "results", "compete", "pin-plan.json"), "utf8")); } catch { return {}; } };
 if (ALL18) RACES.eighteen.ladder = true;
 const records = [];
 const want = ALL18 ? ["eighteen"] : (arg("--races", null) ?? Object.keys(RACES).join(",")).split(",");
@@ -115,9 +122,11 @@ async function playRound(s, n) {
     const idle = Math.round(5 + Math.random() * 85);
     fs.appendFileSync(ctlLog, `[${new Date().toISOString().slice(11, 19)}] ${s.name} round ${n}: idling ${idle} s on Number of Holes (a new draw)\n`);
     await post(s.port, "wait", [String(idle * 1000)]);
-    const startCode = await run(["tools/harness/round-start.mjs", "--port", String(s.port), ...(s.R.nine ? ["--nine", s.R.nine] : [])], env, path.join(HERE, playLog));
+    const PP = PINPLAN ? pinPlan() : {};
+    const pins = Object.entries(PP).filter(([h]) => Number(h) > s.R.from && Number(h) <= s.R.to).map(([h, x]) => `${h}:${x.slot}`).join(",");
+    const startCode = await run(["tools/harness/round-start.mjs", "--port", String(s.port), ...(s.R.nine ? ["--nine", s.R.nine] : []), ...(PP[s.R.from] ? ["--pin", String(PP[s.R.from].slot)] : [])], env, path.join(HERE, playLog));
     if (startCode !== 0) throw new Error(`round-start exit ${startCode}`);
-    await run(["tools/harness/round-ctl.mjs", "--port", String(s.port), "--from", String(s.R.from), "--to", String(s.R.to), "--log", playLog, "--out", out, "--label", `${s.name} #${n}`, ...(WINDPLAN ? ["--wind-plan", WINDPLAN] : []), ...(PERFECT ? ["--perfect"] : [])], env, ctlLog);
+    await run(["tools/harness/round-ctl.mjs", "--port", String(s.port), "--from", String(s.R.from), "--to", String(s.R.to), "--log", playLog, "--out", out, "--label", `${s.name} #${n}`, ...(WINDPLAN ? ["--wind-plan", WINDPLAN] : []), ...(PERFECT ? ["--perfect"] : []), ...(pins ? ["--pins", pins] : []), ...(BEATREC ? ["--beat-file", "results/compete/record.json"] : [])], env, ctlLog);
     const r = readJson(path.join(HERE, out));
     let strokes = 0, par = 0, complete = true, through = 0;
     for (let h = s.R.from; h <= s.R.to; h++) { const x = r?.holes?.[h]; const k = x?.game?.strokes ?? x?.strokes?.length; if (!k) { complete = false; break; } strokes += k; par += PAR[h]; through = h; }
@@ -151,7 +160,8 @@ async function player(s) {
     const st = state[s.slug];
     st.rounds.push(r);
     if (r.complete && (st.best == null || r.toPar < st.best)) st.best = r.toPar;
-    log(`${s.name}: round ${n} ${r.complete ? `${r.strokes} strokes, ${r.toPar} (${Object.values(r.card ?? {}).join(" ")})` : `${PERFECT && r.through ? `ended after hole ${r.through} (${r.partial} through ${r.through}: off a perfect round)` : "incomplete"}${r.error ? ` (${r.error})` : ""}`}; best ${st.best ?? "-"}`);
+    if (BEATREC && r.complete) { let rec = null; try { rec = JSON.parse(fs.readFileSync(RECF, "utf8")).record; } catch { /* none */ } if (!Number.isFinite(rec) || r.toPar < rec) { try { fs.writeFileSync(RECF, JSON.stringify({ record: r.toPar, by: s.name, round: n, at: new Date().toISOString() })); } catch { /* next time */ } log(`${s.name}: a new record, ${r.toPar}`); } }
+    log(`${s.name}: round ${n} ${r.complete ? `${r.strokes} strokes, ${r.toPar} (${Object.values(r.card ?? {}).join(" ")})` : `${(PERFECT || BEATREC) && r.through ? `ended after hole ${r.through} (${r.partial} through ${r.through}: ${BEATREC ? "the record out of reach" : "off a perfect round"})` : "incomplete"}${r.error ? ` (${r.error})` : ""}`}; best ${st.best ?? "-"}`);
     if (r.complete && r.toPar <= s.R.goal && s.R.ladder) {
       records.push({ goal: s.R.goal, name: s.name, n, toPar: r.toPar, card: r.card, at: new Date().toISOString() });
       log(`${s.R.name}: RECORD ${r.toPar} by ${s.name} in round ${n} (the goal was ${s.R.goal}); the goal is now ${r.toPar - 1}`);

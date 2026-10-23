@@ -328,22 +328,27 @@ export function createPlaybook({ solveDir = SOLVE_DIR, pinIndex = PIN_INDEX } = 
   // the wind a chosen-wind round sets for the hole (round-play.mjs windPlan): of the solutions for
   // the drawn pin whose first stroke is struck from this ball and lie, the fewest strokes; on a tie a
   // savestate solve before a natural round's hole, then calm before a wind
-  function chooseWind(hole, st, { posTol = POS_TOL, pinTol = PIN_TOL } = {}) {
+  // (equal stroke counts: the route whose final stroke the model holes over the most cells first,
+  // results/compete/route-robust.json; skip: the n-th route instead, for a retry from a savestate)
+  let robustAt = 0, robustT = {};
+  const robustOf = (sol) => { if (Date.now() - robustAt > 600000) { try { robustT = JSON.parse(fs.readFileSync(path.join(HERE, "results", "compete", "route-robust.json"), "utf8")); } catch { robustT = {}; } robustAt = Date.now(); } return robustT[`${path.relative(HERE, sol.file).split(path.sep).join("/")}#${sol.cup}`]?.cells ?? -1; };
+  function chooseWind(hole, st, { posTol = POS_TOL, pinTol = PIN_TOL, skip = 0 } = {}) {
     const ball = st?.ball?.pos, pin = st?.pin, lie = st?.player?.lie;
     if (!xz(ball) || !xz(pin)) return null;
     if (!refreshes) refresh(); else refresh();
     const rank = { "solve-wind": 0, solve: 0, round: 1 };
-    let best = null;
+    const all = [];
     for (const sol of byHole.get(Number(hole)) ?? []) {
       if (Math.hypot(sol.pin[0] - pin[0], sol.pin[2] - pin[2]) > pinTol) continue;
       const s1 = sol.strokes[0];
       if (!s1 || s1.lie !== lie || Math.hypot(s1.from[0] - ball[0], s1.from[2] - ball[2]) > posTol) continue;
-      const key = [sol.strokes.length, rank[sol.src] ?? 2, sol.wind ? 1 : 0];
-      if (!best || key[0] < best.key[0] || (key[0] === best.key[0] && (key[1] < best.key[1] || (key[1] === best.key[1] && key[2] < best.key[2])))) best = { sol, key };
+      all.push({ sol, key: [sol.strokes.length, -robustOf(sol), rank[sol.src] ?? 2, sol.wind ? 1 : 0] });
     }
-    if (!best) return null;
+    if (!all.length) return null;
+    all.sort((a, b) => { for (let i = 0; i < 4; i++) if (a.key[i] !== b.key[i]) return a.key[i] - b.key[i]; return 0; });
+    const best = all[Math.min(skip, all.length - 1)];
     const n = [...(byHole.get(Number(hole)) ?? [])].filter((x) => Math.hypot(x.pin[0] - pin[0], x.pin[2] - pin[2]) <= pinTol && x.strokes.length === best.sol.strokes.length).length;
-    return { wind: best.sol.wind, flagWind: best.sol.flagWind, cup: best.sol.cup, strokes: best.sol.strokes.length, src: best.sol.src, file: best.sol.file, alike: n };
+    return { wind: best.sol.wind, flagWind: best.sol.flagWind, cup: best.sol.cup, strokes: best.sol.strokes.length, src: best.sol.src, file: best.sol.file, alike: n, cells: -best.key[1], of: all.length };
   }
   return {
     lookup, refresh, lookupNear, adjustPower, chooseWind,

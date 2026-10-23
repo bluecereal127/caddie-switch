@@ -259,7 +259,7 @@ async function planFrom(hole, st, windSet = null) {
   return { Pl, pl, ms: Date.now() - t0, from: st.ball.pos, lie: st.player.lie };
 }
 
-export async function playHole({ gdb, dsu, hole, last = false, maxStrokes = 15, logFile = null, src = null, label = null, windSet = null, forceNext = null, windPlan = null }) {
+export async function playHole({ gdb, dsu, hole, last = false, maxStrokes = 15, logFile = null, src = null, label = null, windSet = null, forceNext = null, windPlan = null, routeSkip = 0, stopUnholed = false }) {
   if (logFile) LOG = logFile;
   // the stroke's name in the planner's memory (results/knowledge/strokes.jsonl)
   src ??= path.basename(LOG, ".log");
@@ -291,7 +291,7 @@ export async function playHole({ gdb, dsu, hole, last = false, maxStrokes = 15, 
       chosen = true;
       try {
         const PBm = await playbook();
-        const ch = PBm.chooseWind(hole, st);
+        const ch = PBm.chooseWind(hole, st, { skip: routeSkip });
         if (ch) { windSet = ch.wind ?? { dir: 0, speedIdx: 0 }; flagWind = ch.flagWind; log(`hole ${hole}: the wind chosen: ${ch.wind ? `${2 * ch.wind.speedIdx} mph (dir ${ch.wind.dir})` : "calm"}, the ${ch.src} route that holes pin ${ch.cup} in ${ch.strokes} (${ch.alike} documented in ${ch.strokes}; ${path.basename(ch.file ?? "")})`); }
         else log(`hole ${hole}: no documented route from this tee for this pin; the game's own wind`);
       } catch (e) { log(`hole ${hole}: choosing the wind failed: ${e.message}`); }
@@ -464,6 +464,9 @@ export async function playHole({ gdb, dsu, hole, last = false, maxStrokes = 15, 
     await gdb.go();
     ahead = await planFrom(hole, nextSt, windSet);
   }
+  // a try that did not hole (perfect-round.mjs: maxStrokes, stopUnholed): no next pin, no screens
+  // advanced; the caller loads the tee back
+  if (stopUnholed && !rec.strokes.some((x) => x.holed)) { await gdb.haltSafe(); return rec; }
   // the next hole's pin forced to WSR slot forceNext (round-ctl.mjs --pins; the
   // user's permission to set the pins, 2026-10-22): armed now, before the
   // hole-out's screens are advanced, so the next hole's start stops after

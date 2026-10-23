@@ -1,0 +1,227 @@
+{
+ "1": {
+  "cup": "h01-s1",
+  "slot": 1,
+  "strokes": 2,
+  "perfect": true,
+  "wind": {
+   "dir": 2,
+   "speedIdx": 6
+  },
+  "src": "solve-wind",
+  "cells": 345,
+  "route": "state/solve-wind/h01-s1/d2-i6.json#h01-s1"
+ },
+ "2": {
+  "cup": "h02-s0",
+  "slot": 0,
+  "strokes": 1,
+  "perfect": true,
+  "wind": {
+   "dir": 1,
+   "speedIdx": 1
+  },
+  "src": "solve-wind",
+  "cells": 472,
+  "route": "state/solve-wind/h02-s0/d1-i1.json#h02-s0"
+ },
+ "3": {
+  "cup": "h03-s4",
+  "slot": 4,
+  "strokes": 2,
+  "perfect": true,
+  "wind": {
+   "dir": 4,
+   "speedIdx": 7
+  },
+  "src": "solve-wind",
+  "cells": 185,
+  "route": "state/solve-wind/h03-s4/d4-i7.json#h03-s4"
+ },
+ "4": {
+  "cup": "h04-s1",
+  "slot": 1,
+  "strokes": 1,
+  "perfect": true,
+  "wind": {
+   "dir": 0,
+   "speedIdx": 14
+  },
+  "src": "solve-wind",
+  "cells": 259,
+  "route": "state/solve-wind/h04-s1/d0-i14.json#h04-s1"
+ },
+ "5": {
+  "cup": "h05-s5",
+  "slot": 5,
+  "strokes": 2,
+  "perfect": true,
+  "wind": {
+   "dir": 4,
+   "speedIdx": 5
+  },
+  "src": "round",
+  "cells": 111,
+  "route": "results/compete/eighteen-2/round-18.json#h05-s5"
+ },
+ "6": {
+  "cup": "h06-s2",
+  "slot": 2,
+  "strokes": 2,
+  "perfect": true,
+  "wind": null,
+  "src": "solve",
+  "cells": 309,
+  "route": "results/solve/h06-s2.json#h06-s2"
+ },
+ "7": {
+  "cup": "h07-s5",
+  "slot": 5,
+  "strokes": 2,
+  "perfect": true,
+  "wind": {
+   "dir": 6,
+   "speedIdx": 4
+  },
+  "src": "round",
+  "cells": 381,
+  "route": "results/compete/eighteen-2/round-14.json#h07-s5"
+ },
+ "8": {
+  "cup": "h08-s2",
+  "slot": 2,
+  "strokes": 1,
+  "perfect": true,
+  "wind": {
+   "dir": 0,
+   "speedIdx": 5
+  },
+  "src": "solve-wind",
+  "cells": 193,
+  "route": "state/solve-wind/h08-s2/d0-i5.json#h08-s2"
+ },
+ "9": {
+  "cup": "h09-s5",
+  "slot": 5,
+  "strokes": 2,
+  "perfect": true,
+  "wind": {
+   "dir": 4,
+   "speedIdx": 10
+  },
+  "src": "round",
+  "cells": 54,
+  "route": "results/compete/eighteen-5/round-6.json#h09-s5"
+ },
+ "10": {
+  "cup": "h10-s4",
+  "slot": 4,
+  "strokes": 2,
+  "perfect": true,
+  "wind": {
+   "dir": 2,
+   "speedIdx": 3
+  },
+  "src": "solve-wind",
+  "cells": 495,
+  "route": "state/solve-wind/h10-s4/d2-i3.json#h10-s4"
+ },
+ "11": {
+  "cup": "h11-s1",
+  "slot": 1,
+  "strokes": 1,
+  "perfect": true,
+  "wind": {
+   "dir": 0,
+   "speedIdx": 2
+  },
+  "src": "solve-wind",
+  "cells": 414,
+  "route": "state/solve-wind/h11-s1/d0-i2.json#h11-s1"
+ },
+ "12": {
+  "cup": "h12-s5",
+  "slot": 5,
+  "strokes": 2,
+  "perfect": true,
+  "wind": {
+   "dir": 7,
+   "speedIdx": 4
+  },
+  "src": "round",
+  "cells": 166,
+  "route": "results/compete/eighteen-3/round-9.json#h12-s5"
+ },
+ "13": {
+  "cup": "h13-s0",
+  "slot": 0,
+  "strokes": 1,
+  "perfect": true,
+  "wind": {
+   "dir": 2,
+   "speedIdx": 14
+  },
+  "src": "solve-wind",
+  "cells": 375,
+  "route": "state/solve-wind/h13-s0/d2-i14.json#h13-s0"
+ },
+ "14": {
+  "cup": "h14-s5",
+  "slot": 5,
+  "strokes": 2,
+  "perfect": true,
+  "wind": null,
+  "src": "round",
+  "cells": 386,
+  "route": "results/compete/eighteen-3/round-5.json#h14-s5"
+ },
+ "15": {
+  "cup": "h15-s3",
+  "slot": 3,
+  "strokes": 2,
+  "perfect": true,
+  "wind": {
+   "dir": 5,
+   "speedIdx": 5
+  },
+  "src": "round",
+  "cells": 572,
+  "route": "results/compete/eighteen-1/round-5.json#h15-s3"
+ },
+ "16": {
+  "cup": "h16-s3",
+  "slot": 3,
+  "strokes": 2,
+  "perfect": true,
+  "wind": {
+   "dir": 7,
+   "speedIdx": 2
+  },
+  "src": "round",
+  "cells": 775,
+  "route": "results/compete/classic9-1/round-1.json#h16-s3"
+ },
+ "17": {
+  "cup": "h17-s0",
+  "slot": 0,
+  "strokes": 1,
+  "perfect": true,
+  "wind": {
+   "dir": 0,
+   "speedIdx": 15
+  },
+  "src": "solve-wind",
+  "cells": 221,
+  "route": "state/solve-wind/h17-s0/d0-i15.json#h17-s0"
+ },
+ "18": {
+  "cup": "h18-s0",
+  "slot": 0,
+  "strokes": 2,
+  "perfect": true,
+  "wind": null,
+  "src": "round",
+  "cells": 306,
+  "route": "results/compete/eighteen-1/round-2.json#h18-s0"
+ }
+}
