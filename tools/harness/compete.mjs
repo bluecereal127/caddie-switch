@@ -15,7 +15,12 @@
 // kept (results/compete/<race>-winner.png) and both players of the race stop.
 // Windows on the portrait monitor, two across and a race to a row; the board:
 // results/compete/BOARD.md; the log: state/compete/compete.log.
-//   node tools/harness/compete.mjs [--races resort9,classic9,eighteen]
+// --eighteen N (2026-10-23, after the Classic nine was won at -20 in its first
+// round): N players all on eighteen holes, a ladder from --goal (-40): a
+// round at the goal is a record (its scorecard results/compete/eighteen-<n>.png,
+// n strokes under) and the goal goes one past it (-41 next), nobody stopping;
+// a player's rounds and memory carry on from its earlier ones.
+//   node tools/harness/compete.mjs [--races resort9,classic9,eighteen] | --eighteen 6 [--goal -40]
 import fs from "node:fs";
 import path from "node:path";
 import http from "node:http";
@@ -29,12 +34,19 @@ const PAR = { 1: 4, 2: 3, 3: 5, 4: 3, 5: 5, 6: 4, 7: 4, 8: 3, 9: 5, 10: 4, 11: 3
 const RACES = {
   resort9: { name: "Resort nine", nine: "Resort", from: 1, to: 9, goal: -20, row: 0 },
   classic9: { name: "Classic nine", nine: "Classic", from: 10, to: 18, goal: -20, row: 1 },
-  eighteen: { name: "Eighteen holes", nine: null, from: 1, to: 18, goal: -40, row: 2 },
+  eighteen: { name: "Eighteen holes", nine: null, from: 1, to: 18, goal: Number(arg("--goal", -40)), row: 2 },
 };
-const want = (arg("--races", null) ?? Object.keys(RACES).join(",")).split(",");
+const ALL18 = Number(arg("--eighteen", 0));
+if (ALL18) RACES.eighteen.ladder = true;
+const records = [];
+const want = ALL18 ? ["eighteen"] : (arg("--races", null) ?? Object.keys(RACES).join(",")).split(",");
 const SLOTS = [];
 let inst = 1;
-for (const [race, R] of Object.entries(RACES)) for (const k of [1, 2]) {
+if (ALL18) for (let k = 1; k <= ALL18; k++) {
+  const R = RACES.eighteen, n = k;
+  SLOTS.push({ slug: `eighteen-${k}`, race: "eighteen", R, name: `Eighteen holes · player ${k}`, inst: n, port: 8800 + n, x: 2560 + ((k - 1) % 2) * 720, y: -929 + Math.floor((k - 1) / 2) * 436, w: 720, h: 436 });
+}
+else for (const [race, R] of Object.entries(RACES)) for (const k of [1, 2]) {
   const n = inst++;
   if (want.includes(race)) SLOTS.push({ slug: `${race}-${k}`, race, R, name: `${R.name} · player ${k}`, inst: n, port: 8800 + n, x: 2560 + (k - 1) * 720, y: -929 + R.row * 436, w: 720, h: 436 });
 }
@@ -69,7 +81,8 @@ function board() {
   const lines = ["# The competition", "", `Natural rounds (the game's own wind and pins, no savestate after the menu), two players a race, the first round at the goal wins. Updated ${new Date().toISOString().slice(0, 16).replace("T", " ")} UTC.`, ""];
   for (const [race, R] of Object.entries(RACES)) {
     if (!want.includes(race)) continue;
-    lines.push(`## ${R.name} (goal ${R.goal})${raceDone[race] ? ` — won by ${raceDone[race].name}, round ${raceDone[race].n}: ${raceDone[race].toPar}` : ""}`, "");
+    if (R.ladder) lines.push(`## ${R.name}: the goal now ${R.goal}`, "", ...(records.length ? records.map((x) => `- record ${x.toPar} (the goal was ${x.goal}): ${x.name}, round ${x.n}, ${x.at.slice(0, 16).replace("T", " ")} UTC`) : ["- no record yet"]), "");
+    else lines.push(`## ${R.name} (goal ${R.goal})${raceDone[race] ? ` — won by ${raceDone[race].name}, round ${raceDone[race].n}: ${raceDone[race].toPar}` : ""}`, "");
     for (const s of SLOTS.filter((x) => x.race === race)) {
       const st = state[s.slug];
       lines.push(`- ${s.name} (instance ${s.inst}): ${st.rounds.length} rounds, best ${st.best ?? "—"}; ${st.rounds.map((r) => r.toPar ?? "x").join(", ") || "none yet"}`);
@@ -106,10 +119,11 @@ async function playRound(s, n) {
     for (let h = s.R.from; h <= s.R.to; h++) { const x = r?.holes?.[h]; const k = x?.game?.strokes ?? x?.strokes?.length; if (!k) { complete = false; break; } strokes += k; par += PAR[h]; }
     const res = { n, complete, strokes: complete ? strokes : null, toPar: complete ? strokes - par : null, card: r ? Object.fromEntries(Object.entries(r.holes ?? {}).map(([h, x]) => [h, x?.game?.strokes ?? x?.strokes?.length])) : null };
     if (complete && res.toPar <= s.R.goal && !raceDone[s.race]) {
+      res.shot = true;
       await sleep(8000);
       // the driver answers with the screenshot's path (Dolphin also keeps it in state/user<N>/ScreenShots)
       const shot = (await post(s.port, "shot")).match(/[A-Za-z]:[\\/][^"\n]*?\.png/)?.[0];
-      if (shot && fs.existsSync(shot)) fs.copyFileSync(shot, path.join(RD, `${s.race}-winner.png`));
+      if (shot && fs.existsSync(shot)) fs.copyFileSync(shot, path.join(RD, s.R.ladder ? `${s.race}${res.toPar}.png` : `${s.race}-winner.png`));
     }
     return res;
   } finally {
@@ -123,7 +137,9 @@ async function playRound(s, n) {
 
 async function player(s) {
   await sleep(SLOTS.indexOf(s) * 20000);   // boots 20 s apart
-  for (let n = 1; !raceDone[s.race]; n++) {
+  // a player's rounds carry on from its earlier ones (its files, its memory)
+  const done = (() => { try { return fs.readdirSync(path.join(RD, s.slug)).filter((f) => /^round-\d+\.json$/.test(f)).map((f) => Number(f.match(/\d+/)[0])); } catch { return []; } })();
+  for (let n = (done.length ? Math.max(...done) : 0) + 1; !raceDone[s.race]; n++) {
     log(`${s.name}: round ${n}`);
     let r;
     try { r = await playRound(s, n); } catch (e) { r = { n, complete: false, error: e.message }; }
@@ -132,7 +148,11 @@ async function player(s) {
     st.rounds.push(r);
     if (r.complete && (st.best == null || r.toPar < st.best)) st.best = r.toPar;
     log(`${s.name}: round ${n} ${r.complete ? `${r.strokes} strokes, ${r.toPar} (${Object.values(r.card ?? {}).join(" ")})` : `incomplete${r.error ? ` (${r.error})` : ""}`}; best ${st.best ?? "-"}`);
-    if (r.complete && r.toPar <= s.R.goal) {
+    if (r.complete && r.toPar <= s.R.goal && s.R.ladder) {
+      records.push({ goal: s.R.goal, name: s.name, n, toPar: r.toPar, card: r.card, at: new Date().toISOString() });
+      log(`${s.R.name}: RECORD ${r.toPar} by ${s.name} in round ${n} (the goal was ${s.R.goal}); the goal is now ${r.toPar - 1}`);
+      s.R.goal = r.toPar - 1;
+    } else if (r.complete && r.toPar <= s.R.goal) {
       raceDone[s.race] = { name: s.name, n, toPar: r.toPar };
       log(`${s.R.name}: WON by ${s.name} in round ${n} at ${r.toPar}`);
       for (const o of SLOTS.filter((x) => x.race === s.race && x !== s)) if (state[o.slug].current) killTree(state[o.slug].current.pid);
