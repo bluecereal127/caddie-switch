@@ -1,0 +1,165 @@
+{
+ "version": 1,
+ "holes": {
+  "1": {
+   "bin": "h01.bin",
+   "json": "h01.json",
+   "bytes": 306431,
+   "sha1": "0cb7586762386d8de96c3eec1e43c3ba64d58e5b",
+   "prisms": 4683,
+   "palm": false
+  },
+  "2": {
+   "bin": "h02.bin",
+   "json": "h02.json",
+   "bytes": 220967,
+   "sha1": "f9b7afd438348bc1d2a47fe0fb43d5aa52e24eba",
+   "prisms": 3403,
+   "palm": true
+  },
+  "3": {
+   "bin": "h03.bin",
+   "json": "h03.json",
+   "bytes": 507815,
+   "sha1": "d22b074354f81e9ffbfe1aeedac022b24dfe2cb3",
+   "prisms": 7959,
+   "palm": true
+  },
+  "4": {
+   "bin": "h04.bin",
+   "json": "h04.json",
+   "bytes": 176303,
+   "sha1": "afd162f51ef9379f57e0771c082a7dedda0a23dd",
+   "prisms": 2811,
+   "palm": true
+  },
+  "5": {
+   "bin": "h05.bin",
+   "json": "h05.json",
+   "bytes": 480371,
+   "sha1": "2c38cfe0e4e933f8b7ab7a7450573bdc88acc78d",
+   "prisms": 7435,
+   "palm": true
+  },
+  "6": {
+   "bin": "h06.bin",
+   "json": "h06.json",
+   "bytes": 400488,
+   "sha1": "7a068ad1e85c3b006a931edef5714216004ce549",
+   "prisms": 6096,
+   "palm": false
+  },
+  "7": {
+   "bin": "h07.bin",
+   "json": "h07.json",
+   "bytes": 410484,
+   "sha1": "8499485fd5edd7baf6419ff7be3e28343f20dd21",
+   "prisms": 6372,
+   "palm": true
+  },
+  "8": {
+   "bin": "h08.bin",
+   "json": "h08.json",
+   "bytes": 443447,
+   "sha1": "5531ae32d880c0e2707993b776b036c7b6f556b3",
+   "prisms": 6687,
+   "palm": true
+  },
+  "9": {
+   "bin": "h09.bin",
+   "json": "h09.json",
+   "bytes": 555102,
+   "sha1": "ab983ac5da8f05b8fbe3fb7ae218dc7663df90d9",
+   "prisms": 8422,
+   "palm": false
+  },
+  "10": {
+   "bin": "h10.bin",
+   "json": "h10.json",
+   "bytes": 562824,
+   "sha1": "dc2d2498d12e5a70a29e2b205d2159709d7c43e6",
+   "prisms": 8572,
+   "palm": false
+  },
+  "11": {
+   "bin": "h11.bin",
+   "json": "h11.json",
+   "bytes": 165210,
+   "sha1": "8047b0955605683d4f7375af8b25ef3ce1b98655",
+   "prisms": 2498,
+   "palm": false
+  },
+  "12": {
+   "bin": "h12.bin",
+   "json": "h12.json",
+   "bytes": 612660,
+   "sha1": "20dd98dc7c56d87645cfd719d36caf27616aa5f5",
+   "prisms": 9544,
+   "palm": false
+  },
+  "13": {
+   "bin": "h13.bin",
+   "json": "h13.json",
+   "bytes": 207299,
+   "sha1": "06340f745ee81e0c053098802577a9a05b777367",
+   "prisms": 3163,
+   "palm": false
+  },
+  "14": {
+   "bin": "h14.bin",
+   "json": "h14.json",
+   "bytes": 436908,
+   "sha1": "05b3d45a636a4d1054d5a354bceacbb43d0dcc94",
+   "prisms": 6748,
+   "palm": false
+  },
+  "15": {
+   "bin": "h15.bin",
+   "json": "h15.json",
+   "bytes": 460662,
+   "sha1": "c89e30814a2318af9875e35e5f485b4b3c6e1b17",
+   "prisms": 6958,
+   "palm": false
+  },
+  "16": {
+   "bin": "h16.bin",
+   "json": "h16.json",
+   "bytes": 271265,
+   "sha1": "4996d65158cd8eabcd2647616ef8cfed60c84006",
+   "prisms": 4105,
+   "palm": false
+  },
+  "17": {
+   "bin": "h17.bin",
+   "json": "h17.json",
+   "bytes": 269928,
+   "sha1": "1c34593859cb4e2a94fac8ae8427e59b38e9345b",
+   "prisms": 4084,
+   "palm": false
+  },
+  "18": {
+   "bin": "h18.bin",
+   "json": "h18.json",
+   "bytes": 522228,
+   "sha1": "d99bb870e83077448d155791d0b8620a91dc755f",
+   "prisms": 8076,
+   "palm": false
+  }
+ },
+ "palm": {
+  "bin": "palm.bin",
+  "n": 404,
+  "thick": 5,
+  "offs": {
+   "PV": 0,
+   "FN": 4848,
+   "E1": 9696,
+   "E2": 14544,
+   "E3": 19392,
+   "H": 24240,
+   "attr": 25856
+  },
+  "bytes": 26260,
+  "sha1": "5afe3790004eaa124d8501d6ff1aabe0637127b1"
+ }
+}

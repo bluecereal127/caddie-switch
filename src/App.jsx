@@ -11,6 +11,7 @@ import { contourDataUrl } from "./relief.js";
 import { MAP_SCALES, mapScaleOf, mapFileUrl, loadMapIndex, preloadImage } from "./mapScale.js";
 import { scrollFor } from "./mapView.js";
 import { loadPlaybook, pinKeyOf, routesFor } from "./playbook.js";
+import { liveSolve } from "./live3d.js";
 
 
 /* ============================================================
@@ -598,6 +599,54 @@ function PlaybookCard({ hole, pb, pinKey, match, pick, onPick, show, onShow, onS
         </div>
       )}
       <div className="opacity-60 text-[10px] mt-1">Played in WSR, the Wii original, from a savestate of this pin's tee: the last shot holes or stops within 1 ft. Aim is in degrees off the straight line from your ball to the flag; on the map and the green the white line is that aim and the gold dashes the ball's path (the gap between them is the wind and the spin), so line the game's aim line up with the white one.</div>
+    </div>
+  );
+}
+
+// The live solve card: WSR's own physics (the harness's 3D model, src/live3d-core.js,
+// in a worker) from wherever the ball is on the map, for when a shot came off
+// the solved route: per club the power and aim whose ball stops nearest the
+// target (the line's target when one is drawn, else the pin; the cup in play),
+// in the dial's wind, with where it rests, the full-power option and a
+// 0.1-bar sand check; tapping one draws its aim and path on the map.
+function LiveSolveCard({ hole, line, pinKey, pin, windSpeed, windDeg, onTee, onShow }) {
+  const [st, setSt] = useState({ busy: false, prog: null, res: null, err: null, sel: null });
+  const key = `${hole}|${line.ball?.x},${line.ball?.y}|${line.target?.x},${line.target?.y}|${pinKey ?? pin?.x}|${windSpeed}|${windDeg}`;
+  const [solvedKey, setSolvedKey] = useState(null);
+  const stale = st.res && solvedKey !== key;
+  const go = () => {
+    if (!line.ball || (!line.target && !pin)) return;
+    setSt({ busy: true, prog: null, res: null, err: null, sel: null }); onShow(null);
+    const k = key;
+    liveSolve({ hole, ball: line.ball, target: line.target ?? null, pinKey, pinFrac: pin, windMph: Number(windSpeed) || 0, windDeg: Number(windDeg) || 0, onTee },
+      (pr) => setSt((x) => ({ ...x, prog: pr.done ? pr : x.prog })))
+      .then((res) => { setSt({ busy: false, prog: null, res, err: null, sel: null }); setSolvedKey(k); })
+      .catch((e) => setSt({ busy: false, prog: null, res: null, err: e.message, sel: null }));
+  };
+  const show = (i) => { const r = st.res.recs[i]; setSt((x) => ({ ...x, sel: i })); onShow([{ from: [line.ball.x, line.ball.y], rest: r.rest, aimTo: r.aimTo, holed: r.holed }]); };
+  const off = (d) => (Math.abs(d) < 0.05 ? "straight at" : `${Math.abs(d).toFixed(1)}° ${d > 0 ? "right" : "left"} of`);
+  const toWhat = line.target ? "the target" : "the pin";
+  return (
+    <div className="rounded-xl border-2 px-3 py-2 text-xs" style={{ borderColor: T.flag, background: "#FFF7F4" }}>
+      <div className="disp text-[11px] font-bold mb-1">🎯 Live solve · WSR's own physics</div>
+      <div className="opacity-75 mb-1.5">From the ball on the map to {toWhat}{line.target ? " (tap the map again to change it)" : ""}, in the dial's wind. For when a shot came off the solved route.</div>
+      <button onClick={go} disabled={st.busy || !line.ball} className="disp w-full py-1.5 rounded-lg text-[11px] font-bold text-white"
+        style={{ background: st.busy || !line.ball ? "#C9A9A3" : T.flag }}>
+        {st.busy ? (st.prog ? `Solving… club ${st.prog.done} of ${st.prog.of}` : "Loading the hole…") : !line.ball ? "Tap your ball on the map first" : stale ? "Solve again (the ball, target or wind changed)" : "Solve from the ball"}
+      </button>
+      {st.err && <div className="mt-1 font-semibold" style={{ color: T.flag }}>{st.err}</div>}
+      {st.res && (
+        <div className="space-y-1 mt-1.5" style={stale ? { opacity: 0.45 } : null}>
+          <div className="opacity-60 text-[10px]">{Math.round(st.res.D)} yd to {toWhat} · lie {({ 1: "fairway", 2: "rough", 3: "bunker", 6: "green", 9: "fringe", 15: "tee", 16: "bunker" })[st.res.lie] ?? st.res.lie} · tap one to see it on the map</div>
+          {st.res.recs.slice(0, 5).map((r, i) => (
+            <button key={i} onClick={() => show(i)} className="w-full text-left rounded-lg border-2 px-2 py-1"
+              style={st.sel === i ? { background: T.flag, color: "#fff", borderColor: T.flag } : { borderColor: T.line, background: "#fff", color: T.ink }}>
+              <b>{PB_CLUB[r.club] ?? r.club}</b> <span className="mono font-bold">{r.bars.toFixed(2)}</span> bars{r.max ? " (max)" : ""} · aim {off(r.aimOffTarget)} {toWhat}{line.target && pin ? ` (${off(r.aimOffFlag)} the flag)` : ""} → {r.holed ? "in" : `${r.miss < 3 ? r.miss.toFixed(1) : Math.round(r.miss)} yd from ${toWhat}`}, {r.restLie}{r.safe ? "" : " · ⚠ 0.1 bar off can find sand or water"}
+              {r.full && <div className="opacity-70 text-[10px]">at full power (4.00 max): aim {off(r.full.aimOffTarget)} {toWhat} → {r.full.holed ? "in" : `${Math.round(r.full.miss)} yd from ${toWhat}`}, {r.full.restLie}</div>}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -1248,6 +1297,9 @@ export default function App() {
   const [playbook, setPlaybook] = useState(null);
   const [pbPick, setPbPick] = useState(0);
   const [pbShow, setPbShow] = useState(false);
+  // the live solve's picked shot on the map (LiveSolveCard), gone with a new hole or ball
+  const [liveRoute, setLiveRoute] = useState(null);
+  useEffect(() => { setLiveRoute(null); }, [hole, line.ball?.x, line.ball?.y]);
   useEffect(() => {
     let live = true;
     setPlaybook(null);
@@ -1740,7 +1792,7 @@ export default function App() {
                     teePos={holesMeta[hole].tee ?? null}
                     teeOnlinePos={holesMeta[hole].teeOnline ?? null}
                     stopMarker={stopPoint} landMarker={landPoint} treeMarker={treePoint}
-                    route={pbRoute}
+                    route={liveRoute ?? pbRoute}
                     zoom={mapScale / 2} />
                 </div>
                 <div className="grid grid-cols-2 gap-2 text-xs">
@@ -1811,12 +1863,15 @@ export default function App() {
                 greenPoly={holesMeta[hole].green?.poly ?? null}
                 grid={holesMeta[hole].green?.grid ?? null}
                 meta={holesMeta[hole].green?.view ?? null}
-                route={pbRoute}
+                route={liveRoute ?? pbRoute}
                 onPick={(id) => setCurPin(hole, id)} />
               <PlaybookCard hole={hole} pb={playbook} pinKey={pbKey} match={pbMatch}
                 pick={pbPick} onPick={setPbPick} show={pbShow} onShow={setPbShow}
                 windSpeed={windSpeed} windDeg={windDeg} line={line}
                 onStroke={(s) => { setLine({ ball: pbAt(s.from), target: pbAt(s.rest) }); setSelRec(null); }} />
+              <LiveSolveCard hole={hole} line={line} pinKey={pbKey}
+                pin={(() => { const p = holesMeta[hole].pins.find((x) => x.id === holesMeta[hole].curPin); return p ? { x: p.x, y: p.y } : null; })()}
+                windSpeed={windSpeed} windDeg={windDeg} onTee={ballOn(line.ball, holesMeta[hole].tee)} onShow={setLiveRoute} />
               {activeWindRules.map((r, i) => (
                 <div key={i} className="rounded-xl border-2 px-3 py-2 text-xs font-semibold"
                   style={r.kind === "block" ? { borderColor: T.flag, background: "#FFF3F3", color: "#8C1C1C" }
