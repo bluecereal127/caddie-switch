@@ -37,6 +37,10 @@ const RACES = {
   eighteen: { name: "Eighteen holes", nine: null, from: 1, to: 18, goal: Number(arg("--goal", -40)), row: 2 },
 };
 const ALL18 = Number(arg("--eighteen", 0));
+// --wind-plan best: every hole's wind chosen for its pin (round-play.mjs windPlan; the user, 2026-10-23)
+const WINDPLAN = arg("--wind-plan", null);
+// --perfect: a round ends at its first hole off a perfect score, and the next one starts (round-ctl.mjs --perfect)
+const PERFECT = process.argv.includes("--perfect");
 if (ALL18) RACES.eighteen.ladder = true;
 const records = [];
 const want = ALL18 ? ["eighteen"] : (arg("--races", null) ?? Object.keys(RACES).join(",")).split(",");
@@ -113,11 +117,11 @@ async function playRound(s, n) {
     await post(s.port, "wait", [String(idle * 1000)]);
     const startCode = await run(["tools/harness/round-start.mjs", "--port", String(s.port), ...(s.R.nine ? ["--nine", s.R.nine] : [])], env, path.join(HERE, playLog));
     if (startCode !== 0) throw new Error(`round-start exit ${startCode}`);
-    await run(["tools/harness/round-ctl.mjs", "--port", String(s.port), "--from", String(s.R.from), "--to", String(s.R.to), "--log", playLog, "--out", out, "--label", `${s.name} #${n}`], env, ctlLog);
+    await run(["tools/harness/round-ctl.mjs", "--port", String(s.port), "--from", String(s.R.from), "--to", String(s.R.to), "--log", playLog, "--out", out, "--label", `${s.name} #${n}`, ...(WINDPLAN ? ["--wind-plan", WINDPLAN] : []), ...(PERFECT ? ["--perfect"] : [])], env, ctlLog);
     const r = readJson(path.join(HERE, out));
-    let strokes = 0, par = 0, complete = true;
-    for (let h = s.R.from; h <= s.R.to; h++) { const x = r?.holes?.[h]; const k = x?.game?.strokes ?? x?.strokes?.length; if (!k) { complete = false; break; } strokes += k; par += PAR[h]; }
-    const res = { n, complete, strokes: complete ? strokes : null, toPar: complete ? strokes - par : null, card: r ? Object.fromEntries(Object.entries(r.holes ?? {}).map(([h, x]) => [h, x?.game?.strokes ?? x?.strokes?.length])) : null };
+    let strokes = 0, par = 0, complete = true, through = 0;
+    for (let h = s.R.from; h <= s.R.to; h++) { const x = r?.holes?.[h]; const k = x?.game?.strokes ?? x?.strokes?.length; if (!k) { complete = false; break; } strokes += k; par += PAR[h]; through = h; }
+    const res = { n, complete, through, partial: strokes - par, strokes: complete ? strokes : null, toPar: complete ? strokes - par : null, card: r ? Object.fromEntries(Object.entries(r.holes ?? {}).map(([h, x]) => [h, x?.game?.strokes ?? x?.strokes?.length])) : null };
     if (complete && res.toPar <= s.R.goal && !raceDone[s.race]) {
       res.shot = true;
       await sleep(8000);
@@ -147,7 +151,7 @@ async function player(s) {
     const st = state[s.slug];
     st.rounds.push(r);
     if (r.complete && (st.best == null || r.toPar < st.best)) st.best = r.toPar;
-    log(`${s.name}: round ${n} ${r.complete ? `${r.strokes} strokes, ${r.toPar} (${Object.values(r.card ?? {}).join(" ")})` : `incomplete${r.error ? ` (${r.error})` : ""}`}; best ${st.best ?? "-"}`);
+    log(`${s.name}: round ${n} ${r.complete ? `${r.strokes} strokes, ${r.toPar} (${Object.values(r.card ?? {}).join(" ")})` : `${PERFECT && r.through ? `ended after hole ${r.through} (${r.partial} through ${r.through}: off a perfect round)` : "incomplete"}${r.error ? ` (${r.error})` : ""}`}; best ${st.best ?? "-"}`);
     if (r.complete && r.toPar <= s.R.goal && s.R.ladder) {
       records.push({ goal: s.R.goal, name: s.name, n, toPar: r.toPar, card: r.card, at: new Date().toISOString() });
       log(`${s.R.name}: RECORD ${r.toPar} by ${s.name} in round ${n} (the goal was ${s.R.goal}); the goal is now ${r.toPar - 1}`);

@@ -52,6 +52,8 @@ const RESULTS = path.join(path.dirname(fileURLToPath(import.meta.url)), "results
 // driver's Dolphin, its screenshot hotkey) and the stroke written up in
 // results/highlights.json and results/highlights.md
 async function highlight({ gdb, dsu, round, hole, k, row, kind }) {
+  // off unless HARNESS_HIGHLIGHT=1 (the user, 2026-10-23: the hole-in-one screenshots are not wanted)
+  if (process.env.HARNESS_HIGHLIGHT !== "1") return null;
   let png = null;
   try {
     await gdb.go();
@@ -124,7 +126,8 @@ const AHEAD_NEAR_MS = 6000, READY_NEAR_MS = 3000;
 // or the playbook failed (logged; the planner plans). opts: near (false: the
 // exact lookup only), nearBudgetMs
 export async function playbookStroke(hole, st, windSet, { near = true, nearBudgetMs = AHEAD_NEAR_MS } = {}) {
-  if (!calmSet(windSet)) return null;
+  // a set wind (calm, or a chosen-wind round's): the playbook's solutions in that wind
+  if (!windSet) return null;
   const t0 = Date.now();
   try {
     const PBm = await playbook();
@@ -236,6 +239,14 @@ export async function applyWind(gdb, hole, windSet) {
   b.writeUInt32BE((((v & ~0x7f) | (windSet.dir & 7) | ((windSet.speedIdx & 15) << 3)) >>> 0));
   await gdb.writeMem(at, b);
 }
+// the flag's cloth for a wind (hole-solve.mjs setFlagWind): the pin's yaw at +0x0c, which the game
+// rebuilds the cloth's frame from every frame, and +0xb8 = speedIdx / 15
+export async function setFlag(gdb, w) {
+  const t = Number.isFinite(w.angle) ? w.angle : ((w.dir ?? 0) * Math.PI) / 4;
+  const f = (v) => { const b = Buffer.alloc(4); b.writeFloatBE(v); return b; };
+  const p = await pointers(gdb);
+  for (const [o, v] of [[0x0c, Math.cos(t)], [0x14, -Math.sin(t)], [0x24, Math.sin(t)], [0x2c, Math.cos(t)], [0xb8, (w.speedIdx ?? 0) / 15]]) await gdb.writeMem(p.pin + o, f(v));
+}
 const windOff = (st, windSet) => windSet && (st.wind.speedIdx !== windSet.speedIdx || (windSet.speedIdx > 0 && st.wind.dir !== windSet.dir));
 
 async function planFrom(hole, st, windSet = null) {
@@ -248,7 +259,7 @@ async function planFrom(hole, st, windSet = null) {
   return { Pl, pl, ms: Date.now() - t0, from: st.ball.pos, lie: st.player.lie };
 }
 
-export async function playHole({ gdb, dsu, hole, last = false, maxStrokes = 15, logFile = null, src = null, label = null, windSet = null, forceNext = null }) {
+export async function playHole({ gdb, dsu, hole, last = false, maxStrokes = 15, logFile = null, src = null, label = null, windSet = null, forceNext = null, windPlan = null }) {
   if (logFile) LOG = logFile;
   // the stroke's name in the planner's memory (results/knowledge/strokes.jsonl)
   src ??= path.basename(LOG, ".log");
@@ -266,14 +277,28 @@ export async function playHole({ gdb, dsu, hole, last = false, maxStrokes = 15, 
   // plans at ready; waiting here for lifetime 0 held round 1's hole 16 putt
   // about 67 s, unclocked, the fair-play audit of 2026-10-22 found)
   let ahead = null, lastKnow = null, played = 0;
+  // windPlan "best" (the user, 2026-10-23: "you may tweak the wind on every hole in order to get the
+  // lowest score possible"): once the hole has drawn its pin, the wind of the documented route that
+  // holes it in the fewest strokes from this tee (playbook.mjs chooseWind), set with the flag's cloth
+  // as that route had it; the playbook then replays it, and the planner plays wherever it cannot
+  let chosen = false, flagWind = null;
   for (let i = 0; i < 120 && !ahead; i++) {
     await gdb.haltSafe();
     let st = null;
     try { st = await readState(gdb, { records: false }); } catch { st = null; }
     // the course's set wind, in place before the tee shot is planned
+    if (windPlan && !chosen && st && st.hole === hole && !st.ball.moving && st.ball.life === 0) {
+      chosen = true;
+      try {
+        const PBm = await playbook();
+        const ch = PBm.chooseWind(hole, st);
+        if (ch) { windSet = ch.wind ?? { dir: 0, speedIdx: 0 }; flagWind = ch.flagWind; log(`hole ${hole}: the wind chosen: ${ch.wind ? `${2 * ch.wind.speedIdx} mph (dir ${ch.wind.dir})` : "calm"}, the ${ch.src} route that holes pin ${ch.cup} in ${ch.strokes} (${ch.alike} documented in ${ch.strokes}; ${path.basename(ch.file ?? "")})`); }
+        else log(`hole ${hole}: no documented route from this tee for this pin; the game's own wind`);
+      } catch (e) { log(`hole ${hole}: choosing the wind failed: ${e.message}`); }
+    }
     if (st && st.hole === hole && !st.ball.moving && st.ball.life === 0 && windOff(st, windSet)) {
       const drawn = `${2 * st.wind.speedIdx} mph (dir ${st.wind.dir})`;
-      try { await applyWind(gdb, hole, windSet); st = await readState(gdb, { records: false }); log(`hole ${hole}: wind set to ${2 * windSet.speedIdx} mph${windSet.speedIdx ? ` (dir ${windSet.dir})` : ""} for this course (the game drew ${drawn})`); } catch (e) { log(`hole ${hole}: setting the wind failed: ${e.message}`); }
+      try { await applyWind(gdb, hole, windSet); if (flagWind) await setFlag(gdb, flagWind); st = await readState(gdb, { records: false }); log(`hole ${hole}: wind set to ${2 * windSet.speedIdx} mph${windSet.speedIdx ? ` (dir ${windSet.dir})` : ""}${flagWind ? ", the flag's cloth with it" : ""} (the game drew ${drawn})`); } catch (e) { log(`hole ${hole}: setting the wind failed: ${e.message}`); }
     }
     await gdb.go();
     if (st && st.hole === hole && !st.ball.moving && st.ball.life === 0) ahead = await planFrom(hole, st, windSet);

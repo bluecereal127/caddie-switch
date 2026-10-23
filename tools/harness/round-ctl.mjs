@@ -19,6 +19,12 @@ const PLAY = pathToFileURL(path.join(HERE, "round-play.mjs")).href;
 // strokes' name in the planner's memory (results/... less .json and courses/)
 const LABEL = arg("--label", null);
 // --wind dir:speedIdx: the wind the user set for the course (round-play.mjs applyWind), e.g. 0:0 for none
+// --wind-plan best: every hole's wind chosen for its drawn pin (round-play.mjs windPlan)
+const WINDPLAN = arg("--wind-plan", null);
+// --perfect (the user, 2026-10-23): the round ends at the first hole off a perfect score (a par 3
+// not aced, a par 4 not eagled, a par 5 not albatrossed: no -42 left), exit 3
+const PERFECT = process.argv.includes("--perfect");
+const PERFECT_AT = { 3: 1, 4: 2, 5: 2 }, PAR_OF = { 1: 4, 2: 3, 3: 5, 4: 3, 5: 5, 6: 4, 7: 4, 8: 3, 9: 5, 10: 4, 11: 3, 12: 5, 13: 3, 14: 5, 15: 4, 16: 4, 17: 3, 18: 5 };
 const WIND = arg("--wind", null), windSet = WIND ? { dir: Number(WIND.split(":")[0]), speedIdx: Number(WIND.split(":")[1]) } : null;
 // --pins 1:0,2:3,3:3: the WSR slot each hole's pin is forced to (round-play.mjs
 // forceNext forces the next hole's; the first hole's is round-start.mjs --pin's)
@@ -34,12 +40,13 @@ const save = () => { fs.mkdirSync(path.dirname(OUT), { recursive: true }); fs.wr
 
 for (let hole = from; hole <= to; hole++) {
   for (let call = 0; call < 3; call++) {
-    const js = `const m = await import("${PLAY}?v=" + Date.now()); return await m.playHole({ gdb, dsu, hole: ${hole}, last: ${hole === to}, logFile: ${JSON.stringify(LOGF)}, src: ${JSON.stringify(SRC)}, label: ${JSON.stringify(LABEL)}, windSet: ${JSON.stringify(windSet)}, forceNext: ${hole < to && PINS[hole + 1] != null ? PINS[hole + 1] : "null"} });`;
+    const js = `const m = await import("${PLAY}?v=" + Date.now()); return await m.playHole({ gdb, dsu, hole: ${hole}, last: ${hole === to}, logFile: ${JSON.stringify(LOGF)}, src: ${JSON.stringify(SRC)}, label: ${JSON.stringify(LABEL)}, windSet: ${JSON.stringify(windSet)}, windPlan: ${JSON.stringify(WINDPLAN)}, forceNext: ${hole < to && PINS[hole + 1] != null ? PINS[hole + 1] : "null"} });`;
     const r = await post({ op: "eval", args: [js] });
     if (r.ok) {
       const rec = JSON.parse(r.text);
       const prev = round.holes[hole];
       round.holes[hole] = prev ? { ...rec, strokes: [...prev.strokes, ...rec.strokes], calls: (prev.calls ?? 1) + 1 } : rec;
+      if (PERFECT) { const got = round.holes[hole]?.game?.strokes ?? round.holes[hole]?.strokes?.length; if (got && got > PERFECT_AT[PAR_OF[hole]]) { save(); console.log(`hole ${hole}: ${got} strokes, off a perfect round (${PERFECT_AT[PAR_OF[hole]]} on a par ${PAR_OF[hole]}): the round ends here`); process.exit(3); } }
       save();
       console.log(`hole ${hole}: ${round.holes[hole].strokes.length} strokes, the game counts ${rec.game?.strokes}`);
       if (rec.next !== hole || hole === to) break;

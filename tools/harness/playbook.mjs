@@ -139,6 +139,10 @@ const FILE_RE = /^h(\d\d)-(s\d+)\.json$/;
 const LIE_NAME = { 1: "fairway", 2: "rough", 3: "sand", 6: "green", 9: "fringe", 10: "green", 11: "green", 15: "tee", 16: "sand" };
 const angDiff = (a, b) => Math.atan2(Math.sin(a - b), Math.cos(a - b));
 const xz = (p) => Array.isArray(p) && p.length >= 3 && Number.isFinite(p[0]) && Number.isFinite(p[2]);
+// a solution's wind (null: calm) against the game's: calm alike in any direction, else the same direction and speed
+const calmW = (w) => !w || !(w.speedIdx > 0);
+export const windEq = (a, b) => (calmW(a) ? calmW(b) : !calmW(b) && a.dir === b.dir && a.speedIdx === b.speedIdx);
+const windOfSol = (w) => (calmW(w) ? null : { dir: w.dir, speedIdx: w.speedIdx });
 
 // one result file -> its solution, or { error }
 function solutionOf(r, file, pins) {
@@ -164,7 +168,50 @@ function solutionOf(r, file, pins) {
   }
   strokes.sort((a, b) => a.k - b.k);
   if (!strokes[strokes.length - 1].holed) return { error: `${cup}: solved, but its last stroke is not holed` };
-  return { cup, hole: Number(m[1]), id: m[2], label: r.label ?? c.label, sets: r.sets ?? c.sets, par: r.par ?? null, target: r.target ?? null, pin: c.pinRam, file, strokes };
+  // the wind it was played in (results/solve: calm; hole-solve's sweep: its wind), and the flag's (the
+  // calm solves kept each tee state's own cloth, the cup's index.json wind; the sweep wrote the cloth for its wind)
+  const wind = windOfSol(r.wind);
+  return { cup, hole: Number(m[1]), id: m[2], label: r.label ?? c.label, sets: r.sets ?? c.sets, par: r.par ?? null, target: r.target ?? null, pin: c.pinRam, file, strokes,
+    wind, flagWind: wind ?? c.wind ?? null, src: wind ? "solve-wind" : "solve" };
+}
+
+// ---- the solutions in wind (the chosen-wind rounds, round-play.mjs windPlan) ----
+// the wind campaign's per-wind solves (hole-solve.mjs --winds: state/solve-wind/hHH-<id>/dD-iI.json,
+// each with its tries) and the holes natural rounds holed in the game's own wind (results/natural18,
+// compete, wind, courses: a round file with no set wind; each stroke from the last one's rest, exactly)
+export const WIND_DIR = path.join(HERE, "state", "solve-wind");
+export const ROUND_DIRS = ["natural18", "compete", "wind", "courses"].map((d) => path.join(HERE, "results", d));
+function walkJson(dir, out = []) { let es = []; try { es = fs.readdirSync(dir, { withFileTypes: true }); } catch { return out; } for (const e of es) { const p = path.join(dir, e.name); if (e.isDirectory()) walkJson(p, out); else if (e.name.endsWith(".json")) out.push(p); } return out; }
+function extraSolutions(pins) {
+  const out = [];
+  let dirs = [];
+  try { dirs = fs.readdirSync(WIND_DIR).filter((d) => /^h\d\d-s\d+$/.test(d)); } catch { /* none */ }
+  for (const d of dirs) for (const f of fs.readdirSync(path.join(WIND_DIR, d)).filter((x) => /^d\d-i\d+\.json$/.test(x))) {
+    let r; try { r = JSON.parse(fs.readFileSync(path.join(WIND_DIR, d, f), "utf8")); } catch { continue; }
+    const sol = solutionOf(r, path.join(WIND_DIR, d, `${d}.json`), pins);
+    if (sol.cup) { sol.file = path.join(WIND_DIR, d, f); out.push(sol); }
+  }
+  for (const file of ROUND_DIRS.flatMap((d) => walkJson(d))) {
+    let r; try { r = JSON.parse(fs.readFileSync(file, "utf8")); } catch { continue; }
+    if (!r || r.wind != null || !r.holes || typeof r.holes !== "object") continue;   // a set wind: its cloth is not the wind's
+    for (const [h, x] of Object.entries(r.holes)) {
+      const ss = x?.strokes;
+      if (!Array.isArray(ss) || !ss.length || !ss[ss.length - 1].holed || ss.some((s) => !xz(s.from) || !s.aim || !Number.isFinite(s.aim.heading) || s.hazard)) continue;   // ('placed' also marks a fast flight's 60 u poll jump: the chain check below catches a real drop)
+      const w = ss[0].wind;
+      if (!w || ss.some((s) => !windEq(windOfSol(s.wind), windOfSol(w)))) continue;
+      let chain = true;
+      for (let k = 1; k < ss.length; k++) if (!xz(ss[k - 1].rest) || Math.hypot(ss[k].from[0] - ss[k - 1].rest[0], ss[k].from[2] - ss[k - 1].rest[2]) > POS_TOL) chain = false;
+      if (!chain) continue;
+      const pin = ss[0].pin;
+      const cup = Object.keys(pins).find((k) => k.startsWith(`h${String(h).padStart(2, "0")}-`) && xz(pins[k].pinRam) && xz(pin) && Math.hypot(pins[k].pinRam[0] - pin[0], pins[k].pinRam[2] - pin[2]) <= PIN_TOL);
+      if (!cup) continue;
+      const c = pins[cup], wind = windOfSol(w);
+      out.push({ cup, hole: Number(h), id: cup.slice(4), label: c.label, sets: c.sets, par: null, target: ss.length, pin: c.pinRam, file, src: "round", wind, flagWind: { dir: w.dir ?? 0, speedIdx: w.speedIdx ?? 0 },   // the cloth as that round's hole began (calm too: its yaw)
+        strokes: ss.map((s) => ({ k: s.k, club: s.club, power: Number.isFinite(s.plan?.power) ? s.plan.power : s.gamePower, requested: s.aim.heading + (s.aim.errDeg ?? 0) * DEG, reached: s.aim.heading, aimErrDeg: s.aim.errDeg ?? 0,
+          gamePower: s.gamePower ?? null, from: s.from, lie: s.lie, rest: s.rest, holed: !!s.holed, hazard: s.hazard ?? 0, toPin: s.toPin ?? null, n: null, why: "a natural round" })) });
+    }
+  }
+  return out;
 }
 
 export function createPlaybook({ solveDir = SOLVE_DIR, pinIndex = PIN_INDEX } = {}) {
@@ -175,9 +222,12 @@ export function createPlaybook({ solveDir = SOLVE_DIR, pinIndex = PIN_INDEX } = 
   let gen = 0;
   const memo = [];
 
+  let extra = [], extraAt = 0;
   function rebuild() {
     byHole = new Map(); errors = [];
     gen++; memo.length = 0;
+    if (Date.now() - extraAt > 600000 || !extraAt) { try { extra = extraSolutions(pins.cups); } catch (e) { errors.push(`the solutions in wind: ${e.message}`); } extraAt = Date.now(); }
+    for (const sol of extra) { if (!byHole.has(sol.hole)) byHole.set(sol.hole, []); byHole.get(sol.hole).push(sol); }
     for (const [name, f] of files) {
       if (!f.raw) continue;
       const sol = solutionOf(f.raw, path.join(solveDir, name), pins.cups);
@@ -215,7 +265,7 @@ export function createPlaybook({ solveDir = SOLVE_DIR, pinIndex = PIN_INDEX } = 
         changed = true;
       } catch { /* not parsed (being written): keep the last reading, try again next time */ }
     }
-    if (changed) rebuild();
+    if (changed || Date.now() - extraAt > 600000) rebuild();
     refreshes++;
     lastRefreshMs = performance.now() - t0;
     return changed;
@@ -225,11 +275,11 @@ export function createPlaybook({ solveDir = SOLVE_DIR, pinIndex = PIN_INDEX } = 
   function lookup(hole, st, { posTol = POS_TOL, pinTol = PIN_TOL, refresh: doRefresh = true } = {}) {
     const ball = st?.ball?.pos, pin = st?.pin, lie = st?.player?.lie;
     if (!xz(ball) || !xz(pin) || lie == null) return null;
-    if (st.wind && st.wind.speedIdx !== 0) return null;
     if (doRefresh || !refreshes) refresh();
     let best = null;
     for (const sol of byHole.get(Number(hole)) ?? []) {
       if (Math.hypot(sol.pin[0] - pin[0], sol.pin[2] - pin[2]) > pinTol) continue;
+      if (!windEq(sol.wind, st.wind)) continue;
       for (const s of sol.strokes) {
         if (s.lie !== lie) continue;
         const d = Math.hypot(s.from[0] - ball[0], s.from[2] - ball[2]);
@@ -245,12 +295,12 @@ export function createPlaybook({ solveDir = SOLVE_DIR, pinIndex = PIN_INDEX } = 
     const t0 = performance.now();
     const ball = st?.ball?.pos, pin = st?.pin, lie = st?.player?.lie;
     if (!xz(ball) || !xz(pin) || lie == null) return null;
-    if (st.wind && st.wind.speedIdx !== 0) return null;
     if (doRefresh || !refreshes) refresh();
     hole = Number(hole);
     const cands = [];
     for (const sol of byHole.get(hole) ?? []) {
       if (Math.hypot(sol.pin[0] - pin[0], sol.pin[2] - pin[2]) > pinTol) continue;
+      if (!windEq(sol.wind, st.wind)) continue;
       for (const s of sol.strokes) {
         if (lieClass(s.lie) !== lieClass(lie)) continue;
         const d = Math.hypot(s.from[0] - ball[0], s.from[2] - ball[2]);
@@ -275,8 +325,28 @@ export function createPlaybook({ solveDir = SOLVE_DIR, pinIndex = PIN_INDEX } = 
     return plan;
   }
 
+  // the wind a chosen-wind round sets for the hole (round-play.mjs windPlan): of the solutions for
+  // the drawn pin whose first stroke is struck from this ball and lie, the fewest strokes; on a tie a
+  // savestate solve before a natural round's hole, then calm before a wind
+  function chooseWind(hole, st, { posTol = POS_TOL, pinTol = PIN_TOL } = {}) {
+    const ball = st?.ball?.pos, pin = st?.pin, lie = st?.player?.lie;
+    if (!xz(ball) || !xz(pin)) return null;
+    if (!refreshes) refresh(); else refresh();
+    const rank = { "solve-wind": 0, solve: 0, round: 1 };
+    let best = null;
+    for (const sol of byHole.get(Number(hole)) ?? []) {
+      if (Math.hypot(sol.pin[0] - pin[0], sol.pin[2] - pin[2]) > pinTol) continue;
+      const s1 = sol.strokes[0];
+      if (!s1 || s1.lie !== lie || Math.hypot(s1.from[0] - ball[0], s1.from[2] - ball[2]) > posTol) continue;
+      const key = [sol.strokes.length, rank[sol.src] ?? 2, sol.wind ? 1 : 0];
+      if (!best || key[0] < best.key[0] || (key[0] === best.key[0] && (key[1] < best.key[1] || (key[1] === best.key[1] && key[2] < best.key[2])))) best = { sol, key };
+    }
+    if (!best) return null;
+    const n = [...(byHole.get(Number(hole)) ?? [])].filter((x) => Math.hypot(x.pin[0] - pin[0], x.pin[2] - pin[2]) <= pinTol && x.strokes.length === best.sol.strokes.length).length;
+    return { wind: best.sol.wind, flagWind: best.sol.flagWind, cup: best.sol.cup, strokes: best.sol.strokes.length, src: best.sol.src, file: best.sol.file, alike: n };
+  }
   return {
-    lookup, refresh, lookupNear, adjustPower,
+    lookup, refresh, lookupNear, adjustPower, chooseWind,
     solutions: () => { if (!refreshes) refresh(); return [...byHole.values()].flat().sort((a, b) => a.cup.localeCompare(b.cup)); },
     stats: () => { if (!refreshes) refresh(); return { files: files.size, solved: [...byHole.values()].reduce((t, l) => t + l.length, 0), strokes: [...byHole.values()].flat().reduce((t, x) => t + x.strokes.length, 0), errors: [...errors], refreshes, lastRefreshMs }; },
   };
@@ -295,7 +365,7 @@ function planOf(sol, s, d) {
     reached: s.reached, gamePower: s.gamePower, aimErrDeg: s.aimErrDeg, of: n, target: sol.target, par: sol.par,
     holed: s.holed, rest: s.rest, toPin: s.toPin, offYd: d / YD, file: `results/solve/${sol.cup}.json`,
     // the solved stroke itself (adjustPower's replay of it)
-    solve: { from: s.from, lie: s.lie, power: s.power, gamePower: s.gamePower, reached: s.reached, requested: s.requested, rest: s.rest, pin: sol.pin },
+    solve: { from: s.from, lie: s.lie, power: s.power, gamePower: s.gamePower, reached: s.reached, requested: s.requested, rest: s.rest, pin: sol.pin, wind: sol.wind ?? CALM },
     expect: {
       src: "playbook", restLie: s.holed ? "cup" : next ? LIE_NAME[next.lie] ?? `lie ${next.lie}` : "?", toPin: s.holed ? 0 : s.toPin != null ? +s.toPin.toFixed(1) : null,
       aimDeg: +right.toFixed(3), distance: +distance.toFixed(2),
@@ -381,8 +451,8 @@ async function replayRuns(RM, hole, club, sv, pin, tick) {
   const key = [hole, club, sv.lie, sv.from[0], sv.from[1], sv.from[2], sv.gamePower, sv.reached, pin[0], pin[1], pin[2]].join(",");
   if (replays.has(key)) return replays.get(key);
   const qs = powersRound(sv.gamePower, ADJ_SPAN, ADJ_STEP, floorOf(club, sv.lie), capOf(club, sv.lie)), ok = [];
-  for (const q of qs) { ok.push(holes(RM.predict({ hole, ball: sv.from, heading: sv.reached, club, power: q, lie: sv.lie, wind: CALM, pin }))); await tick(); }
-  const at = RM.predict({ hole, ball: sv.from, heading: sv.reached, club, power: sv.gamePower, lie: sv.lie, wind: CALM, pin });
+  for (const q of qs) { ok.push(holes(RM.predict({ hole, ball: sv.from, heading: sv.reached, club, power: q, lie: sv.lie, wind: sv.wind ?? CALM, pin }))); await tick(); }
+  const at = RM.predict({ hole, ball: sv.from, heading: sv.reached, club, power: sv.gamePower, lie: sv.lie, wind: sv.wind ?? CALM, pin });
   const R = { holes: holes(at), runs: runsOf(qs, ok) };
   if (replays.size >= 64) replays.clear();
   replays.set(key, R);
@@ -394,7 +464,7 @@ async function setupTarget(RM, hole, club, sv, rest) {
   if (!xz(rest)) return null;
   const game = [rest[0], rest[2]];
   if (!xz(sv?.from) || !Number.isFinite(sv.gamePower) || !Number.isFinite(sv.reached)) return { xz: game, src: "game", offYd: null };
-  const p = RM.predict({ hole, ball: sv.from, heading: sv.reached, club, power: sv.gamePower, lie: sv.lie, wind: CALM, pin: null });
+  const p = RM.predict({ hole, ball: sv.from, heading: sv.reached, club, power: sv.gamePower, lie: sv.lie, wind: sv.wind ?? CALM, pin: null });
   const offYd = Math.hypot(p.rest[0] - game[0], p.rest[1] - game[1]) / YD;
   return offYd <= SETUP_REPLAY_YD ? { xz: [p.rest[0], p.rest[1]], src: "model", offYd } : { xz: game, src: "game", offYd };
 }
@@ -413,7 +483,7 @@ export async function adjustPower(hole, st, pb, reachedHeading, { span = ADJ_SPA
   const club = pb.club, cap = capOf(club, lie), lo = floorOf(club, lie);
   const sv = pb.solve ?? { from: ball, lie, power: pb.power, gamePower: pb.gamePower ?? pb.power, reached: pb.reached, rest: pb.rest, pin };
   const tick = ticker();
-  const fly = (q, cup) => RM.predict({ hole, ball, heading: reachedHeading, club, power: q, lie, wind: CALM, pin: cup ? pin : null });
+  const fly = (q, cup) => RM.predict({ hole, ball, heading: reachedHeading, club, power: q, lie, wind: sv.wind ?? CALM, pin: cup ? pin : null });
   const qs = powersRound(q0, span, step, lo, cap);
   if (!qs.length) return keep(`the plan's launch ${q0.toFixed(4)} lies outside the lie's range ${lo.toFixed(3)}-${cap}: the plan's power`);
   const offDeg = angDiff(reachedHeading, pb.reached ?? pb.heading) / DEG;
@@ -490,8 +560,8 @@ async function nearHoling(RM, hole, st, { s }, deadline) {
   const tick = ticker();
   const ball = st.ball.pos, lie = st.player.lie, pin = st.pin, club = s.club;
   const cap = capOf(club, lie), lo = floorOf(club, lie), gp = s.gamePower ?? s.power;
-  const fly = (q, h, cup) => RM.predict({ hole, ball, heading: h, club, power: q, lie, wind: CALM, pin: cup ? pin : null });
-  const T0p = RM.predict({ hole, ball: s.from, heading: s.reached, club, power: gp, lie: s.lie, wind: CALM, pin: null });
+  const fly = (q, h, cup) => RM.predict({ hole, ball, heading: h, club, power: q, lie, wind: st.wind?.speedIdx > 0 ? st.wind : CALM, pin: cup ? pin : null });
+  const T0p = RM.predict({ hole, ball: s.from, heading: s.reached, club, power: gp, lie: s.lie, wind: st.wind?.speedIdx > 0 ? st.wind : CALM, pin: null });
   const T0 = [T0p.rest[0], T0p.rest[1]];
   const h0 = s.reached + angDiff(Math.atan2(T0[0] - ball[0], T0[1] - ball[2]), Math.atan2(T0[0] - s.from[0], T0[1] - s.from[2]));
   const m = await matchRest((q, h) => fly(q, h, false), clamp(gp, lo, cap), h0, T0, lo, cap, tick);
@@ -591,8 +661,8 @@ async function nearSetup(RM, hole, st, { sol, s }, deadline, tolYd) {
   const tick = ticker();
   const ball = st.ball.pos, lie = st.player.lie, pin = st.pin, club = s.club;
   const cap = capOf(club, lie), lo = floorOf(club, lie), gp = s.gamePower ?? s.power;
-  const fly = (q, h) => RM.predict({ hole, ball, heading: h, club, power: q, lie, wind: CALM, pin: null });
-  const T = await setupTarget(RM, hole, club, { from: s.from, lie: s.lie, gamePower: gp, reached: s.reached }, s.rest);
+  const fly = (q, h) => RM.predict({ hole, ball, heading: h, club, power: q, lie, wind: st.wind?.speedIdx > 0 ? st.wind : CALM, pin: null });
+  const T = await setupTarget(RM, hole, club, { from: s.from, lie: s.lie, gamePower: gp, reached: s.reached, wind: sol.wind ?? CALM }, s.rest);
   if (!T) return null;
   const h0 = s.reached + angDiff(Math.atan2(T.xz[0] - ball[0], T.xz[1] - ball[2]), Math.atan2(T.xz[0] - s.from[0], T.xz[1] - s.from[2]));
   const m = await matchRest(fly, clamp(gp, lo, cap), h0, T.xz, lo, cap, tick);
@@ -643,7 +713,7 @@ function nearPlanOf(sol, s, d, r, st, ms) {
     club: s.club, power, heading: r.heading, k: s.k, cup: sol.cup, why,
     reached: r.heading, gamePower: r.launch, aimErrDeg: 0, of: n, target: sol.target, par: sol.par,
     holed: s.holed, rest: s.rest, toPin: s.holed ? s.toPin : r.toPinYd, offYd: yd, file: `results/solve/${sol.cup}.json`,
-    solve: { from: s.from, lie: s.lie, power: s.power, gamePower: s.gamePower, reached: s.reached, requested: s.requested, rest: s.rest, pin: sol.pin },
+    solve: { from: s.from, lie: s.lie, power: s.power, gamePower: s.gamePower, reached: s.reached, requested: s.requested, rest: s.rest, pin: sol.pin, wind: sol.wind ?? CALM },
     near,
     expect: {
       src: "playbook-near", restLie, toPin: s.holed ? 0 : +r.toPinYd.toFixed(1), aimDeg: +right.toFixed(3), distance: +distance.toFixed(2),
@@ -656,6 +726,7 @@ function nearPlanOf(sol, s, d, r, st, ms) {
 const main = createPlaybook();
 export const lookup = (hole, st, opts) => main.lookup(hole, st, opts);
 export const lookupNear = (hole, st, opts) => main.lookupNear(hole, st, opts);
+export const chooseWind = (hole, st, opts) => main.chooseWind(hole, st, opts);
 export const refresh = () => main.refresh();
 export const solutions = () => main.solutions();
 export const stats = () => main.stats();
