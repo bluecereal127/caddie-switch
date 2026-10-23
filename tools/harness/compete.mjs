@@ -107,7 +107,8 @@ async function playRound(s, n) {
     const res = { n, complete, strokes: complete ? strokes : null, toPar: complete ? strokes - par : null, card: r ? Object.fromEntries(Object.entries(r.holes ?? {}).map(([h, x]) => [h, x?.game?.strokes ?? x?.strokes?.length])) : null };
     if (complete && res.toPar <= s.R.goal && !raceDone[s.race]) {
       await sleep(8000);
-      const shot = (await post(s.port, "shot")).match(/shot : (.*\.png)/)?.[1]?.trim();
+      // the driver answers with the screenshot's path (Dolphin also keeps it in state/user<N>/ScreenShots)
+      const shot = (await post(s.port, "shot")).match(/[A-Za-z]:[\\/][^"\n]*?\.png/)?.[0];
       if (shot && fs.existsSync(shot)) fs.copyFileSync(shot, path.join(RD, `${s.race}-winner.png`));
     }
     return res;
