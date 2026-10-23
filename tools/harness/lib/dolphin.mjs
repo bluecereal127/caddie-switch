@@ -134,7 +134,8 @@ export function writeUserDir({
     AutoUpdate: { UpdateTrack: "", HashOverride: "" },
     Core: {
       CPUThread: "False", CPUCore: cpuCore, EnableCheats: cheats ? "True" : "False",
-      EmulationSpeed: speed.toFixed(6), GFXBackend: backend, SyncOnSkipIdle: "True",
+      // HARNESS_SPEED / HARNESS_GFX override the speed limit (0 = none) and the video backend ("Null": nothing drawn)
+      EmulationSpeed: (process.env.HARNESS_SPEED != null ? Number(process.env.HARNESS_SPEED) : speed).toFixed(6), GFXBackend: process.env.HARNESS_GFX || backend, SyncOnSkipIdle: "True",
       WiimoteContinuousScanning: "False", WiimoteEnableSpeaker: "False", WiiSDCard: "False",
       PauseOnFocusLost: "False",
     },
