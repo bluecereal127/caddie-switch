@@ -259,7 +259,7 @@ async function planFrom(hole, st, windSet = null) {
   return { Pl, pl, ms: Date.now() - t0, from: st.ball.pos, lie: st.player.lie };
 }
 
-export async function playHole({ gdb, dsu, hole, last = false, maxStrokes = 15, logFile = null, src = null, label = null, windSet = null, forceNext = null, windPlan = null, routeSkip = 0, stopUnholed = false }) {
+export async function playHole({ gdb, dsu, hole, last = false, maxStrokes = 15, logFile = null, src = null, label = null, windSet = null, forceNext = null, windPlan = null, routeSkip = 0, stopUnholed = false, firstPlan = null, flagWindSet = null }) {
   if (logFile) LOG = logFile;
   // the stroke's name in the planner's memory (results/knowledge/strokes.jsonl)
   src ??= path.basename(LOG, ".log");
@@ -281,7 +281,9 @@ export async function playHole({ gdb, dsu, hole, last = false, maxStrokes = 15, 
   // lowest score possible"): once the hole has drawn its pin, the wind of the documented route that
   // holes it in the fewest strokes from this tee (playbook.mjs chooseWind), set with the flag's cloth
   // as that route had it; the playbook then replays it, and the planner plays wherever it cannot
-  let chosen = false, flagWind = null;
+  // firstPlan { club, power, heading, why }: the first stroke as given (perfect-round.mjs's ace
+  // attempts), not planned; flagWindSet: the flag's cloth for a windSet given outright
+  let chosen = false, flagWind = flagWindSet ?? null;
   for (let i = 0; i < 120 && !ahead; i++) {
     await gdb.haltSafe();
     let st = null;
@@ -346,6 +348,7 @@ export async function playHole({ gdb, dsu, hole, last = false, maxStrokes = 15, 
       else if (got) { same = false; P = { Pl: await planner(), pl: got.pb, ms: got.ms, from: st.ball.pos, lie: st.player.lie, playbook: got.pb }; }
       else if (same && ahead.playbook) same = false;
     }
+    if (k === 1 && firstPlan) P = { Pl: await planner(), pl: { ...firstPlan, why: firstPlan.why ?? `[given] ${firstPlan.club} ${firstPlan.power.toFixed(4)} at ${((firstPlan.heading * 180) / Math.PI).toFixed(3)} deg`, expect: { src: "given" } }, ms: 0, from: st.ball.pos, lie: st.player.lie };
     P ??= same ? ahead : await planFrom(hole, st, windSet);
     const { Pl, pl } = P;
     const [bx, , bz] = st.ball.pos, [px, , pz] = st.pin;

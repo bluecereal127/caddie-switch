@@ -1,0 +1,706 @@
+{
+ "hole": 15,
+ "pin": "s4",
+ "label": "AL",
+ "yd": 347.3,
+ "winds": [
+  {
+   "mph": 0,
+   "dir": 0,
+   "toward": null,
+   "clubs": {
+    "driver": {
+     "roll": 0,
+     "hop": 0,
+     "nearest": 89.1
+    },
+    "spoon": {
+     "roll": 0,
+     "hop": 0,
+     "nearest": 103.31
+    }
+   }
+  },
+  {
+   "mph": 6,
+   "dir": 0,
+   "toward": "S",
+   "clubs": {
+    "driver": {
+     "roll": 0,
+     "hop": 0,
+     "nearest": 95.59
+    },
+    "spoon": {
+     "roll": 0,
+     "hop": 0,
+     "nearest": 116.52
+    }
+   }
+  },
+  {
+   "mph": 6,
+   "dir": 1,
+   "toward": "SE",
+   "clubs": {
+    "driver": {
+     "roll": 0,
+     "hop": 0,
+     "nearest": 96.47
+    },
+    "spoon": {
+     "roll": 0,
+     "hop": 0,
+     "nearest": 115.01
+    }
+   }
+  },
+  {
+   "mph": 6,
+   "dir": 2,
+   "toward": "E",
+   "clubs": {
+    "driver": {
+     "roll": 0,
+     "hop": 0,
+     "nearest": 95.09
+    },
+    "spoon": {
+     "roll": 0,
+     "hop": 0,
+     "nearest": 112.36
+    }
+   }
+  },
+  {
+   "mph": 6,
+   "dir": 3,
+   "toward": "NE",
+   "clubs": {
+    "driver": {
+     "roll": 0,
+     "hop": 0,
+     "nearest": 89.9
+    },
+    "spoon": {
+     "roll": 0,
+     "hop": 0,
+     "nearest": 106.12
+    }
+   }
+  },
+  {
+   "mph": 6,
+   "dir": 4,
+   "toward": "N",
+   "clubs": {
+    "driver": {
+     "roll": 0,
+     "hop": 0,
+     "nearest": 84.41
+    },
+    "spoon": {
+     "roll": 0,
+     "hop": 0,
+     "nearest": 101.29
+    }
+   }
+  },
+  {
+   "mph": 6,
+   "dir": 5,
+   "toward": "NW",
+   "clubs": {
+    "driver": {
+     "roll": 0,
+     "hop": 0,
+     "nearest": 78.99
+    },
+    "spoon": {
+     "roll": 0,
+     "hop": 0,
+     "nearest": 94.68
+    }
+   }
+  },
+  {
+   "mph": 6,
+   "dir": 6,
+   "toward": "W",
+   "clubs": {
+    "driver": {
+     "roll": 0,
+     "hop": 0,
+     "nearest": 82.92
+    },
+    "spoon": {
+     "roll": 0,
+     "hop": 0,
+     "nearest": 100.75
+    }
+   }
+  },
+  {
+   "mph": 6,
+   "dir": 7,
+   "toward": "SW",
+   "clubs": {
+    "driver": {
+     "roll": 0,
+     "hop": 0,
+     "nearest": 89.79
+    },
+    "spoon": {
+     "roll": 0,
+     "hop": 0,
+     "nearest": 113.08
+    }
+   }
+  },
+  {
+   "mph": 12,
+   "dir": 0,
+   "toward": "S",
+   "clubs": {
+    "driver": {
+     "roll": 0,
+     "hop": 0,
+     "nearest": 96
+    },
+    "spoon": {
+     "roll": 0,
+     "hop": 0,
+     "nearest": 122.39
+    }
+   }
+  },
+  {
+   "mph": 12,
+   "dir": 1,
+   "toward": "SE",
+   "clubs": {
+    "driver": {
+     "roll": 0,
+     "hop": 0,
+     "nearest": 100.15
+    },
+    "spoon": {
+     "roll": 0,
+     "hop": 0,
+     "nearest": 120.08
+    }
+   }
+  },
+  {
+   "mph": 12,
+   "dir": 2,
+   "toward": "E",
+   "clubs": {
+    "driver": {
+     "roll": 0,
+     "hop": 0,
+     "nearest": 99.87
+    },
+    "spoon": {
+     "roll": 0,
+     "hop": 0,
+     "nearest": 113.05
+    }
+   }
+  },
+  {
+   "mph": 12,
+   "dir": 3,
+   "toward": "NE",
+   "clubs": {
+    "driver": {
+     "roll": 0,
+     "hop": 0,
+     "nearest": 94.59
+    },
+    "spoon": {
+     "roll": 0,
+     "hop": 0,
+     "nearest": 102.74
+    }
+   }
+  },
+  {
+   "mph": 12,
+   "dir": 4,
+   "toward": "N",
+   "clubs": {
+    "driver": {
+     "roll": 0,
+     "hop": 0,
+     "nearest": 83.42
+    },
+    "spoon": {
+     "roll": 0,
+     "hop": 0,
+     "nearest": 97.98
+    }
+   }
+  },
+  {
+   "mph": 12,
+   "dir": 5,
+   "toward": "NW",
+   "clubs": {
+    "driver": {
+     "roll": 0,
+     "hop": 0,
+     "nearest": 77.48
+    },
+    "spoon": {
+     "roll": 0,
+     "hop": 0,
+     "nearest": 89.66
+    }
+   }
+  },
+  {
+   "mph": 12,
+   "dir": 6,
+   "toward": "W",
+   "clubs": {
+    "driver": {
+     "roll": 0,
+     "hop": 0,
+     "nearest": 82.34
+    },
+    "spoon": {
+     "roll": 0,
+     "hop": 0,
+     "nearest": 105.13
+    }
+   }
+  },
+  {
+   "mph": 12,
+   "dir": 7,
+   "toward": "SW",
+   "clubs": {
+    "driver": {
+     "roll": 0,
+     "hop": 0,
+     "nearest": 94.15
+    },
+    "spoon": {
+     "roll": 0,
+     "hop": 0,
+     "nearest": 117.57
+    }
+   }
+  },
+  {
+   "mph": 18,
+   "dir": 0,
+   "toward": "S",
+   "clubs": {
+    "driver": {
+     "roll": 0,
+     "hop": 0,
+     "nearest": 100.59
+    },
+    "spoon": {
+     "roll": 0,
+     "hop": 0,
+     "nearest": 129.77
+    }
+   }
+  },
+  {
+   "mph": 18,
+   "dir": 1,
+   "toward": "SE",
+   "clubs": {
+    "driver": {
+     "roll": 0,
+     "hop": 0,
+     "nearest": 103.62
+    },
+    "spoon": {
+     "roll": 0,
+     "hop": 0,
+     "nearest": 124.23
+    }
+   }
+  },
+  {
+   "mph": 18,
+   "dir": 2,
+   "toward": "E",
+   "clubs": {
+    "driver": {
+     "roll": 0,
+     "hop": 0,
+     "nearest": 103.4
+    },
+    "spoon": {
+     "roll": 0,
+     "hop": 0,
+     "nearest": 117.5
+    }
+   }
+  },
+  {
+   "mph": 18,
+   "dir": 3,
+   "toward": "NE",
+   "clubs": {
+    "driver": {
+     "roll": 0,
+     "hop": 0,
+     "nearest": 96.33
+    },
+    "spoon": {
+     "roll": 0,
+     "hop": 0,
+     "nearest": 101.86
+    }
+   }
+  },
+  {
+   "mph": 18,
+   "dir": 4,
+   "toward": "N",
+   "clubs": {
+    "driver": {
+     "roll": 0,
+     "hop": 0,
+     "nearest": 83.95
+    },
+    "spoon": {
+     "roll": 0,
+     "hop": 0,
+     "nearest": 93.69
+    }
+   }
+  },
+  {
+   "mph": 18,
+   "dir": 5,
+   "toward": "NW",
+   "clubs": {
+    "driver": {
+     "roll": 0,
+     "hop": 0,
+     "nearest": 75.34
+    },
+    "spoon": {
+     "roll": 0,
+     "hop": 0,
+     "nearest": 87.76
+    }
+   }
+  },
+  {
+   "mph": 18,
+   "dir": 6,
+   "toward": "W",
+   "clubs": {
+    "driver": {
+     "roll": 0,
+     "hop": 0,
+     "nearest": 82.48
+    },
+    "spoon": {
+     "roll": 0,
+     "hop": 0,
+     "nearest": 105.52
+    }
+   }
+  },
+  {
+   "mph": 18,
+   "dir": 7,
+   "toward": "SW",
+   "clubs": {
+    "driver": {
+     "roll": 0,
+     "hop": 0,
+     "nearest": 98.03
+    },
+    "spoon": {
+     "roll": 0,
+     "hop": 0,
+     "nearest": 121.64
+    }
+   }
+  },
+  {
+   "mph": 24,
+   "dir": 0,
+   "toward": "S",
+   "clubs": {
+    "driver": {
+     "roll": 0,
+     "hop": 0,
+     "nearest": 105.53
+    },
+    "spoon": {
+     "roll": 0,
+     "hop": 0,
+     "nearest": 132.67
+    }
+   }
+  },
+  {
+   "mph": 24,
+   "dir": 1,
+   "toward": "SE",
+   "clubs": {
+    "driver": {
+     "roll": 0,
+     "hop": 0,
+     "nearest": 106.82
+    },
+    "spoon": {
+     "roll": 0,
+     "hop": 0,
+     "nearest": 129.57
+    }
+   }
+  },
+  {
+   "mph": 24,
+   "dir": 2,
+   "toward": "E",
+   "clubs": {
+    "driver": {
+     "roll": 0,
+     "hop": 0,
+     "nearest": 88.34
+    },
+    "spoon": {
+     "roll": 0,
+     "hop": 0,
+     "nearest": 129.45
+    }
+   }
+  },
+  {
+   "mph": 24,
+   "dir": 3,
+   "toward": "NE",
+   "clubs": {
+    "driver": {
+     "roll": 0,
+     "hop": 0,
+     "nearest": 96.45
+    },
+    "spoon": {
+     "roll": 0,
+     "hop": 0,
+     "nearest": 105.4
+    }
+   }
+  },
+  {
+   "mph": 24,
+   "dir": 4,
+   "toward": "N",
+   "clubs": {
+    "driver": {
+     "roll": 0,
+     "hop": 0,
+     "nearest": 81.91
+    },
+    "spoon": {
+     "roll": 0,
+     "hop": 0,
+     "nearest": 89.51
+    }
+   }
+  },
+  {
+   "mph": 24,
+   "dir": 5,
+   "toward": "NW",
+   "clubs": {
+    "driver": {
+     "roll": 0,
+     "hop": 0,
+     "nearest": 73.3
+    },
+    "spoon": {
+     "roll": 0,
+     "hop": 0,
+     "nearest": 84.31
+    }
+   }
+  },
+  {
+   "mph": 24,
+   "dir": 6,
+   "toward": "W",
+   "clubs": {
+    "driver": {
+     "roll": 0,
+     "hop": 0,
+     "nearest": 84.54
+    },
+    "spoon": {
+     "roll": 0,
+     "hop": 0,
+     "nearest": 106.43
+    }
+   }
+  },
+  {
+   "mph": 24,
+   "dir": 7,
+   "toward": "SW",
+   "clubs": {
+    "driver": {
+     "roll": 0,
+     "hop": 0,
+     "nearest": 100.64
+    },
+    "spoon": {
+     "roll": 0,
+     "hop": 0,
+     "nearest": 126.05
+    }
+   }
+  },
+  {
+   "mph": 30,
+   "dir": 0,
+   "toward": "S",
+   "clubs": {
+    "driver": {
+     "roll": 0,
+     "hop": 0,
+     "nearest": 113.51
+    },
+    "spoon": {
+     "roll": 0,
+     "hop": 0,
+     "nearest": 134.45
+    }
+   }
+  },
+  {
+   "mph": 30,
+   "dir": 1,
+   "toward": "SE",
+   "clubs": {
+    "driver": {
+     "roll": 0,
+     "hop": 0,
+     "nearest": 111.46
+    },
+    "spoon": {
+     "roll": 0,
+     "hop": 0,
+     "nearest": 141.7
+    }
+   }
+  },
+  {
+   "mph": 30,
+   "dir": 2,
+   "toward": "E",
+   "clubs": {
+    "driver": {
+     "roll": 0,
+     "hop": 0,
+     "nearest": 89.42
+    },
+    "spoon": {
+     "roll": 0,
+     "hop": 0,
+     "nearest": 109.84
+    }
+   }
+  },
+  {
+   "mph": 30,
+   "dir": 3,
+   "toward": "NE",
+   "clubs": {
+    "driver": {
+     "roll": 0,
+     "hop": 0,
+     "nearest": 96.67
+    },
+    "spoon": {
+     "roll": 0,
+     "hop": 0,
+     "nearest": 111.72
+    }
+   }
+  },
+  {
+   "mph": 30,
+   "dir": 4,
+   "toward": "N",
+   "clubs": {
+    "driver": {
+     "roll": 0,
+     "hop": 0,
+     "nearest": 82.07
+    },
+    "spoon": {
+     "roll": 0,
+     "hop": 0,
+     "nearest": 85.92
+    }
+   }
+  },
+  {
+   "mph": 30,
+   "dir": 5,
+   "toward": "NW",
+   "clubs": {
+    "driver": {
+     "roll": 0,
+     "hop": 0,
+     "nearest": 65.88
+    },
+    "spoon": {
+     "roll": 0,
+     "hop": 0,
+     "nearest": 78.81
+    }
+   }
+  },
+  {
+   "mph": 30,
+   "dir": 6,
+   "toward": "W",
+   "clubs": {
+    "driver": {
+     "roll": 0,
+     "hop": 0,
+     "nearest": 84.15
+    },
+    "spoon": {
+     "roll": 0,
+     "hop": 0,
+     "nearest": 107.07
+    }
+   }
+  },
+  {
+   "mph": 30,
+   "dir": 7,
+   "toward": "SW",
+   "clubs": {
+    "driver": {
+     "roll": 0,
+     "hop": 0,
+     "nearest": 103.5
+    },
+    "spoon": {
+     "roll": 0,
+     "hop": 0,
+     "nearest": 130.59
+    }
+   }
+  }
+ ],
+ "ms": 102120
+}

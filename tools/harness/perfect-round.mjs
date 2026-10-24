@@ -54,6 +54,31 @@ const READY = `try {
 } catch (e) { return JSON.stringify({ menu: true }); }`;
 const state = async () => { try { return JSON.parse((await post("eval", [READY])).text); } catch { return {}; } };
 const pinPlan = () => { try { return JSON.parse(fs.readFileSync(path.join(HERE, "results", "compete", "pin-plan.json"), "utf8")); } catch { return {}; } };
+// a par 4's ace (the user: "the lowest score possible"; -42 needs none, -43 one): ace-search.mjs's widest
+// window per par 4 (results/ace-search: pin, wind, club, rolling cells), its cells listed here by the 3D
+// model round the search's best (0.0005 of power x 0.01 deg), the window's middle first; --ace-tries a hole
+const ACE_TRIES = Number(arg("--ace-tries", 16)), DEG = Math.PI / 180, YD = 9.144;
+const RM = await import(pathToFileURL(path.join(HERE, "round-model.mjs")).href);
+const cupsIdx = JSON.parse(fs.readFileSync(path.join(HERE, "state", "saves", "pins", "index.json"), "utf8")).cups;
+const holesRule = (p) => p.holed && !!p.cupPass && p.cupPass.h < 0.25 && (!p.flag || (p.flag.vn * 240) / YD <= 3.4);
+function acePlan() {
+  const out = {};
+  let files = []; try { files = fs.readdirSync(path.join(HERE, "results", "ace-search")).filter((f) => /^h\d\d-s\d\.json$/.test(f)); } catch { return out; }
+  for (const f of files) { const r = JSON.parse(fs.readFileSync(path.join(HERE, "results", "ace-search", f), "utf8")); for (const w of r.winds) for (const [club, c] of Object.entries(w.clubs)) if (c.roll > 0 && (!out[r.hole] || c.roll > out[r.hole].roll)) out[r.hole] = { hole: r.hole, cup: `h${String(r.hole).padStart(2, "0")}-${r.pin}`, pin: r.pin, wind: w.speedIdx === undefined ? { dir: w.dir, speedIdx: w.mph / 2 } : w, club, roll: c.roll, bars: c.bars, aimDeg: c.aimDeg }; }
+  for (const a of Object.values(out)) { a.wind = { dir: a.wind.dir, speedIdx: (a.wind.mph ?? 2 * a.wind.speedIdx) / 2 }; const c = cupsIdx[a.cup]; a.slot = c.slot; a.cells = aceCells(a, c); }
+  return out;
+}
+function aceCells(a, c) {
+  const ball = c.tee.pos, pin = c.pinRam, h0 = Math.atan2(pin[0] - ball[0], pin[2] - ball[2]);
+  const q0 = a.bars / 4, hA = h0 - a.aimDeg * DEG, wind = { ...a.wind, angle: (a.wind.dir * Math.PI) / 4 };
+  const cells = [];
+  for (let i = -16; i <= 16; i++) for (let j = -20; j <= 20; j++) { const q = q0 + i * 0.0005, h = hA + j * 0.01 * DEG; if (q > 1 || q < 0.1) continue; if (holesRule(RM.predict({ hole: a.hole, ball, heading: h, club: a.club, power: q, lie: 15, wind, pin }))) cells.push({ q, h }); }
+  if (!cells.length) return [];
+  const mq = cells.reduce((s, x) => s + x.q, 0) / cells.length, mh = cells.reduce((s, x) => s + x.h, 0) / cells.length;
+  return cells.sort((x, y) => Math.hypot((x.q - mq) / 0.0005, (x.h - mh) / (0.01 * DEG)) - Math.hypot((y.q - mq) / 0.0005, (y.h - mh) / (0.01 * DEG)));
+}
+const ACES = acePlan();
+log(`ace windows: ${Object.values(ACES).map((a) => `hole ${a.hole} pin ${a.pin} ${2 * a.wind.speedIdx} mph d${a.wind.dir} ${a.club} (${a.cells.length} cells)`).join("; ") || "none"}`);
 
 async function playRound(n) {
   const env = { ...process.env, HARNESS_INSTANCE: String(INST), HARNESS_KNOW: path.join(SD, "strokes.jsonl") };
@@ -69,6 +94,7 @@ async function playRound(n) {
     execFile("powershell", ["-NoProfile", "-Command", ps], { windowsHide: true, timeout: 60000 }, () => {});
     await sleep(4000);
     const PP = pinPlan();
+    for (const a of Object.values(ACES)) if (a.cells.length) PP[a.hole] = { ...(PP[a.hole] ?? {}), slot: a.slot, cup: a.cup };   // the ace's pin
     if ((await run(["tools/harness/round-start.mjs", "--port", String(PORT), ...(PP[1] ? ["--pin", String(PP[1].slot)] : [])], env, playLog)) !== 0) throw new Error("round-start failed");
     for (let hole = 1; hole <= 18; hole++) {
       const target = PERFECT[PAR[hole]], forceNext = hole < 18 && PP[hole + 1] ? PP[hole + 1].slot : null;
@@ -86,6 +112,17 @@ async function playRound(n) {
       await post("save", ["1"]);
       const tee = st.pos;
       let done = false;
+      // a par 4 with an ace window: its cells first, each from the tee saved
+      const ace = PAR[hole] === 4 ? ACES[hole] : null;
+      for (let k = 0; ace && ace.cells.length && k < Math.min(ACE_TRIES, ace.cells.length) && !done; k++) {
+        if (k > 0) { await post("load", ["1"]); for (let i = 0; i < 40; i++) { const s2 = await state(); if (s2.hole === hole && s2.pos && Math.hypot(s2.pos[0] - tee[0], s2.pos[2] - tee[2]) < 0.01 && s2.life === 0) break; await sleep(500); } }
+        const cell = ace.cells[k];
+        const js = `const m = await import("${PLAY}?v=" + Date.now()); return await m.playHole({ gdb, dsu, hole: ${hole}, last: ${hole === 18}, maxStrokes: 1, logFile: ${JSON.stringify(playLog)}, src: "perfect-${n}", label: "Player 7 #${n}", windSet: ${JSON.stringify(ace.wind)}, flagWindSet: ${JSON.stringify(ace.wind)}, firstPlan: ${JSON.stringify({ club: ace.club, power: cell.q, heading: cell.h, why: `[ace window] ${ace.club} ${cell.q.toFixed(4)}, cell ${k + 1} of ${ace.cells.length}` })}, stopUnholed: true, forceNext: ${forceNext ?? "null"} });`;
+        let rec = null; try { rec = JSON.parse((await post("eval", [js])).text); } catch { rec = null; }
+        if (rec?.strokes?.some((x) => x.holed)) { card[hole] = 1; done = true; tries[hole] = `ace ${k + 1}`; log(`round ${n} hole ${hole}: AN ACE on the par 4, ace try ${k + 1}`); }
+        else log(`round ${n} hole ${hole}: ace try ${k + 1} missed${rec?.strokes?.[0]?.toPin != null ? ` (${rec.strokes[0].toPin.toFixed(1)} yd)` : ""}`);
+      }
+      if (ace && !done) { await post("load", ["1"]); for (let i = 0; i < 40; i++) { const s2 = await state(); if (s2.hole === hole && s2.pos && Math.hypot(s2.pos[0] - tee[0], s2.pos[2] - tee[2]) < 0.01 && s2.life === 0) break; await sleep(500); } }
       for (let k = 0; k <= TRIES && !done; k++) {
         if (k > 0) {
           await post("load", ["1"]);
