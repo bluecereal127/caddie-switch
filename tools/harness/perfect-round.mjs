@@ -158,7 +158,7 @@ const done = (() => { try { return fs.readdirSync(RD).filter((f) => /^round-\d+\
 for (let n = (done.length ? Math.max(...done) : 0) + 1; ; n++) {
   let r;
   try { r = await playRound(n); } catch (e) { log(`round ${n}: ${e.message}`); continue; }
-  log(`round ${n}: ${r.strokes} strokes, ${r.toPar} (${Object.values(r.card).join(" ")}) in ${r.min.toFixed(0)} min; reloads ${Object.values(r.tries).reduce((a, b) => a + b - 1, 0)}`);
+  log(`round ${n}: ${r.strokes} strokes, ${r.toPar} (${Object.values(r.card).join(" ")}) in ${r.min.toFixed(0)} min; reloads ${Object.values(r.tries).reduce((a, b) => a + (Number(String(b).match(/d+/)?.[0] ?? 1) - 1), 0)}`);
   try { fs.writeFileSync(path.join(RD, "BOARD.md"), `# Player 7: pins, wind and savestates\n\nLatest round ${n}: ${r.toPar} (${Object.values(r.card).join(" ")}), ${r.min.toFixed(0)} min, reloads by hole ${JSON.stringify(r.tries)}. Since the start: ${((Date.now() - T0) / 60000).toFixed(0)} min.\n`); } catch { /* next time */ }
   if (r.toPar <= GOAL) { log(`player 7: ${r.toPar} in round ${n}, ${((Date.now() - T0) / 60000).toFixed(0)} min after the start`); break; }
 }
