@@ -346,7 +346,7 @@ export function createPlaybook({ solveDir = SOLVE_DIR, pinIndex = PIN_INDEX } = 
     }
     if (!all.length) return null;
     all.sort((a, b) => { for (let i = 0; i < 4; i++) if (a.key[i] !== b.key[i]) return a.key[i] - b.key[i]; return 0; });
-    const best = all[Math.min(skip, all.length - 1)];
+    const best = all[skip % all.length];   // a retry past the last route goes round them again
     const n = [...(byHole.get(Number(hole)) ?? [])].filter((x) => Math.hypot(x.pin[0] - pin[0], x.pin[2] - pin[2]) <= pinTol && x.strokes.length === best.sol.strokes.length).length;
     return { wind: best.sol.wind, flagWind: best.sol.flagWind, cup: best.sol.cup, strokes: best.sol.strokes.length, src: best.sol.src, file: best.sol.file, alike: n, cells: -best.key[1], of: all.length };
   }

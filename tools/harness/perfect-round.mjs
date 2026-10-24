@@ -21,7 +21,9 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, "../..");
 const arg = (n, d) => { const i = process.argv.indexOf(n); return i >= 0 ? process.argv[i + 1] : d; };
-const INST = Number(arg("--instance", 7)), PORT = 8800 + INST, GOAL = Number(arg("--goal", -42)), TRIES = Number(arg("--tries", 12));
+// --tries / --ace-tries: reloads a hole gets (default none: the user, 2026-10-24, "it does not stop on hole 16
+// until it holes out": every hole is played again until it is perfect, 16 until its ace drops)
+const INST = Number(arg("--instance", 7)), PORT = 8800 + INST, GOAL = Number(arg("--goal", -43)), TRIES = Number(arg("--tries", Infinity));
 const WIN = { x: Number(arg("--x", 2560)), y: Number(arg("--y", 379)), w: Number(arg("--w", 720)), h: Number(arg("--h", 436)) };
 const PAR = { 1: 4, 2: 3, 3: 5, 4: 3, 5: 5, 6: 4, 7: 4, 8: 3, 9: 5, 10: 4, 11: 3, 12: 5, 13: 3, 14: 5, 15: 4, 16: 4, 17: 3, 18: 5 };
 const PERFECT = { 3: 1, 4: 2, 5: 2 };
@@ -57,7 +59,7 @@ const pinPlan = () => { try { return JSON.parse(fs.readFileSync(path.join(HERE, 
 // a par 4's ace (the user: "the lowest score possible"; -42 needs none, -43 one): ace-search.mjs's widest
 // window per par 4 (results/ace-search: pin, wind, club, rolling cells), its cells listed here by the 3D
 // model round the search's best (0.0005 of power x 0.01 deg), the window's middle first; --ace-tries a hole
-const ACE_TRIES = Number(arg("--ace-tries", 16)), DEG = Math.PI / 180, YD = 9.144;
+const ACE_TRIES = Number(arg("--ace-tries", Infinity)), DEG = Math.PI / 180, YD = 9.144;
 const RM = await import(pathToFileURL(path.join(HERE, "round-model.mjs")).href);
 const cupsIdx = JSON.parse(fs.readFileSync(path.join(HERE, "state", "saves", "pins", "index.json"), "utf8")).cups;
 const holesRule = (p) => p.holed && !!p.cupPass && p.cupPass.h < 0.25 && (!p.flag || (p.flag.vn * 240) / YD <= 3.4);
@@ -114,9 +116,9 @@ async function playRound(n) {
       let done = false;
       // a par 4 with an ace window: its cells first, each from the tee saved
       const ace = PAR[hole] === 4 ? ACES[hole] : null;
-      for (let k = 0; ace && ace.cells.length && k < Math.min(ACE_TRIES, ace.cells.length) && !done; k++) {
+      for (let k = 0; ace && ace.cells.length && k < ACE_TRIES && !done; k++) {
         if (k > 0) { await post("load", ["1"]); for (let i = 0; i < 40; i++) { const s2 = await state(); if (s2.hole === hole && s2.pos && Math.hypot(s2.pos[0] - tee[0], s2.pos[2] - tee[2]) < 0.01 && s2.life === 0) break; await sleep(500); } }
-        const cell = ace.cells[k];
+        const cell = ace.cells[k % ace.cells.length];   // round the window again when every cell has been tried
         const js = `const m = await import("${PLAY}?v=" + Date.now()); return await m.playHole({ gdb, dsu, hole: ${hole}, last: ${hole === 18}, maxStrokes: 1, logFile: ${JSON.stringify(playLog)}, src: "perfect-${n}", label: "Player 7 #${n}", windSet: ${JSON.stringify(ace.wind)}, flagWindSet: ${JSON.stringify(ace.wind)}, firstPlan: ${JSON.stringify({ club: ace.club, power: cell.q, heading: cell.h, why: `[ace window] ${ace.club} ${cell.q.toFixed(4)}, cell ${k + 1} of ${ace.cells.length}` })}, stopUnholed: true, forceNext: ${forceNext ?? "null"} });`;
         let rec = null; try { rec = JSON.parse((await post("eval", [js])).text); } catch { rec = null; }
         if (rec?.strokes?.some((x) => x.holed)) { card[hole] = 1; done = true; tries[hole] = `ace ${k + 1}`; log(`round ${n} hole ${hole}: AN ACE on the par 4, ace try ${k + 1}`); }
@@ -129,7 +131,7 @@ async function playRound(n) {
           let s2 = {};
           for (let i = 0; i < 40; i++) { s2 = await state(); if (s2.hole === hole && s2.pos && Math.hypot(s2.pos[0] - tee[0], s2.pos[2] - tee[2]) < 0.01 && s2.life === 0) break; await sleep(500); }
         }
-        const last = k === TRIES;   // the last try plays the hole out
+        const last = Number.isFinite(TRIES) && k === TRIES;   // the last try plays the hole out (never, with no cap)
         const js = `const m = await import("${PLAY}?v=" + Date.now()); return await m.playHole({ gdb, dsu, hole: ${hole}, last: ${hole === 18}, maxStrokes: ${last ? 15 : target}, logFile: ${JSON.stringify(playLog)}, src: "perfect-${n}", label: "Player 7 #${n}", windSet: null, windPlan: "best", routeSkip: ${k}, stopUnholed: ${!last}, forceNext: ${forceNext ?? "null"} });`;
         const r = await post("eval", [js]);
         let rec = null; try { rec = JSON.parse(r.text); } catch { rec = null; }
