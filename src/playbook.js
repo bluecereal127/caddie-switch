@@ -15,7 +15,7 @@
 
 const cache = new Map();
 export function loadPlaybook(hole) {
-  if (!(hole >= 1 && hole <= 18)) return Promise.resolve(null);
+  if (!(hole >= 1 && hole <= 21)) return Promise.resolve(null);
   if (!cache.has(hole)) {
     const p = fetch(`/playbook/h${String(hole).padStart(2, "0")}.json`)
       .then((r) => (r.ok ? r.json() : null)).catch(() => null)

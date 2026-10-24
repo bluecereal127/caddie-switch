@@ -81,7 +81,9 @@ const DRY = process.argv.includes("--dry");
 const inst = Number(arg("--instance", 15)), hole = Number(arg("--hole", NaN)), cupId = arg("--cup", null);
 const WX = Number(arg("--x", 0)), WY = Number(arg("--y", 0)), WW = Number(arg("--w", 853)), WH = Number(arg("--h", 510));
 const LABEL = arg("--label", `H${hole}`);
-const PAR = { 1: 4, 2: 3, 3: 5, 4: 3, 5: 5, 6: 4, 7: 4, 8: 3, 9: 5, 10: 4, 11: 3, 12: 5, 13: 3, 14: 5, 15: 4, 16: 4, 17: 3, 18: 5 };
+// holes 19-21: the Special course, all par 4 (the game's own banners, "Hole 20: Par 4", "Hole 21: Par 4",
+// and its "Par" call on hole 19 holed in 4; 2026-10-24)
+const PAR = { 1: 4, 2: 3, 3: 5, 4: 3, 5: 5, 6: 4, 7: 4, 8: 3, 9: 5, 10: 4, 11: 3, 12: 5, 13: 3, 14: 5, 15: 4, 16: 4, 17: 3, 18: 5, 19: 4, 20: 4, 21: 4 };
 const par = PAR[hole];
 // --rule near (the default since 2026-10-22; the user: "the goal is for a human
 // to be able to replicate these"; the tap-in made 1 ft on every par the same

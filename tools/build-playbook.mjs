@@ -23,7 +23,8 @@
 // (the bearing it blows toward, deg N-up, through the hole's registration), so
 // the app matches the solver's wind dial against it.
 //   node tools/build-playbook.mjs
-// writes public/playbook/hNN.json for holes 1-18 and public/playbook/index.json.
+// writes public/playbook/hNN.json for holes 1-18, and for each of the Special course's 19-21 once every pin
+// of it has a calm route, and public/playbook/index.json.
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -38,7 +39,9 @@ const REG = JSON.parse(fs.readFileSync(path.join(HERE, "mesh-registration.json")
 const DERIVED = JSON.parse(fs.readFileSync(path.join(ROOT, "public", "derived.json"), "utf8"));
 const MAP_W = 250, MAP_H = 304, YD = 9.144, R2D = 180 / Math.PI;
 const NEAR_YD = 1 / 3;
-const PAR = { 1: 4, 2: 3, 3: 5, 4: 3, 5: 5, 6: 4, 7: 4, 8: 3, 9: 5, 10: 4, 11: 3, 12: 5, 13: 3, 14: 5, 15: 4, 16: 4, 17: 3, 18: 5 };
+// holes 19-21: the Special course, all par 4 (the game's own banners, "Hole 20: Par 4", "Hole 21: Par 4",
+// and its "Par" call on hole 19 holed in 4; 2026-10-24)
+const PAR = { 1: 4, 2: 3, 3: 5, 4: 3, 5: 5, 6: 4, 7: 4, 8: 3, 9: 5, 10: 4, 11: 3, 12: 5, 13: 3, 14: 5, 15: 4, 16: 4, 17: 3, 18: 5, 19: 4, 20: 4, 21: 4 };
 const hh = (n) => String(n).padStart(2, "0");
 const r4 = (v) => Math.round(v * 1e4) / 1e4, r2 = (v) => Math.round(v * 100) / 100, r1 = (v) => Math.round(v * 10) / 10;
 const angDiff = (a, b) => Math.atan2(Math.sin(a - b), Math.cos(a - b));
@@ -49,10 +52,20 @@ const TEE_AIM = readJson(path.join(HERE, "harness", "results", "tee-aims.json"))
 const CALM_RISK = readJson(path.join(HERE, "harness", "results", "solve-wind", "calm-sand-risk.json")) ?? {};
 
 let bad = 0;
+// a Special hole is built once every WSR pin has a calm entry under the near rule (solved or a fallback)
+function specialReady(hole) {
+  return PINS.holes[hole].spots.every((sp) => {
+    const s = readJson(path.join(SWEEP, `h${hh(hole)}-s${sp.slots[0]}`, "i00.json"));
+    return Object.values(s?.winds ?? {}).some((e) => /^near/.test(e.rule) && e.speedIdx === 0 && (e.solved || e.fallback));
+  });
+}
 const fail = (m) => { console.error(`  ${m}`); bad++; };
 fs.mkdirSync(OUT, { recursive: true });
 const index = { version: 1, source: "the Dolphin harness: each route played in WSR itself, from a savestate of the pin's tee", mapW: MAP_W, mapH: MAP_H, holes: {} };
-for (let hole = 1; hole <= 18; hole++) {
+// holes 19-21 (the Special course) only once every pin has its calm route; until then they are left out
+const PENDING = [];
+for (let hole = 1; hole <= 21; hole++) {
+  if (hole >= 19 && !specialReady(hole)) { PENDING.push(hole); continue; }
   const B = REG.holes[hole]?.meshToMapFrac;
   if (!B) { fail(`hole ${hole}: no registration`); continue; }
   const toMap = (m) => [r4(B[0][0] * m[0] + B[0][1] * m[2] + B[0][2]), r4(B[1][0] * m[0] + B[1][1] * m[2] + B[1][2])];
@@ -143,4 +156,5 @@ for (let hole = 1; hole <= 18; hole++) {
   console.log(`hole ${hole}: ${Object.keys(pins).length} pins, ${nRoutes} routes (${Object.values(pins).map((p) => p.routes.length).join(", ")})`);
 }
 fs.writeFileSync(path.join(OUT, "index.json"), JSON.stringify(index, null, 1));
+if (PENDING.length) console.log(`holes ${PENDING.join(", ")}: left out until every pin has a calm route`);
 if (bad) { console.error(`${bad} problems`); process.exit(1); }

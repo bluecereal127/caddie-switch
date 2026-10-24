@@ -40,7 +40,8 @@ const range = (t) => t.split(",").flatMap((x) => { const [a, b] = x.split("-").m
 const INST = range(arg("--instances", "1-18"));
 // (2026-10-22, later: holes 1 and 10 again with full-power setups, then the
 // par 5s, then the par 4s left; the par 3s, done, have no setup to change)
-const HOLES = range(arg("--holes", "1,10,3,5,9,12,14,18,6,7,15,16,2,4,8,11,13,17"));
+// (2026-10-24: the Special course's holes 19-21 at the end)
+const HOLES = range(arg("--holes", "1,10,3,5,9,12,14,18,6,7,15,16,2,4,8,11,13,17,19,20,21"));
 const SPEEDS = range(arg("--speeds", "0,8,15,4,12,2,6,10,14,1,3,5,7,9,11,13"));
 const DIRS = range(arg("--dirs", "0-7"));
 const MAX_TRIES = Number(arg("--max-tries", 40)), STALL_MIN = Number(arg("--stall", 15));
@@ -50,8 +51,10 @@ const RULE = "near";
 // the rule a wind's entry must be played under: a par 4's and 5's "near-max"
 // (hole-solve.mjs: the setups at full power first), a par 3's "near"
 const ruleOf = (c) => (PAR[c.hole] === 3 ? "near" : "near-max");
-const PAR = { 1: 4, 2: 3, 3: 5, 4: 3, 5: 5, 6: 4, 7: 4, 8: 3, 9: 5, 10: 4, 11: 3, 12: 5, 13: 3, 14: 5, 15: 4, 16: 4, 17: 3, 18: 5 };
-const COURSE = (h) => ["Resort A", "Resort B", "Resort C", "Classic A", "Classic B", "Classic C"][Math.floor((h - 1) / 3)];
+// holes 19-21: the Special course, all par 4 (the game's own banners, "Hole 20: Par 4", "Hole 21: Par 4",
+// and its "Par" call on hole 19 holed in 4; 2026-10-24)
+const PAR = { 1: 4, 2: 3, 3: 5, 4: 3, 5: 5, 6: 4, 7: 4, 8: 3, 9: 5, 10: 4, 11: 3, 12: 5, 13: 3, 14: 5, 15: 4, 16: 4, 17: 3, 18: 5, 19: 4, 20: 4, 21: 4 };
+const COURSE = (h) => ["Resort A", "Resort B", "Resort C", "Classic A", "Classic B", "Classic C", "Special"][Math.floor((h - 1) / 3)];
 const OUTD = path.join(HERE, "results", "solve-wind");
 const LOGD = path.join(HERE, "state", "wind-campaign");
 fs.mkdirSync(OUTD, { recursive: true }); fs.mkdirSync(LOGD, { recursive: true });

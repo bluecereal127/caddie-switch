@@ -1,6 +1,6 @@
 // Acceptance for the solver's playbook: src/playbook.js (pinKeyOf, routesFor,
 // loadPlaybook through a fetch stand-in) and the committed public/playbook/
-// files (tools/build-playbook.mjs): every WSR pin of holes 1-18 with its calm
+// files (tools/build-playbook.mjs): every WSR pin of holes 1-18 (and of 19-21 once built) with its calm
 // route, each route of at most the hole's target (a par 3's 1, else 2; a
 // fallback or legacy one 3) ending holed or within 1 ft, each stroke
 // from the last one's rest, the first from the hole's tee (derived.json's,
@@ -49,13 +49,15 @@ globalThis.fetch = async (u) => { calls.push(u); return u.endsWith("h05.json") ?
 const a = await loadPlaybook(2), b = await loadPlaybook(2);
 ok(a && a === b && calls.filter((u) => u === "/playbook/h02.json").length === 1, "loadPlaybook: one fetch, shared");
 ok((await loadPlaybook(5)) === null && (await loadPlaybook(5)) === null && calls.filter((u) => u.endsWith("h05.json")).length === 2, "loadPlaybook: a miss is null and fetched again");
-ok((await loadPlaybook(19)) === null && !calls.some((u) => u.endsWith("h19.json")), "loadPlaybook: no file past hole 18");
+ok((await loadPlaybook(22)) === null && !calls.some((u) => u.endsWith("h22.json")), "loadPlaybook: no file past hole 21");
 
 // the committed files
 const index = JSON.parse(fs.readFileSync(path.join(DIR, "index.json"), "utf8"));
 const W = JSON.parse(fs.readFileSync(path.join(ROOT, "tools", "wsr-pins.json"), "utf8"));
 let routes = 0, windy = 0;
-for (let h = 1; h <= 18; h++) {
+// holes 1-18 always; the Special course's 19-21 once tools/build-playbook.mjs writes them (every pin with a calm route)
+const HOLES = [...Array.from({ length: 18 }, (_, i) => i + 1), ...[19, 20, 21].filter((h) => index.holes[h])];
+for (const h of HOLES) {
   const f = JSON.parse(fs.readFileSync(path.join(DIR, `h${String(h).padStart(2, "0")}.json`), "utf8"));
   const tee = DERIVED.holes[h].tee;
   ok(f.hole === h && f.dirs.length === 8, `h${h}: the file`);
