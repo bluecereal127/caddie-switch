@@ -28,7 +28,7 @@
 //   passes them (play-round.mjs reads them from RAM), else tools/wsr-pins.json
 //   through the registration; a hit ends the flight (outcome "tree");
 //   `treeMargin` grows every shape, so the planner keeps clear of them;
-// - the cup: src/putt.js's capture window measured in WSR (the ball's centre
+// - the cup: src/wsrPutt.js's capture window measured in WSR (the ball's centre
 //   within cupWindow(v) of the cup centre at speed v, on the cup's level), and
 //   the flagstick when the ball is not on the green (a ball reaching it is
 //   drawn into the cup, wsr-ground-phase.md 6).
@@ -47,7 +47,7 @@ import { parseObj } from "../lib/obj.mjs";
 import { CLUBS } from "../lib/wsrsim.mjs";
 
 export const YD = 9.144;
-const P = await import(pathToFileURL(path.join(ROOT, "src/putt.js")).href);
+const P = await import(pathToFileURL(path.join(ROOT, "src/wsrPutt.js")).href);
 export const cupWindow = P.cupWindow;     // yd against yd/s (WSR's, measured by the harness)
 export const V_CAP = P.V_CAP;
 

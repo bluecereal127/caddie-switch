@@ -3,31 +3,55 @@
 Turns Switch capture frames into Log-tab import JSON rows:
 `{club,power,lie,windSpeed,windDeg,ended,side?,hole?,stroke?}`.
 
-Course geometry from the Wii Sports Resort collision meshes (16-bit heightmaps,
-surface-class maps, mesh→hole mapping, unit scale), the hole maps rendered
-from WSR's own minimap model (`render-maps.mjs`) and the terrain shipped to
-the app (`build-terrain.mjs` → `public/terrain/`: ground height and surface
-class per hole, fine green heights) are a separate track: see
-[MESHES.md](MESHES.md) (`mesh-inspect.mjs`, `mesh-heightmap.mjs`, `mesh-holes.json`).
-The order for the app's data is extract-maps → extract-greens → (wsr-truth /
-wsr-pins, then build-terrain, when the meshes, archives, registration or
-map-style.json's regions change) → render-maps → build-derived.
-`node tools/test-terrain.mjs` checks the terrain files.
+Since 2026-10-24/25 the course data the app ships is Nintendo Switch Sports'
+own (the user: NSS's data replaces WSR's): the cups, the local tee, the online
+platform, the collision (terrain and the live solver's course), the trees,
+the minimap art and the ball, from the user's NSS 1.5.0 dump in the
+git-ignored `tools/harness/state/eden/nss-golf-x/` (decodes, Eden RAM
+recordings, the verifiers' corrections) and the RomFS beside it. See
+[MESHES.md](MESHES.md) (NSS's collision and the frame it shares with WSR's
+meshes; WSR's KCL track as history) and [PINS.md](PINS.md) (the cups, the
+tees, the platform's seating). The generators that read the dump or the RomFS
+run on the dump machine and commit their outputs; everything below them runs
+from committed files. The order for the app's data:
 
-The hole maps at 3x and 4x (`build-map-scales.mjs` → `public/maps/`) sit
-beside the 2x maps that src/maps.js bundles, and come right after
-render-maps: render the two scales into their own directories
-(`node tools/render-maps.mjs --scale 3 --out captures/derived/render-3x --no-green`,
-likewise `--scale 4` into `render-4x`; about 5 and 8 s per hole against 2.5
-at 2x), then `node tools/build-map-scales.mjs` encodes them as JPEG q78
-(`hNN-3x.jpg` 750×912, `hNN-4x.jpg` 1000×1216; 2.9 and 4.6 MB for the 21
-holes) with an `index.json` (size, bytes, SHA-1 per hole and scale) that the
-app reads only when its map-resolution setting asks for more than 2x. Like
-build-derived it ships only the WSR art (`--art wsr --wsr model`), and it
-box-filters each render and the 2x one to the 250×304 frame to warn about a
-scale left stale by a renderer change, so rerun all three scales whenever
-render-maps' inputs change. `--scales 3` refreshes one scale and keeps the
-other's files.
+1. When the dump changes (on the dump machine):
+   `node tools/nss-export.mjs` (→ `nss-registration.json`, `nss-pins.json`,
+   `nss-platform.json`) → `node tools/nss-truth.mjs` (→ `nss-truth.json`, the
+   green truth) → `node tools/build-terrain.mjs` (→ `public/terrain/`) →
+   `node tools/build-course3d.mjs` (→ `public/course3d/`) →
+   `node tools/nss-trees-export.mjs` (→ `nss-trees.json`). The ball:
+   `node tools/nss-physics-export.mjs` (→ `nss-physics.json`, the
+   `<nss-physics>` block of src/nsssim.js, `fixtures/nss-flights/`) →
+   `node tools/build-nss-shape.mjs` (→ src/nssShape.js).
+2. The maps (needs the RomFS, and Python with numpy, Pillow, zstandard and
+   texture2ddecoder; scipy for the comparison and the backdrop):
+   `python -P tools/render-nss-maps.py --jobs 7` renders NSS's own minimap at
+   2x, 3x and 4x plus each green crop into `captures/derived/render-nss/`
+   (about 3.5 min for 21 holes; `--derive-backdrop` first when the capture
+   stacks change, which writes `nss-map-backdrop.json`, the off-course colours),
+   then `node tools/build-map-scales.mjs` encodes the 3x and 4x maps as JPEG
+   q78 into `public/maps/` (`hNN-3x.jpg` 750×912, `hNN-4x.jpg` 1000×1216; 1.4
+   and 2.4 MB for the 21 holes) with an `index.json` (`art: "nss"`, size,
+   bytes, SHA-1 per hole and scale) that the app reads only when its map
+   setting asks for more than 2x. It ships only NSS's art with the 2 m plaid,
+   and it box-filters each scale and the 2x render to the 250×304 frame to
+   warn about a scale left stale. `--scales 3` refreshes one scale and keeps
+   the other's files; `--art wsr` rebuilds the WSR maps of before from
+   `render-maps.mjs`'s `captures/derived/render-{3,4}x`.
+3. The captures: extract-maps → extract-greens → assemble-shots (below).
+4. `node tools/build-derived.mjs` last (after build-terrain: the shot rows
+   are flown over `public/terrain/`): `public/derived.json` (geometry from
+   nss-truth, the six cups, the tee, the platform, the trees, the shot rows),
+   `src/maps.js` and `src/greens.js` (from render-nss). It exits 1 when any
+   NSS input is missing rather than fall back to WSR's.
+
+The tests: `test-nss-export`, `test-terrain`, `test-course3d`, `test-live3d`,
+`test-nsssim`, `test-solver`, `test-putt`, `test-trees`, `test-pins`,
+`test-platform`, `test-platform-helpers`, `test-merge-pins`,
+`test-merge-slope`, `test-merge-tree-fields`, `test-mapscale`, `test-mapview`,
+`test-relief`, `test-rows` (`node tools/test-<name>.mjs`; each header says what
+it checks; the dump-dependent steps skip without the dump).
 
 Pure Node (pngjs + jpeg-js, no native deps). PNG and JPG both work — Switch
 album transfers arrive as JPG, capture cards usually give PNG.
@@ -135,35 +159,37 @@ for stragglers that predate the switch.
 **Then:** `npm run ingest` reads `captures/inbox/` and writes
 `captures/rows.json` for the Log-tab importer (after setup below is done).
 
-## Hole cataloging captures (pins, tees, scale — the maps themselves are rendered)
+## Hole cataloging captures (which cup a round played — the rest is NSS's)
 
-The hole maps and green views no longer come from captures: since 2026-10-18
-they are rendered from WSR's own minimap model (`render-maps.mjs`, MESHES.md
-"Rendered minimaps"), and the green box, outline, slope grid, pins, tee and
-trees come from the WSR meshes and placement files. Captures supply what WSR
-cannot, and this is what to take, tracked in the app (Guide tab):
+The hole maps and green views no longer come from captures: since 2026-10-25
+they are rendered from NSS's own minimap (`render-nss-maps.py`, MESHES.md
+"NSS's minimaps"), and the green box, outline, slope grid, cups, tee, online
+platform and trees come from NSS's own game files. All six cups of every hole
+are built in (tools/PINS.md); captures only say which cup each round played
+(derived.json `seen`, which picks the hole's default line) and check the data.
+What to take, tracked in the app (Guide tab):
 
 1. **From the tee**: a frame showing the "**NNN yd to go**" badge under the
-   player name (it alternates with "Stroke 1"). The badge confirms the hole's
-   yards-per-pixel scale and is what credits a pin reading to a spot; the
-   frame's avatar places the online tee platform's tier (online rounds) and
-   its cup is a pin reading of its own. The map image is not built from it
-   any more (the stacks under captures/derived/maps are kept for comparison).
+   player name (it alternates with "Stroke 1"). The badge is the floor of the
+   flat yards from the ball to the cup, from GlfTeeOBJ in local play and from
+   the player's platform spot online: it is what decides between two near
+   cups, and its frame's cup is a reading of its own. The map image is not
+   built from it (the stacks under captures/derived/maps are kept for
+   comparison and for render-nss-maps' off-course backdrop).
 2. **Zoomed minimap green view, plain** — one frame.
 3. **Zoomed minimap green view with the heightmap/Terrain overlay** — one
-   frame. The pin flag in these frames is how pins get cataloged — nothing
-   extra to do; the green outline and shading only confirm the WSR data.
+   frame. The pin flag in these frames is how a round's cup is read — nothing
+   extra to do; the green outline, the 2 m plaid and the shading only confirm
+   NSS's data.
 
 Keep the "Hole N  Par N" banner visible in every frame — it's how the
-classifier knows which hole a frame belongs to. WSR's own pin spots are built
-in (tools/PINS.md), so a round needs captures only when the flag stands
-somewhere new: a tee frame showing the "yd to go" badge plus the two zoomed
-green frames. A spot that isn't one of WSR's ships on two independent
-readings: two rounds, or a zoomed green plus a tee frame (which can be one
-round). Hole 1's 384 yd spot has one round of tee frames and is waiting for a
-zoomed green or a second round. A new online round also needs its tier judged
-into tools/online-rounds.json. Shot Assist ON keeps the power bar straight in
-all frames, which also simplifies gauge reading.
+classifier knows which hole a frame belongs to. A reading within 2.5 map px of
+a cup is that cup (one within 1 px of two goes to the badges, else
+`pinAmbiguous`; one beyond every cup to `pinUnmatched`); there are no
+Switch-only spots any more (the ones the captures found were NSS cups). A new
+online round's tier, judged by eye into tools/online-rounds.json, is test data
+for tools/test-platform.mjs only. Shot Assist ON keeps the power bar straight
+in all frames, which also simplifies gauge reading.
 
 ## How to capture (per shot, 2 presses of the capture button)
 
@@ -236,12 +262,15 @@ row comes back from derived.json on the next load.
 
 `node tools/build-derived.mjs` ships the importable rows in derived.json's
 `shots` (less `flags`, `spot`, `importable`) and, for each row with a
-position, flies it with WSR's ball (src/wsrsim.js) over the hole's terrain
-(public/terrain) along `bearing`, as the solver flies a club
-(src/model.js `lineProfile` / `simProfile` at k = 1), at the row's power and
-wind: `elevFactor` = that stop over the same shot's on level fairway, and
+position, flies it over the hole's terrain (public/terrain) along `bearing`,
+as the solver flies a club, at the row's power from its lie in its wind:
+`elevFactor` = that stop over the same shot's on level fairway, and
 `flatEnded` = ended / elevFactor, the level-fairway stop the app's club fit
-reads. A row whose frame gave neither an aim nor a cup takes the line to the
+reads. The flight is NSS's ball (src/model.js `lineProfile` and
+`elevFlight`, src/nsssim.js), which tools/test-rows.mjs flies again; with
+captures/derived/shots.json present, a row that cannot be read or flown fails
+the build (exit 1, derived.json not written) rather than shipping an empty
+Log. A row whose frame gave neither an aim nor a cup takes the line to the
 hole's most-seen pin (`bearingFrom: "pin"`); a row without an elevFactor says
 why (`elevWhy`). The exclusions ship as `excludedShots`, and the app deletes
 stored rows with those ids. `node tools/test-rows.mjs` checks all of it on
@@ -292,9 +321,9 @@ silently drops rows with null club/power, so unfilled rows can't corrupt data.)
 - **Club + lie detection** from the HUD club selector.
 - **Red overswing / capped-bar detection** on the gauge (rough/sand caps).
 - Map/green extraction was built and then superseded: the maps and green
-  views are rendered from the WSR course data (MESHES.md) and the slope grids
-  come from the mesh heights; the capture stacks and the zoom frames' shading
-  (STATIC, lighter = higher) only confirm them.
+  views are rendered from NSS's own minimap textures (MESHES.md) and the slope
+  grids come from NSS's collision heights; the capture stacks and the zoom
+  frames' shading (STATIC, lighter = higher) only confirm them.
 
 What each hole still lacks shows in the app's Guide tab: "Per-hole setup,
 in order" lists the steps (green box + slopes, pins, map scale, trees, logged

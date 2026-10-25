@@ -2,12 +2,12 @@
 // Holes tab's "Contours (debug)" chip lays them over the hole map so the
 // heights the solver flies (src/model.js, "elevation") can be checked by eye
 // against the real hole. A line every CONTOUR_YD yd of height relative to the
-// hole's datum (the WSR start, where local play tees off), the ones on every
-// LABEL_EVERY-th level darker and labelled with their height, the tee's own
-// level (0) dark red, each with a faint light edge on its low side so it
-// reads on the dark OB rough and the sea too. Transparent elsewhere and
-// wherever the terrain has no data (class 0 or no height: past the raster's
-// crop).
+// hole's datum (NSS y 0, the WSR start's height, where local play tees off),
+// the ones on every LABEL_EVERY-th level darker and labelled with their
+// height, the tee's own level (0) dark red, each with a faint light edge on
+// its low side so it reads on the dark OB rough and the sea too. Transparent
+// elsewhere and wherever the terrain has no data (class 0 or no height: no
+// ground, past the end of NSS's field mesh).
 //
 // contourImage is pure and deterministic (the same terrain and size give the
 // same bytes; tools/test-relief.mjs runs it under Node); contourDataUrl wraps

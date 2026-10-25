@@ -1,11 +1,14 @@
 // The course terrain tools/build-terrain.mjs ships under public/terrain/, from
-// the WSR collision meshes: per hole the ground height and the KCL surface
-// class on a 125x152 grid over the 250x304 map frame (one sample per 2 map px,
-// 1.8-5.0 yd), and a 0.5 yd height grid over the green. Positions in and out
-// are map fractions (0-1 of the frame) as everywhere in the app; heights are
-// yards above the hole's datum, the WSR player start's height (where local
-// play tees off), so a tree's base height `z` (derived.json, on the same
-// datum) compares with them directly. Byte layouts: the tool's header.
+// NSS's own collision (the Switch game's field meshes, read by vertical ray
+// casts, the cups closed by their covers): per hole the ground height and the
+// surface class on a 125x152 grid over the 250x304 map frame (one sample per 2
+// map px, 1.8-5.0 yd), and a 0.5 yd height grid over the green. Positions in
+// and out are map fractions (0-1 of the frame) as everywhere in the app;
+// heights are yards above the hole's datum, NSS y 0: the WSR player start's
+// height (where local play tees off; the NSS ground there, at Glf_RotateOBJ
+// and at GlfTeeOBJ is 0.000 m fairway on every hole), so a tree's base height
+// `z` (derived.json, on the same datum) compares with them directly. Byte
+// layouts: the tool's header.
 //
 // Parsing and sampling are pure (the tools run them under Node); the loaders
 // fetch a hole's file once, cache it, and resolve to null when it is missing
@@ -14,18 +17,22 @@
 export const TERRAIN_DIR = "/terrain/";
 export const TERRAIN_NODATA = -32768;
 const LAYOUT = 1;
-// the KCL classes (tools/lib/obj.mjs KCL_GOLF) as the app's lie keys; the tee
-// pad is fairway-class. 5 is the dead floor plane under water and OB, 12/13
-// walls (no footprint in the rasters, listed for completeness). 0 (past the
-// raster's crop), 14 (H1's zone) and 16 (H14's fall boundary) have no lie.
-const LIE = { 1: "fairway", 2: "rough", 3: "bunker", 4: "outer", 5: "outer", 6: "green", 7: "water", 9: "fringe", 12: "wall", 13: "wall" };
+// the terrain's classes (the KCL vocabulary, tools/lib/obj.mjs KCL_GOLF, plus
+// 17) as the app's lie keys. From NSS's surface codes (tools/build-terrain.mjs):
+// 1 fairway (the tee pads too), 2 rough, 3 bunker, 4 OB ground, 6 green, 7
+// water, 9 fringe, 12 rock (banks, cliffs: a wall), 17 sand OB (the Switch's
+// beaches, out of bounds where WSR's were sand). 5 (WSR's dead floor plane
+// under water and OB) and 13 (a wall) are WSR's, kept for completeness; 0 (no
+// ground), 14 (WSR's H1 zone) and 16 (WSR's H14 fall boundary) have no lie.
+const LIE = { 1: "fairway", 2: "rough", 3: "bunker", 4: "outer", 5: "outer", 6: "green", 7: "water", 9: "fringe", 12: "wall", 13: "wall", 17: "outer" };
 export const lieOf = (cls) => LIE[cls] ?? null;
 
 const bytesOf = (buf) => (buf instanceof ArrayBuffer ? new Uint8Array(buf) : new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength));
 const magic = (dv) => String.fromCharCode(dv.getUint8(0), dv.getUint8(1), dv.getUint8(2), dv.getUint8(3));
 
-// hNN.bin -> { hole, w, h, datumY (KCL units), unitYd, heights (Int16Array,
-// unitYd above the datum, TERRAIN_NODATA past the raster), classes (Uint8Array) }
+// hNN.bin -> { hole, w, h, datumY (the datum in WSR's KCL units, 0.1 m), unitYd,
+// heights (Int16Array, unitYd above the datum, TERRAIN_NODATA where no ground
+// lies under the sample), classes (Uint8Array) }
 export function parseTerrain(buf) {
   const u8 = bytesOf(buf), dv = new DataView(u8.buffer, u8.byteOffset, u8.byteLength);
   if (u8.byteLength < 20 || magic(dv) !== "CTRN" || dv.getUint16(4, true) !== LAYOUT) throw new Error("not a terrain file of layout 1");
@@ -39,13 +46,14 @@ export function parseTerrain(buf) {
 
 // Ground height in yd above the datum at map fraction (x, y): bilinear between
 // the sample centres, flat over the half sample at the frame's edges; samples
-// past the raster drop out of the weights. null outside the frame or with no
-// sample around (the outer ground beyond the meshes' crop). Against the mesh
-// raster at 42,000 random points on the course (fairway, rough, sand, green,
-// fringe): 0.02 yd at the median, 0.05 at the 90th percentile; within a
-// sample of a cliff or a bank down to water it reads part way down (the 99th
-// percentile 2.4 yd, the worst 20 yd at H7's cliffs; on H8's island the 90th
-// percentile is 1.2 yd).
+// with no ground drop out of the weights. null outside the frame or with no
+// sample around (past the end of NSS's field mesh: the edges of H1, H6, H9,
+// H10, H16, H19 and two samples of H20). Each sample is the ray at its centre
+// (0.1 yd steps), so between the centres the read is the bilinear blend:
+// against NSS's ground ray at 10,548 random points on the course (fairway,
+// rough, sand, green, fringe), 0.017 yd at the median, 0.043 at the 90th
+// percentile, 0.17 at the 99th; within a sample of a cliff or a bank down to
+// water it reads part way down (the worst 19 yd, at a cliff on H20).
 export function heightAt(t, x, y) {
   if (!t || !(x >= 0 && x <= 1 && y >= 0 && y <= 1)) return null;
   const u = Math.min(t.w - 1, Math.max(0, x * t.w - 0.5)), v = Math.min(t.h - 1, Math.max(0, y * t.h - 0.5));
@@ -58,7 +66,8 @@ export function heightAt(t, x, y) {
   return ws > 0 ? (s / ws) * t.unitYd : null;
 }
 
-// KCL class of the sample whose cell holds (x, y) (0 outside the frame or past the raster).
+// Class of the sample whose cell holds (x, y): the majority of the 4x4 rays
+// over its cell (0 outside the frame or where none finds ground).
 export function classAt(t, x, y) {
   if (!t || !(x >= 0 && x <= 1 && y >= 0 && y <= 1)) return 0;
   const i = Math.min(t.w - 1, Math.floor(x * t.w)), j = Math.min(t.h - 1, Math.floor(y * t.h));
@@ -66,11 +75,11 @@ export function classAt(t, x, y) {
 }
 
 // gNN.bin -> { hole, w, h, box ({x0, y0, x1, y1}, map fractions), stepYd, z0Yd,
-// unitYd, data (Int16Array, unitYd above z0Yd), mask (Uint8Array, 1 = inside
-// the WSR green outline, less the nodes build-terrain leaves out as pits
-// (index.json `pits`)) }. Node (i, j) sits at box.x0 + i(box.x1 - box.x0)/(w - 1),
-// box.y0 + j(box.y1 - box.y0)/(h - 1), stepYd apart; the box is the WSR green
-// box plus 0.12 of it on every side, grown to fit the grid.
+// unitYd, data (Int16Array, unitYd above z0Yd), mask (Uint8Array, 1 = the
+// node's ray lands on NSS's green, a cup's cover included) }. Node (i, j) sits
+// at box.x0 + i(box.x1 - box.x0)/(w - 1), box.y0 + j(box.y1 - box.y0)/(h - 1),
+// stepYd apart; the box is tools/nss-truth.json's green box plus 0.12 of it on
+// every side, grown to fit the grid.
 export function parseGreenHeights(buf) {
   const u8 = bytesOf(buf), dv = new DataView(u8.buffer, u8.byteOffset, u8.byteLength);
   if (u8.byteLength < 40 || magic(dv) !== "CGRN" || dv.getUint16(4, true) !== LAYOUT) throw new Error("not a green height file of layout 1");

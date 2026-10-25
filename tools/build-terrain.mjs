@@ -1,310 +1,247 @@
-// Ship the course terrain to the app: per hole, the ground height and the KCL
+// Ship the course terrain to the app: per hole, the ground height and the
 // surface class on a grid over the 250x304 map frame, and a fine height grid
-// over the green. The source rasters are the WSR collision meshes'
-// (tools/mesh-heightmap.mjs, gitignored rips), so the output is committed.
+// over the green. The source is NSS's own collision (the Switch game's
+// Fld_GolfCourseNN field meshes, as the eden exporter dumps them; the user's
+// rule since 2026-10-24: NSS data replaces WSR data), read by vertical ray
+// casts. The dump is git-ignored (on the dump machine only), so the output is
+// committed.
 //
-//   node tools/build-terrain.mjs [--heightmaps captures/meshes/heightmaps-res4] [--out public/terrain]
-//        [--holes 7,16] [--style tools/map-style.json]
+//   node tools/build-terrain.mjs [--collision tools/harness/state/eden/nss-golf-x/collision]
+//        [--truth tools/nss-truth.json] [--registration tools/nss-registration.json]
+//        [--pins tools/nss-pins.json] [--out public/terrain] [--holes 7,16]
+//        [--allow-missing water]
 //
-// Reads per hole captures/meshes/heightmaps-res4/hole-NN.json and the RAW and
-// _classes.png it names (4 KCL units per px: the height and the KCL type of
-// the topmost surface), tools/mesh-registration.json (map fraction <-> mesh
-// units), tools/wsr-pins.json (the WSR player start: its height is the hole's
-// datum), tools/wsr-truth.json (green box, outline, yd per map px) and
-// tools/map-style.json (what the minimap draws over the raster's nodata).
-// Writes public/terrain/hNN.bin, gNN.bin and index.json; the app reads them
-// through src/terrain.js. Rerun when the meshes, the registration or
-// tools/map-style.json's `regions` change (wsr-truth.mjs's triggers plus the
-// style, which decides the nodata classes). A --holes batch merges its
+// Reads per hole collision/hNN.json + hNN.bin (the field) and hNN-covers.bin
+// (the six HoleCover plugs, which close the cups) through tools/lib/nsscol.mjs,
+// and on H3 hNN-water.json + .bin (Object_BGOBJ_GolfCourse03Water: H3's sea is
+// its own actor, not in the field mesh). Without that file the build refuses
+// (exit 1, nothing written): H3's sea floor, sand OB, would stand where the
+// water is. --allow-missing water builds it so on purpose, and index.json then
+// lists the actor under the hole's `missing`. tools/nss-truth.json
+// (green box, yd per map px), tools/nss-registration.json (map fraction <->
+// NSS metres, tools/lib/nssreg.mjs; originMeshY, the datum in WSR's KCL units)
+// and tools/nss-pins.json (the WSR start's mesh height, for the index's audit
+// field). Writes public/terrain/hNN.bin, gNN.bin and index.json; the app reads
+// them through src/terrain.js. Rerun when the dump's collision, the
+// registration or tools/nss-truth.json change. A --holes batch merges its
 // entries into the existing index.json; every file is written only after all
-// holes are built.
+// holes are built. Deterministic: doubles over the dump's float32 vertices,
+// the rays' ties broken by triangle index (nsscol topGround), fixed rounding.
+//
+// The datum: NSS y 0, the height of the WSR player start (the ground ray there
+// reads 0.000 m fairway on all 21 holes, as at Glf_RotateOBJ and GlfTeeOBJ),
+// where local play tees off. In WSR's KCL units it is the registration's
+// originMeshY, the header's datumY, so a tree's base height `z` (derived.json,
+// on the WSR start's height) compares with these heights directly.
 //
 // hNN.bin, little-endian, 20-byte header then two arrays, row-major from the
 // map's top-left (row 0 = the north edge, column 0 = the west edge):
 //   0  "CTRN"   4  u16 layout version (1)   6  u16 w   8  u16 h   10 u16 hole
-//   12 f32 datumY: the WSR start's height, KCL units (0.1 m)
+//   12 f32 datumY: NSS y 0 (the WSR start's height) in KCL units (0.1 m)
 //   16 f32 yd per height unit (0.1)
 //   20 int16[w*h] ground height in 0.1 yd above the datum; -32768 = no data
-//      (beyond the raster's crop)
-//   20 + 2wh  uint8[w*h] KCL class (legend in index.json; 0 = beyond the raster)
+//      (no ground under the sample: past the end of NSS's field mesh)
+//   20 + 2wh  uint8[w*h] surface class (CLASS_NAMES; 0 = no ground)
 // gNN.bin, 40-byte header:
 //   0  "CGRN"   4  u16 version (1)   6  u16 w   8  u16 h   10 u16 hole
 //   12 f32 box x0, y0, x1, y1 (map fractions; node (i, j) sits at
 //      x0 + i(x1 - x0)/(w - 1), y0 + j(y1 - y0)/(h - 1), stepYd apart)
 //   28 f32 stepYd (0.5)   32 f32 z0Yd: the green's mean height above the datum
 //   36 f32 yd per height unit (0.001)
-//   40 int16[w*h] height above z0Yd   40 + 2wh  uint8[w*h] 1 = inside the
-//      WSR green outline and not reading a KCL hole (below)
+//   40 int16[w*h] height above z0Yd   40 + 2wh  uint8[w*h] 1 = the node's
+//      ray lands on the green
 // The headers hold NUL bytes on purpose: git (core.autocrlf on this repo)
-// takes a file with no NUL in its first 8000 bytes for text, and the height
-// data of holes 2 and 13 has none there. The files are not compressed; the
-// log gives their raw and gzipped sizes.
+// takes a file with no NUL in its first 8000 bytes for text. The files are
+// not compressed; the log gives their raw and gzipped sizes.
 //
-// The grid: one sample per GRID_PX map px, the sample's cell the map px square
-// it covers, its centre at ((i + 0.5)/w, (j + 0.5)/h). Height: a bilinear read
-// of the raster at the centre through mapFracToMesh (against the median of the
-// raster px in the cell: under 0.04 yd at the median cell, 0.07-0.13 yd at the
-// 99th percentile; a cell astride a cliff or bank reads part way down it).
-// Class: the majority of the raster pixels whose centres fall in the cell
-// (the part of a cell past the raster's crop votes 0; ties take the class
-// under the centre). The KCL class stays wherever the KCL has a surface, also
-// where WSR's own minimap model draws something else (tools/MESHES.md "Where
-// the model and the KCL differ": fairway over a sand cell on H4, rough over a
-// sand patch behind H9's tee, OB over KCL water and rough on H12 and over the
-// sea plane on H3, H5, H7 and H21, beaches over the water plane on H3 and H19;
-// tools/test-terrain.mjs lists them). Two things in the rasters are not KCL
-// surfaces and are mended first:
-//  - nodata (no surface at all): enclosed collision gaps in the ground, the
-//    void past the mesh, H12's ponds and H8's strait. Each nodata region takes
-//    what tools/map-style.json says the minimap draws there (sea or pond ->
-//    water, outer -> outer ground; the rest, the gaps, the nearest class), as
-//    tools/lib/minimap.mjs resolveRaster does for the renderer: H8's start
-//    stands in an 80x80 u gap in its tee pad, which the minimap draws as tee.
-//    The heights there are mesh-heightmap.mjs's own fill from the nearest
-//    surface. Floor (5), zone (14) and fall (16) are KCL types and stay.
-//  - cracks: max-Y rasterising leaves 1-2 px slits along shared and T-junction
-//    triangle edges where what lies below shows through: 1,008 px over the 21
-//    holes, 5-705 u down (627 water, 367 nodata, 8 floor, 6 sand or rough;
-//    219 of them round H1's zone; 11 in H3's green box, 16-17 yd down at the
-//    edges of the water holes round its green, none inside the outline). A 3x3
-//    grey-scale closing lifts a slit at most 2 px wide to the surface around
-//    it and leaves wider features and slopes alone (a concave kink rises by
-//    its slope x 4 u at most); a pixel it lifts by more than CRACK_DEPTH takes
-//    the closed height and the majority class of its other neighbours. The
-//    lifts fall in two groups, 199 px at 2-4 u (kinks, beach alternation) and
-//    1,002 px over 8 u (slits), with 14 px between them. Wider holes in the
-//    ground (tools/MESHES.md "Quirks") are in the KCL and stay, the closing
-//    trimming only their ragged edges: in the frame five round H3's green
-//    (15-170 px, water 130-160 u down), one north of H17's green (50 px, 230 u)
-//    and a shallow one on H2; so do a dozen 1-3 px pits in H15's river bed
-//    that no 3x3 neighbourhood bridges.
+// The classes keep the KCL vocabulary the app has always read (src/terrain.js
+// lieOf), plus 17 for NSS's sand OB: GolfFairway 5 -> 1, GolfRough 6 -> 2,
+// GolfBunker 7 -> 3, GolfOB 10 -> 4, GolfGreen 18 (and the covers) -> 6,
+// GolfWaterhazard 8 -> 7, GolfGreenEdge 24 -> 9, GolfRock 32 -> 12 (a wall:
+// banks, cliffs, the rocks along the water), GolfSandOB 36 -> 17 (the
+// Switch's beaches, which are out of bounds where WSR's were sand). A ray
+// lands on the topmost of those ground codes (nsscol GROUND_CODES) and
+// passes through the rest: leaves, palm leaves, trunks, the cups' walls and
+// bottoms (closed by their covers), glass, objects, barriers and the air OB
+// volumes, none of which the 2D terrain carries.
 //
-// The green: heights at GREEN_STEP_YD over the WSR green box plus
+// The grid: one sample per GRID_PX map px, the sample's cell the map px
+// square it covers, its centre at ((i + 0.5)/w, (j + 0.5)/h). Height: the ray
+// at the centre (at a cliff it reads the exact top or foot, not a blend).
+// Class: the majority of SUB x SUB rays over the cell (at its (s + 0.5)/SUB
+// points); a ray that finds no ground does not vote, ties take the centre
+// ray's class when it is one of them (else the lowest tied id), and a cell
+// none of whose rays finds ground is 0 (classVote, exported for
+// tools/test-terrain.mjs; importing this file builds nothing).
+//
+// The green: heights at GREEN_STEP_YD over nss-truth's green box plus
 // GREEN_MARGIN of it on every side (the app's green view, build-derived's
-// GT_MARGIN), grown by under half a step so the grid fits it exactly, read
-// bilinearly from the same mended raster, in GREEN_UNIT_YD above the green's
-// mean (over the mask). The mask is the WSR green outline (wsr-truth.json
-// greenPoly) less any node whose bilinear read takes in a raster px more than
-// GREEN_PIT_YD below the mean of its 8 neighbours inside the outline: that
-// read reaches into a hole in the KCL beside the green, not the green's
-// surface. Two nodes, both on H3 at its green's north-west edge beside a
-// water hole whose px lie 16.6-16.7 yd below them: they read 0.57 and 0.23 yd
-// below the green px of the same reads (0.58 yd under the next node inside, a
-// 115% slope in src/putt.js's gradient), which no test of a node's own height
-// tells from a sound green (0.52 and 0.12 yd under their neighbours' mean; a
-// node on H19's sound surface is 0.11 under). On the other 20 greens the
-// lowest px any read takes lies at most 0.19 yd (H19) under its neighbours'
-// mean. The class under a node does not tell either: both of H3's have green
-// under them (the nearest px), while 17 nodes on H2, H8, H9 and H18 have sand,
-// water, rough or outer ground there at their green's height. H3: 3,262
-// nodes inside the outline, 3,260 in the mask (index.json green.pits: 2).
-// The unit is 0.001 yd, not 0.01: a step of 0.01 yd over the 0.5 yd spacing
-// is a 2% slope, against 1.9 / 5.5 / 11.8% at the p10 / p50 / p90 of the
-// 1,373 green cells of tools/wsr-truth.json's 9x9 grids; 0.001 yd is 0.2%,
-// about what the raster itself resolves (0.001-0.004 yd: uint16 over each
-// hole's height range). The box's heights stay within -25.0 yd (H17's box
-// reaches that hole) and +3.2 yd (H20) of their green's mean, inside
-// int16's +-32.767 yd; the greens themselves have 0.6-3.3 yd of relief.
+// GT_MARGIN), grown by under half a step so the grid fits it exactly, each
+// node the ray at it, in GREEN_UNIT_YD above the green's mean (over the
+// mask). The mask: the nodes whose ray lands on the green (GolfGreen, or a
+// cover where a cup is). The covers matter: without them a ray over a cup
+// reads its bottom 0.30 m down, a 60 %+ spike in src/putt.js's gradient. A
+// masked node whose topmost hit among the ground codes and the cup's
+// (GolfCupside 30, GolfCup 31) is the cup is a cup its cover does not close:
+// the build refuses it (exit 1). The unit is 0.001 yd, not 0.01: a step of
+// 0.01 yd over the 0.5 yd spacing is a 2% slope, against the few percent of a
+// typical green cell; 0.001 yd is 0.2%, about the collision's own vertex grid
+// (1/512 m = 0.002 yd).
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createHash } from "node:crypto";
 import { gzipSync } from "node:zlib";
-import { MAP_W, MAP_H, UNITS_PER_YD, CLS, loadHole, deadRegions, fillNearest, pointInPoly, readJson } from "./lib/minimap.mjs";
+import { loadCollision, gridIndex, topGround, GROUND_CODES } from "./lib/nsscol.mjs";
+import { regOf, mapToNss, MAP_W, MAP_H, M_PER_YD } from "./lib/nssreg.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
-const args = process.argv.slice(2);
-const opt = { heightmaps: join(ROOT, "captures/meshes/heightmaps-res4"), out: join(ROOT, "public/terrain"), holes: null, style: join(ROOT, "tools/map-style.json") };
-for (let i = 0; i < args.length; i++) {
-  const a = args[i];
-  if (a === "--heightmaps") opt.heightmaps = args[++i];
-  else if (a === "--out") opt.out = args[++i];
-  else if (a === "--holes") opt.holes = args[++i].split(",").map(Number);
-  else if (a === "--style") opt.style = args[++i];
-  else { console.error(`unknown argument ${a}\nusage: node tools/build-terrain.mjs [--heightmaps dir] [--out public/terrain] [--holes 7,16] [--style tools/map-style.json]`); process.exit(1); }
-}
-const HOLES = opt.holes ?? Array.from({ length: 21 }, (_, i) => i + 1);
-// the defaults are the repo's; a path given resolves against the cwd (an
-// absolute one as it is); loadHole wants the rasters relative to the repo root
-const HM_DIR = resolve(opt.heightmaps), OUT = resolve(opt.out);
-const STYLE = readJson(resolve(opt.style)).holes ?? {};
+// the run's options and inputs, set by main()
+let opt, TRUTH, REGJ, PINS;
 
 const LAYOUT = 1;
 // one sample per 2 map px: 125x152, a cell 1.8-5.0 yd across (0.89-2.51 yd
 // per map px), 57 KB per hole
 const GRID_PX = 2, GW = MAP_W / GRID_PX, GH = MAP_H / GRID_PX;
+const SUB = 4; // class rays per cell side
 const Z_UNIT_YD = 0.1, NODATA = -32768;
-const CRACK_DEPTH = 5; // KCL units: what the closing must lift for a pixel to count as a crack
 const GREEN_MARGIN = 0.12, GREEN_STEP_YD = 0.5, GREEN_UNIT_YD = 0.001;
-const GREEN_PIT_YD = 1; // a read taking in a px this far under its neighbours' mean is off the green (header)
 const HEADER = 20, GREEN_HEADER = 40;
-const NCLS = 17; // class ids 0-16
-const CLASS_NAMES = { 0: "nodata (beyond the raster's crop)", 1: "fairway (and the tee pad)", 2: "rough", 3: "bunker (sand, beaches, river gravel)", 4: "outer ground (OB terrain)", 5: "floor plane (the dead plane under water and OB)", 6: "green", 7: "water", 9: "fringe", 14: "zone (H1)", 16: "fall boundary (H14)" };
+const KCL_UNITS_PER_M = 10;
+const CROP_M = 10; // triangles kept: those within 10 m of the frame (and the green grid's box)
+// NSS surface code -> terrain class (the header)
+const CLASS_OF = { 5: 1, 6: 2, 7: 3, 8: 7, 10: 4, 18: 6, 24: 9, 32: 12, 36: 17 };
+const NCLS = 18; // class ids 0-17
+const CLASS_NAMES = {
+  0: "no ground (past the end of NSS's field mesh)",
+  1: "fairway (GolfFairway 5; the tee pads)",
+  2: "rough (GolfRough 6)",
+  3: "bunker (GolfBunker 7)",
+  4: "outer ground (GolfOB 10: OB terrain)",
+  6: "green (GolfGreen 18, with the HoleCovers that close the cups)",
+  7: "water (GolfWaterhazard 8; on H3 the separate actor Object_BGOBJ_GolfCourse03Water)",
+  9: "fringe (GolfGreenEdge 24)",
+  12: "wall (GolfRock 32: banks, cliffs and the rocks along the water)",
+  17: "sand OB (GolfSandOB 36: the Switch's beaches, out of bounds)",
+};
+for (const c of GROUND_CODES) if (CLASS_OF[c] == null) throw new Error(`NSS ground code ${c} has no terrain class`);
+const CUP_CODES = new Set([30, 31]);
+const RAY_CODES = new Set([...GROUND_CODES, ...CUP_CODES]);
+// separate collision actors a hole's ground includes (loadCollision extras)
+const EXTRAS = { 3: ["water"] };
+const EXTRA_ACTOR = { water: "Object_BGOBJ_GolfCourse03Water, H3's sea: without it the field mesh's sea floor, sand OB, stands where the water is" };
 
-// 3x3 grey-scale dilation (max) or erosion (min), separable, edges clamped
-function pass3(src, w, h, op) {
-  const tmp = new Float64Array(w * h), out = new Float64Array(w * h);
-  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
-    const p = y * w + x;
-    let v = src[p];
-    if (x > 0) v = op(v, src[p - 1]);
-    if (x < w - 1) v = op(v, src[p + 1]);
-    tmp[p] = v;
-  }
-  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
-    const p = y * w + x;
-    let v = tmp[p];
-    if (y > 0) v = op(v, tmp[p - w]);
-    if (y < h - 1) v = op(v, tmp[p + w]);
-    out[p] = v;
-  }
-  return out;
+// A cell's class from its rays' votes: votes[c] = the rays that landed on
+// class c (c >= 1; a ray that finds no ground does not vote, and votes[0] is
+// not read), centre = the centre ray's class (-1 when it found no ground).
+// The majority; a tie goes to the centre ray's class when it is one of the
+// tied, else to the lowest tied id; 0 when no ray found ground.
+// -> { cls, tied }
+export function classVote(votes, centre = -1) {
+  let best = 1;
+  for (let c = 1; c < votes.length; c++) if (votes[c] > votes[best]) best = c;
+  if (!(votes[best] > 0)) return { cls: 0, tied: false };
+  let tied = false;
+  for (let c = 1; c < votes.length; c++) if (c !== best && votes[c] === votes[best]) tied = true;
+  if (tied && centre >= 1 && votes[centre] === votes[best]) best = centre;
+  return { cls: best, tied };
 }
 
-// the hole's rasters, mended (see the header): heights in KCL units, classes
-function mendedRaster(hole) {
-  const r = hole.raster, enc = hole.side.height, w = r.w, h = r.h;
-  const raw = readFileSync(join(HM_DIR, enc.file));
-  if (raw.length !== w * h * 2) throw new Error(`H${hole.n}: ${enc.file} holds ${raw.length} bytes, the class raster is ${w}x${h}`);
-  const span = enc.encodeMaxY - enc.encodeMinY;
-  const ht = new Float64Array(w * h);
-  for (let p = 0; p < w * h; p++) ht[p] = enc.encodeMinY + (raw.readUInt16LE(2 * p) / 65535) * span;
-  // nodata regions as the minimap draws them, keyed on the unmended raster
-  // the way map-style.json designates them
-  const des = STYLE[hole.n]?.regions ?? {};
-  const { label, regions } = deadRegions(r);
-  const cls = Uint8Array.from(r.cls), dead = { water: 0, outer: 0, nearest: 0 };
-  for (let p = 0; p < w * h; p++) {
-    if (r.cls[p] !== CLS.NODATA) continue;
-    const d = des[regions[label[p]].key];
-    cls[p] = d === "sea" || d === "pond" ? CLS.WATER : d === "outer" ? CLS.OUTER : 0;
-    dead[d === "sea" || d === "pond" ? "water" : d === "outer" ? "outer" : "nearest"]++;
+// the triangles of `mesh` whose xz box meets [x0, x1] x [z0, z1], in order
+// (so the rays' ties by triangle index fall as on the whole mesh), with the
+// vertices they use, in order of first use
+function crop(mesh, x0, z0, x1, z1) {
+  const { verts: V, tris: T, surface: S } = mesh;
+  const keep = [];
+  for (let t = 0; t < mesh.nt; t++) {
+    const a = T[t * 3] * 3, b = T[t * 3 + 1] * 3, c = T[t * 3 + 2] * 3;
+    if (Math.max(V[a], V[b], V[c]) < x0 || Math.min(V[a], V[b], V[c]) > x1 || Math.max(V[a + 2], V[b + 2], V[c + 2]) < z0 || Math.min(V[a + 2], V[b + 2], V[c + 2]) > z1) continue;
+    keep.push(t);
   }
-  fillNearest(cls, w, h);
-  // cracks
-  const closed = pass3(pass3(ht, w, h, Math.max), w, h, Math.min);
-  const crack = new Uint8Array(w * h);
-  let cracks = 0;
-  for (let p = 0; p < w * h; p++) if (closed[p] - ht[p] > CRACK_DEPTH) { crack[p] = 1; cracks++; }
-  const n = new Int32Array(NCLS);
-  for (let p = 0; p < w * h; p++) {
-    if (!crack[p]) continue;
-    ht[p] = closed[p];
-    const x = p % w, y = (p - x) / w;
-    n.fill(0);
-    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
-      const xx = x + dx, yy = y + dy;
-      if ((dx || dy) && xx >= 0 && yy >= 0 && xx < w && yy < h && !crack[yy * w + xx]) n[cls[yy * w + xx]]++;
+  const remap = new Int32Array(mesh.nv).fill(-1), vlist = [];
+  const tris = new Uint32Array(keep.length * 3), surface = new Uint8Array(keep.length);
+  keep.forEach((t, k) => {
+    for (let c = 0; c < 3; c++) {
+      const vi = T[t * 3 + c];
+      if (remap[vi] < 0) { remap[vi] = vlist.length; vlist.push(vi); }
+      tris[k * 3 + c] = remap[vi];
     }
-    let best = -1;
-    for (let c = 0; c < NCLS; c++) if (n[c] && (best < 0 || n[c] > n[best])) best = c;
-    if (best >= 0) cls[p] = best;
-  }
-  return { ht, cls, cracks, dead };
+    surface[k] = S[t];
+  });
+  const verts = new Float32Array(vlist.length * 3);
+  vlist.forEach((vi, k) => { verts[k * 3] = V[vi * 3]; verts[k * 3 + 1] = V[vi * 3 + 1]; verts[k * 3 + 2] = V[vi * 3 + 2]; });
+  return { nv: vlist.length, nt: keep.length, verts, tris, surface };
 }
 
 function buildHole(n) {
-  const hole = loadHole(ROOT, n, { heightmaps: relative(ROOT, HM_DIR) });
-  const r = hole.raster, w = r.w, h = r.h, A = hole.M, B = hole.reg.meshToMapFrac;
-  const start = hole.pins?.starts?.[0];
-  if (!start) throw new Error(`H${n}: no WSR player start in tools/wsr-pins.json, so no datum`);
-  if (!hole.truth?.greenBox || !hole.truth.greenPoly || !hole.truth.scale) throw new Error(`H${n}: no green box, outline or scale in tools/wsr-truth.json`);
-  const datumY = start.mesh[1];
-  const { ht, cls, cracks, dead } = mendedRaster(hole);
-  const toMesh = (fx, fy) => [A[0][0] * fx + A[0][1] * fy + A[0][2], A[1][0] * fx + A[1][1] * fy + A[1][2]];
-  // raster coordinates with pixel centres at integers (tools/lib/minimap.mjs)
-  const toPx = (X, Z) => [(X - r.originX) / r.upp - 0.5, (Z - r.originZ) / r.upp - 0.5];
-  // a bilinear read at a mesh point: the top-left of the four raster px it
-  // weighs and its fractions across them; null past the raster's crop
-  const readAt = (X, Z) => {
-    let [c, q] = toPx(X, Z);
-    if (c < -0.5 || q < -0.5 || c > w - 0.5 || q > h - 0.5) return null;
-    c = Math.min(w - 1, Math.max(0, c)); q = Math.min(h - 1, Math.max(0, q));
-    const c0 = Math.min(w - 2, Math.floor(c)), q0 = Math.min(h - 2, Math.floor(q));
-    return [q0 * w + c0, c - c0, q - q0];
-  };
-  // bilinear height (KCL units) at a mesh point; null past the raster's crop
-  const heightAt = (X, Z) => {
-    const rd = readAt(X, Z);
-    if (!rd) return null;
-    const [p, fx, fy] = rd;
-    return (ht[p] * (1 - fx) + ht[p + 1] * fx) * (1 - fy) + (ht[p + w] * (1 - fx) + ht[p + w + 1] * fx) * fy;
-  };
-  // the lowest of the raster px that read weighs (KCL units)
-  const lowestAt = (X, Z) => {
-    const [p, fx, fy] = readAt(X, Z);
-    let lo = Infinity;
-    for (const [q, wt] of [[p, (1 - fx) * (1 - fy)], [p + 1, fx * (1 - fy)], [p + w, (1 - fx) * fy], [p + w + 1, fx * fy]]) if (wt > 0) lo = Math.min(lo, ht[q]);
-    return lo;
-  };
-  const toUnits = (y, unitYd) => Math.round((y - datumY) / UNITS_PER_YD / unitYd);
+  const reg = regOf(REGJ, n), t = TRUTH[n], tees = PINS[n]?.tees;
+  if (!t?.greenBox || !t.scale) throw new Error(`H${n}: no green box or scale in tools/nss-truth.json`);
+  if (!tees?.wsrStart?.mesh) throw new Error(`H${n}: no WSR start in tools/nss-pins.json`);
+  const extras = EXTRAS[n] ?? [];
+  const full = loadCollision(opt.collision, n, { covers: true, extras });
+  const files = (list) => list.map((m) => `h${String(n).padStart(2, "0")}-${m}.json / .bin (${EXTRA_ACTOR[m] ?? m})`).join(", ");
+  const refused = full.missing.filter((m) => !opt.allowMissing.has(m));
+  if (refused.length) throw new Error(`H${n}: ${files(refused)} not in the dump (${opt.collision}). Export it, or pass --allow-missing ${refused.join(",")} to build without it`);
+  if (full.missing.length) console.warn(`H${n}: ${files(full.missing)} not in the dump: built without it (--allow-missing), index.json lists it under missing`);
+  const datumY = reg.originMeshY;
 
-  // ---- the map-frame grid ----
-  const heights = new Int16Array(GW * GH), classes = new Uint8Array(GW * GH);
-  for (let j = 0; j < GH; j++) for (let i = 0; i < GW; i++) {
-    const y = heightAt(...toMesh((i + 0.5) / GW, (j + 0.5) / GH));
-    heights[j * GW + i] = y == null ? NODATA : Math.max(-32767, Math.min(32767, toUnits(y, Z_UNIT_YD)));
-  }
-  const votes = new Int32Array(GW * GH * NCLS), count = new Int32Array(GW * GH);
-  for (let q = 0; q < h; q++) for (let c = 0; c < w; c++) {
-    const X = r.originX + (c + 0.5) * r.upp, Z = r.originZ + (q + 0.5) * r.upp;
-    const i = Math.floor((B[0][0] * X + B[0][1] * Z + B[0][2]) * GW), j = Math.floor((B[1][0] * X + B[1][1] * Z + B[1][2]) * GH);
-    if (i < 0 || j < 0 || i >= GW || j >= GH) continue;
-    votes[(j * GW + i) * NCLS + cls[q * w + c]]++; count[j * GW + i]++;
-  }
-  // raster px per cell, for the share of a cell past the crop
-  const perCell = Math.abs(A[0][0] * A[1][1] - A[0][1] * A[1][0]) / (GW * GH) / (r.upp * r.upp);
-  const pastCrop = (fx, fy) => { const [c, q] = toPx(...toMesh(fx, fy)); return c < -0.5 || q < -0.5 || c > w - 0.5 || q > h - 0.5; };
-  const centreClass = (i, j) => {
-    const [c, q] = toPx(...toMesh((i + 0.5) / GW, (j + 0.5) / GH)), cc = Math.round(c), qq = Math.round(q);
-    return cc < 0 || qq < 0 || cc >= w || qq >= h ? 0 : cls[qq * w + cc];
-  };
-  let ties = 0;
-  for (let j = 0; j < GH; j++) for (let i = 0; i < GW; i++) {
-    const k = j * GW + i, v = votes.subarray(k * NCLS, (k + 1) * NCLS);
-    const edge = [[i, j], [i + 1, j], [i, j + 1], [i + 1, j + 1]].some(([a, b]) => pastCrop(a / GW, b / GH));
-    if (edge) v[0] += Math.max(0, Math.round(perCell) - count[k]);
-    let best = 0;
-    for (let c = 1; c < NCLS; c++) if (v[c] > v[best]) best = c;
-    if (v[best] === 0) { classes[k] = 0; continue; }
-    let tie = false;
-    for (let c = 0; c < NCLS; c++) if (c !== best && v[c] === v[best]) tie = true;
-    if (tie) { classes[k] = centreClass(i, j); ties++; } else classes[k] = best;
-  }
-
-  // ---- the green ----
-  const t = hole.truth, b = t.greenBox, sc = t.scale; // yd per map px
+  // ---- the green grid's box (nss-truth's green box + margin, fitted to the step) ----
+  const b = t.greenBox, sc = t.scale; // yd per map px
   const bw = b.x1 - b.x0, bh = b.y1 - b.y0;
   let gx0 = b.x0 - GREEN_MARGIN * bw, gx1 = b.x1 + GREEN_MARGIN * bw, gy0 = b.y0 - GREEN_MARGIN * bh, gy1 = b.y1 + GREEN_MARGIN * bh;
   const wYd = (gx1 - gx0) * MAP_W * sc, hYd = (gy1 - gy0) * MAP_H * sc;
   const gw = Math.ceil(wYd / GREEN_STEP_YD - 1e-9) + 1, gh = Math.ceil(hYd / GREEN_STEP_YD - 1e-9) + 1;
   const growX = ((gw - 1) * GREEN_STEP_YD - wYd) / 2 / (MAP_W * sc), growY = ((gh - 1) * GREEN_STEP_YD - hYd) / 2 / (MAP_H * sc);
   gx0 -= growX; gx1 += growX; gy0 -= growY; gy1 += growY;
-  const gYd = new Float64Array(gw * gh), lowYd = new Float64Array(gw * gh), outline = new Uint8Array(gw * gh);
+
+  // ---- the triangles in reach, indexed ----
+  let cx0 = Infinity, cz0 = Infinity, cx1 = -Infinity, cz1 = -Infinity;
+  for (const [fx, fy] of [[0, 0], [1, 0], [0, 1], [1, 1], [gx0, gy0], [gx1, gy0], [gx0, gy1], [gx1, gy1]]) {
+    const [x, z] = mapToNss(reg, fx, fy);
+    cx0 = Math.min(cx0, x); cx1 = Math.max(cx1, x); cz0 = Math.min(cz0, z); cz1 = Math.max(cz1, z);
+  }
+  const mesh = crop(full, cx0 - CROP_M, cz0 - CROP_M, cx1 + CROP_M, cz1 + CROP_M);
+  const idx = gridIndex(mesh, 4, { codes: RAY_CODES });
+  const ground = (fx, fy) => { const [x, z] = mapToNss(reg, fx, fy); return topGround(idx, x, z, GROUND_CODES); };
+
+  // ---- the map-frame grid ----
+  const heights = new Int16Array(GW * GH), classes = new Uint8Array(GW * GH);
+  const votes = new Int32Array(NCLS);
+  let ties = 0, partial = 0;
+  for (let j = 0; j < GH; j++) for (let i = 0; i < GW; i++) {
+    const k = j * GW + i;
+    const hc = ground((i + 0.5) / GW, (j + 0.5) / GH);
+    heights[k] = hc ? Math.max(-32767, Math.min(32767, Math.round(hc.y / M_PER_YD / Z_UNIT_YD))) : NODATA;
+    votes.fill(0);
+    let hits = 0;
+    for (let sy = 0; sy < SUB; sy++) for (let sx = 0; sx < SUB; sx++) {
+      const h = ground((i + (sx + 0.5) / SUB) / GW, (j + (sy + 0.5) / SUB) / GH);
+      if (h) { votes[CLASS_OF[h.code]]++; hits++; }
+    }
+    if (hits && hits < SUB * SUB) partial++;
+    const v = classVote(votes, hc ? CLASS_OF[hc.code] : -1);
+    if (v.tied) ties++;
+    classes[k] = v.cls;
+  }
+
+  // ---- the green ----
+  const gYd = new Float64Array(gw * gh), mask = new Uint8Array(gw * gh);
+  const openCups = [];
   for (let j = 0; j < gh; j++) for (let i = 0; i < gw; i++) {
     const fx = gx0 + (i / (gw - 1)) * (gx1 - gx0), fy = gy0 + (j / (gh - 1)) * (gy1 - gy0), k = j * gw + i;
-    const [X, Z] = toMesh(fx, fy), y = heightAt(X, Z);
-    if (y == null) throw new Error(`H${n}: the green grid reaches past the raster's crop at ${fx.toFixed(4)}, ${fy.toFixed(4)}`);
-    gYd[k] = (y - datumY) / UNITS_PER_YD;
-    lowYd[k] = (lowestAt(X, Z) - datumY) / UNITS_PER_YD;
-    if (pointInPoly(t.greenPoly, fx, fy)) outline[k] = 1;
+    const [x, z] = mapToNss(reg, fx, fy);
+    const hit = topGround(idx, x, z, GROUND_CODES);
+    if (!hit) throw new Error(`H${n}: no ground under the green grid at ${fx.toFixed(4)}, ${fy.toFixed(4)}`);
+    gYd[k] = hit.y / M_PER_YD;
+    if (hit.code !== 18) continue;
+    mask[k] = 1;
+    const top = topGround(idx, x, z, RAY_CODES);
+    if (CUP_CODES.has(top.code)) openCups.push(`(${i}, ${j}) at ${fx.toFixed(5)}, ${fy.toFixed(5)}: code ${top.code} ${(top.y - hit.y).toFixed(4)} m over the green`);
   }
-  // the mask: the outline less the nodes whose read takes in a KCL hole
-  // (header), each against its neighbours inside the outline
-  const mask = Uint8Array.from(outline);
-  let pits = 0;
-  for (let j = 0; j < gh; j++) for (let i = 0; i < gw; i++) {
-    const k = j * gw + i;
-    if (!outline[k]) continue;
-    let s = 0, c = 0;
-    for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) {
-      const ii = i + di, jj = j + dj;
-      if ((di || dj) && ii >= 0 && jj >= 0 && ii < gw && jj < gh && outline[jj * gw + ii]) { s += gYd[jj * gw + ii]; c++; }
-    }
-    if (lowYd[k] < (c ? s / c : gYd[k]) - GREEN_PIT_YD) { mask[k] = 0; pits++; }
-  }
+  if (openCups.length) throw new Error(`H${n}: ${openCups.length} green node(s) whose ray meets a cup its cover does not close: ${openCups.join("; ")}`);
   let sum = 0, inside = 0;
   for (let k = 0; k < gw * gh; k++) if (mask[k]) { sum += gYd[k]; inside++; }
+  if (!inside) throw new Error(`H${n}: no green node lands on the green`);
   const z0Yd = +(sum / inside).toFixed(4);
   const gData = new Int16Array(gw * gh);
   let clamped = 0, lo = Infinity, hi = -Infinity;
@@ -333,33 +270,79 @@ function buildHole(n) {
   for (const c of classes) tally[c] = (tally[c] || 0) + 1;
   const noHeight = heights.reduce((s, v) => s + (v === NODATA), 0);
   const entry = {
-    file: `h${nn}.bin`, meshId: hole.meshId, datumY: +datumY.toFixed(2), datumYd: +(datumY / UNITS_PER_YD).toFixed(4), bytes: tb.length, sha1: sha1(tb),
-    classes: tally, noHeight, cracks, deadPx: dead,
-    green: { file: `g${nn}.bin`, w: gw, h: gh, box: { x0: +gx0.toFixed(6), y0: +gy0.toFixed(6), x1: +gx1.toFixed(6), y1: +gy1.toFixed(6) }, stepYd: GREEN_STEP_YD, z0Yd, unitYd: GREEN_UNIT_YD, inside, ...(pits ? { pits } : {}), rangeYd: [+lo.toFixed(3), +hi.toFixed(3)], bytes: gb.length, sha1: sha1(gb) },
+    file: `h${nn}.bin`, meshId: full.meta.shape, datumY: +datumY.toFixed(2), datumYd: +(datumY / KCL_UNITS_PER_M / M_PER_YD).toFixed(4),
+    datumWsrMeshY: tees.wsrStart.mesh[1], bytes: tb.length, sha1: sha1(tb),
+    collisionSha1: full.sha1, ...(full.missing.length ? { missing: full.missing } : {}),
+    classes: tally, noHeight,
+    green: { file: `g${nn}.bin`, w: gw, h: gh, box: { x0: +gx0.toFixed(6), y0: +gy0.toFixed(6), x1: +gx1.toFixed(6), y1: +gy1.toFixed(6) }, stepYd: GREEN_STEP_YD, z0Yd, unitYd: GREEN_UNIT_YD, inside, rangeYd: [+lo.toFixed(3), +hi.toFixed(3)], bytes: gb.length, sha1: sha1(gb) },
   };
-  const yd = (k) => (heights[k] === NODATA ? "-" : (heights[k] * Z_UNIT_YD).toFixed(1));
-  console.log(`H${n} ${hole.meshId}: datum ${datumY} u (${entry.datumYd} yd); ${GW}x${GH} samples, ${noHeight} past the raster's crop; classes ${Object.entries(tally).map(([c, k]) => `${c}:${k}`).join(" ")} (${ties} ties); ${cracks} crack px mended, nodata px ${dead.water} -> water, ${dead.outer} -> outer, ${dead.nearest} -> nearest; heights ${yd(heights.indexOf(Math.min(...heights.filter((v) => v !== NODATA))))}..${yd(heights.indexOf(Math.max(...heights)))} yd; green ${gw}x${gh} at ${GREEN_STEP_YD} yd (${inside} inside the outline${pits ? `, ${pits} more left out of the mask as reading a KCL hole` : ""}), mean ${z0Yd} yd, box ${lo.toFixed(2)}..${hi.toFixed(2)} yd round it`);
-  return { n, nn, entry, tb, gb };
+  let zmin = Infinity, zmax = -Infinity;
+  for (const v of heights) if (v !== NODATA) { zmin = Math.min(zmin, v); zmax = Math.max(zmax, v); }
+  console.log(`H${n} ${full.meta.shape}${extras.length ? ` + ${extras.filter((e) => !full.missing.includes(e)).join(", ") || "(none)"}` : ""}: ${mesh.nt} of ${full.nt} tris in reach; datum ${datumY} u (${entry.datumYd} yd); ${GW}x${GH} samples, ${noHeight} with no ground; classes ${Object.entries(tally).map(([c, k]) => `${c}:${k}`).join(" ")} (${ties} ties, ${partial} cells part off the mesh); heights ${(zmin * Z_UNIT_YD).toFixed(1)}..${(zmax * Z_UNIT_YD).toFixed(1)} yd; green ${gw}x${gh} at ${GREEN_STEP_YD} yd (${inside} on the green), mean ${z0Yd} yd, box ${lo.toFixed(2)}..${hi.toFixed(2)} yd round it`);
+  return { n, entry, tb, gb };
 }
 
-const built = HOLES.map(buildHole);
-mkdirSync(OUT, { recursive: true });
-let prev = {};
-if (opt.holes) try { prev = JSON.parse(readFileSync(join(OUT, "index.json"), "utf8")).holes ?? {}; } catch {}
-const holes = { ...prev };
-let raw = 0, gz = 0, rawG = 0, gzG = 0;
-for (const { n, entry, tb, gb } of built) {
-  writeFileSync(join(OUT, entry.file), tb); writeFileSync(join(OUT, entry.green.file), gb);
-  holes[n] = entry;
-  raw += tb.length; gz += gzipSync(tb, { level: 9 }).length; rawG += gb.length; gzG += gzipSync(gb, { level: 9 }).length;
+function main() {
+  const args = process.argv.slice(2);
+  opt = {
+    collision: join(ROOT, "tools/harness/state/eden/nss-golf-x/collision"),
+    truth: join(ROOT, "tools/nss-truth.json"),
+    registration: join(ROOT, "tools/nss-registration.json"),
+    pins: join(ROOT, "tools/nss-pins.json"),
+    out: join(ROOT, "public/terrain"),
+    holes: null,
+    allowMissing: new Set(),
+  };
+  const USAGE = "usage: node tools/build-terrain.mjs [--collision dir] [--truth tools/nss-truth.json] [--registration tools/nss-registration.json] [--pins tools/nss-pins.json] [--out public/terrain] [--holes 7,16] [--allow-missing water]";
+  const extraNames = new Set(Object.values(EXTRAS).flat());
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i];
+    if (a === "--collision") opt.collision = resolve(args[++i]);
+    else if (a === "--truth") opt.truth = resolve(args[++i]);
+    else if (a === "--registration") opt.registration = resolve(args[++i]);
+    else if (a === "--pins") opt.pins = resolve(args[++i]);
+    else if (a === "--out") opt.out = resolve(args[++i]);
+    else if (a === "--holes") opt.holes = args[++i].split(",").map(Number);
+    else if (a === "--allow-missing") for (const m of (args[++i] ?? "").split(",")) {
+      if (!extraNames.has(m)) { console.error(`--allow-missing: one of ${[...extraNames].join(", ")}, not "${m}"\n${USAGE}`); process.exit(1); }
+      opt.allowMissing.add(m);
+    }
+    else { console.error(`unknown argument ${a}\n${USAGE}`); process.exit(1); }
+  }
+  const HOLES = opt.holes ?? Array.from({ length: 21 }, (_, i) => i + 1);
+  if (HOLES.some((n) => !(Number.isInteger(n) && n >= 1 && n <= 21))) { console.error(`--holes: 1-21 only\n${USAGE}`); process.exit(1); }
+  const OUT = opt.out;
+  const readJson = (q) => JSON.parse(readFileSync(q, "utf8"));
+  TRUTH = readJson(opt.truth).holes; REGJ = readJson(opt.registration); PINS = readJson(opt.pins).holes;
+
+  // every file is written only after every hole has built
+  let built;
+  try { built = HOLES.map(buildHole); } catch (e) { console.error(`REFUSED: ${e.message}`); process.exit(1); }
+  mkdirSync(OUT, { recursive: true });
+  let prev = {};
+  if (opt.holes) try { prev = JSON.parse(readFileSync(join(OUT, "index.json"), "utf8")).holes ?? {}; } catch {}
+  const holes = { ...prev };
+  let raw = 0, gz = 0, rawG = 0, gzG = 0;
+  for (const { n, entry, tb, gb } of built) {
+    writeFileSync(join(OUT, entry.file), tb); writeFileSync(join(OUT, entry.green.file), gb);
+    holes[n] = entry;
+    raw += tb.length; gz += gzipSync(tb, { level: 9 }).length; rawG += gb.length; gzG += gzipSync(gb, { level: 9 }).length;
+  }
+  const sorted = {};
+  for (const k of Object.keys(holes).map(Number).sort((a, b) => a - b)) sorted[k] = holes[k];
+  const index = {
+    _note: "Course terrain for the app, written by tools/build-terrain.mjs from NSS's own collision (the Switch game's Fld_GolfCourseNN field meshes with the six HoleCovers closing the cups, and on H3 the separate sea actor Object_BGOBJ_GolfCourse03Water) by vertical ray casts through tools/nss-registration.json; read by src/terrain.js. hNN.bin: the ground height and surface class on a w x h grid over the 250x304 map frame (sample (i, j) = the map px square [2i, 2i+2) x [2j, 2j+2), its centre at ((i+0.5)/w, (j+0.5)/h)): the height the ray at the centre lands on, in ydPerUnit above the hole's datum (NSS y 0 = the WSR player start's height; datumY = it in WSR's KCL units, 0.1 m, datumYd in yd), nodata where no ground lies under it; the class the majority of 4x4 rays over the cell (classNames: the KCL vocabulary plus 17, sand OB; codeToClass maps the NSS surface codes). gNN.bin: heights over nss-truth.json's green box + margin at stepYd, in unitYd above z0Yd (the green's mean height above the datum), with a mask of the nodes whose ray lands on the green. Byte layouts in the tool's header; both files repeat their own sizes, datum, box and units in a header. classes: per-hole sample counts by class; noHeight: samples with no ground; collisionSha1: the dump files read; datumWsrMeshY: the WSR start's height in KCL units (tools/nss-pins.json), against datumY; missing (only on a build run with --allow-missing): the separate collision actors the hole was built without.",
+    source: "nss",
+    version: LAYOUT, w: GW, h: GH, mapPxPerSample: GRID_PX, classRaysPerSample: SUB * SUB, ydPerUnit: Z_UNIT_YD, nodata: NODATA, headerBytes: HEADER,
+    classNames: CLASS_NAMES, codeToClass: CLASS_OF,
+    green: { stepYd: GREEN_STEP_YD, margin: GREEN_MARGIN, unitYd: GREEN_UNIT_YD, headerBytes: GREEN_HEADER },
+    holes: sorted,
+  };
+  writeFileSync(join(OUT, "index.json"), JSON.stringify(index, null, 1) + "\n");
+  const kb = (v) => `${(v / 1024).toFixed(0)} KB`;
+  console.log(`wrote ${relative(ROOT, OUT).startsWith("..") ? OUT : relative(ROOT, OUT)}: ${built.length} hole(s)${opt.holes ? ` (${Object.keys(holes).length} in index.json)` : ""}; terrain ${kb(raw)} raw / ${kb(gz)} gzip, greens ${kb(rawG)} raw / ${kb(gzG)} gzip`);
 }
-const index = {
-  _note: "Course terrain for the app, written by tools/build-terrain.mjs from the WSR collision-mesh rasters (tools/mesh-heightmap.mjs) through tools/mesh-registration.json; read by src/terrain.js. hNN.bin: the ground height and KCL class on a w x h grid over the 250x304 map frame (sample (i, j) = the map px square [2i, 2i+2) x [2j, 2j+2), its centre at ((i+0.5)/w, (j+0.5)/h)), heights in ydPerUnit above the hole's datum (datumY, KCL units = 0.1 m: the WSR player start's height; datumYd the same in yd), nodata past the raster's crop; the classes are the KCL's, except that the raster's nodata takes what tools/map-style.json says the minimap draws there and its 1-2 px rasterising cracks are closed (the tool's header). gNN.bin: heights over the WSR green box + margin at stepYd, in unitYd above z0Yd (the green's mean height above the datum), with a mask of the WSR green outline (less green.pits nodes, where a hole's floor bleeds into the read). Byte layouts in the tool's header; both files repeat their own sizes, datum, box and units in a header. classes: per-hole sample counts by class; noHeight: samples past the raster's crop; cracks: raster px mended; deadPx: nodata raster px by what they became.",
-  version: LAYOUT, w: GW, h: GH, mapPxPerSample: GRID_PX, ydPerUnit: Z_UNIT_YD, nodata: NODATA, headerBytes: HEADER,
-  classNames: CLASS_NAMES,
-  green: { stepYd: GREEN_STEP_YD, margin: GREEN_MARGIN, unitYd: GREEN_UNIT_YD, headerBytes: GREEN_HEADER },
-  holes,
-};
-writeFileSync(join(OUT, "index.json"), JSON.stringify(index, null, 1) + "\n");
-const kb = (v) => `${(v / 1024).toFixed(0)} KB`;
-console.log(`wrote ${relative(ROOT, OUT).startsWith("..") ? OUT : relative(ROOT, OUT)}: ${built.length} hole(s)${opt.holes ? ` (${Object.keys(holes).length} in index.json)` : ""}; terrain ${kb(raw)} raw / ${kb(gz)} gzip, greens ${kb(rawG)} raw / ${kb(gzG)} gzip`);
+
+// run as a script (node tools/build-terrain.mjs ...), not when imported for classVote
+const self = fileURLToPath(import.meta.url), argv1 = process.argv[1] ? resolve(process.argv[1]) : "";
+if (process.platform === "win32" ? argv1.toLowerCase() === self.toLowerCase() : argv1 === self) main();

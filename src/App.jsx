@@ -10,8 +10,8 @@ import { treesAlong } from "./trees.js";
 import { contourDataUrl } from "./relief.js";
 import { MAP_SCALES, mapScaleOf, mapFileUrl, loadMapIndex, preloadImage } from "./mapScale.js";
 import { scrollFor } from "./mapView.js";
-import { loadPlaybook, pinKeyOf, routesFor } from "./playbook.js";
 import { liveSolve } from "./live3d.js";
+import { onlineOf, checkOnline, fixOnline, pairWith, ballOf, startOf, onPlatform, slotLift, TIERS, HANDS, HIGH_COUNTS, LOW_COUNTS } from "./platform.js";
 
 
 /* ============================================================
@@ -26,13 +26,6 @@ const STORE_KEY = "sss-golf-solver-v2";
 // old club ids -> the clubs' ids; the capture pipeline shipped the irons as
 // "3i" .. "9i" until 2026-10-21, which no club's fit matched
 const CLUB_MIGRATE = { "3wood": "spoon", pw: "wedge", sw: "wedge", "3i": "3iron", "5i": "5iron", "7i": "7iron", "9i": "9iron" };
-// The third-party guide's h and c the clubs were seeded with until
-// clubsWsrV1 (src/model.js DEFAULT_CLUBS is WSR's own since 2026-10-21): a
-// stored value still equal to one was never fitted nor edited.
-const GUIDE_SEEDS = {
-  driver: { h: 0.008, c: 0.35 }, spoon: { h: 0.009, c: 0.4 }, "3iron": { h: 0.009, c: 0.42 }, "5iron": { h: 0.01, c: 0.44 },
-  "7iron": { h: 0.01, c: 0.47 }, "9iron": { h: 0.011, c: 0.5 }, wedge: { h: 0.012, c: 0.55 },
-};
 // A derived.json shot row (tools/assemble-shots.mjs, tools/build-derived.mjs)
 // as the Log stores it: wind aim-relative (deg 0 = tail), the stop as carry,
 // and the pipeline's pos / bearing (the ball on its address frame's minimap
@@ -48,6 +41,22 @@ const pipelineRow = (r) => {
     raw: { speed: r.windSpeed ?? 0, deg: r.windDeg ?? 0 },
     ...(r.pos ? { pos: r.pos } : {}), ...(r.bearing != null ? { bearing: r.bearing } : {}),
     ...(r.elevFactor > 0 && r.flatEnded > 0 ? { elevFactor: r.elevFactor, flatEnded: r.flatEnded } : {}) };
+};
+
+// holesMeta as the store keeps it: the auto tree markers without `col`
+// (NSS's collision per tree, about 0.5 MB over the 21 holes), which
+// src/derivedMerge.js puts back from derived.json on every load; the player's
+// own markers (no auto) and everything else as they are.
+const storedHolesMeta = (hm) => {
+  if (!hm || typeof hm !== "object") return hm;
+  const out = {};
+  for (const [n, h] of Object.entries(hm)) {
+    const ms = h?.markers;
+    out[n] = Array.isArray(ms) && ms.some((m) => m?.auto && m.col)
+      ? { ...h, markers: ms.map((m) => { if (!(m?.auto && m.col)) return m; const { col, ...rest } = m; return rest; }) }
+      : h;
+  }
+  return out;
 };
 
 // The putt log's rows as stored or imported ({ id, hole, bars, rolled, flat }):
@@ -93,8 +102,9 @@ const NOTES = {
 const LIES = { tee: 1.0, fairway: 1.0, rough: 0.85, bunker: 0.7 };
 // v13's hand-placed tree positions (fractional x,y; an audit found 24 of the
 // 130 within 6 map px of a real tree). They only seed a fresh install's
-// markers (auto: true) until derived.json loads: its trees are WSR's own,
-// from the course placement files, with each canopy's radius, and they
+// markers (auto: true) until derived.json loads: its trees are NSS's own,
+// from the Switch game's files, with each footprint's radius and collision
+// (col), and they
 // replace every auto marker on every load (derivedMerge.js). The player's
 // own markers (no auto) are never touched.
 const TREE_SEEDS = {
@@ -162,12 +172,20 @@ const T = {
   sky: "#CBE9F6", sand: "#EAD9A4", flag: "#E5484D",
   ink: "#14301D", cream: "#F7F9F4", line: "#CFE0D2",
 };
+// What the cards name as the course and as the ball. The course is NSS's own
+// (its collision under the terrain and the live solver, its six cups, its
+// tee platform), and so is the ball since 2026-10-25 (src/model.js flies
+// src/nsssim.js; the live solver, src/live3d-core.js, reports physics "NSS");
+// the live card names it with PHYSICS_LABEL, the rec cards with
+// src/model.js's SHAPE_LABEL.
+const COURSE_LABEL = "NSS course";
+const PHYSICS_LABEL = "NSS's physics";
 
 const fmtPow = (p) => (Math.round(p * 20) / 20).toFixed(2);
 // A rec card's carry / landing / roll line (src/model.js). The roll is
-// WSR-shaped; a spinning club landing on a green or fairway shows the range
-// from full backspin to none (D4: the spin comes from the swing's stop after
-// impact, which the app cannot know). Where the course map shows water, OB
+// NSS's; a spinning club would show the range from full backspin to none
+// (D4), but src/model.js gives no spin range (rollSpin null: NSS's swing sets
+// the spin, which the app cannot know). Where the course map shows water, OB
 // or a bank at the carry, the card says so (the stop beyond assumes fairway).
 // Flown over the terrain (r.elev), it also says how far above or below the
 // ball the carry lands (from a yard), and where the ball stops when that is
@@ -193,8 +211,9 @@ const recRollLine = (r, dist) => {
 };
 // A tree-hit rec's line (src/model.js checkTrees): the tree, how the flight
 // meets it, and the best clean rec as the alternative with how it passes that
-// tree. The shapes are Wii Sports Resort's, the flight's heights WSR-shaped
-// (src/trees.js); a player's own marker is checked as a mid-size broadleaf.
+// tree. The collision is NSS's own per tree (its marker's col, src/trees.js),
+// the flight NSS's ball; a player's own marker is checked as a mid-size
+// broadleaf.
 const TREE_INK = "#8a6d1a";
 const TREE_HIT = { canopy: "through the canopy", trunk: "into the trunk" };
 const ALT_HOW = { over: "clears it (over)", under: "clears it (under)", clear: "passes beside it" };
@@ -246,21 +265,24 @@ function WindDial({ deg, setDeg, speed, topLabel = "PIN", bottomLabel = "YOU", s
 const MAP_PX_W = 250, MAP_PX_H = 304;
 const boxAspect = (b) => (b && b.y1 > b.y0 ? ((b.x1 - b.x0) * MAP_PX_W) / ((b.y1 - b.y0) * MAP_PX_H) : 1);
 
-// Pipeline pins say where they came from (tools/build-derived.mjs): src "wsr"
-// is one of WSR's own spots, decoded from the game files (set "A" = the harder
-// three, "B" = the easier three, label like "BL"); src "switch" is a spot only
-// Switch captures show (label "S1"...). Pins the player adds carry neither and
-// are numbered P1, P2... among themselves, so they never collide with the
-// specials' 1-6 or shift when a load reorders the list.
+// Pipeline pins say where they came from (tools/build-derived.mjs): src "nss"
+// is one of NSS's own six cups on the hole (the course model's cup bones,
+// decoded from the game files; derived id c0..c5, labelled "1".."6"), with
+// `difficult` on the 16 cups the game's CupDifficulties marks (H5 4, H6 5,
+// H7 4, H8 3, H9 2, H14 5, H16 0 and 4, H17 0, H18 3, H19 1 and 5, H20 2
+// and 4, H21 0 and 5 by k): online a player rated under the game's threshold
+// is never drawn one (inferred from the code). They are drawn red. Pins the
+// player adds carry no src and are numbered P1, P2... among themselves, so
+// they never collide with the cups' 1-6 or shift when a load reorders the
+// list. A stored pipeline pin of an older build (src "wsr" / "switch") lasts
+// only until derived.json loads (src/derivedMerge.js mirrors the cups).
 const pinLabels = (pins) => {
   let own = 0, pipe = 0;
   return pins.map((p) => (isPipelinePin(p) ? (pipe++, p.label ?? String(pipe)) : `P${++own}`));
 };
-const pinTitle = (p) => p.src === "switch"
-  ? `Switch-only spot (not one of WSR's), seen in ${p.seen ?? 0} of your rounds`
-  : p.src === "wsr"
-    ? `${p.set === "A" ? "A pin (harder set)" : p.set === "B" ? "B pin (easier set)" : "WSR pin"}${p.yd != null ? ` · ${p.yd} yd from the tee` : ""} · ${p.seen ? `seen in ${p.seen} of your rounds` : "not in your captures yet"}`
-    : isPipelinePin(p) ? "spot from your captures" : "your own pin";
+const pinTitle = (p) => p.src === "nss"
+  ? `NSS cup ${p.label ?? (p.k ?? 0) + 1}${p.difficult ? " · a difficult cup (red): the game marks it hard, and online a player under its rating threshold never gets it" : ""}${p.yd != null ? ` · ${p.yd} yd from the tee` : ""} · ${p.seen ? `seen in ${p.seen} of your rounds` : "not in your captures yet"}`
+  : isPipelinePin(p) ? "a spot from an older build (the next load of the course data replaces it)" : "your own pin";
 
 function GreenCanvas({ mapSrc, green, mode, onGrid, ball, cup, onTap, path, aimPt }) {
   const [phase, setPhase] = useState(0);
@@ -346,8 +368,8 @@ function GreenCanvas({ mapSrc, green, mode, onGrid, ball, cup, onTap, path, aimP
 }
 
 /* ---------------- zoomed green view ----------------
-   The putting surface at its own scale: the WSR green rendered from the game
-   files (tools/render-maps.mjs; meta.source "render") or, for a hole with no
+   The putting surface at its own scale: the green rendered from NSS's own
+   minimap files (tools/render-nss-maps.py; meta.source "render") or, for a hole with no
    render, fused from the zoomed green captures and free of the flag, pole
    and cup. It needs no projection onto the hole map: the image IS the
    green's bounding box plus its margin, so green-local (0,0)..(1,1) lands on
@@ -404,11 +426,11 @@ function GreenView({ holeNum, pins = [], curPinId = null, greenBox = null, green
         <img src={src} alt="" className="absolute inset-0 w-full h-full rounded-lg"
           style={{ objectFit: "fill", imageRendering: "auto" }} />
         <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="absolute inset-0 w-full h-full">
-          {/* the playbook route (PlaybookCard's "Show route on map"): each stroke's aim
-              line in white and the ball's path in gold, clipped to the green's view,
-              so a putt's or an approach's line onto the cup reads at this zoom */}
+          {/* the live solve's picked shot (LiveSolveCard): its aim line in white
+              and the ball's path in gold, clipped to the green's view, so an
+              approach's or a putt's line onto the cup reads at this zoom */}
           {route && route.map((st, i) => {
-            const a = toLocal(pbAt(st.from)), r = toLocal(pbAt(st.rest)), t = st.aimTo ? toLocal(pbAt(st.aimTo)) : null;
+            const a = toLocal(atFrac(st.from)), r = toLocal(atFrac(st.rest)), t = st.aimTo ? toLocal(atFrac(st.aimTo)) : null;
             return (
               <g key={`r${i}`} pointerEvents="none">
                 {t && <line x1={a.x} y1={a.y} x2={t.x} y2={t.y} stroke="#fff" strokeWidth="0.7" />}
@@ -428,20 +450,25 @@ function GreenView({ holeNum, pins = [], curPinId = null, greenBox = null, green
               </g>
             );
           })}
+          {/* every cup of the hole, numbered (NSS's six, 2.06 px apart at the
+              closest, on H9): the pin in use filled red, a difficult cup with
+              a red number and a red ring, which the pin in use keeps outside
+              its fill */}
           {pins.map((p, i) => {
             const q = toLocal(p);
             if (q.x < -8 || q.y < -8 || q.x > 108 || q.y > 108) return null;
             const cur = p.id === curPinId;
             const lab = labels[i], two = lab.length > 1;
+            const r = (cur ? 3 : 2.2) + (two ? 0.6 : 0);
             return (
               <g key={p.id} transform={`translate(${q.x} ${q.y})`}
                 onPointerDown={onPick ? (e) => { e.stopPropagation(); onPick(p.id); } : undefined}
                 style={{ cursor: onPick ? "pointer" : "default" }}>
                 <title>{pinTitle(p)}</title>
-                <circle r={(cur ? 3 : 2.2) + (two ? 0.6 : 0)} fill={cur ? T.flag : "rgba(255,255,255,0.85)"}
-                  stroke={T.ink} strokeWidth="0.7" strokeDasharray={p.src === "switch" ? "1.2 0.8" : undefined} />
+                {p.difficult && <circle r={r + 0.9} fill="none" stroke={T.flag} strokeWidth="0.7" />}
+                <circle r={r} fill={cur ? T.flag : "rgba(255,255,255,0.85)"} stroke={T.ink} strokeWidth="0.7" />
                 <text y={two ? 0.9 : 1.1} textAnchor="middle" fontSize={two ? 2.5 : 3.2} fontWeight="700"
-                  fill={cur ? "#fff" : p.set === "A" ? T.flag : T.ink}>{lab}</text>
+                  fill={cur ? "#fff" : p.difficult ? T.flag : T.ink}>{lab}</text>
               </g>
             );
           })}
@@ -451,21 +478,15 @@ function GreenView({ holeNum, pins = [], curPinId = null, greenBox = null, green
   );
 }
 
-// The ball is on a spot (the tee star, an online tier) only when it was put
-// there exactly: the ⛳ chips copy the spot's own coordinates, so an exact
-// match is what they make, and 1e-6 of the map is far under a map px. One
-// test for the chips and for HoleMap's ring, so they cannot disagree. The
-// old 0.01 reach (2.5 x 3 map px) lit both Online chips at once on 10 of the
-// 12 holes with tiers (the tiers are 4 yd apart, 0.0052-0.0152 of the map;
-// only H4 and H11 clear 0.01) and From tee as well on H10/H11/H15/H16/H18.
+// The ball is on a spot (the tee star, its platform place) only when it was
+// put there exactly: the ⛳ chip and the Online inputs copy the spot's own
+// coordinates, so an exact match is what they make, and 1e-6 of the map is
+// far under a map px (src/platform.js onPlatform makes the same test). One
+// test for the chips and for HoleMap's ring, so they cannot disagree: the 14
+// spots a ball can take on a tier (7 standing places, either hand) lie
+// 0.22-0.61 map px apart at the closest, the tiers 1.5-4.3 px apart, and the
+// platform's balls 0.3-12.2 yd from the local tee.
 const ballOn = (ball, spot) => !!(ball && spot && Math.hypot(ball.x - spot.x, ball.y - spot.y) < 1e-6);
-// The online platform's upper tier stands "a few feet" above the lower (the
-// player: upper-tier players see little more than the tops of the lower-tier
-// players' heads); unmeasured, so 1 yd. A ball there sits that far above the
-// course's ground under it (the terrain has no platform), which the solver
-// flies from (ctx.ballLift: +1.3 yd of carry on a full driver, src/model.js);
-// the lower tier is taken as the ground itself.
-const UPPER_TIER_YD = 1.0;
 // the debug contour image's size (src/relief.js): the maps' own 2x of the
 // 250x304 frame, so its lines sit on the 2x image's pixels (over a 3x / 4x map
 // it stretches over the same box, the frame being the same); 25-65 ms a hole
@@ -508,6 +529,64 @@ function useHoleMapSrc(n, scale) {
   };
 }
 
+// The live solve card: the harness's 3D model (src/live3d-core.js, in a
+// worker) on the NSS course (public/course3d v2: the Switch game's own
+// collision, cups and platform) with PHYSICS_LABEL's ball, from wherever the
+// ball is on the map: per club the power and aim whose ball stops nearest the
+// target (the line's target when one is drawn, else the pin in use, NSS's cup
+// cupKey; the cup in play), in the dial's wind, with where it rests, the
+// full-power option and a 0.1-bar sand check; tapping one draws its aim and
+// path on the map and the green. start says where the stroke starts (the
+// local tee, the player's platform ball, or the course under the ball) and
+// lift how far the ball sits above the ground there (the platform's mat).
+const CLUB_LABEL = { driver: "Driver", spoon: "Spoon", "3iron": "3-iron", "5iron": "5-iron", "7iron": "7-iron", "9iron": "9-iron", wedge: "Wedge", putter: "Putter" };
+const atFrac = (p) => ({ x: p[0], y: p[1] });
+function LiveSolveCard({ hole, line, cupKey, pin, windSpeed, windDeg, start, lift, onShow }) {
+  const [st, setSt] = useState({ busy: false, prog: null, res: null, err: null, sel: null });
+  const startKey = start ? `${start.kind}:${start.tier ?? ""}:${start.hand ?? ""}:${start.ballLocalX ?? ""}` : "ground";
+  const key = `${hole}|${line.ball?.x},${line.ball?.y}|${line.target?.x},${line.target?.y}|${cupKey ?? `${pin?.x},${pin?.y}`}|${windSpeed}|${windDeg}|${startKey}|${lift}`;
+  const [solvedKey, setSolvedKey] = useState(null);
+  const stale = st.res && solvedKey !== key;
+  const go = () => {
+    if (!line.ball || (!line.target && !pin)) return;
+    setSt({ busy: true, prog: null, res: null, err: null, sel: null }); onShow(null);
+    const k = key;
+    liveSolve({ hole, ball: line.ball, target: line.target ?? null, cupKey, pinFrac: pin, windMph: Number(windSpeed) || 0, windDeg: Number(windDeg) || 0, start, lift },
+      (pr) => setSt((x) => ({ ...x, prog: pr.done ? pr : x.prog })))
+      .then((res) => { setSt({ busy: false, prog: null, res, err: null, sel: null }); setSolvedKey(k); })
+      .catch((e) => setSt({ busy: false, prog: null, res: null, err: e.message, sel: null }));
+  };
+  const show = (i) => { const r = st.res.recs[i]; setSt((x) => ({ ...x, sel: i })); onShow([{ from: [line.ball.x, line.ball.y], rest: r.rest, aimTo: r.aimTo, holed: r.holed }]); };
+  const off = (d) => (Math.abs(d) < 0.05 ? "straight at" : `${Math.abs(d).toFixed(1)}° ${d > 0 ? "right" : "left"} of`);
+  const toWhat = line.target ? "the target" : "the pin";
+  // a miss as a golfer says it: in, within a few yards, or so far short or long and left or right
+  const where = (r) => r.holed ? "in" : r.miss < 3 ? `${r.miss.toFixed(1)} yd from ${toWhat}` : `${Math.round(Math.abs(r.long))} yd ${r.long < 0 ? "short" : "long"}${Math.abs(r.right) >= 3 ? ` and ${Math.round(Math.abs(r.right))} yd ${r.right > 0 ? "right" : "left"}` : ""}`;
+  const from = start?.kind === "platform" ? `your ball on the platform's ${start.tier} tier` : start?.kind === "local" ? "the tee" : "the ball on the map";
+  return (
+    <div className="rounded-xl border-2 px-3 py-2 text-xs" style={{ borderColor: T.flag, background: "#FFF7F4" }}>
+      <div className="disp text-[11px] font-bold mb-1">🎯 Live solve · {COURSE_LABEL}, {PHYSICS_LABEL}</div>
+      <div className="opacity-75 mb-1.5">From {from} to {toWhat}{line.target ? " (tap the map again to change it)" : ""}, in the dial's wind: each club's power and aim, flown over the course itself (its slopes, trees and the cup).</div>
+      <button onClick={go} disabled={st.busy || !line.ball} className="disp w-full py-1.5 rounded-lg text-[11px] font-bold text-white"
+        style={{ background: st.busy || !line.ball ? "#C9A9A3" : T.flag }}>
+        {st.busy ? (st.prog ? `Solving… club ${st.prog.done} of ${st.prog.of}` : "Loading the hole…") : !line.ball ? "Tap your ball on the map first" : stale ? "Solve again (the ball, target, start or wind changed)" : "Solve from the ball"}
+      </button>
+      {st.err && <div className="mt-1 font-semibold" style={{ color: T.flag }}>{st.err}</div>}
+      {st.res && (
+        <div className="space-y-1 mt-1.5" style={stale ? { opacity: 0.45 } : null}>
+          <div className="opacity-60 text-[10px]">Each club's best shot, the best first (a club that cannot get there shows the nearest it can) · {Math.round(st.res.D)} yd to {toWhat} · lie {({ 1: "fairway", 2: "rough", 3: "bunker", 6: "green", 9: "fringe", 15: "tee", 16: "bunker", 17: "sand OB" })[st.res.lie] ?? st.res.lie} · tap one to see it on the map</div>
+          {st.res.recs.slice(0, 5).map((r, i) => (
+            <button key={i} onClick={() => show(i)} className="w-full text-left rounded-lg border-2 px-2 py-1"
+              style={st.sel === i ? { background: T.flag, color: "#fff", borderColor: T.flag } : { borderColor: T.line, background: "#fff", color: T.ink }}>
+              <b>{CLUB_LABEL[r.club] ?? r.club}</b> <span className="mono font-bold">{r.bars.toFixed(2)}</span> bars{r.max ? " (max)" : ""} · aim {off(r.aimOffTarget)} {toWhat}{line.target && pin ? ` (${off(r.aimOffFlag)} the flag)` : ""} {i === 0 ? " · ◀ best" : ""} → {where(r)}, {r.holed ? "in the cup" : `in the ${r.restLie}`}{r.safe ? "" : " · ⚠ 0.1 bar off can find sand or water"}
+              {r.full && <div className="opacity-70 text-[10px]">at full power (4.00 max): aim {off(r.full.aimOffTarget)} {toWhat} → {where(r.full)}, {r.full.holed ? "in the cup" : `in the ${r.full.restLie}`}</div>}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ---------------- clickable hole map ---------------- */
 // mapSrc: the map image (useHoleMapSrc; the 2x bundle image when absent) and
 // onMapError its <img>'s fallback. The image is the 250x304 frame at any
@@ -520,140 +599,7 @@ function useHoleMapSrc(n, scale) {
 // marks keep their fitted size on screen (each drawn at 1 / zoom about its
 // spot, so 4x shows more map around a pin, not a pin twice the size) and the
 // wind badge stays in the viewport's corner, where the fitted map has it.
-// The playbook card: the route the Dolphin harness played in WSR itself to
-// the hole's target (an ace, an eagle, the albatross on 14) from the pin in
-// use, in the wind on the dial (src/playbook.js routesFor: calm, or WSR's
-// direction nearest the dial at the even speeds either side, WSR's wind
-// being 0-30 mph in steps of 2). Each stroke: the club, the bars, the aim off
-// the line from the ball to the pin, the yards before and left; tapping it
-// puts the solver's line on that stroke (the ball at its start, the target at
-// its rest), so the recs below read the same shot.
-const PB_CLUB = { driver: "Driver", spoon: "Spoon", "3iron": "3-iron", "5iron": "5-iron", "7iron": "7-iron", "9iron": "9-iron", wedge: "Wedge", putter: "Putter" };
-const PB_ARROW = ["↑", "↗", "→", "↘", "↓", "↙", "←", "↖"];
-const pbArrow = (deg) => PB_ARROW[Math.round((((deg % 360) + 360) % 360) / 45) % 8];
-const pbAt = (p) => ({ x: p[0], y: p[1] });
-// a route's score: the strokes, plus the tap-in when the last rests within 1 ft
-const PB_SCORE = { 1: "birdie", 2: "eagle", 3: "albatross" };
-function pbFinish(par, r) {
-  const last = r.strokes[r.strokes.length - 1], n = r.strokes.length + (last.holed ? 0 : 1);
-  if (par === 3 && n === 1) return "hole-in-one";
-  const name = PB_SCORE[par - n] ?? (n === par ? "par" : `${n} strokes`);
-  return last.holed ? name : `tap-in ${name}`;
-}
-function PlaybookCard({ hole, pb, pinKey, match, pick, onPick, show, onShow, onStroke, windSpeed, windDeg, line }) {
-  const box = "rounded-xl border-2 px-3 py-2 text-xs";
-  const boxStyle = { borderColor: T.turf, background: "#F4FAF5" };
-  const title = (goal) => <div className="disp text-[11px] font-bold mb-1">📘 Solved in WSR{goal ? ` · ${goal}` : ""}</div>;
-  if (!pb) return null;
-  const pin = pinKey ? pb.pins[pinKey] : null;
-  if (!pin) return <div className={box} style={boxStyle}>{title("")}<span className="opacity-70">Tap one of WSR's pins on the green to see the route the harness found for it.</span></div>;
-  const sp = Math.round(Number(windSpeed) || 0);
-  const calm = sp < 1;
-  const fallback = !calm && !match.routes.length ? routesFor(pb, pinKey, { mph: 0 }).routes : [];
-  const routes = match.routes.length ? match.routes : fallback;
-  const r = routes[Math.min(pick, routes.length - 1)] ?? null;
-  const failed = !calm && match.dir != null && (pin.unsolved ?? []).some(([d, m]) => d === match.dir && (m === 2 * Math.floor(sp / 2) || m === 2 * Math.ceil(sp / 2)));
-  const windTxt = (x) => (x.mph === 0 ? "calm" : `${x.mph} mph ${pbArrow(x.deg)}`);
-  const lineOn = (s) => ballOn(line.ball, pbAt(s.from)) && ballOn(line.target, pbAt(s.rest));
-  return (
-    <div className={box} style={boxStyle}>
-      {title(r ? pbFinish(pb.par, r) : "")}
-      <div className="opacity-75 mb-1">
-        Pin {pin.label}, wind {calm ? "calm" : `${sp} mph ${pbArrow(windDeg)}`}:{" "}
-        {calm ? "the calm route." : match.routes.length ? (match.exact && match.routes.some((x) => x.mph === sp) ? "solved in this wind." : `solved at ${match.routes.map(windTxt).join(" and ")}${sp % 2 ? " (WSR's wind runs in steps of 2 mph)" : ""}.`)
-          : failed ? "the harness found no route in this wind; the calm one for reference." : "not solved in this wind yet (the wind campaign is still running); the calm one for reference."}
-      </div>
-      {routes.length > 1 && (
-        <div className="flex gap-1 mb-1">
-          {routes.map((x, i) => (
-            <button key={i} onClick={() => onPick(i)} className="px-2 py-0.5 rounded-full border-2 text-[11px] font-bold"
-              style={i === pick ? { background: T.turf, color: "#fff", borderColor: T.turf } : { borderColor: T.line, background: "#fff", color: T.ink }}>{windTxt(x)}</button>
-          ))}
-        </div>
-      )}
-      {r && (
-        <div className="space-y-1">
-          {r.strokes.map((s, i) => {
-            // the aim as a human sets it: the game's own left alone, or degrees off it
-            // (the flag's line beside it); else degrees off the flag's line
-            const flagTxt = Math.abs(s.aim) < 0.05 ? "at the pin" : `${Math.abs(s.aim).toFixed(1)}° ${s.aim > 0 ? "right" : "left"} of the flag`;
-            const aim = s.keepAim ? "keep the game's aim (no D-pad)" : s.aimGame != null ? `${Math.abs(s.aimGame).toFixed(1)}° ${s.aimGame > 0 ? "right" : "left"} of the game's aim (${flagTxt})` : flagTxt;
-            const end = s.holed ? (s.how === "flag" ? "in, off the flag" : s.how === "hop" ? "in, on the hop" : "in")
-              : s.near ? `${Math.max(1, Math.round(s.left * 36))} in from the cup, tap in` : `${Math.round(s.left)} yd left`;
-            const on = lineOn(s);
-            return (
-              <button key={i} onClick={() => onStroke(s)} className="w-full text-left rounded-lg border-2 px-2 py-1"
-                style={on ? { background: T.turf, color: "#fff", borderColor: T.turf } : { borderColor: T.line, background: "#fff", color: T.ink }}>
-                <span className="mono font-bold">{i + 1}.</span> <b>{PB_CLUB[s.club] ?? s.club}</b> <span className="mono font-bold">{s.bars.toFixed(2)}</span> bars{s.bars > 4 ? " (past full, into the red)" : s.max ? " (max)" : ""} · aim {aim} · {Math.round(s.yd)} yd → {end}{s.sandRisk ? " · ⚠ 0.1 bar off can find sand or water" : ""}
-              </button>
-            );
-          })}
-          {r.aceWindowYd != null && <div className="opacity-60">The ace holds over {r.aceWindowYd} yd of aim across the pin.</div>}
-          {r.fallback && <div className="opacity-75">No route comes within 1 ft in two in this wind: this one gives an eagle chance, a tap-in birdie at worst.</div>}
-          {r.legacy && <div className="opacity-75">From the first campaign ({r.legacy}); the 1-ft route for this pin is still to be played.</div>}
-          <div className="flex items-center gap-2 pt-0.5">
-            <button onClick={() => onShow(!show)} className="px-2 py-0.5 rounded-full border-2 text-[11px] font-bold"
-              style={show ? { background: T.turf, color: "#fff", borderColor: T.turf } : { borderColor: T.line, background: "#fff", color: T.ink }}>{show ? "Route shown on map" : "Show route on map"}</button>
-            <span className="opacity-60 text-[10px]">Tap a stroke to put it on the line.</span>
-          </div>
-        </div>
-      )}
-      <div className="opacity-60 text-[10px] mt-1">Played in WSR, the Wii original, from a savestate of this pin's tee: the last shot holes or stops within 1 ft. Aim is in degrees off the straight line from your ball to the flag; on the map and the green the white line is that aim and the gold dashes the ball's path (the gap between them is the wind and the spin), so line the game's aim line up with the white one.</div>
-    </div>
-  );
-}
-
-// The live solve card: WSR's own physics (the harness's 3D model, src/live3d-core.js,
-// in a worker) from wherever the ball is on the map, for when a shot came off
-// the solved route: per club the power and aim whose ball stops nearest the
-// target (the line's target when one is drawn, else the pin; the cup in play),
-// in the dial's wind, with where it rests, the full-power option and a
-// 0.1-bar sand check; tapping one draws its aim and path on the map.
-function LiveSolveCard({ hole, line, pinKey, pin, windSpeed, windDeg, onTee, onShow }) {
-  const [st, setSt] = useState({ busy: false, prog: null, res: null, err: null, sel: null });
-  const key = `${hole}|${line.ball?.x},${line.ball?.y}|${line.target?.x},${line.target?.y}|${pinKey ?? pin?.x}|${windSpeed}|${windDeg}`;
-  const [solvedKey, setSolvedKey] = useState(null);
-  const stale = st.res && solvedKey !== key;
-  const go = () => {
-    if (!line.ball || (!line.target && !pin)) return;
-    setSt({ busy: true, prog: null, res: null, err: null, sel: null }); onShow(null);
-    const k = key;
-    liveSolve({ hole, ball: line.ball, target: line.target ?? null, pinKey, pinFrac: pin, windMph: Number(windSpeed) || 0, windDeg: Number(windDeg) || 0, onTee },
-      (pr) => setSt((x) => ({ ...x, prog: pr.done ? pr : x.prog })))
-      .then((res) => { setSt({ busy: false, prog: null, res, err: null, sel: null }); setSolvedKey(k); })
-      .catch((e) => setSt({ busy: false, prog: null, res: null, err: e.message, sel: null }));
-  };
-  const show = (i) => { const r = st.res.recs[i]; setSt((x) => ({ ...x, sel: i })); onShow([{ from: [line.ball.x, line.ball.y], rest: r.rest, aimTo: r.aimTo, holed: r.holed }]); };
-  const off = (d) => (Math.abs(d) < 0.05 ? "straight at" : `${Math.abs(d).toFixed(1)}° ${d > 0 ? "right" : "left"} of`);
-  const toWhat = line.target ? "the target" : "the pin";
-  // a miss as a golfer says it: in, within a few yards, or so far short or long and left or right
-  const where = (r) => r.holed ? "in" : r.miss < 3 ? `${r.miss.toFixed(1)} yd from ${toWhat}` : `${Math.round(Math.abs(r.long))} yd ${r.long < 0 ? "short" : "long"}${Math.abs(r.right) >= 3 ? ` and ${Math.round(Math.abs(r.right))} yd ${r.right > 0 ? "right" : "left"}` : ""}`;
-  return (
-    <div className="rounded-xl border-2 px-3 py-2 text-xs" style={{ borderColor: T.flag, background: "#FFF7F4" }}>
-      <div className="disp text-[11px] font-bold mb-1">🎯 Live solve · WSR's own physics</div>
-      <div className="opacity-75 mb-1.5">From the ball on the map to {toWhat}{line.target ? " (tap the map again to change it)" : ""}, in the dial's wind. For when a shot came off the solved route.</div>
-      <button onClick={go} disabled={st.busy || !line.ball} className="disp w-full py-1.5 rounded-lg text-[11px] font-bold text-white"
-        style={{ background: st.busy || !line.ball ? "#C9A9A3" : T.flag }}>
-        {st.busy ? (st.prog ? `Solving… club ${st.prog.done} of ${st.prog.of}` : "Loading the hole…") : !line.ball ? "Tap your ball on the map first" : stale ? "Solve again (the ball, target or wind changed)" : "Solve from the ball"}
-      </button>
-      {st.err && <div className="mt-1 font-semibold" style={{ color: T.flag }}>{st.err}</div>}
-      {st.res && (
-        <div className="space-y-1 mt-1.5" style={stale ? { opacity: 0.45 } : null}>
-          <div className="opacity-60 text-[10px]">Each club's best shot, the best first (a club that cannot get there shows the nearest it can) · {Math.round(st.res.D)} yd to {toWhat} · lie {({ 1: "fairway", 2: "rough", 3: "bunker", 6: "green", 9: "fringe", 15: "tee", 16: "bunker" })[st.res.lie] ?? st.res.lie} · tap one to see it on the map</div>
-          {st.res.recs.slice(0, 5).map((r, i) => (
-            <button key={i} onClick={() => show(i)} className="w-full text-left rounded-lg border-2 px-2 py-1"
-              style={st.sel === i ? { background: T.flag, color: "#fff", borderColor: T.flag } : { borderColor: T.line, background: "#fff", color: T.ink }}>
-              <b>{PB_CLUB[r.club] ?? r.club}</b> <span className="mono font-bold">{r.bars.toFixed(2)}</span> bars{r.max ? " (max)" : ""} · aim {off(r.aimOffTarget)} {toWhat}{line.target && pin ? ` (${off(r.aimOffFlag)} the flag)` : ""} {i === 0 ? " · ◀ best" : ""} → {where(r)}, {r.holed ? "in the cup" : `in the ${r.restLie}`}{r.safe ? "" : " · ⚠ 0.1 bar off can find sand or water"}
-              {r.full && <div className="opacity-70 text-[10px]">at full power (4.00 max): aim {off(r.full.aimOffTarget)} {toWhat} → {where(r.full)}, {r.full.holed ? "in the cup" : `in the ${r.full.restLie}`}</div>}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function HoleMap({ holeNum, line, onLine, markers, onMarkers, markerMode, aimPreview, cornerMode, onCorner, pins = [], curPinId = null, pinMode = false, onPins, distLabel = null, windBadge = null, teePos = null, teeOnlinePos = null, stopMarker = null, landMarker = null, treeMarker = null, route = null, overlaySrc = null, mapSrc = null, onMapError, zoom = 1 }) {
+function HoleMap({ holeNum, line, onLine, markers, onMarkers, markerMode, aimPreview, cornerMode, onCorner, pins = [], curPinId = null, pinMode = false, onPins, distLabel = null, windBadge = null, teePos = null, ballOnPlatform = false, stopMarker = null, landMarker = null, treeMarker = null, route = null, overlaySrc = null, mapSrc = null, onMapError, zoom = 1 }) {
   const imgRef = useRef(null);
   const src = mapSrc ?? HOLE_MAPS[holeNum];
   const pinLabelList = pinLabels(pins);
@@ -862,10 +808,6 @@ function HoleMap({ holeNum, line, onLine, markers, onMarkers, markerMode, aimPre
   const px = (p) => ({ x: p.x * 100, y: p.y * 100 });
   const b = line.ball ? px(line.ball) : null;
   const t = line.target ? px(line.target) : null;
-  // the ball is on the online platform: on either tier's spot, or on the one
-  // spot of a hole whose tiers are unjudged; ballOn, the same test as the ⛳ chips
-  const onlineSpots = teeOnlinePos ? (teeOnlinePos.lower && teeOnlinePos.upper ? [teeOnlinePos.lower, teeOnlinePos.upper] : [teeOnlinePos]) : [];
-  const onlineTee = onlineSpots.some((p) => ballOn(line.ball, p));
 
   // the wind badge: in the map's SVG when fitted; magnified, in an SVG of its
   // own over the viewport, at the same place in the view as on the fitted map
@@ -913,11 +855,11 @@ function HoleMap({ holeNum, line, onLine, markers, onMarkers, markerMode, aimPre
         {b && t && aimPreview && (
           <line x1={b.x} y1={b.y} x2={aimPreview.x * 100} y2={aimPreview.y * 100} stroke={T.sand} strokeWidth={k} strokeDasharray={`${1.5 * k} ${1.5 * k}`} />
         )}
-        {/* Nothing is drawn over the green: the map is WSR's own minimap art,
-            rendered from the game files at 2x (the 3x / 4x renders for the
-            Map chips' magnified views),
-            its green flat and light like the Switch's overview (the renderer holds WSR's height-contour
-            bands at one; the zoomed GreenView keeps them, lighter = higher).
+        {/* Nothing is drawn over the green: the map is NSS's own minimap art,
+            rendered from the Switch game's files at 2x (the 3x / 4x renders
+            for the Map chips' magnified views), its green with NSS's 2 m
+            plaid like the Switch's overview (the zoomed GreenView keeps the
+            green's height bands, lighter = higher).
             The SVG checker that used to fill the green's outline was drawn
             when the maps were stacked captures whose 28-px greens averaged
             to flat colour. */}
@@ -927,15 +869,13 @@ function HoleMap({ holeNum, line, onLine, markers, onMarkers, markerMode, aimPre
             <path d="M0,-2.4 L0.72,-0.74 2.5,-0.74 1.06,0.36 1.6,2.1 0,1.05 -1.6,2.1 -1.06,0.36 -2.5,-0.74 -0.72,-0.74 Z" fill="#FFD447" stroke="#8a6d1a" strokeWidth="0.25" />
           </g>
         )}
-        {/* the online (Survival Golf) platform's tiers sit 0.4-2.7 (lower)
-            and 0.8-3.9 (upper) viewBox units from the tee star on the 12
-            holes that have them, mostly inside the star's 2.5-unit arms (the
-            lower tier is within 2 yd of the star on H10 and H11, and level
-            with it along the hole but 4.6 yd beside it on H14), so markers
-            of their own covered the star. A thin white ring around the ball
-            shows only while the ball is on a tier (a ⛳ tier chip is
-            active). */}
-        {onlineTee && (
+        {/* the online (Survival Golf) platform: the ball on its place there
+            (ballOnPlatform, App's src/platform.js onPlatform test) gets a thin
+            white ring. The platform's 28 ball spots lie 0.22-0.61 map px
+            apart at the closest and its two tiers 1.5-4.3 map px apart,
+            so marks of their own would only smear over the tee star; the
+            Online inputs say where the ball is. */}
+        {ballOnPlatform && b && (
           <circle cx={b.x} cy={b.y} r={2.2 * k} fill="none" stroke="#fff" strokeWidth={0.5 * k} />
         )}
         {stopMarker && (
@@ -961,9 +901,9 @@ function HoleMap({ holeNum, line, onLine, markers, onMarkers, markerMode, aimPre
             <circle r="2.6" fill="none" stroke={T.flag} strokeWidth="0.7" />
           </g>
         )}
-        {/* the playbook's route (PlaybookCard's "Show route on map"): each
-            stroke from its start to its rest, gold dashes over a dark edge,
-            and the stroke's number at its rest */}
+        {/* the live solve's picked shot (LiveSolveCard): its aim line in
+            white, the ball's path from its start to its rest in gold dashes
+            over a dark edge, and its number at the rest */}
         {route && route.map((s, i) => (
           <g key={i}>
             {s.aimTo && <line x1={s.from[0] * 100} y1={s.from[1] * 100} x2={s.aimTo[0] * 100} y2={s.aimTo[1] * 100} stroke="#fff" strokeWidth={0.6 * k} opacity="0.95" />}
@@ -981,31 +921,34 @@ function HoleMap({ holeNum, line, onLine, markers, onMarkers, markerMode, aimPre
         {pins.map((p, i) => {
           const cur = p.id === curPinId;
           // during play only the pin in use is drawn; pin-edit mode shows the
-          // whole catalog so spots can be picked, added or removed
+          // whole catalog so spots can be picked, added or removed (the
+          // zoomed green beside the map shows all six cups, numbered)
           if (!cur && !pinMode) return null;
           const lab = pinLabelList[i];
-          // Built-in spots sit 0.6-2.4 units apart and a two-letter label is
-          // ~4.2 units wide, so in pin-edit mode labelling every spot piled
-          // them into one smear; there, only your own pins and the current
-          // pin are named and the rest are bare flags. Same marks as the
-          // zoomed green and the pin chips: A pins red, Switch-only spots
-          // dashed, and a tooltip with the spot's story.
+          // NSS's six cups sit 0.7-2.5 viewBox units from their nearest
+          // neighbour (2.06 map px at the closest, on H9; 7.4 units the
+          // furthest apart) and a label is ~2-4 units wide, so in
+          // pin-edit mode labelling every cup piled them into one smear;
+          // there, only your own pins and the current pin are named and the
+          // rest are bare flags. Same marks as the zoomed green: a difficult
+          // cup's flag red with a red ring at its foot, and a tooltip with
+          // the cup's story.
           const named = cur || !isPipelinePin(p);
-          const dash = p.src === "switch" ? "0.8 0.6" : undefined;
           return (
             <g key={p.id} transform={at(p.x * 100, p.y * 100)} style={{ pointerEvents: "auto" }}>
               <title>{pinTitle(p)}</title>
-              <circle r="1.4" fill={cur ? T.flag : "#fff"} stroke={T.ink} strokeWidth="0.5" strokeDasharray={dash} />
+              {p.difficult && <circle r="2.2" fill="none" stroke={T.flag} strokeWidth="0.45" />}
+              <circle r="1.4" fill={cur ? T.flag : "#fff"} stroke={T.ink} strokeWidth="0.5" />
               <line x1="0" y1="0" x2="0" y2="-6" stroke={cur ? T.flag : "#fff"} strokeWidth="1" />
-              <path d="M 0 -6 L 4.5 -4.5 L 0 -3 Z" fill={cur || p.set === "A" ? T.flag : "#EAD9A4"} stroke={T.ink} strokeWidth="0.3" strokeDasharray={dash} />
+              <path d="M 0 -6 L 4.5 -4.5 L 0 -3 Z" fill={cur || p.difficult ? T.flag : "#EAD9A4"} stroke={T.ink} strokeWidth="0.3" />
               {named && <text y="-7.5" textAnchor="middle" fontSize="3.4" fontWeight="700" fill="#fff" stroke={T.ink} strokeWidth="0.15">{lab}</text>}
             </g>
           );
         })}
         {/* Your own hazard markers. The course's trees are in the map itself
-            (WSR's sprites, rendered from the game files at their placement
-            positions), so the pipeline's tree markers (auto, with the
-            painted canopy's radius r and offset dy, dx) draw nothing here and
+            (NSS's minimap, rendered from the game files, paints them), so the
+            pipeline's tree markers (auto, with the collision footprint's
+            radius r and offset dy, dx) draw nothing here and
             only serve the tap rule above; the v13 seeds an install may still
             hold until derived.json loads are auto too, and draw nothing. */}
         {markers.filter((m) => !m.auto).map((m) => (
@@ -1084,6 +1027,13 @@ export default function App() {
   // the same image. Stored at the root of the app state, an additive key (an
   // install without it reads 2).
   const [mapScale, setMapScale] = useState(2);
+  // the online Survival Golf round (the Online inputs; src/platform.js):
+  // { on, tier, countHigh, countLow, place, hand }. On, the ball starts on
+  // the platform, at the place the inputs name with the ball 0.9 m to the
+  // dominant hand's side; off, on the local tee. Stored at the root of the
+  // app state, an additive key that onlineOf sanitises (an install without
+  // it reads the default: off, right-handed).
+  const [online, setOnline] = useState(() => onlineOf(null));
   const [saveState, setSaveState] = useState("");
   const [openHole, setOpenHole] = useState(null);
   const [holeMarkerEdit, setHoleMarkerEdit] = useState(false);
@@ -1103,8 +1053,8 @@ export default function App() {
   const [putt, setPutt] = useState({ ball: null, cup: null });
   // the putt log (the putting panel's "Log a flat putt"): { id, hole, bars,
   // rolled, flat } rows that fit greenSpeed, the flat roll of a full-gauge
-  // putt (src/putt.js fitGreenSpeed: WSR's 20.5 yd under 2 flat rows). Both at
-  // the store root, additive keys (an install without them reads [] / 20.5);
+  // putt (src/putt.js fitGreenSpeed: NSS's 20.13 yd under 2 flat rows). Both at
+  // the store root, additive keys (an install without them reads [] / 20.13);
   // the stored greenSpeed is for a reader of the store, the app refits it
   // from the rows on load.
   const [putts, setPutts] = useState([]);
@@ -1138,21 +1088,23 @@ export default function App() {
         setShots(loadedShots);
         setPutts(puttRows(d.putts));
         {
-          // clubsWsrV1: the seed numbers became WSR's own (src/model.js
-          // DEFAULT_CLUBS, 2026-10-21). Once, a stored club with no logged
-          // shots takes them, and a calibrated club's h or c still at the
-          // guide's seed takes WSR's (h is fitted only from rows across the
-          // wind and c only from rows with a sideways miss, so those were
-          // never data); every club is then refit from its rows as before.
+          // clubsNssV1 (2026-10-25): the seed clubs became NSS's own
+          // (src/model.js DEFAULT_CLUBS: a = NSS's full-power level stop / 4,
+          // h = c = 0), and the solver flies NSS's own wind, reading h and c
+          // only as residuals over it. A stored club from before (the guide's
+          // seeds, or WSR's since clubsWsrV1, 2026-10-21) carries a fitted
+          // or seeded a for WSR's ball and h / c as multipliers on the whole
+          // wind, which would count the wind twice; c was never refit (no
+          // pipeline row has a sideways miss), so WSR's stayed on every club.
+          // Once, every stored club takes NSS's seeds (its name and maxPower
+          // kept), and is then refit from its rows on NSS's flight, as every
+          // load does: a, h and c come back only where the rows give them.
           const stored = d.clubs ?? [];
           const merged = DEFAULT_CLUBS.map((def) => {
             const s0 = stored.find((c) => c.id === def.id);
             if (!s0) return def;
-            const cl = { ...def, ...s0 };
-            if (d.clubsWsrV1) return cl;
-            if (!loadedShots.some((s) => s.club === def.id)) return { ...cl, a: def.a, h: def.h, c: def.c };
-            const old = GUIDE_SEEDS[def.id];
-            return { ...cl, h: cl.h === old?.h ? def.h : cl.h, c: cl.c === old?.c ? def.c : cl.c };
+            if (!d.clubsNssV1) return { ...def, name: s0.name ?? def.name, maxPower: s0.maxPower ?? def.maxPower };
+            return { ...def, ...s0 };
           });
           setClubs(merged.map((c) => fitClub(c, loadedShots)));
         }
@@ -1183,6 +1135,7 @@ export default function App() {
         });
         if (d.activeRound) setActiveRound(d.activeRound);
         setMapScale(mapScaleOf(d.mapScale));
+        setOnline(onlineOf(d.online));
         // mapV5: maps.js swapped from the 219x270 originals to 250x304
         // median-stacked captures; migrate stored fractional positions with
         // the per-hole registration transforms (fNew = fOld*a + b)
@@ -1208,9 +1161,9 @@ export default function App() {
       // derived.json: pipeline output shipped with the deploy (scales, green
       // boxes, slope grids, pins, tees). First time it applies wholesale
       // (derivedV1); afterwards it only fills empty slots, so newer manual
-      // edits survive. Holes built from the WSR collision meshes (the truth
-      // source) overwrite once more on the first load after that switch
-      // (per-hole marker green.src). Pipeline pins mirror derived.json on every load. The rules
+      // edits survive. Holes built from the game's own collision (the truth
+      // source: NSS's, source "nss", before it WSR's meshes) overwrite once
+      // more on the first load after a switch (per-hole marker green.src). Pipeline pins mirror derived.json on every load. The rules
       // live in derivedMerge.js.
       try {
         const res = await fetch("/derived.json");
@@ -1255,7 +1208,8 @@ export default function App() {
   }, []);
 
   const persist = async (patch = {}) => {
-    const data = { clubs, shots, putts, greenSpeed, holesMeta, rounds, activeRound, mapScale, parFixV3: true, mapV4: true, treesV9: true, mapV5: true, derivedV1: true, clubsWsrV1: true, ...patch };
+    const data = { clubs, shots, putts, greenSpeed, holesMeta, rounds, activeRound, mapScale, online, parFixV3: true, mapV4: true, treesV9: true, mapV5: true, derivedV1: true, clubsWsrV1: true, clubsNssV1: true, ...patch };
+    data.holesMeta = storedHolesMeta(data.holesMeta);
     try {
       await window.storage.set(STORE_KEY, JSON.stringify(data));
       setSaveState("saved"); setTimeout(() => setSaveState(""), 1500);
@@ -1282,8 +1236,8 @@ export default function App() {
   const solverMap = useHoleMapSrc(tab === "solver" ? hole : null, mapScale);
   const openMap = useHoleMapSrc(tab === "holes" ? openHole : null, mapScale);
 
-  // the solver's hole's terrain (src/terrain.js: the KCL surface class and the
-  // ground height from the WSR meshes); null while it loads or when missing,
+  // the solver's hole's terrain (src/terrain.js: the surface class and the
+  // ground height from the NSS course's collision); null while it loads or when missing,
   // and the solver then assumes every landing is fairway
   const [terrain, setTerrain] = useState(null);
   useEffect(() => {
@@ -1292,34 +1246,15 @@ export default function App() {
     loadTerrain(hole).then((t) => { if (live) setTerrain(t); });
     return () => { live = false; };
   }, [hole]);
-  // the solver's hole's playbook (src/playbook.js: the routes the harness
-  // solved in WSR, per pin and wind); null while it loads or when missing,
-  // and PlaybookCard then shows nothing. pbPick: which of the matched routes
-  // (an odd speed has the even ones either side); pbShow: the route on the map
-  const [playbook, setPlaybook] = useState(null);
-  const [pbPick, setPbPick] = useState(0);
-  const [pbShow, setPbShow] = useState(false);
   // the live solve's picked shot on the map (LiveSolveCard), gone with a new hole or ball
   const [liveRoute, setLiveRoute] = useState(null);
   useEffect(() => { setLiveRoute(null); }, [hole, line.ball?.x, line.ball?.y]);
-  useEffect(() => {
-    let live = true;
-    setPlaybook(null);
-    loadPlaybook(hole).then((pb) => { if (live) setPlaybook(pb); });
-    return () => { live = false; };
-  }, [hole]);
-  const pbKey = pinKeyOf(hole, holesMeta[hole]?.curPin);
-  const pbMatch = useMemo(() => routesFor(playbook, pbKey, { mph: windSpeed, deg: windDeg }), [playbook, pbKey, windSpeed, windDeg]);
-  useEffect(() => { setPbPick(0); }, [hole, pbKey, windSpeed, windDeg]);
-  // the route the card shows, drawn on the map while pbShow (the calm one when
-  // the wind has none yet, as the card says)
-  const pbRoute = useMemo(() => {
-    if (!pbShow || !playbook || !pbKey) return null;
-    const rs = pbMatch.routes.length ? pbMatch.routes : (Number(windSpeed) >= 0.5 ? routesFor(playbook, pbKey, { mph: 0 }).routes : []);
-    return rs[Math.min(pbPick, rs.length - 1)]?.strokes ?? null;
-  }, [pbShow, playbook, pbKey, pbMatch, pbPick, windSpeed]);
+  // the pin in use and, for one of NSS's cups, its key in the live solver's
+  // course (public/course3d's meta.pins: "c0".."c5", the derived id after "d<hole>-")
+  const curPinObj = (holesMeta[hole]?.pins ?? []).find((p) => p.id === holesMeta[hole]?.curPin) ?? null;
+  const cupKey = curPinObj?.src === "nss" && typeof curPinObj.id === "string" ? curPinObj.id.slice(curPinObj.id.indexOf("-") + 1) : null;
   // and its green's heights (src/terrain.js loadGreenHeights: 0.5 yd over the
-  // WSR green box) for the putt model while the lie is green: { hole, g } once
+  // green box) for the putt model while the lie is green: { hole, g } once
   // the load settles, g null when the file is missing; while they load or when
   // missing the putt reads the painted grid. Keyed by hole, so the render
   // between a hole change and the load never reads the last hole's green.
@@ -1355,12 +1290,30 @@ export default function App() {
     if (geo && scale) setDist(Math.round(geo.srcPx * scale));
   }, [geo, scale, lie]);
 
-  // the tee box is the default hitting position (derived tee when known)
+  // Where a hole's first stroke starts (src/platform.js startOf): in an
+  // online round the player's ball on the platform (derived.json's platform
+  // and the Online inputs), else the local tee (derived.json's tee); null
+  // until derived.json has loaded. A new hole puts the ball there. So does a
+  // change of the start itself (derived.json arriving after the hole opened,
+  // the Online inputs) while the ball is unplaced or on the tee or the
+  // platform; a ball the player put elsewhere stays.
+  const startPt = startOf(holesMeta[hole], online);
+  const atStart = (b) => !b || ballOn(b, holesMeta[hole]?.tee) || !!onPlatform(b, holesMeta[hole]?.platform);
   useEffect(() => {
-    const tee = holesMeta[hole]?.tee ?? null;
-    setLine({ ball: tee ? { x: tee.x, y: tee.y } : null, target: null });
+    setLine({ ball: startPt ? { x: startPt.x, y: startPt.y } : null, target: null });
     setMarkerMode(false); setPutt({ ball: null, cup: null }); setSelRec(null);
   }, [hole]);  // eslint-disable-line
+  useEffect(() => {
+    if (!startPt) return;
+    setLine((l) => (ballOn(l.ball, startPt) || !atStart(l.ball) ? l : { ball: { x: startPt.x, y: startPt.y }, target: null }));
+  }, [startPt?.x, startPt?.y]);  // eslint-disable-line
+  // the Online inputs: sanitised, stored, and the ball put on its new start
+  const setOnlineState = (next) => {
+    const o = onlineOf(next);
+    setOnline(o); persist({ online: o });
+    const s = startOf(holesMeta[hole], o);
+    if (s) { setLine({ ball: { x: s.x, y: s.y }, target: null }); setSelRec(null); }
+  };
   useEffect(() => {
     if (lie !== "green" || putt.cup) return;
     const meta = holesMeta[hole];
@@ -1372,15 +1325,15 @@ export default function App() {
   }, [lie, hole, holesMeta, putt.cup]);
 
   // default alignment when no target is drawn: the game's default line ≈
-  // ball(tee) → current pin; keeps N-up wind convertible without tapping
+  // ball (the tee or the platform) → current pin; keeps N-up wind convertible without tapping
   const defaultBearing = useMemo(() => {
-    const from = line.ball ?? holesMeta[hole]?.tee ?? null;
+    const from = line.ball ?? startPt ?? null;
     const meta = holesMeta[hole];
     const pin = (meta?.pins ?? []).find((p) => p.id === meta?.curPin) ?? meta?.pins?.[0] ?? null;
     if (!from || !pin) return null;
     const dx = (pin.x - from.x) * MAP_W, dy = (pin.y - from.y) * MAP_H;
     return ((Math.atan2(dx, -dy) * 180) / Math.PI + 360) % 360;
-  }, [line.ball, holesMeta, hole]);
+  }, [line.ball, holesMeta, hole, startPt?.x, startPt?.y]);  // eslint-disable-line
   // windDeg state is ALWAYS stored N-up absolute; "relative to shot" is just
   // a different view of the same value, so dragging the target (which
   // changes the bearing) correctly changes the effective wind either way.
@@ -1416,14 +1369,24 @@ export default function App() {
     };
   }, [terrain, scale, line.ball, shotBearing]);
   // what the solver reads along the line; ballLift = how far the ball sits
-  // above that ground at address, yd: UPPER_TIER_YD on the online platform's
-  // upper tier (its ⛳ chip; ballOn, the chips' own test), else 0 (on the
-  // course itself, the lower tier included)
-  const teeUpper = holesMeta[hole]?.teeOnline?.upper ?? null;
-  const ballLift = teeUpper && ballOn(line.ball, teeUpper) ? UPPER_TIER_YD : 0;
+  // above that ground at address, yd: on the online platform (the ball on one
+  // of its places, src/platform.js onPlatform, the exact test ballOn makes)
+  // its tier's mat less the terrain's ground under the ball (slotLift: 0.11
+  // yd on the low tier, 1.82 on the high, on flat ground; H3 0.11 more), else
+  // 0 (on the course itself, the local tee included). It follows the ball,
+  // not the Online switch: a ball tapped off the platform gets 0.
+  const ballPlat = onPlatform(line.ball, holesMeta[hole]?.platform);
+  const ballLift = ballPlat ? slotLift(ballPlat, terrain, heightAt) : 0;
+  // the online ball the inputs name (null offline, for a pair NSS never
+  // seats or without the hole's platform), and where the live solver's stroke
+  // starts: the platform's mat (the ball's map spot raised by ballLift; lie
+  // tee), the local tee, or the course under the ball
+  const onlineBall = online.on ? ballOf(holesMeta[hole]?.platform, online) : null;
+  const liveStart = ballPlat ? { kind: "platform", tier: ballPlat.tier, hand: ballPlat.hand, ballLocalX: ballPlat.localX }
+    : ballOn(line.ball, holesMeta[hole]?.tee) ? { kind: "local" } : null;
   // the hole's trees on the line's frame (src/trees.js treesAlong): the
-  // pipeline's trees, on and off the course (WSR collides with every tree it
-  // places), with their kind, scales and base height, and your own markers
+  // pipeline's trees, on and off the course (NSS collides with every tree it
+  // places), with their kind, scales, base height and collision, and your own markers
   // as a mid-size broadleaf on the ground under them; the solver checks
   // every club's flight against them (src/model.js, "trees"). null without
   // terrain, line or scale, or a height under the ball: no check
@@ -1434,7 +1397,7 @@ export default function App() {
   }, [terrain, scale, line.ball, shotBearing, holeMarkers]);
   const solveCtx = useMemo(() => ({ surfaceAt, heightAt: heightAlong, ballLift, trees: treesOnLine }), [surfaceAt, heightAlong, ballLift, treesOnLine]);
   // the readouts under the distance field: the ball's height against the tee
-  // (the heights' datum is the WSR start, the local tee spot; the ball's lift
+  // (the heights' datum is NSS's hole origin, y 0, the local tee's level; the ball's lift
   // included) and the target's against the ball, the target being the point
   // dist along the line, where the solver aims to stop (the drawn target
   // unless max reach clamped dist). null without terrain or a height under
@@ -1787,14 +1750,14 @@ export default function App() {
                   <HoleMap holeNum={hole} line={line} onLine={setLine}
                     mapSrc={solverMap.src} onMapError={solverMap.onError}
                     markers={holesMeta[hole].markers} onMarkers={(m) => setMarkers(hole, m)}
-                    markerMode={markerMode} aimPreview={pbRoute ? null : aimPreview}
+                    markerMode={markerMode} aimPreview={liveRoute ? null : aimPreview}
                     pins={holesMeta[hole].pins} curPinId={holesMeta[hole].curPin}
                     pinMode={false} onPins={(p) => setPins(hole, p)}
                     distLabel={geo ? (scale ? `${Math.round(geo.srcPx * scale)} yd` : "? yd") : null}
                     teePos={holesMeta[hole].tee ?? null}
-                    teeOnlinePos={holesMeta[hole].teeOnline ?? null}
+                    ballOnPlatform={!!ballPlat}
                     stopMarker={stopPoint} landMarker={landPoint} treeMarker={treePoint}
-                    route={liveRoute ?? pbRoute}
+                    route={liveRoute}
                     zoom={mapScale / 2} />
                 </div>
                 <div className="grid grid-cols-2 gap-2 text-xs">
@@ -1814,48 +1777,108 @@ export default function App() {
                       </div>
                     )}
                   </div>
+                  {/* the start: the local tee, or in an online round the
+                      player's ball on the platform (startPt); Clear line
+                      puts the ball back there too */}
                   <div className="flex gap-2">
-                    {holesMeta[hole].tee && (
-                      <button onClick={() => setLine({ ball: { ...holesMeta[hole].tee }, target: null })}
-                        className="flex-1 py-1.5 rounded-xl border-2 font-bold" style={chip(ballOn(line.ball, holesMeta[hole].tee))}>
-                        ⛳ From tee
+                    {startPt && (
+                      <button onClick={() => { setLine({ ball: { x: startPt.x, y: startPt.y }, target: null }); setSelRec(null); }}
+                        title={onlineBall ? "Your ball on the online platform, where the Online inputs below put it" : "The local tee, where local play tees off"}
+                        className="flex-1 py-1.5 rounded-xl border-2 font-bold" style={chip(ballOn(line.ball, startPt))}>
+                        ⛳ {onlineBall ? "From platform" : "From tee"}
                       </button>
                     )}
-                    <button onClick={() => setLine({ ball: holesMeta[hole].tee ? { ...holesMeta[hole].tee } : null, target: null })} className="flex-1 py-1.5 rounded-xl border-2 font-bold" style={chip(false)}>
+                    <button onClick={() => setLine({ ball: startPt ? { x: startPt.x, y: startPt.y } : null, target: null })} className="flex-1 py-1.5 rounded-xl border-2 font-bold" style={chip(false)}>
                       Clear line
                     </button>
                   </div>
-                  {/* the online platform's two tiers; a single chip while none
-                      of the hole's online rounds has a judged tier (x, y only).
-                      Two chips to a line (basis = half the row less half the
-                      gap), each label kept on one line, a chip that does not
-                      fit beside another taking a line of its own: three
-                      abreast had 46 px each in the 155-px cell of a 360-px
-                      phone and broke every label into three lines. Measured
-                      in Chrome (Trebuchet MS bold): "⛳ Lower tier" is 76 px
-                      at 11 px and 70 at 10 px, and the half row is 73.5 px at
-                      360 (77 at 375), so 10 px pairs the tiers on a 360-px
-                      phone. (The "trees shown / hidden" chip that shared this
-                      row went with the app's own tree markers: the map shows
-                      the game's trees now, and your own markers have the 🌲
-                      button above.) */}
-                  {holesMeta[hole].teeOnline && (() => {
-                    const to = holesMeta[hole].teeOnline;
-                    const tiers = to.lower && to.upper ? [["⛳ Lower tier", to.lower], ["⛳ Upper tier", to.upper]] : [["⛳ Online tee", to]];
-                    return (
-                      <div className="flex flex-wrap gap-2 mt-1.5">
-                        {tiers.map(([label, p]) => (
-                          <button key={label} onClick={() => setLine({ ball: { x: p.x, y: p.y }, target: null })}
-                            title="Online Survival Golf tees off from a two-tier platform on every hole: four slots on the lower tier, four on the upper, 4 yd behind and a few feet up. Your slot can shift you up to ~5 yd sideways, so trust the 'yd to go' badge"
-                            className="grow basis-[calc(50%-0.25rem)] py-1 rounded-xl border-2 text-[10px] font-bold whitespace-nowrap"
-                            style={chip(ballOn(line.ball, p))}>
-                            {label}
-                          </button>
-                        ))}
-                      </div>
-                    );
-                  })()}
                 </div>
+                {/* Online (Survival Golf): the platform NSS tees off from on
+                    every hole (src/platform.js, NSS's own seating rule). A
+                    full-width card under the two cells: in the 155-px cell of
+                    a 360-px phone the old tier chips broke their labels into
+                    three lines. Each row is a label and its chips, the chips
+                    wrapping under it on a narrow screen; every input is
+                    stored at once (the root key online) and puts the ball on
+                    its place. The place depends only on the player's own
+                    tier, its count, the place and the hand (slots.md section
+                    1), so the other tier's count is a consistency check: a
+                    count chip keeps the tapped tier's count and moves the
+                    other tier's to the nearest NSS seats beside it
+                    (pairWith); a stored pair NSS never seats is kept as
+                    given and flagged, one tap from fixOnline's pair (the own
+                    tier and count kept), while the ball stands on the own
+                    tier's place all the same. Only a low tier with nobody on
+                    it keeps the ball on the tee. */}
+                {(() => {
+                  const plat = holesMeta[hole].platform ?? null;
+                  const chk = checkOnline(online), o = chk.online;
+                  const set = (patch) => setOnlineState({ ...online, ...patch });
+                  const setCount = (tier, n) => setOnlineState(pairWith({ ...online, [tier === "high" ? "countHigh" : "countLow"]: n }, tier));
+                  const row = "flex items-center gap-1 flex-wrap";
+                  const lab = "disp text-[10px] font-bold w-[4.75rem] shrink-0";
+                  const cc = "px-2 py-0.5 rounded-full border-2 text-[10px] font-bold";
+                  const places = Array.from({ length: Math.max(1, chk.mine) }, (_, i) => i + 1);
+                  const fixed = fixOnline(online);
+                  const seat = (h, l) => `${h} on the high tier${l ? ` and ${l} on the low` : ", none on the low"}`;
+                  return (
+                    <div className="rounded-xl border-2 p-2 text-xs space-y-1.5" style={{ borderColor: T.line, background: "#fff" }}>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="disp text-[11px] font-bold">Online platform</span>
+                        <button onClick={() => set({ on: !online.on })}
+                          title="Online Survival Golf tees off from NSS's two-tier platform on every hole: up to four players on each tier, the high one 3.5 m (3.8 yd) behind the low and 1.57 m (1.7 yd) up. NSS seats 1-4 players all on the high tier, 5 as 3 high + 2 low, 6 as 3 + 3, 7 as 4 + 3, 8 as 4 + 4, every group centred, and deals the places afresh each hole; your ball sits 0.9 m (1 yd) to your dominant hand's side of where you stand."
+                          className={cc} style={chip(online.on)}>{online.on ? "🌐 Online: on" : "🌐 Online: off"}</button>
+                      </div>
+                      {!online.on && <div className="text-[10px] opacity-60">Off: local play, the ball on the local tee. Turn it on in an online round to start from your place on the platform.</div>}
+                      {online.on && (
+                        <>
+                          <div className={row}>
+                            <span className={lab}>My tier</span>
+                            {TIERS.map((t) => <button key={t} onClick={() => set({ tier: t })} className={cc} style={chip(o.tier === t)}>{t === "high" ? "High" : "Low"}</button>)}
+                          </div>
+                          <div className={row}>
+                            <span className={lab}>Players high</span>
+                            {HIGH_COUNTS.map((n) => <button key={n} onClick={() => setCount("high", n)} className={cc} style={chip(o.countHigh === n)}>{n}</button>)}
+                          </div>
+                          <div className={row}>
+                            <span className={lab} title="the low tier never holds exactly one player">Players low</span>
+                            {LOW_COUNTS.map((n) => <button key={n} onClick={() => setCount("low", n)} className={cc} style={chip(o.countLow === n)}>{n}</button>)}
+                          </div>
+                          <div className={row}>
+                            <span className={lab} title="as you face the green">My place</span>
+                            {places.map((k) => <button key={k} onClick={() => set({ place: k })} disabled={chk.mine < 1} className={cc} style={chip(chk.mine >= 1 && o.place === k)}>{k}</button>)}
+                            <span className="text-[10px] opacity-60">from the left</span>
+                          </div>
+                          <div className={row}>
+                            <span className={lab}>I swing</span>
+                            {HANDS.map((h) => <button key={h} onClick={() => set({ hand: h })} className={cc} style={chip(o.hand === h)}>{h === "right" ? "Right-handed" : "Left-handed"}</button>)}
+                          </div>
+                          {!chk.ok ? (
+                            <div className="text-[10px] font-semibold flex items-center gap-2 flex-wrap" style={{ color: "#8a6d1a" }}>
+                              <span>⚠ You stand on the low tier, but Players low is 0: NSS seats the low tier only from 5 players (2, 3 or 4 on it), so the ball stays on the tee.</span>
+                              <button onClick={() => setOnlineState({ ...o, tier: "high" })} className={cc} style={chip(false)}>I'm on the high tier</button>
+                              <button onClick={() => setOnlineState(fixed)} className={cc} style={chip(false)}>Use {fixed.countHigh} high + {fixed.countLow} low</button>
+                            </div>
+                          ) : !plat ? (
+                            <div className="text-[10px] font-semibold" style={{ color: "#8a6d1a" }}>This hole's platform is not in the course data yet, so the ball stays on the local tee.</div>
+                          ) : onlineBall ? (
+                            <>
+                              {!chk.pairOk && (
+                                <div className="text-[10px] font-semibold flex items-center gap-2 flex-wrap" style={{ color: "#8a6d1a" }}>
+                                  <span>⚠ NSS never seats {o.countHigh} high + {o.countLow} low: beside {chk.mine} on the {o.tier} tier it seats {chk.partners.join(" or ")} on the {o.tier === "high" ? "low" : "high"}. Your ball goes by your tier's count alone.</span>
+                                  <button onClick={() => setOnlineState(fixed)} className={cc} style={chip(false)}>Use {fixed.countHigh} high + {fixed.countLow} low</button>
+                                </div>
+                              )}
+                              <div className="text-[10px] opacity-70">
+                                {chk.pairOk ? `${chk.total} player${chk.total === 1 ? "" : "s"}: ${seat(o.countHigh, o.countLow)}. ` : ""}Your ball: {o.tier} tier, {o.place} of {onlineBall.count} from the left, 0.9 m to your {o.hand} of where you stand, on the tier's mat {onlineBall.zYd.toFixed(1)} yd above the local tee{ballOn(line.ball, onlineBall) ? "" : " (tap ⛳ From platform to put it there)"}.
+                              </div>
+                            </>
+                          ) : null}
+                        </>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
             </section>
             <section className="space-y-3">
@@ -1865,15 +1888,11 @@ export default function App() {
                 greenPoly={holesMeta[hole].green?.poly ?? null}
                 grid={holesMeta[hole].green?.grid ?? null}
                 meta={holesMeta[hole].green?.view ?? null}
-                route={liveRoute ?? pbRoute}
+                route={liveRoute}
                 onPick={(id) => setCurPin(hole, id)} />
-              <PlaybookCard hole={hole} pb={playbook} pinKey={pbKey} match={pbMatch}
-                pick={pbPick} onPick={setPbPick} show={pbShow} onShow={setPbShow}
-                windSpeed={windSpeed} windDeg={windDeg} line={line}
-                onStroke={(s) => { setLine({ ball: pbAt(s.from), target: pbAt(s.rest) }); setSelRec(null); }} />
-              <LiveSolveCard hole={hole} line={line} pinKey={pbKey}
-                pin={(() => { const p = holesMeta[hole].pins.find((x) => x.id === holesMeta[hole].curPin); return p ? { x: p.x, y: p.y } : null; })()}
-                windSpeed={windSpeed} windDeg={windDeg} onTee={ballOn(line.ball, holesMeta[hole].tee)} onShow={setLiveRoute} />
+              <LiveSolveCard hole={hole} line={line} cupKey={cupKey}
+                pin={curPinObj ? { x: curPinObj.x, y: curPinObj.y } : null}
+                windSpeed={windSpeed} windDeg={windDeg} start={liveStart} lift={ballLift} onShow={setLiveRoute} />
               {activeWindRules.map((r, i) => (
                 <div key={i} className="rounded-xl border-2 px-3 py-2 text-xs font-semibold"
                   style={r.kind === "block" ? { borderColor: T.flag, background: "#FFF3F3", color: "#8C1C1C" }
@@ -1911,7 +1930,7 @@ export default function App() {
                     </div>
                   )}
                   {lie !== "green" && elevNote && (
-                    <div className="text-[11px] font-semibold opacity-70" title="Heights from the course's terrain (Wii Sports Resort's meshes): the ball against the tee spot, and the target (the distance along your line) against the ball">
+                    <div className="text-[11px] font-semibold opacity-70" title={`Heights from the course's terrain (the ${COURSE_LABEL}'s collision): the ball against the local tee (on the online platform its tier's mat), and the target (the distance along your line) against the ball`}>
                       <div>ball {fmtRise(elevNote.ball, "the tee") || "level with the tee"}</div>
                       {elevNote.target != null && <div>target {fmtRise(elevNote.target) || "level with you"}</div>}
                     </div>
@@ -1944,7 +1963,7 @@ export default function App() {
                       </div>
                       <div className="flex items-center justify-between gap-2 text-[11px]">
                         <span className="opacity-70">
-                          Slopes: {puttGround?.src === "heights" ? "mesh heights (Wii Sports Resort's green)"
+                          Slopes: {puttGround?.src === "heights" ? `mesh heights (the ${COURSE_LABEL}'s green)`
                             : puttGround?.src === "edited" ? "painted grid (edited)"
                             : greenH?.hole !== hole ? "painted grid (loading the mesh heights…)" : "painted grid (no mesh heights for this hole)"}
                         </span>
@@ -1955,7 +1974,7 @@ export default function App() {
                   <div className="rounded-lg border p-2 space-y-1.5" style={{ borderColor: T.line }}>
                     <div className="flex items-baseline justify-between gap-2">
                       <span className="disp text-xs font-bold">Log a flat putt</span>
-                      <span className="text-[10px] opacity-60 text-right">greenSpeed {greenSpeed.toFixed(1)} yd per full gauge · {greenFit.n >= 2 ? `fitted from ${greenFit.n} flat putts` : "WSR's, until 2 flat putts are logged"}</span>
+                      <span className="text-[10px] opacity-60 text-right">greenSpeed {greenSpeed.toFixed(1)} yd per full gauge · {greenFit.n >= 2 ? `fitted from ${greenFit.n} flat putts` : "NSS's, until 2 flat putts are logged"}</span>
                     </div>
                     <div className="flex items-end gap-2">
                       <label className="flex-1 text-[10px] font-bold">bars (0–4)
@@ -2035,7 +2054,7 @@ export default function App() {
                         </div>
                       </div>
                       <div className="text-[11px] opacity-60 mt-2">
-                        Aim at the gold ✛ on the green view — the dashed line is the simulated roll. {!puttSol.r.holed && `Comes ${puttSol.r.best.toFixed(1)} yd from the cup at best.`}{puttSol.holeBars && `Of the lines that drop, this aim forgives the strength most: anything from ${puttSol.holeBars.lo.toFixed(2)} to ${puttSol.holeBars.hi.toFixed(2)} bars curls in, and the read is the middle of that. `} Power {puttSol.power.toFixed(2)} of a flat putt of this length · gauge ≈ {puttSol.bars.toFixed(1)} bars{puttSol.bars > 4 ? ", past a full gauge" : ""} (WSR-shaped; greenSpeed {greenSpeed.toFixed(1)} yd per full gauge).
+                        Aim at the gold ✛ on the green view — the dashed line is the simulated roll. {!puttSol.r.holed && `Comes ${puttSol.r.best.toFixed(1)} yd from the cup at best.`}{puttSol.holeBars && `Of the lines that drop, this aim forgives the strength most: anything from ${puttSol.holeBars.lo.toFixed(2)} to ${puttSol.holeBars.hi.toFixed(2)} bars curls in, and the read is the middle of that. `} Power {puttSol.power.toFixed(2)} of a flat putt of this length · gauge ≈ {puttSol.bars.toFixed(1)} bars{puttSol.bars > 4 ? ", past a full gauge" : ""} (NSS's roll; greenSpeed {greenSpeed.toFixed(1)} yd per full gauge).
                       </div>
                     </div>
                   )}
@@ -2063,7 +2082,7 @@ export default function App() {
                       <div className="disp text-base font-bold">{r.club.name}{selRec === i && <span className="text-[10px] font-semibold ml-2 opacity-60">● stop · ◆ landing{r.tree ? " · ◯ tree" : ""} shown on map</span>}</div>
                       {r.tree && (
                         <div className="text-[11px] font-semibold mt-0.5" style={{ color: TREE_INK }}
-                          title="Checked against Wii Sports Resort's tree collision shapes (a trunk and a canopy per tree, from the game's code) along this club's flight; the heights are WSR's, so the Switch may differ">
+                          title="Checked against NSS's own tree collision (each tree's trunk and limbs, which stop the ball, and its canopy, which only slows it; from the Switch game's files) along this club's flight with NSS's ball">
                           {recTreeLine(r.tree)}
                         </div>
                       )}
@@ -2103,14 +2122,14 @@ export default function App() {
                       <div className="mt-2 text-[11px] font-semibold" style={{ color: HAZARD_LIE[r.landsOn] ? T.flag : T.ink }}>{recRollLine(r, dist)}</div>
                       {r.red && (
                         <div className="mt-1 text-[10px] font-semibold" style={{ color: T.flag }}>
-                          ⚠ needs the full bar — past the cap the bar goes red and the ball curves to a RANDOM side (WSR: up to ~35 yd for the driver, ~22 yd for a 7-iron){(lie === "rough" || lie === "bunker") && " (in WSR the red adds up to one bar of power; untested on the Switch)"}
+                          ⚠ needs the full bar — past the cap the bar goes red and the ball curves to a RANDOM side (how far is not decoded for NSS){(lie === "rough" || lie === "bunker") && " (from rough or sand NSS lets the red add up to one bar of power)"}
                         </div>
                       )}
                       {(lie === "rough" || lie === "bunker") && (
                         <div className="mt-2 text-[10px] font-semibold" style={{ color: "#8a6d1a" }}>⚠ {lie} lie: shots skew off-line more{lie === "bunker" ? ` — bar capped at ${r.cap} of ${r.club.maxPower}` : " — bar capped at ¾"}</div>
                       )}
                       <div className="mt-2 text-[11px] opacity-60">
-                        {r.calibrated > 0 ? `calibrated (${r.calibrated} shots)` : "Wii Sports Resort's numbers — calibrate this club"} · {SHAPE_LABEL}
+                        {r.calibrated > 0 ? `calibrated (${r.calibrated} shots)` : "the seed numbers — calibrate this club"} · {COURSE_LABEL} · {SHAPE_LABEL}
                       </div>
                     </div>
                   );
@@ -2190,7 +2209,7 @@ export default function App() {
                                   </div>
                                   <GreenCanvas mapSrc={openMap.src} green={m.green} mode={greenPaint ? "paint" : "view"}
                                     onGrid={(grid) => paintGrid(n, grid)} />
-                                  <div className="text-[10px] opacity-60">The putt read takes this green's slopes from Wii Sports Resort's course meshes; the arrows are the same slopes in 3 levels. Open the in-game elevation grid (B on the green) and copy it if it differs: drag in a cell in the downhill direction — short drag = gentle, long drag = steep. Tap a cell to clear it. {m.green.gridEdited ? "Your painted grid now replaces the mesh heights in the putt read; \"use mesh heights\" goes back." : "Painting makes the putt read use your grid instead."}</div>
+                                  <div className="text-[10px] opacity-60">The putt read takes this green's slopes from the {COURSE_LABEL}'s collision; the arrows are the same slopes in 3 levels. Open the in-game elevation grid (B on the green) and copy it if it differs: drag in a cell in the downhill direction — short drag = gentle, long drag = steep. Tap a cell to clear it. {m.green.gridEdited ? "Your painted grid now replaces the mesh heights in the putt read; \"use mesh heights\" goes back." : "Painting makes the putt read use your grid instead."}</div>
                                 </div>
                               )}
                             </div>
@@ -2477,10 +2496,10 @@ export default function App() {
         {/* ================= GUIDE ================= */}
         {tab === "guide" && (() => {
           const steps = [
-            ["Green box + slopes", (n) => !!holesMeta[n].green?.box && (holesMeta[n].green?.grid ?? []).some((r) => r.some(([x, y]) => x || y)), "AUTO: boundary + slope grid come from Wii Sports Resort's collision meshes (the game files); your zoomed green captures only confirm them. Manual paint in Holes → ⚙ stays available as an override."],
-            ["Pins", (n) => (holesMeta[n].pins?.length ?? 0) > 0, "AUTO: WSR's own spots are built in (from the game files). A spot that isn't one of them gets added as S1, S2… once two independent readings agree on it: two rounds, or a zoomed green plus a tee frame (which can be one round)."],
-            ["Map scale", (n) => !!holesMeta[n].scale, "AUTO: yards per map pixel from the registration of the WSR meshes to the hole maps; the tee 'yd to go' badges confirm it. (Manual fallback: Solver → tap ball, tap target, type the in-game distance → Set.)"],
-            ["Trees", (n) => (holesMeta[n].markers ?? []).some((m) => m.auto && m.r > 0 && !m.off), "AUTO: the map is the game's own minimap, rendered from the Wii Sports Resort course files with every tree where the game plants it, at its size. The app keeps those trees (the ones on the course; a tree out on the outer ground or water, where a ball is out of bounds anyway, doesn't count) so that a tap on a canopy in Edit trees mode adds no marker on top of it. Add your own markers in Holes → ⚙ for anything else that blocks a line."],
+            ["Green box + slopes", (n) => !!holesMeta[n].green?.box && (holesMeta[n].green?.grid ?? []).some((r) => r.some(([x, y]) => x || y)), "AUTO: boundary + slope grid come from the Switch game's own collision (NSS's course files); your zoomed green captures only confirm them. Manual paint in Holes → ⚙ stays available as an override."],
+            ["Pins", (n) => (holesMeta[n].pins?.length ?? 0) > 0, "AUTO: NSS's own six cups per hole are built in (from the game files), numbered 1–6; the 16 difficult ones are red. Your captures only count which cup each round played. Add your own pin in Holes → ⚙ if a cup ever looks off."],
+            ["Map scale", (n) => !!holesMeta[n].scale, "AUTO: yards per map pixel from the NSS→map fit (the game's own trees and cups registered on the hole maps); the tee 'yd to go' badges confirm it. (Manual fallback: Solver → tap ball, tap target, type the in-game distance → Set.)"],
+            ["Trees", (n) => (holesMeta[n].markers ?? []).some((m) => m.auto && m.r > 0 && !m.off), "AUTO: the map is the game's own minimap, rendered from the Switch game's files (NSS's minimap textures) with its trees as the game paints them. The app keeps those trees (the ones on the course; a tree out on the outer ground or water, where a ball is out of bounds anyway, doesn't count) so that a tap on a canopy in Edit trees mode adds no marker on top of it. Add your own markers in Holes → ⚙ for anything else that blocks a line."],
             ["Log shots", (n) => holeStats[n].shots > 0, "Phase 2: two captures per shot (address + result pop-up) — the pipeline turns them into Log rows."],
             ["Play & score", (n) => holeStats[n].times > 0, "Rounds → Start a round → enter strokes as you play. Mark blocked lines from the Solver when a rec hits trees."],
           ];
@@ -2488,7 +2507,7 @@ export default function App() {
             <div className="space-y-5">
               <section className="rounded-2xl border-2 p-4" style={{ borderColor: T.turf, background: "#fff" }}>
                 <h2 className="disp text-lg font-bold mb-1">One-time first: calibrate your clubs</h2>
-                <p className="text-xs opacity-80">Until a club has logged shots it plays Wii Sports Resort's own numbers, decoded from the game: 279 / 253 / 212 / 176 / 146 / 110 / 60 yd at full power on level fairway, driver to wedge. They replace a guide's (driver 250) that hole 10's logged full drives disproved: flown with WSR's ball over the hole's slope in their own wind, they stop within 4 yd of what was logged. The irons logged so far go further than WSR's, so log yours. Find a hole with 0–2 mph wind. Hit each club at full power (4.0) from the tee or fairway, aimed dead straight, and log every shot. Then a few full drivers into a strong headwind and a strong crosswind. ~15 shots pins the whole model.</p>
+                <p className="text-xs opacity-80">Until a club has logged shots it plays NSS's own numbers, decoded from the Switch game and checked against flights recorded in an emulator: 266 / 245 / 218 / 185 / 152 / 118 / 66 yd at full power on level fairway (carrying 240 / 220 / 191 / 161 / 130 / 100 / 55), driver to wedge. Hole 10's logged full drives, flown with NSS's ball over the hole's slope in their own wind, stop within 1.1 yd of what was logged, and the 29 logged rows a median 0.5 yd, so log yours to confirm your clubs. Find a hole with 0–2 mph wind. Hit each club at full power (4.0) from the tee or fairway, aimed dead straight, and log every shot. Then a few full drivers into a strong headwind and a strong crosswind. ~15 shots pins the whole model.</p>
               </section>
               <section>
                 <h2 className="disp text-lg font-bold mb-2">Per-hole setup, in order</h2>
@@ -2566,18 +2585,18 @@ export default function App() {
                 <h2 className="disp text-sm font-bold mb-1">Game rules the model encodes</h2>
                 <div className="text-[11px] opacity-80 space-y-1">
                   <div>1. Lies cap the usable BAR — they don't scale distance. Below the cap every bar flies normally. Rough caps at ¾ of the bar (all clubs) and skews direction more.</div>
-                  <div>2. Bunker caps: driver & spoon = 1 bar, every other club = 2 bars, putter = uncapped but the ball rolls far less in sand. So from sand, irons out-reach the driver and spoon.</div>
+                  <div>2. Bunker caps: driver & spoon = 1 bar, irons = 2 bars, wedge = 3 bars, putter = uncapped but the ball rolls far less in sand. So from sand, irons out-reach the driver and spoon.</div>
                   <div>3. Driver and Spoon cannot backspin; irons/wedge can (stop the swing mid-way; stronger swing = stronger spin; downhill landings can spin the ball away).</div>
                   <div>4. OB / water: +1 stroke, replay from the same spot.</div>
-                  <div>5. Minimap dots = flat-terrain landing points. The solver doesn't assume flat ground: it flies each club over the hole's real terrain along your line (heights from Wii Sports Resort's course meshes), so downhill carries longer and uphill shorter, and the bounce and roll follow the slope. Each rec card says how far above or below you the ball lands, the map marks its landing ◆ beside the stop ●, and under the distance you see the ball's height against the tee and the target's against you.</div>
+                  <div>5. Minimap dots = flat-terrain landing points. The solver doesn't assume flat ground: it flies each club over the hole's real terrain along your line (heights from the Switch game's own collision), so downhill carries longer and uphill shorter, and the bounce and roll follow the slope. Each rec card says how far above or below you the ball lands, the map marks its landing ◆ beside the stop ●, and under the distance you see the ball's height against the tee and the target's against you.</div>
                   <div>6. Wind arrow colour, measured on the captures: blue through 11 mph, lime from 13 to 22, pink from 24 (12 and 23 mph never came up). The dials here use the same colours, split at 12 and 24.</div>
-                  <div>7. Trajectory: driver lowest → spoon → irons rising with number → wedge highest. Low clubs duck under branches; high clubs clear them and feel more wind. The solver flies every club that can stop at your distance past the course's trees, using Wii Sports Resort's own tree collision shapes (each tree a trunk plus a canopy: a ball for the round trees, a cone for the dark pointed ones, a band of fronds for the palms, sized by the tree; your own tree markers count as a mid-size round tree) and the flight's heights from WSR. A shot into a trunk or through a canopy, where the ball drops nearly dead, gets a 🌲 TREE badge, ranks below the clear shots and names the best one that clears that tree: a lofted iron over the canopy, or a driver or spoon under the branches. Tap it to ring the tree on the map. The collision canopy is narrower than the crown the map paints (about 0.7 of it) but centred on the trunk, south of the drawn crown's centre, so a line through a drawn tree's northern edge can be clear while one along its southern edge is not; the trees beyond the course count too (WSR collides with every tree it places). Treat it as WSR's answer until the Switch confirms it.</div>
+                  <div>7. Trajectory: driver lowest → spoon → irons rising with number → wedge highest. Low clubs duck under branches; high clubs clear them and feel more wind. The solver flies every club that can stop at your distance past the course's trees with NSS's own ball, against each tree's own collision from the Switch game's files (its trunk and limbs, and its canopy: round crowns, cones for the dark pointed trees, fronds for the palms; your own tree markers count as a mid-size round tree). A trunk or limb stops the shot (the ball bounces back off the bark); a canopy only slows the ball (each tick inside it keeps 99.25 % of its speed, palm fronds 92 %), so a pass through a crown costs some 10–50 yd. A shot into a trunk, or through a canopy at a cost of a yard or more, gets a 🌲 TREE badge, ranks below the clear shots and names the best one that clears that tree: a lofted iron over the canopy, or a driver or spoon under the branches. Tap it to ring the tree on the map. The trees beyond the course count too (NSS collides with every tree it places). How much a canopy pass costs is the decode's rule, to be tuned once real shots through trees are logged.</div>
                   <div>8. Wind comes in exactly 8 directions (N/NE/E/SE/S/SW/W/NW) at integer mph, observed 0–31. The dial snaps to the 8 when set "as on minimap".</div>
-                  <div>9. All distances here are STOP distances (carry + roll), and the roll is not a fixed share. In Wii Sports Resort's physics (decoded from the game) the carry grows in step with power but the roll comes from the landing: a flatter, slower landing rolls further, so a driver rolls ~39 yd at 4 bars and ~54 at 1 bar; it rolls ~69 on a green, ~29 in rough and next to nothing in a bunker, and an iron's first bounce on a green is damped. Backspin (irons and wedge, from stopping the swing after impact) can pull a full 9-iron back ~10 yd where it would roll ~10 on without, so the cards show that range. The solver uses WSR's stop-vs-power curve for each club, scaled to your logged distances (WSR-shaped until Switch sweeps calibrate it), and reads where each shot lands from the course map. The minimap dots show flat-ground carry.</div>
-                  <div>10. You can physically swing past a capped bar — it goes red and the ball curves to a RANDOM side, more the deeper into the red (WSR: up to ~35 yd for the driver, ~22 yd for a 7-iron). On tee and fairway the red adds no distance; from rough or sand WSR adds up to one more bar (untested on the Switch). The solver never plans on it and flags the recs that need the full bar.</div>
-                  <div>11. Putts follow Wii Sports Resort's roll on a green (decoded from the game): a steady friction plus a drag that grows with speed, and a slope pulls the ball at about 0.11 yd/s² per degree (some 60 % of a real ball's: WSR tilts its gravity only half way with the slope), so a 20 yd putt runs about 4.5 % further per degree downhill and that much shorter uphill. The putter launches level, so on a slope the ball hops for a moment before it rolls, and the read includes that. The slopes come from the course meshes (heights every half yard), or from your painted grid once you edit it (Holes → the green; "use mesh heights" goes back). The cup takes a ball that passes within ~0.15 yd of its centre slowly enough that it would have stopped within ~4.4 yd past; faster ones lip out. The gauge hint is WSR-shaped: greenSpeed is how far a full-gauge putt rolls on a flat green (20.5 yd in WSR); log a few flat putts in the putting panel and it fits the Switch's. Off the green the putter rolls slower: fairway noticeably, sand slowest. No source in 20 years reports any per-bar flight penalty from rough/sand — caps are the whole mechanic until your logs say otherwise.</div>
+                  <div>9. All distances here are STOP distances (carry + roll), and the roll is not a fixed share. In NSS's physics (decoded from the Switch game and checked tick by tick against flights recorded in an emulator) the carry grows in step with power but the roll comes from the landing: on fairway a driver rolls ~25 yd at 4 bars and ~28 at 1 bar; at full power it rolls ~22 on a green, ~17 in rough and ~4 in a bunker. Where a landing only just slows enough to start rolling, the ball takes one bounce more and stops shorter, so the stop can step down as the power rises; the solver works around those steps. The cards show no backspin range: NSS's spin comes from the swing (a short finish on a strong swing), which the app cannot know. The solver uses NSS's stop-vs-power curve for each club, scaled to your logged distances, flies NSS's ball itself over the slope and in the wind, and reads where each shot lands from the course map. The minimap dots show flat-ground carry.</div>
+                  <div>10. You can physically swing past a capped bar — it goes red and the ball curves to a RANDOM side (how far is not decoded for NSS). On tee and fairway the red adds no power; from rough or sand NSS lets the power run up to one bar past the cap. The solver never plans on it and flags the recs that need the full bar.</div>
+                  <div>11. Putts follow NSS's roll on a green (decoded from the Switch game): a steady friction plus a drag that grows with speed, and a slope pulls the ball at about 0.115 yd/s² per degree (NSS's gravity on a green is 6 m/s², not 10), except that a slow ball (under about 0.55 yd/s) more than about a yard from the cup no longer feels the slope. The putter's small loft (1.14°) hops the ball for a few ticks before it rolls, and the read includes that. The slopes come from the course's collision (heights every half yard), or from your painted grid once you edit it (Holes → the green; "use mesh heights" goes back). The cup takes a ball that passes within ~0.21 yd of its centre at up to ~1.75 yd/s, a narrower window faster and none from ~5.4 yd/s; faster ones lip out. greenSpeed is how far a full-gauge putt rolls on a flat green (20.1 yd in NSS); log a few flat putts in the putting panel and it fits yours. Off the green the putter rolls slower: fairway noticeably, sand slowest. No source in 20 years reports any per-bar flight penalty from rough/sand — caps are the whole mechanic until your logs say otherwise.</div>
                   <div>12. Backspin strength scales with swing power ("the harder you swing, the stronger the backspin" — official). Capped lies therefore also cap max spin; that alone explains weaker spin from rough/sand.</div>
-                  <div>13. Pins are fixed spots, read straight from Wii Sports Resort's course files: H1 has 3, H2–H17 have 6 (B = the easier three, A = the harder three), H18 has 1, the Specials 6 each. In WSR your score picks the set — A once you're more than k/2 under par going into the round's k-th hole (−3 or better before the 4th), never in 3-hole rounds — and a random draw picks the spot within it. Switch Sports reuses these spots (your captures show both sets) and adds a few of its own, labelled S1, S2… Local play tees off from WSR's own tee spot unless you move it (Shot Position). Online Survival Golf tees off from the same two-tier platform on every hole: four slots on the lower tier, four on the upper, which is 4 yd further back and a few feet up. The lower tier is the local tee spot on some holes and up to 8 yd behind it on others (the ⛳ Lower tier / Upper tier chips put the ball on either), and your slot can put you up to ~5 yd to either side. Online captures exist on 12 holes; holes 1, 2, 3, 6, 7, 12, 13, 17 and 21 have none yet, so only the local tee is offered there. The "yd to go" badge is the authority.</div>
+                  <div>13. Pins are NSS's own six cups per hole, read straight from the Switch game's course files and numbered 1–6 (the Specials' cups too, not WSR's spots of the same numbers). The game marks 16 of them difficult (red here: H5 5, H6 6, H7 5, H8 4, H9 3, H14 6, H16 1 and 5, H17 1, H18 4, H19 2 and 6, H20 3 and 5, H21 1 and 6); online a player under its rating threshold is never drawn one (read from the code, not yet seen). Local play tees off from the local tee unless you move it (Shot Position). Online Survival Golf tees off from the same two-tier platform on every hole, the high tier 3.5 m (3.8 yd) behind the low and 1.57 m (1.7 yd) up: NSS counts the players at each hole and seats 1–4 all on the high tier, 5 as 3 high + 2 low, 6 as 3 + 3, 7 as 4 + 3 and 8 as 4 + 4 (never one alone on the low tier), every group centred (an even group on the tier's four spots 2.3 m apart, an odd one between them), and deals the places afresh each hole. Your ball sits 0.9 m (1 yd) to your dominant hand's side of where you stand, on the tier's mat. Turn Online on under the map and say your tier, how many stand on each tier, your place from the left and your hand: the ball goes there, and the solver flies it from that height. The "yd to go" badge is the authority.</div>
                   <div>14. At 0 mph the wind still HAS a direction — read it off the flag cloth on the pin.</div>
                 </div>
               </section>
@@ -2589,7 +2608,7 @@ export default function App() {
         {tab === "clubs" && (
           <section>
             <h2 className="disp text-lg font-bold mb-1">Club model</h2>
-            <p className="text-xs opacity-70 mb-3">Fitted coefficients — edit directly if you know better values. Logging shots refits automatically; a club with no shots logged keeps Wii Sports Resort's own numbers (decoded from the game: a its full-power stop on level fairway ÷ 4, h and c from its wind at full power), which hole 10's logged drives match.</p>
+            <p className="text-xs opacity-70 mb-3">Fitted coefficients — edit directly if you know better values. Logging shots refits automatically; a club with no shots logged keeps NSS's own numbers (decoded from the Switch game: a its full-power stop on level fairway ÷ 4; h and c 0, since the solver flies NSS's own wind and h and c are only what your logs show beyond it), which hole 10's logged drives match.</p>
             <div className="overflow-x-auto rounded-2xl border-2" style={{ borderColor: T.line, background: "#fff" }}>
               <table className="w-full text-xs">
                 <thead>
@@ -2625,7 +2644,7 @@ export default function App() {
               </table>
             </div>
             <p className="text-[11px] opacity-60 mt-3">
-              stop = 4a × S(power ÷ 4, landing) × (1 + h × tailwind-mph) · sidedrift = c × crosswind-mph × power. S is the club's stop-vs-power curve from Wii Sports Resort's physics (decoded from the game; {SHAPE_LABEL} until Switch sweeps calibrate it): S = 1 at 4 bars landing on fairway, so a is the full-power fairway stop ÷ 4; the carry comes off the same curve, and a landing on green, fringe, rough or sand changes the roll. Gauge is 4 bars for every club. Lies cap the usable bar (distance per bar is unchanged below the cap) — fixed values baked in: rough = 3 bars for every club; sand = wedge 3, irons 2, spoon/driver 1; putter uncapped in sand but rolls far less. Distance fits use tee/fairway shots when available, each read through the curve at its power and where it finished; a row from the capture pipeline is read as the stop the same shot would have had on level fairway (its logged stop over its elevFactor: WSR's ball flown over the hole's terrain along the shot, against level ground); blank sideways entries are skipped by the drift fit. The putter has no row here: its roll is WSR's green physics, and its gauge maps through greenSpeed ({greenSpeed.toFixed(1)} yd per full gauge, {greenFit.n >= 2 ? `fitted from ${greenFit.n} flat putts` : "WSR's"}), which the flat putts you log in the putting panel fit.
+              stop = 4a × S(power ÷ 4, landing) × (1 + h × tailwind-mph) · sidedrift = NSS's own drift + c × crosswind-mph × power. S is the club's stop-vs-power curve from {SHAPE_LABEL} (NSS's physics, decoded from the Switch game): S = 1 at 4 bars landing on fairway, so a is the full-power fairway stop ÷ 4; the carry comes off the same curve, and a landing on green, fringe, rough or sand changes the roll. With wind on the dial or slopes along your line the solver flies NSS's ball itself, its own wind in the air, so h and c are only the residuals your logs show beyond it (0 until they do). Gauge is 4 bars for every club. Lies cap the usable bar (distance per bar is unchanged below the cap) — fixed values baked in: rough = 3 bars for every club; sand = wedge 3, irons 2, spoon/driver 1; putter uncapped in sand but rolls far less. Distance fits use tee/fairway shots when available, each read through the curve at its power and where it finished; a row from the capture pipeline is read as the stop the same shot would have had on level fairway (its logged stop over its elevFactor: NSS's ball flown over the hole's terrain along the shot, against level ground); blank sideways entries are skipped by the drift fit. The putter has no row here: its roll is NSS's green physics, and its gauge maps through greenSpeed ({greenSpeed.toFixed(1)} yd per full gauge, {greenFit.n >= 2 ? `fitted from ${greenFit.n} flat putts` : "NSS's"}), which the flat putts you log in the putting panel fit.
             </p>
           </section>
         )}

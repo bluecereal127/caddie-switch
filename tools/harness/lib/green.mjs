@@ -1,4 +1,6 @@
-// The app's putt model (src/putt.js) on a green the harness plays: the field
+// WSR's putt model (src/wsrPutt.js: the app's src/putt.js as it stood before
+// it became Nintendo Switch Sports' own, 2026-10-25) on a green the harness
+// plays: the field
 // over the mesh green heights (public/terrain gNN.bin through puttField), the
 // ball and cup in green-box fractions, the launch power for a flat roll, the
 // app's roll with the cup taken away, the aim that passes the cup at a given
@@ -12,7 +14,7 @@ import { pathToFileURL } from "node:url";
 import { YD, ROOT, DERIVED, meshToMap, mapToMesh } from "./course.mjs";
 
 const imp = (p) => import(pathToFileURL(path.join(ROOT, p)).href);
-export const P = await imp("src/putt.js");
+export const P = await imp("src/wsrPutt.js");
 const { parseGreenHeights } = await imp("src/terrain.js");
 
 // a path's closest approach to the cup, in the green's east-north yards: the

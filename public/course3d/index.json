@@ -1,165 +1,383 @@
 {
- "version": 1,
+ "version": 2,
+ "src": "nss",
+ "_note": "NSS's collision meshes for the live solver (tools/build-course3d.mjs; src/live3d-core.js buildCourse reads them): per hole hNN.bin (V/T/A the ground pack, TV/TT/TA the tree pack; vertices in NSS metres, mesh = unitsPerM * nss + O) and hNN.json; WSR's physics (tools/harness/lib/model3d.mjs) on NSS's course",
+ "unitsPerM": 10,
+ "thick": 5,
+ "cropM": 50,
+ "attrMap": {
+  "5": 1,
+  "6": 2,
+  "7": 3,
+  "8": 7,
+  "10": 4,
+  "18": 6,
+  "24": 9,
+  "25": 20,
+  "32": 12,
+  "34": 12,
+  "36": 17,
+  "37": 19,
+  "39": 18,
+  "40": 12,
+  "43": 21,
+  "44": 12
+ },
+ "attrs": {
+  "1": "fairway",
+  "2": "rough",
+  "3": "bunker",
+  "4": "ob",
+  "6": "green",
+  "7": "water",
+  "9": "fringe",
+  "12": "wall",
+  "17": "sand OB",
+  "18": "air OB",
+  "19": "trunk",
+  "20": "leaf",
+  "21": "palm leaf"
+ },
  "holes": {
   "1": {
    "bin": "h01.bin",
    "json": "h01.json",
-   "bytes": 306431,
-   "sha1": "0cb7586762386d8de96c3eec1e43c3ba64d58e5b",
-   "prisms": 4683,
-   "palm": false
+   "bytes": 537763,
+   "sha1": "b6493c2e21cb8485a07b04aaea53a2a5f4e2e1db",
+   "tris": 15490,
+   "treeTris": 23567,
+   "verts": 9324,
+   "treeVerts": 12706,
+   "actorTrees": 10
   },
   "2": {
    "bin": "h02.bin",
    "json": "h02.json",
-   "bytes": 220967,
-   "sha1": "f9b7afd438348bc1d2a47fe0fb43d5aa52e24eba",
-   "prisms": 3403,
-   "palm": true
+   "bytes": 297088,
+   "sha1": "a635e1e936bb1ad31b36c9dba90c0bde5debd2a1",
+   "tris": 12619,
+   "treeTris": 8088,
+   "verts": 7981,
+   "treeVerts": 4697,
+   "actorTrees": 14
   },
   "3": {
    "bin": "h03.bin",
    "json": "h03.json",
-   "bytes": 507815,
-   "sha1": "d22b074354f81e9ffbfe1aeedac022b24dfe2cb3",
-   "prisms": 7959,
-   "palm": true
+   "bytes": 415701,
+   "sha1": "e6c60518c74e26057c3a11172a64a3fade32efc9",
+   "tris": 15907,
+   "treeTris": 13257,
+   "verts": 9143,
+   "treeVerts": 8486,
+   "actorTrees": 22
   },
   "4": {
    "bin": "h04.bin",
    "json": "h04.json",
-   "bytes": 176303,
-   "sha1": "afd162f51ef9379f57e0771c082a7dedda0a23dd",
-   "prisms": 2811,
-   "palm": true
+   "bytes": 379534,
+   "sha1": "661ab9e4208e20183639eef1342791b8e0ada591",
+   "tris": 11588,
+   "treeTris": 15578,
+   "verts": 6930,
+   "treeVerts": 8851,
+   "actorTrees": 12
   },
   "5": {
    "bin": "h05.bin",
    "json": "h05.json",
-   "bytes": 480371,
-   "sha1": "2c38cfe0e4e933f8b7ab7a7450573bdc88acc78d",
-   "prisms": 7435,
-   "palm": true
+   "bytes": 645748,
+   "sha1": "b1a175b3300708cc49c7f8b31386555f932988de",
+   "tris": 19176,
+   "treeTris": 27196,
+   "verts": 10838,
+   "treeVerts": 15924,
+   "actorTrees": 24
   },
   "6": {
    "bin": "h06.bin",
    "json": "h06.json",
-   "bytes": 400488,
-   "sha1": "7a068ad1e85c3b006a931edef5714216004ce549",
-   "prisms": 6096,
-   "palm": false
+   "bytes": 651982,
+   "sha1": "4a8c1739e8308cfc6ec7151065d2713d0d9a39a8",
+   "tris": 8676,
+   "treeTris": 39982,
+   "verts": 4544,
+   "treeVerts": 21404,
+   "actorTrees": 32
   },
   "7": {
    "bin": "h07.bin",
    "json": "h07.json",
-   "bytes": 410484,
-   "sha1": "8499485fd5edd7baf6419ff7be3e28343f20dd21",
-   "prisms": 6372,
-   "palm": true
+   "bytes": 983118,
+   "sha1": "28f979cdd97abc668e0352c75ece31ddf2514613",
+   "tris": 35064,
+   "treeTris": 35766,
+   "verts": 21347,
+   "treeVerts": 19262,
+   "actorTrees": 29
   },
   "8": {
    "bin": "h08.bin",
    "json": "h08.json",
-   "bytes": 443447,
-   "sha1": "5531ae32d880c0e2707993b776b036c7b6f556b3",
-   "prisms": 6687,
-   "palm": true
+   "bytes": 571764,
+   "sha1": "6a4127dc9ccc4c2826bbf15b04728a931fe1dcc7",
+   "tris": 16578,
+   "treeTris": 25228,
+   "verts": 9545,
+   "treeVerts": 13715,
+   "actorTrees": 18
   },
   "9": {
    "bin": "h09.bin",
    "json": "h09.json",
-   "bytes": 555102,
-   "sha1": "ab983ac5da8f05b8fbe3fb7ae218dc7663df90d9",
-   "prisms": 8422,
-   "palm": false
+   "bytes": 590302,
+   "sha1": "8fafa3b7bc7377fbda939e54e4b21982e9ca25c0",
+   "tris": 31290,
+   "treeTris": 10610,
+   "verts": 18380,
+   "treeVerts": 6370,
+   "actorTrees": 31
   },
   "10": {
    "bin": "h10.bin",
    "json": "h10.json",
-   "bytes": 562824,
-   "sha1": "dc2d2498d12e5a70a29e2b205d2159709d7c43e6",
-   "prisms": 8572,
-   "palm": false
+   "bytes": 657967,
+   "sha1": "f08d27fcf52d0c157c0507d6bc8295a6cc58c001",
+   "tris": 9530,
+   "treeTris": 39199,
+   "verts": 5116,
+   "treeVerts": 21289,
+   "actorTrees": 32
   },
   "11": {
    "bin": "h11.bin",
    "json": "h11.json",
-   "bytes": 165210,
-   "sha1": "8047b0955605683d4f7375af8b25ef3ce1b98655",
-   "prisms": 2498,
-   "palm": false
+   "bytes": 787784,
+   "sha1": "f054230bbf5542b14483c8d620e6007055e5675e",
+   "tris": 9074,
+   "treeTris": 49396,
+   "verts": 5391,
+   "treeVerts": 26150,
+   "actorTrees": 22
   },
   "12": {
    "bin": "h12.bin",
    "json": "h12.json",
-   "bytes": 612660,
-   "sha1": "20dd98dc7c56d87645cfd719d36caf27616aa5f5",
-   "prisms": 9544,
-   "palm": false
+   "bytes": 1079820,
+   "sha1": "7a65c4be5b92eec6abc3d7b6878d381c9cbf82b8",
+   "tris": 14506,
+   "treeTris": 66252,
+   "verts": 8174,
+   "treeVerts": 34702,
+   "actorTrees": 9
   },
   "13": {
    "bin": "h13.bin",
    "json": "h13.json",
-   "bytes": 207299,
-   "sha1": "06340f745ee81e0c053098802577a9a05b777367",
-   "prisms": 3163,
-   "palm": false
+   "bytes": 679558,
+   "sha1": "cd981515d863b79e5b50f04a2938bcff53f1c8bd",
+   "tris": 5031,
+   "treeTris": 45958,
+   "verts": 3064,
+   "treeVerts": 23822,
+   "actorTrees": 17
   },
   "14": {
    "bin": "h14.bin",
    "json": "h14.json",
-   "bytes": 436908,
-   "sha1": "05b3d45a636a4d1054d5a354bceacbb43d0dcc94",
-   "prisms": 6748,
-   "palm": false
+   "bytes": 426516,
+   "sha1": "650edf8c5afd044eb71108006fbd78504a7545e5",
+   "tris": 18667,
+   "treeTris": 11600,
+   "verts": 11070,
+   "treeVerts": 6817,
+   "actorTrees": 37
   },
   "15": {
    "bin": "h15.bin",
    "json": "h15.json",
-   "bytes": 460662,
-   "sha1": "c89e30814a2318af9875e35e5f485b4b3c6e1b17",
-   "prisms": 6958,
-   "palm": false
+   "bytes": 853226,
+   "sha1": "c5796813514933192cdb29d1f417b5e9219d71a9",
+   "tris": 27001,
+   "treeTris": 34598,
+   "verts": 16595,
+   "treeVerts": 18574,
+   "actorTrees": 27
   },
   "16": {
    "bin": "h16.bin",
    "json": "h16.json",
-   "bytes": 271265,
-   "sha1": "4996d65158cd8eabcd2647616ef8cfed60c84006",
-   "prisms": 4105,
-   "palm": false
+   "bytes": 1387042,
+   "sha1": "ea86328184706c5bd8140a08fc4b233fa8078a11",
+   "tris": 6321,
+   "treeTris": 98642,
+   "verts": 3386,
+   "treeVerts": 50972,
+   "actorTrees": 32
   },
   "17": {
    "bin": "h17.bin",
    "json": "h17.json",
-   "bytes": 269928,
-   "sha1": "1c34593859cb4e2a94fac8ae8427e59b38e9345b",
-   "prisms": 4084,
-   "palm": false
+   "bytes": 613897,
+   "sha1": "83822b569f24db448b570e67ea5944687bd5ddd4",
+   "tris": 28548,
+   "treeTris": 14969,
+   "verts": 17740,
+   "treeVerts": 8033,
+   "actorTrees": 15
   },
   "18": {
    "bin": "h18.bin",
    "json": "h18.json",
-   "bytes": 522228,
-   "sha1": "d99bb870e83077448d155791d0b8620a91dc755f",
-   "prisms": 8076,
-   "palm": false
+   "bytes": 1008912,
+   "sha1": "362a08e6633951a1bd426a34d60202289c494f9b",
+   "tris": 35432,
+   "treeTris": 37096,
+   "verts": 22103,
+   "treeVerts": 19665,
+   "actorTrees": 19
+  },
+  "19": {
+   "bin": "h19.bin",
+   "json": "h19.json",
+   "bytes": 756038,
+   "sha1": "a4928b799cf74f0de9c122d99041903d5e261304",
+   "tris": 18679,
+   "treeTris": 35026,
+   "verts": 11523,
+   "treeVerts": 20152,
+   "actorTrees": 17
+  },
+  "20": {
+   "bin": "h20.bin",
+   "json": "h20.json",
+   "bytes": 395302,
+   "sha1": "c57e650cc54ff7fab4cf1bfd09154b5be34ffb1f",
+   "tris": 21897,
+   "treeTris": 6086,
+   "verts": 13143,
+   "treeVerts": 3475,
+   "actorTrees": 18
+  },
+  "21": {
+   "bin": "h21.bin",
+   "json": "h21.json",
+   "bytes": 501579,
+   "sha1": "3ecd287fc66f1b2780291abb5e50e712dd2b175e",
+   "tris": 14299,
+   "treeTris": 21543,
+   "verts": 8161,
+   "treeVerts": 12729,
+   "actorTrees": 7
   }
  },
- "palm": {
-  "bin": "palm.bin",
-  "n": 404,
-  "thick": 5,
-  "offs": {
-   "PV": 0,
-   "FN": 4848,
-   "E1": 9696,
-   "E2": 14544,
-   "E3": 19392,
-   "H": 24240,
-   "attr": 25856
+ "source": {
+  "1": {
+   "field": "04c6f095233660beafc82f74435a81b41c84233b",
+   "covers": "96de466efe7120528cb057baadc350ea25b6f9ec",
+   "leaf": "1b3492e74305c76961df74e086e10e8c852c36c3"
   },
-  "bytes": 26260,
-  "sha1": "5afe3790004eaa124d8501d6ff1aabe0637127b1"
+  "2": {
+   "field": "e290fb1a99303f2cdb08c0ac2d364174be1658c3",
+   "covers": "3f1bc53845b8eafafdf5b3fc5b4380da0eb82140",
+   "leaf": "15481a8103a905ac043bfc8caa0cb16848811e34"
+  },
+  "3": {
+   "field": "8269d83ea0bbe09f9cd3e438437a5a42802398a5",
+   "covers": "8e2c889d250d2cf97d4c7b06846f0cc64704d567",
+   "leaf": "0b6ba056f124bfa841f5283d572723bba4f54699",
+   "water": "a5c55ff4452dea6bdd0725c0ee0ccd4d7b512472"
+  },
+  "4": {
+   "field": "d87b70472e0dd55bfcfc6fececc24214addf0fdb",
+   "covers": "1bd972999fe65bbc2df605b51575ec4a7d80fd39",
+   "leaf": "c6d63966b8bbd4d77e7d32d7ca75907e3d94a5de"
+  },
+  "5": {
+   "field": "e78244d13489ca35d985ea9b8ea128762a187fff",
+   "covers": "0534f3433417a94c852b6d7e8e27666e80ec4ae1",
+   "leaf": "2beed087b9dece2623cbbfb231dc3a1aa944181e"
+  },
+  "6": {
+   "field": "f5586ff04f8b8da5ce352600a9d578d69d23b40a",
+   "covers": "729c5e61f2bbe9fd01eee2ea811f902d23763b05",
+   "leaf": "13339b2c33ab08bce1452a8f4bbf755dcef7858e"
+  },
+  "7": {
+   "field": "286fbe26f494f5e6af44b6a9aec599766805803c",
+   "covers": "c029a5946fd4a7127844056cac1bfb181f8ab54c",
+   "leaf": "17c6d82b069396ef277abc21a0c50380fe84a2d8"
+  },
+  "8": {
+   "field": "b6b86cb839b131353b8f9ab220c40dc55bffac91",
+   "covers": "685fb839e8ecf83a81f003f6d50407c828fd00eb",
+   "leaf": "9d76e521d1a08dd2419eac245237dcf8f0c6b584"
+  },
+  "9": {
+   "field": "255f0caf642f83e5535b003a5186d8977f74044e",
+   "covers": "5b02b285a806e257f14dbbec3b4e4cd2611862ea",
+   "leaf": "3543c8ccca1444eaad1d33d789fe88d990c61922"
+  },
+  "10": {
+   "field": "485c1b4814a30f273a71f6dda389e5ade7f9d69b",
+   "covers": "983cddecb260219bf0f9bdac8d8027295258a456",
+   "leaf": "e0578f871bf9fd8703cdc3e681e69a9164399091"
+  },
+  "11": {
+   "field": "42d304c96035e3e677852596cea4ccc77b213434",
+   "covers": "35e6b19a6c71ae0b7ee0047941c72769af684e61",
+   "leaf": "2618cbb7b952325ce414aabfda492f32b06cb87c"
+  },
+  "12": {
+   "field": "4319516492849fdee2aa43f97082c1b0914449c0",
+   "covers": "3aa8018b4bd34b6011a9493c704b7280350a71bc",
+   "leaf": "dd37e039cd7c662c73916d12ac3e55eb9c3840c4"
+  },
+  "13": {
+   "field": "94067b15d562b34b2c25facf9aa1209f29925f74",
+   "covers": "99150fd24d82e6c91a4c01adfa3751eecaa4ff26",
+   "leaf": "40a9617261f94e288e2f6eccaa7451128619449e"
+  },
+  "14": {
+   "field": "c20c0a68505f6057b2a5f0abd5072e652336d4a3",
+   "covers": "998f7e4dceeaa769d4860dee798dd0f4e802ae77",
+   "leaf": "9375cc93a03bc79a156c1185212f2f8e09ed2d9a"
+  },
+  "15": {
+   "field": "a22adcbfb81fac6e82215266dc764a9109a5dd5b",
+   "covers": "c75beabb111a5278094d9b3cb59cddcf014a42ad",
+   "leaf": "9f987e227268b3fcc5c2c88aa773ab9e02e4fc3d"
+  },
+  "16": {
+   "field": "331d3400f37a3d00bbdb1f235785e6ee75d5f612",
+   "covers": "8379916f73faa7cf813e7b514959a144a870c756",
+   "leaf": "b74fbfc59f463ba2051ce86e76d31b72c6fdf3c6"
+  },
+  "17": {
+   "field": "eb1ee9100e65e04e9d898006b77fa1d7d34e7be2",
+   "covers": "1f3d1b334382df0bb63c27da9922fb4bcdf268a2",
+   "leaf": "454979276075f3391eaf49a6ee9525511d49cc37"
+  },
+  "18": {
+   "field": "318730c9e57ca125aad56dc7919e98a26f6bb799",
+   "covers": "b6690244845c052883f5806a639ed221e8f4d05a",
+   "leaf": "d49b30068212c4a626ca746da35c0596461f72f1"
+  },
+  "19": {
+   "field": "c6eee0aea2a56cc0622503e953d54d67cd256f78",
+   "covers": "2868a62c51692260dd40e38f877e05bacd56918b",
+   "leaf": "487c375fc0972e8ca4b4c3b9f5bbc3565de3b0ba"
+  },
+  "20": {
+   "field": "ee5409475ea95da3bd987fcf968f3936c5088bde",
+   "covers": "1fc9f7f871cca3a4ba4c48b3cadbd568055500bf",
+   "leaf": "c35493e9bac6e8d79512143fd321796b104ff84e"
+  },
+  "21": {
+   "field": "36d2ddc684a3bb63965917e05f0552ac1c674249",
+   "covers": "7abea5cc6750aed91e0a06f893600fc5a90d0eae",
+   "leaf": "01533dff2a2efce909fad80c9f934293397cbfb4"
+  },
+  "trees": "de3ca134829919dc4701f661e6ce5e8c3ac8dabe"
  }
 }

@@ -1,17 +1,25 @@
 // Assemble the app's shipped course data from the pipeline outputs:
-//   src/maps.js       base64-JPEG hole maps: the renders of WSR's own minimap
-//                     (tools/render-maps.mjs, captures/derived/render/hNN.png,
-//                     the 250x304 frame at 2x); a hole with no render ships
-//                     its median-stacked captures as before
+//   src/maps.js       base64-JPEG hole maps: the renders of NSS's own minimap
+//                     (tools/render-nss-maps.py, captures/derived/render-nss/
+//                     hNN.png, the 250x304 frame at 2x); a hole with no render
+//                     ships its median-stacked captures as before
 //   src/greens.js     the zoomed green views: the renderer's green crops, or
 //                     the capture-fused texture where there is no crop
 //   src/mapxform.js   old->new fractional transforms (for the one-time
 //                     migration of stored positions) + new map px size
 //   public/derived.json  per-hole scale, green box, quantized 9x9 slope
 //                     grid (app convention: unit direction x magnitude
-//                     1|2|3), pins, tees and trees in map-fractional coords;
-//                     the importable shot rows, each flown over its hole's
-//                     terrain (elevFactor, flatEnded), and excludedShots
+//                     1|2|3) from NSS's collision (tools/nss-truth.json,
+//                     source "nss", rev "nss-<hash>"), pins (NSS's six cups),
+//                     the tee (NSS's GlfTeeOBJ), the online platform and the
+//                     trees (NSS's, tools/nss-trees.json) in map-fractional
+//                     coords; the importable shot rows, each flown over its
+//                     hole's terrain (elevFactor, flatEnded), and excludedShots
+// Every source of course data is NSS's own (the Switch game's files, through
+// tools/nss-export.mjs, nss-truth.mjs, nss-trees-export.mjs and
+// render-nss-maps.py); none of them may be missing: a silent fallback to WSR's
+// would flip the stored pin ids, the green geometry's rev and the tree ids on
+// every build. WSR's data no longer enters derived.json.
 //   node tools/build-derived.mjs
 import { readFileSync, writeFileSync, mkdirSync, existsSync, rmSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -22,51 +30,64 @@ import { panelRect, cropRect } from "./lib/panel.mjs";
 import { flagCupMask, inCompass } from "./lib/greensurface.mjs";
 import { fileMs } from "./lib/ulid.mjs";
 import { exifMs } from "./lib/exif.mjs";
-import { run as runWsr, CLUBS as WSR_CLUBS } from "./lib/wsrsim.mjs";
 import { parseTerrain, heightAt as terrainHeightAt, classAt, lieOf } from "../src/terrain.js";
-import { lineProfile, simProfile } from "../src/model.js";
+import { lineProfile, elevFlight } from "../src/model.js";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const INBOX = join(ROOT, "captures", "inbox");
 const D = join(ROOT, "captures", "derived");
 const mapsMeta = JSON.parse(readFileSync(join(D, "maps.json"), "utf8")).holes;
 const register = JSON.parse(readFileSync(join(D, "register.json"), "utf8"));
-// The rendered hole maps and green crops (tools/render-maps.mjs: WSR's own
-// minimap model, textures and tree sprites from the course archives,
-// rasterised into the 250x304 frame at 2x, and each WSR green box plus its
-// margin at the box's true aspect). A hole that has them ships them; one
-// that does not falls back to its median-stacked captures and the fused zoom
-// texture, and the log says so. index.json is read to check that a crop on
-// disk was rendered for the green box the truth now has, and that a render
-// is the WSR art (the renderer's cross-check arts write to another directory
-// by default, but an explicit --out can put them here under the same names).
-const RENDER = join(D, "render");
+// The rendered hole maps and green crops (tools/render-nss-maps.py: NSS's own
+// minimap, the baked textures of Model/MiniMap_Field_Fld_GolfCourseNN with the
+// game's minimap shaders and the green's 2 m plaid, placed through
+// tools/nss-registration.json into the 250x304 frame at 2x, 3x and 4x, and
+// each NSS green box plus its margin at the box's true aspect). A hole that
+// has them ships them; one that does not falls back to its median-stacked
+// captures and the fused zoom texture, and the log says so. index.json is
+// read to check that a render is NSS's art with the 2 m plaid (an earlier
+// render with the GreenAreaSize / 25 tile, or another art written here by an
+// explicit --out, ships the capture stack instead) and that a crop on disk
+// was rendered for the green box the truth now has.
+const RENDER = join(D, "render-nss");
 let renderIdx = {};
 try { renderIdx = JSON.parse(readFileSync(join(RENDER, "index.json"), "utf8")); } catch {}
 const renderIndex = renderIdx.holes ?? {};
+const RENDER_ART = "nss", RENDER_PLAID_M = 2;
 // JPEG quality of the shipped renders. A map at 2x has four times the pixels
-// of the stack it replaces and WSR's textures are dense (the mottled rough and
-// the OB pattern cover most of a frame), so a 500x608 frame runs 62-108 KB at
-// q82 against ~18 KB for a 250x304 stack: src/maps.js would be 2.33 MB of
-// base64 at q82. At q78 it is 2.08 MB (55-96 KB per hole), and crops of H7
-// encoded at q78, q80 and q82, shown at 2x of the render, cannot be told
-// apart; the quantisation hides in the textures' own noise. The green crops
-// (250-290 px) total 244 KB at q82 (227 KB at q80, 288 KB at q86), under
-// the 352 KB (360,042 B) the fused 256x256 capture textures took at q86,
-// so they keep q82.
+// of the stack it replaces, so a 500x608 frame of WSR's dense textures ran
+// 62-108 KB at q82 against ~18 KB for a 250x304 stack; at q78 (55-96 KB per
+// hole) crops encoded at q78, q80 and q82, shown at 2x of the render, could
+// not be told apart, the quantisation hiding in the textures' own noise.
+// NSS's baked minimap is smoother and runs about half that at the same
+// quality (tools/build-map-scales.mjs's 3x / 4x sets, q78 too). The green
+// crops keep q82, as they did for WSR's renders.
 const MAP_JPEG_Q = 78, GREEN_JPEG_Q = 82;
 let mapBytes = 0, greenBytes = 0, mapsFromRender = 0, greensFromRender = 0;
-// WSR collision-mesh truth (tools/wsr-truth.json, written by tools/wsr-truth.mjs).
-// The user's rule: when in doubt the WSR data is the truth and derived data
-// adjusts to it. Where a hole has it, the WSR green box replaces the capture
-// projection (so outline, pin sightings, pin zones and the transplanted green
-// all follow it) and the WSR scale and slope grid replace the capture ones.
-// With tools/wsr-pins.json as well, pins are WSR's own spots and the tee is
-// the WSR player start (see WSRP below). Without the files, or for a hole they
-// lack, the capture data is used as before: pins are the sighting clusters and
-// the tee is the detected marker kept on the WSR tee pad.
-let WSR = null;
-try { WSR = JSON.parse(readFileSync(join(ROOT, "tools", "wsr-truth.json"), "utf8")).holes; } catch {}
+// NSS collision-mesh truth (tools/nss-truth.json, written by tools/nss-truth.mjs
+// from the Switch game's field meshes through tools/nss-registration.json):
+// per hole the scale (yd per map px), the green box and outline (NSS's
+// GolfGreen triangles) and the 9x9 slope grid with slopeMaxPct. The user's
+// rule: NSS's own data is the truth and derived data adjusts to it, so the
+// NSS green box replaces the capture projection (outline, pin sightings and
+// the transplanted green all follow it) and the NSS scale and slope grid
+// replace the capture ones. Required: without it the build stops (a fallback
+// to WSR's geometry would flip every hole's rev, and the app would re-apply
+// the other geometry on each flip).
+let TRUTH = null;
+try { TRUTH = JSON.parse(readFileSync(join(ROOT, "tools", "nss-truth.json"), "utf8")).holes; }
+catch (e) { console.error(`tools/nss-truth.json: ${e.message}. It is required (rerun node tools/nss-truth.mjs); nothing written.`); process.exit(1); }
+{
+  const box = (b) => b && ["x0", "y0", "x1", "y1"].every((k) => Number.isFinite(b[k])) && b.x1 > b.x0 && b.y1 > b.y0;
+  const bad = [];
+  for (let hole = 1; hole <= 21; hole++) {
+    const t = TRUTH?.[hole];
+    if (!t || !(t.scale > 0) || !box(t.greenBox) || !Array.isArray(t.greenPoly) || t.greenPoly.length < 3
+      || !Array.isArray(t.grid) || t.grid.length !== 9 || !t.grid.every((r) => Array.isArray(r) && r.length === 9) || !Number.isFinite(t.slopeMaxPct))
+      bad.push(`H${hole}: ${t ? "malformed (scale, greenBox, greenPoly, the 9x9 grid, slopeMaxPct)" : "missing"}`);
+  }
+  if (bad.length) { console.error(`tools/nss-truth.json refused (rerun node tools/nss-truth.mjs); nothing written:\n  ${bad.join("\n  ")}`); process.exit(1); }
+}
 
 const isFlagPink = (p) => p[0] > 190 && p[2] > 120 && p[1] < 110 && p[0] - p[1] > 100;
 const colorDist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
@@ -225,21 +246,22 @@ function quantizeGrid(grid) {
   }));
 }
 
-const mapsJs = ["// AUTO-GENERATED by tools/build-derived.mjs: the hole maps rendered from the",
-  "// WSR course data by tools/render-maps.mjs (500x608 = the 250x304 map frame",
-  "// at 2x; a hole with no render ships its median-stacked captures at 250x304).",
-  "// Fractional coordinates as always.", "export const HOLE_MAPS = {"];
-const greensJs = ["// AUTO-GENERATED by tools/build-derived.mjs: each green rendered from the WSR",
-  "// course data (tools/render-maps.mjs) in the green's OWN frame: the WSR green",
-  "// box plus 12% of it on every side, at the box's true aspect, so box-local",
-  "// (u, v) sits at (u + 0.12) / 1.24 of the image (derived.json's greenView",
-  "// carries aspect and margin). A hole with no render crop ships the fused,",
-  "// flag-free zoom-capture texture instead (256x256, the same margin).",
+const mapsJs = ["// AUTO-GENERATED by tools/build-derived.mjs: the hole maps, NSS's own minimap",
+  "// rendered from the Switch game's files by tools/render-nss-maps.py (500x608 =",
+  "// the 250x304 map frame at 2x; a hole with no render ships its median-stacked",
+  "// captures at 250x304). Fractional coordinates as always.", "export const HOLE_MAPS = {"];
+const greensJs = ["// AUTO-GENERATED by tools/build-derived.mjs: each green, NSS's own minimap green",
+  "// (tools/render-nss-maps.py, the Terrain view: the map, the plaid and the height",
+  "// bands) in the green's OWN frame: the NSS green box (tools/nss-truth.json)",
+  "// plus 12% of it on every side, at the box's true aspect, so box-local (u, v)",
+  "// sits at (u + 0.12) / 1.24 of the image (derived.json's greenView carries",
+  "// aspect and margin). A hole with no render crop ships the fused, flag-free",
+  "// zoom-capture texture instead (256x256, the same margin).",
   "export const GREEN_VIEWS = {"];
 const greenMeta = {};
 // ---------------------------------------------------------------------------
 // GREEN TRANSPLANT (the fallback for a hole with no render, since 2026-10-18;
-// the render draws WSR's own green)
+// the render draws the game's own green)
 // The hole overview renders the green about 28px across; the zoomed green
 // captures render the same surface 3-8x larger (the projection solves k at
 // 0.12-0.37). So rather than patching the overview's green in place, rebuild
@@ -343,8 +365,8 @@ function greenTexture(g) {
 // side, so box fraction c lives at texture coordinate (c + M) / (1 + 2M);
 // mapping the box onto the whole texture (as this did until 2026-10) painted
 // every green at 81% of its size with fringe texels inside the outline.
-// poly is the green outline in box-normalized coords (the WSR outline when
-// known). The texture must also look like the overview there: below
+// poly is the green outline in box-normalized coords (the truth's outline).
+// The texture must also look like the overview there: below
 // MIN_TRANSPLANT_R normalized correlation the overview keeps its own art. The
 // check runs over the texture's whole footprint (box plus margin), where the
 // fringe edge and bunkers give it structure; the putting surface alone is too
@@ -408,169 +430,120 @@ function transplantGreen(hole, img, box, poly, t) {
   return { done: true, r: ncc };
 }
 
-// Content revision of a hole's WSR geometry (FNV-1a over scale, box, outline,
-// grid). The app re-applies WSR values whenever it changes, so a corrected
-// truth reaches stored state while unchanged holes keep manual edits.
-function wsrRev(wt) {
+// Content revision of a hole's geometry (FNV-1a over scale, box, outline,
+// grid), prefixed with its source: "nss-<hex>". The app re-applies the
+// geometry whenever it changes (src/derivedMerge.js, green.src against rev),
+// so a corrected truth reaches stored state while unchanged holes keep manual
+// edits; the prefix makes the switch from WSR's geometry ("wsr-<hex>", the
+// old wsrRev) re-apply once on every hole even where the hash would agree.
+function geomRev(wt, source) {
   const s = JSON.stringify([wt.scale, wt.greenBox, wt.greenPoly, wt.grid]);
   let h = 0x811c9dc5;
   for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
-  return "wsr-" + h.toString(16).padStart(8, "0");
+  return `${source}-${h.toString(16).padStart(8, "0")}`;
 }
-
-// nearest point of a polygon (map px) to (x, y); returns (x, y) if inside
-function snapIntoPoly(x, y, poly) {
-  let inside = false;
-  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
-    const [xi, yi] = poly[i], [xj, yj] = poly[j];
-    if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
-  }
-  if (inside) return [x, y, false];
-  let best = null;
-  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
-    const [ax, ay] = poly[j], [bx, by] = poly[i];
-    const L2 = (bx - ax) ** 2 + (by - ay) ** 2 || 1e-9;
-    const t = Math.max(0, Math.min(1, ((x - ax) * (bx - ax) + (y - ay) * (by - ay)) / L2));
-    const qx = ax + t * (bx - ax), qy = ay + t * (by - ay), d = Math.hypot(x - qx, y - qy);
-    if (!best || d < best.d) best = { d, qx, qy };
-  }
-  return [best.qx, best.qy, true];
-}
-
-// Where the ball sits on the WSR tee pad: the detected markers all lie on their
-// pads and match the in-game yardage better than the pad centre does, sitting
-// a few yards toward the green. The median of that offset places the ball on
-// holes with no detected marker.
 const MAP_W = 250, MAP_H = 304;
-const teeAxis = (wt) => {
-  const ux = (wt.greenCentre[0] - wt.tee.x) * MAP_W, uy = (wt.greenCentre[1] - wt.tee.y) * MAP_H;
-  const L = Math.hypot(ux, uy) || 1;
-  return [ux / L, uy / L];
-};
-let TEE_FORWARD_YD = 0;
-if (WSR) {
-  const offs = [];
-  for (let hole = 1; hole <= 21; hole++) {
-    const wt = WSR[hole], meta = mapsMeta.find((m) => m.hole === hole);
-    if (!wt?.tee || !meta?.tee) continue;
-    const [ex, ey] = teeAxis(wt);
-    const dx = meta.tee.x - wt.tee.x * MAP_W, dy = meta.tee.y - wt.tee.y * MAP_H;
-    offs.push((dx * ex + dy * ey) * wt.scale);
-  }
-  offs.sort((a, b) => a - b);
-  if (offs.length) TEE_FORWARD_YD = offs[Math.floor(offs.length / 2)];
-  console.log(`WSR truth: ${Object.keys(WSR).length} holes; detected tee sits a median ${TEE_FORWARD_YD.toFixed(2)} yd toward the green from the pad centre (${offs.length} holes)`);
-}
+console.log(`NSS truth: ${Object.keys(TRUTH).length} holes (tools/nss-truth.json)`);
 
-// WSR's own pin spots and player starts (tools/wsr-pins.json, decoded from the
-// course PMP files by tools/wsr-pins.mjs) are the truth for where pins and the
-// tee are (tools/PINS.md). NSS reuses WSR's spots, both sets, and adds a few of
-// its own. Local play tees off from the WSR start; online Survival Golf from a
-// two-tiered platform whose lower tier stands 0-8 yd behind it (the Tees
-// block below). derived.json gets every WSR spot with the number of rounds it
-// was seen in, the Switch-only spots that two independent readings agree on,
-// tee = the WSR start and teeOnline = the platform's two tiers, placed from
-// the online tee frames.
-let WSRP = null;
-try { WSRP = JSON.parse(readFileSync(join(ROOT, "tools", "wsr-pins.json"), "utf8")).holes; } catch {}
-// Trees are WSR's own too (wsr-pins.json `trees`: the PMP tree objects, kind =
-// the PMP id, size = the object's x scale), replacing the v13 hand-placed
-// seeds (24 of 130 within 6 px of a real tree). The hole map shows them as
-// the game draws them: tools/render-maps.mjs paints the glf_tree sprite quads
-// from the course archives (tools/wsr-map), so the app draws no marker of its
-// own over them and `r` only says how far the painted canopy reaches, for
-// the tap rule. Measured on the quads and the sprite textures (2026-10-18):
-// a quad is 160 KCL units wide per unit of size (all 31 of H7's and all 33 of
-// H16's quads match their PMP trees within 2.5 px; width/size is exactly
-// 160.0 on 28 and 32 of them, the other four 137-169; p10-p90 151-172 over
-// the 460), the PMP position is the trunk base at 0.812 of the quad from its
-// north edge, and the alpha-tested canopy (a >= 128, the material's test)
-// reaches a median 0.422 / 0.395 / 0.387 of the quad from its own centre
-// along 36 rays (kind 2 broadleaf / 3 conifer / 6 palm; the widest row spans
-// 0.414 / 0.445 / 0.383), that centre at 0.477 / 0.469 / 0.477 of the quad
-// from the north edge. So the painted canopy is a disc of 68 / 63 / 62 units
-// per unit of size whose centre stands 54 / 55 / 54 units NORTH of the trunk,
-// checked by drawing the discs over the renders of H7, H16 and H19 (a
-// trunk-centred disc covers only the canopy's southern half). The Switch's
-// own sprites, fitted on the captures before the renders (81 / 48 / 45 units,
-// centred on the trunk), are not what the app shows any more. In map px that
-// is K * size / (scale * 9.144), with scale the hole's yd/px.
-const TREE_CANOPY_UNITS = { 2: 68, 3: 63, 6: 62 };
-const TREE_CANOPY_UP = { 2: 54, 3: 55, 6: 54 };
-const UNITS_PER_YD = 9.144;
-// Since 2026-10-19 that rule is the fallback: an on-course tree takes r and
-// dy from the quad the renderer paints for it (tools/wsr-map/hNN.json
-// `trees.quads`, WSR's own glf_tree model, [material, x0, z0, x1, z1, y] in
-// mesh units with u 0 -> x0 and v 0 -> z0, the north edge, through
-// tools/mesh-registration.json). The rule assumes a 160 u quad per unit of
-// size anchored on the PMP trunk; the quads run 137-192 u per unit and a few
-// are painted off their trunk, so the rule's disc missed the painted canopy
-// by over 2 px or 18% in radius on ~20 of the 458 (H1 k28 painted 4.6 px
-// east of its trunk, H4 k24 3.9 px north with r 1.41x, H6 k45 r 0.67x), and
-// a tap on the painted canopy then added a marker. The canopy within a quad,
-// measured on the three 64x64 sprite textures (the material's alpha test
-// keeps a >= 128): its centre at cx / cy of the quad from the west / north
-// edge (the widest alpha row's middle; the alpha rows' middle), its median
-// reach along 36 rays r of the quad's width; the trunk base, the PMP
-// position, at TREE_QUAD_ANCHOR_V from the north edge. A quad whose anchor is
-// within TREE_QUAD_MATCH px of a trunk is that tree's, closest pairs first:
-// 456 of the 458 on-course trees within 0.7 px (p50 0.03), and the sprites
-// of H1 k28 and H20 k6 stand 4.6 / 3.4 px east of their trunks, hence the
-// radius; an unmatched tree and the off trees keep the rule. A canopy at
-// least TREE_DX_MIN_PX east or west of its trunk ships that offset as dx (a
-// fraction of the map width): the textures' canopies sit 0.5-0.9 px off the
-// quad's middle on some 50 trees, and three sprites stand 2.6-4.6 px off.
-const TREE_SPRITE = { 2: { cx: 0.4766, cy: 0.4766, r: 0.4219 }, 3: { cx: 0.5078, cy: 0.4688, r: 0.3945 }, 6: { cx: 0.5078, cy: 0.4766, r: 0.3867 } };
-const TREE_QUAD_KIND = { Map_tree1: 2, Map_tree2: 3, Map_tree3: 6 }; // the quad material's trailing name -> PMP kind
-const TREE_QUAD_ANCHOR_V = 0.812;
-const TREE_QUAD_MATCH = 5;
-const TREE_DX_MIN_PX = 0.5;
-// the mesh registration (tools/mesh-registration.json), for the painted quads
-let REG = null;
-try { REG = JSON.parse(readFileSync(join(ROOT, "tools", "mesh-registration.json"), "utf8")).holes; } catch {}
-// the hole's painted quads in the map frame: anchor (ax, ay), canopy centre
-// (cx, cy) and radius r (fractions of the frame), or null without the model
-// or the registration
-function paintedQuads(hole) {
-  const reg = REG?.[hole];
-  let model;
-  try { model = JSON.parse(readFileSync(join(ROOT, "tools", "wsr-map", `h${String(hole).padStart(2, "0")}.json`), "utf8")); } catch { return null; }
-  if (!reg || !Array.isArray(model?.trees?.quads)) return null;
-  const M = reg.meshToMapFrac, upp = reg.transform.unitsPerMapPx;
-  const toMap = (X, Z) => [M[0][0] * X + M[0][1] * Z + M[0][2], M[1][0] * X + M[1][1] * Z + M[1][2]];
-  const out = [];
-  for (const [mat, x0, z0, x1, z1] of model.trees.quads) {
-    const kind = TREE_QUAD_KIND[/Map_tree\d$/.exec(mat)?.[0]], s = TREE_SPRITE[kind];
-    if (!s) continue;
-    const w = x1 - x0, h = z1 - z0;
-    const [ax, ay] = toMap((x0 + x1) / 2, z0 + TREE_QUAD_ANCHOR_V * h), [cx, cy] = toMap(x0 + s.cx * w, z0 + s.cy * h);
-    out.push({ kind, ax, ay, cx, cy, r: (w * s.r) / upp / MAP_W });
+// The pins are NSS's own cups (tools/nss-pins.json, written by
+// tools/nss-export.mjs from the Switch game's files): six per hole, the cup
+// bones GolfCourseNNholeK of the course model, k = 0..5, through the hole's
+// NSS -> map transform (tools/nss-registration.json). They ship as c0..c5,
+// labelled 1..6, with `difficult` (the game's CupDifficulties: it leaves those
+// cups out of some draws), yd = the floor of the flat yards from the tee
+// (GlfTeeOBJ, below; the floor is what the game's own "yd to go" badge reads
+// from it), `wsr` = the WSR spot id a cup coincides with (within 0.3 yd; 7 of
+// the 126) and seen = the rounds the Switch captures show it in. There are no
+// Switch-only spots: the four that shipped and H1's candidate were NSS cups.
+//
+// The tee is NSS's course bone GlfTeeOBJ (nss-pins.json tees.teeObj), where
+// local play tees off. The game copies that bone into every player's start
+// matrix in local play (main 0xd548d4 looks it up, 0xd549ac..0xd549fc copies
+// it: the eden dump's REPORT.md, "Placement"), and in Eden the ball at address
+// sits on it to 0.00 yd on holes 2-18. Hole 1 was read once in Eden at
+// Glf_RotateOBJ (there 0.10 yd from the WSR start, 2.02 yd from GlfTeeOBJ);
+// it ships GlfTeeOBJ too, decided on better evidence: the same code path
+// serves every hole, and H1's five local tee badges (two rounds, cups c4 and
+// c5, 398 and 384 yd) fit floor(GlfTeeOBJ -> cup), at -0.66 / -0.98 yd, and
+// miss floor(Glf_RotateOBJ -> cup), at -2.68 / -3.01 (the WSR start -2.58 /
+// -2.90), outside a floored badge's (-1, 0] window; over the 21 holes 67 of
+// the 69 local badges of credited cups fit floor(GlfTeeOBJ -> cup) within
+// 0.1 yd, 42 floor(WSR start -> cup) (tools/test-pins.mjs 4). GlfTeeOBJ stands
+// 0.09-2.55 yd from the WSR start, the tee until this build (H14 2.55, H1
+// 1.92, H20 1.69, H19 1.27). teeNss ships NSS's two tee bones for audit:
+// GlfTeeOBJ (= tee) and Glf_RotateOBJ, where the online platform stands.
+//
+// The online Survival Golf platform is NSS's own too (tools/nss-platform.json):
+// two tiers posed at Glf_RotateOBJ, each with the seven spots a player's ball
+// can stand on (the four slot bones and the three midpoints an odd group
+// stands on), shipped as `platform` with the pose itself (origin, yawDeg: the
+// bone's) and the hole's NSS -> map transform (tools/nss-registration.json's
+// a, b, tx, ty at full precision), from which src/platform.js places the ball
+// by the decoded rule exactly instead of fitting the 5-decimal spots.
+// None of these files may be missing or malformed: a silent fallback to WSR's
+// spots would flip every stored pin id (s<slot> <-> c<k>) on each build.
+const nssFile = (name, by) => {
+  try { return JSON.parse(readFileSync(join(ROOT, "tools", name), "utf8")).holes; }
+  catch (e) { console.error(`tools/${name}: ${e.message}. It is required (rerun node ${by}); nothing written.`); process.exit(1); }
+};
+const NSSP = nssFile("nss-pins.json", "tools/nss-export.mjs"), NSSPL = nssFile("nss-platform.json", "tools/nss-export.mjs");
+const NSSREG = nssFile("nss-registration.json", "tools/nss-export.mjs");
+// the standing spots of a tier, from the player's left to the right facing
+// the green (platform-local x, metres: +x is the player's left)
+const STANDING_X = [3.45, 2.3, 1.15, 0, -1.15, -2.3, -3.45];
+{
+  const bad = [];
+  const fin = (v) => typeof v === "number" && Number.isFinite(v);
+  const pt = (p) => p && fin(p.x) && fin(p.y) && Array.isArray(p.world) && p.world.length === 3 && p.world.every(fin);
+  for (let hole = 1; hole <= 21; hole++) {
+    const np = NSSP?.[hole], pl = NSSPL?.[hole], reg = NSSREG?.[hole], cups = np?.cups;
+    if (!["a", "b", "tx", "ty"].every((k) => fin(reg?.[k])) || !(reg.a ** 2 + reg.b ** 2 > 0)) bad.push(`H${hole}: no NSS -> map transform (a, b, tx, ty) in tools/nss-registration.json`);
+    if (!Array.isArray(cups) || cups.length !== 6) { bad.push(`H${hole}: ${Array.isArray(cups) ? cups.length : "no"} cups in tools/nss-pins.json, not six`); continue; }
+    cups.forEach((c, k) => { if (c.k !== k || !pt(c) || !fin(c.ydFromTeeObj) || typeof c.difficult !== "boolean") bad.push(`H${hole} cup ${k}: malformed (k ${c.k})`); });
+    if (!pt(np.tees?.rotateObj) || !pt(np.tees?.teeObj)) bad.push(`H${hole}: tools/nss-pins.json lacks the tee bones (rotateObj, teeObj)`);
+    if (!fin(pl?.facingDeg) || !fin(pl?.yawDeg) || !Array.isArray(pl?.origin) || pl.origin.length !== 3 || !pl.origin.every(fin)) bad.push(`H${hole}: tools/nss-platform.json lacks facingDeg, yawDeg or origin`);
+    for (const tier of ["low", "high"]) {
+      const ps = pl?.tiers?.[tier];
+      if (!Array.isArray(ps) || ps.length !== STANDING_X.length) { bad.push(`H${hole} ${tier} tier: ${Array.isArray(ps) ? ps.length : "no"} standing spots in tools/nss-platform.json, not ${STANDING_X.length}`); continue; }
+      ps.forEach((p, i) => { if (p.fromLeft !== i || p.localX !== STANDING_X[i] || !pt(p) || !fin(p.z) || !(p.side || p.between?.length === 2)) bad.push(`H${hole} ${tier} spot ${i}: malformed (fromLeft ${p.fromLeft}, localX ${p.localX})`); });
+    }
   }
-  return out;
+  if (bad.length) { console.error(`tools/nss-pins.json / nss-platform.json / nss-registration.json refused (rerun node tools/nss-export.mjs); nothing written:\n  ${bad.join("\n  ")}`); process.exit(1); }
 }
-// each on-course tree's quad (index in `trees` -> quad), closest pairs first, each quad once
-function matchQuads(trees, quads) {
-  const painted = new Map();
-  if (!quads) return painted;
-  const pairs = [];
-  trees.forEach((t, i) => { if (TREE_OFF_LIES.has(t.lie)) return; for (const q of quads) { const d = Math.hypot((q.ax - t.x) * MAP_W, (q.ay - t.y) * MAP_H); if (d <= TREE_QUAD_MATCH) pairs.push({ i, q, d }); } });
-  pairs.sort((a, b) => a.d - b.d);
-  const used = new Set();
-  for (const { i, q } of pairs) { if (painted.has(i) || used.has(q)) continue; painted.set(i, q); used.add(q); }
-  return painted;
+// The trees are NSS's own (tools/nss-trees.json: tools/nss-trees-export.mjs
+// from the eden dump's tree decode, with the tree verifier's corrections):
+// every tree some part of whose collision comes within 0.02 of the map frame,
+// off-course ones included (NSS collides with every tree it places), in the
+// file's order, which is the app's marker order (src/derivedMerge.js numbers
+// the markers t<hole>-<k>; the file's own id says the same, which is checked
+// and not shipped). Per tree: x, y = its placement (map fractions); z = the
+// placement's height in yd above the hole's datum (NSS y 0, public/terrain's
+// datum); kind = the family (2 broadleaf, 3 conifer, 6 palm); size / sy = the
+// bone's x / y scale (the family templates of src/trees.js scale with them,
+// for a tree read without its col); off = OB, sand OB or water under the
+// trunk (the app's Edit-trees tap rule and the Guide's count skip it); r =
+// the collision footprint's radius as a fraction of the map WIDTH, dx / dy =
+// its centre's offset from (x, y) as fractions of the width / height (only
+// where the export gives one; the collision canopy, about where NSS's minimap
+// paints the tree); col = the collision itself in yd about (x, y, z), trunk
+// capsules and leaf volumes, which src/trees.js flies the ball against. The
+// decode's own record (nss: its tree id, kind, source and WSR match) stays
+// out.
+const TREES = nssFile("nss-trees.json", "tools/nss-trees-export.mjs");
+{
+  const bad = [];
+  const fin = (v) => typeof v === "number" && Number.isFinite(v);
+  for (let hole = 1; hole <= 21; hole++) {
+    const ts = TREES?.[hole]?.trees;
+    if (!Array.isArray(ts) || !ts.length) { bad.push(`H${hole}: no trees in tools/nss-trees.json`); continue; }
+    ts.forEach((t, k) => {
+      if (t.id !== `t${hole}-${k}` || ![t.x, t.y, t.z, t.size, t.sy, t.r].every(fin) || ![2, 3, 6].includes(t.kind) || !(t.size > 0 && t.sy > 0 && t.r > 0)
+        || (t.off !== undefined && t.off !== true) || (t.dx !== undefined && !fin(t.dx)) || (t.dy !== undefined && !fin(t.dy))
+        || !t.col || !Array.isArray(t.col.t) || !Array.isArray(t.col.c)) bad.push(`H${hole} tree ${k}: malformed (id ${t.id})`);
+    });
+  }
+  if (bad.length) { console.error(`tools/nss-trees.json refused (rerun node tools/nss-trees-export.mjs); nothing written:\n  ${bad.slice(0, 20).join("\n  ")}${bad.length > 20 ? `\n  ... ${bad.length - 20} more` : ""}`); process.exit(1); }
 }
-// a tree this far outside the frame (fraction) still ships: its canopy reaches in
-const TREE_MARGIN = 0.02;
-// A tree on one of these lies (wsr-pins.json `lie`: the KCL surface under the
-// trunk, read off the mesh class rasters) ships with off: true. The course
-// does not reach there, the minimap draws no canopy and a ball is out of
-// bounds already, so the app's Edit-trees tap rule and the Guide's count skip
-// it (the app draws no marker for pipeline trees since the map is rendered
-// with WSR's own sprites; when it did, the off ones drawn like the course
-// trees buried the map: H16 has 68 of its 101 trees on the outer ground, H1
-// 46 of 57). The lie itself stays out of derived.json: the app only needs
-// on or off, and it would add 1,272 strings to the file.
-const TREE_OFF_LIES = new Set(["outer", "water"]);
 // Capture time and wind of every classified frame, and from them the rounds
 // played on each hole. The time is the EXIF DateTime the console writes into
 // each capture (tools/lib/exif.mjs). The ULID in the original file name is
@@ -623,19 +596,38 @@ const windOf = (file) => FRAMES.get(file)?.wind ?? "?";
 // that hole), and the number of distinct rounds among some frames of the hole
 const roundOf = (hole, file) => ROUNDS.get(hole)?.get(file);
 const roundsOf = (hole, files) => new Set(files.map((f) => roundOf(hole, f)).filter((r) => r != null)).size;
-// A reading within this many yards of a WSR spot is that spot: the zoom
-// readings credited to one land up to 5.09 yd from it (H7 BM; median 2.7 yd),
-// and the nearest reading that matches none is H10 S2's wind-11 reading at
-// 5.59 yd (3.13 px) from AR, whose round reads 387 yd badges, S2's distance
-// (AR is 384). The margin is 0.1 yd each side of 5.5: a registration shift
-// of half a pixel on H10 would move that round from S2 to AR.
-const PIN_MATCH_YD = 5.5;
-// ...unless the next spot is less than this much further (px): then it is
-// ambiguous, and only a local badge that fits one spot and is well off the
-// other decides. NSS puts some spots up to ~3 yd from WSR's (local badges read
-// 0 yd off on some spots and +-2-3 on others from the same tee), hence the
-// wide margin.
-const AMBIG_PX = 1, BADGE_FIT_YD = 2, BADGE_MISS_YD = 5;
+// A reading within this many map px of an NSS cup is that cup: 66 of the 67
+// observations of the captures sit within 2.23 px of one (median 1.08, p90
+// 1.85), the cups of a hole stand at least 2.06 px apart (H9 c2/c4), and the
+// one reading beyond is H19's lone zoom sighting, 4.74 px from every cup
+// (pinUnmatched). The radius is in px, where the reading error lives (the
+// flag base on a zoomed green, the cup on a tee frame), not in yards.
+const CUP_MATCH_PX = 2.5;
+// ...unless the next cup is less than this much further (px): then it is
+// ambiguous, and only the badges decide (below). Two observations come
+// within it on NSS's green boxes, H9's round 1 (ambiguous: no badge) and
+// H18's round 1 (its badges pick c1); on WSR's boxes H9's round 2 did too.
+const AMBIG_PX = 1;
+// The badge rule. The game's "yd to go" badge is the floor of the flat yards
+// from the ball to the cup, in its own coordinates: of the 65 local tee-frame
+// badges of the observations that stand nearest one cup, 58 equal
+// floor(GlfTeeOBJ -> cup) exactly (23 equal floor(WSR start -> cup)); five
+// more miss that window by 0.01-0.06 yd (H3's four at -1.01, H19 QM09 at
+// -1.06), and the other two are a moved ball and a post-shot frame (H8 NCNJ
+// -2.29, H10 3KS8 -7.12). Every
+// one of the 13 judged online rounds fits a standing spot of its own tier
+// (H8's best at -1.02). So a badge b fits a cup from a point P when b - (P to
+// the cup, yd) lies in (-1 - BADGE_TOL_YD, BADGE_TOL_YD], the points being the
+// local tee (GlfTeeOBJ) for a local frame and the platform's 14 standing spots
+// for an online one, all in NSS metres (tools/nss-pins.json, nss-platform.json
+// world). In a tie the cup whose badges fit, when the other's do not, is the
+// one; otherwise the observation is ambiguous. (Until the local tee point was
+// decided a local badge could fit from the WSR start too; dropping it changes
+// no observation's outcome.)
+const BADGE_TOL_YD = 0.1;
+const NSS_YD = 0.9144; // m per yd
+const flatYdNss = (a, b) => Math.sqrt((a[0] - b[0]) ** 2 + (a[2] - b[2]) ** 2) / NSS_YD;
+const badgeFits = (badge, from, cup) => from.some((P) => { const m = badge - flatYdNss(P, cup); return m > -1 - BADGE_TOL_YD && m <= BADGE_TOL_YD; });
 // A tee frame's cup counts only when its own badge agrees with the measured
 // avatar-to-cup distance, which rejects misdetected cups and avatars. The
 // tolerance is in map px, where the error lives: the avatar centroid turns
@@ -652,53 +644,30 @@ const AMBIG_PX = 1, BADGE_FIT_YD = 2, BADGE_MISS_YD = 5;
 // (360 for 380, 564 for 584, 367 for 387, 586 for 536, 819 for 219). 2.5 px
 // sits in the gap. A fixed 3 yd was 1.2-1.5 px on the long holes and failed
 // 9 of the sound frames (H8 x3, H9 x4, H12 14DM, H21 A6KE, whose 416 badge
-// supports the Switch-only spot at 415 against WSR spot 3 at 422): 112 of
+// fits the spot once shipped as Switch-only at 415, an NSS cup, against WSR
+// spot 3 at 422): 112 of
 // the 141 frames passed it, 121 pass 2.5 px, and no frame that passed 3 yd
 // fails.
 const BADGE_TOL_PX = 2.5;
-// In a badge tie-break only local frames whose ball is on the start count,
-// against each spot's decoded WSR yardage (exact, where the floor of the
-// map-frame distance gives 251 for H16 BR, decoded 250). On-start avatars
-// sit up to 4.8 yd from the start on long holes (3 px at H14's 1.6 yd/px,
-// 1.2-1.8 px on H3/H9/H12/H20 at 2.1-2.5 yd/px); the post-shot frames the
-// tee-frame filter also admits (H10's 365-367 yd restart frames) stand
-// 6.0-8.3 yd out, and their badge is a distance from the ball, not the start.
+// In a badge tie-break only local frames whose ball is on the tee count (and
+// online ones, from the platform). On-tee avatars sat up to 4.8 yd from the
+// WSR start on long holes (3 px at H14's 1.6 yd/px, 1.2-1.8 px on
+// H3/H9/H12/H20 at 2.1-2.5 yd/px); the post-shot frames the tee-frame filter
+// also admits (H10's 365-367 yd restart frames) stand 6.0-8.3 yd out, and
+// their badge is a distance from the ball, not the tee. Measured from
+// GlfTeeOBJ (0.09-2.55 yd from the start) the same frames pass and fail.
 const AT_START_YD = 5;
 // Readings of one pin within one session: a tee cup joins a zoom reading
 // within this distance (they disagree by up to 2.3 px), and zoom readings of
 // one pin agree within it.
 const SAME_PIN_PX = 2.5;
-// Tee-frame cups are coarser than zoom sightings (mostly within 2 px of the
-// spot, a few 3.5 px), so a spot only they show must sit clear of every WSR
-// spot by both measures.
-const TEE_ONLY_MIN_YD = 7, TEE_ONLY_MIN_PX = 3;
-// A Switch-only spot ships on two independent readings: two sessions, or a
-// zoom capture and a tee frame. One reading alone is doubt, and the WSR data
-// wins doubt; it goes to pinCandidates. Hole 19's lone zoom sighting is the
-// case in point: 6 px off any spot, while its own session's tee frame shows
-// WSR pin 2.
-const SWITCH_SPOT_MIN_READINGS = 2;
-// The online tee platform. tools/online-rounds.json says which tier of it
-// the player stood on in each online round (a hole at one wind), judged from
-// the frames by eye, and holds the offset between the tiers; without the
-// file the observed median still ships, with no tiers (the Tees block below
-// has the model). An online frame's avatar is the yellow blob nearest the
-// WSR start, if within TEE_REACH_YD of it: the observed round medians stand
-// 0-12 yd from the start (H10 0.3 yd toward the green, H4 11.8 yd behind).
-let ONLINE_ROUNDS = null;
-try { ONLINE_ROUNDS = JSON.parse(readFileSync(join(ROOT, "tools", "online-rounds.json"), "utf8")); } catch {}
-const TIER_OFFSET_YD = ONLINE_ROUNDS?.tierOffsetYd ?? 4;
-// The file keys a round by hole + wind only (no date) and the first entry
-// wins: two entries for one hole + wind, or a second online round at a wind
-// the file judges once (another day, perhaps from the other tier), would hand
-// the same tier to both rounds, 4 yd wrong for one of them. Both cases warn
-// (the per-hole one in the Tees block) rather than pass silently.
-const tierEntries = (hole, wind) => ONLINE_ROUNDS?.rounds?.filter((r) => r.hole === hole && String(r.wind) === String(wind)) ?? [];
-const tierOf = (hole, wind) => tierEntries(hole, wind)[0]?.tier ?? null;
-for (const r of ONLINE_ROUNDS?.rounds ?? []) {
-  const same = tierEntries(r.hole, r.wind);
-  if (same.length > 1 && same[0] === r) console.warn(`tools/online-rounds.json: ${same.length} entries for hole ${r.hole} at wind ${r.wind} (${same.map((q) => q.tier).join(", ")}); the first one is used`);
-}
+// The online tee platform is NSS's (tools/nss-platform.json); the frames only
+// check it. An online frame's avatar is the yellow blob nearest the tee
+// (GlfTeeOBJ), if within TEE_REACH_YD of it: the observed round medians
+// stood 0-12 yd from the WSR start (H10 0.3 yd toward the green, H4 11.8 yd
+// behind), and the same blobs are picked from the tee.
+// tools/online-rounds.json (the tier each online round was judged to be, by
+// eye) is test data for tools/test-platform.mjs, not read here.
 const TEE_REACH_YD = 25;
 const median = (a) => { const s = [...a].sort((p, q) => p - q), m = s.length >> 1; return s.length & 1 ? s[m] : (s[m - 1] + s[m]) / 2; };
 const teeFramesUsed = {}; // file -> roles, for tools/frame-audit.mjs
@@ -719,25 +688,35 @@ mkdirSync(join(D, "boxes"), { recursive: true });
 
 for (let hole = 1; hole <= 21; hole++) {
   const id = `h${String(hole).padStart(2, "0")}`;
-  // the hole's render and green crop (tools/render-maps.mjs), when it has them
-  let renderMap = existsSync(join(RENDER, `${id}.png`)) ? join(RENDER, `${id}.png`) : null;
-  let renderGreen = existsSync(join(RENDER, `${id}-green.png`)) ? join(RENDER, `${id}-green.png`) : null;
-  // Only the WSR art ships (--art wsr --wsr model, the renderer's default).
-  // The cross-check arts write the same file names, and their green entries
-  // carry the same box and margin, so the art index.json records is the only
-  // sign: per entry since 2026-10-19, else the file level (which a --holes
-  // batch rewrites for the whole directory). A hole rendered in another art
-  // ships its capture stack, and the summary count says so.
-  const rIdx = renderIndex[hole], renderArt = rIdx?.art ?? renderIdx.art, renderMode = (rIdx?.wsr ?? renderIdx.wsr)?.mode ?? "model";
-  if ((renderMap || renderGreen) && (renderArt !== "wsr" || renderMode !== "model")) {
-    console.warn(`H${hole}: captures/derived/render/${id}.png was rendered with --art ${renderArt ?? "unknown"}${renderArt === "wsr" ? ` --wsr ${renderMode}` : ""} (the cross-check), not the WSR art the app ships; using the capture stack instead; rerun tools/render-maps.mjs --holes ${hole}`);
+  // the hole's render and green crop (tools/render-nss-maps.py), when it has
+  // them: the files its index.json entry names (the 2x map, maps["2"], and
+  // the green crop; a bare file name only), else the renderer's own names
+  const rIdx = renderIndex[hole];
+  const fileOr = (f, dflt) => (typeof f === "string" && /^[\w.-]+$/.test(f) && !f.startsWith(".") ? f : dflt);
+  const mapFile = fileOr(rIdx?.maps?.["2"]?.file ?? rIdx?.map?.file, `${id}.png`), greenFile = fileOr(rIdx?.green?.file, `${id}-green.png`);
+  let renderMap = existsSync(join(RENDER, mapFile)) ? join(RENDER, mapFile) : null;
+  let renderGreen = existsSync(join(RENDER, greenFile)) ? join(RENDER, greenFile) : null;
+  // Only NSS's art with the 2 m plaid ships (the index.json entry's art "nss"
+  // and plaid.tileM 2, else the file level's art). A render from before the
+  // plaid fix (a GreenAreaSize / 25 m tile), another art an explicit --out
+  // wrote here, or a map that is not the frame at 2x ships the hole's capture
+  // stack instead, and the summary count says so.
+  const renderArt = rIdx?.art ?? renderIdx.art, plaidM = rIdx?.plaid?.tileM ?? null;
+  const renderImg = renderMap ? loadImage(renderMap) : null;
+  const renderWhy = !(renderMap || renderGreen) ? null
+    : renderArt !== RENDER_ART ? `is art ${renderArt ?? "unknown"}, not NSS's (${RENDER_ART})`
+    : plaidM !== RENDER_PLAID_M ? `was rendered with a ${plaidM ?? "unrecorded"} m plaid tile, not ${RENDER_PLAID_M} m (before the plaid fix)`
+    : renderImg && (renderImg.width !== 2 * MAP_W || renderImg.height !== 2 * MAP_H) ? `is ${renderImg.width}x${renderImg.height}, not the ${MAP_W}x${MAP_H} frame at 2x`
+    : null;
+  if (renderWhy) {
+    console.warn(`H${hole}: captures/derived/render-nss/${mapFile} ${renderWhy}; using the capture stack instead; rerun python -P tools/render-nss-maps.py --holes ${hole}`);
     renderMap = renderGreen = null;
   }
   // The median-stacked captures: the shipped map only for a hole with no
   // render (loaded at the end of the loop, where the green is transplanted
   // into it), while the detection stack (flag and cup intact) anchors the
   // capture green-box projection on every hole, since that box ships as
-  // captureGreenBox beside the WSR one. The projection correlates against
+  // captureGreenBox beside the NSS one. The projection correlates against
   // the detection stack because the display stack has the flag inpainted
   // away, which starves the matcher of its strongest dark landmark on
   // pin-less holes.
@@ -769,7 +748,7 @@ for (let hole = 1; hole <= 21; hole++) {
     const pr = projectGreenBox(det, zoom, meta.pin, s.pinPx, s.bboxPx, kLo, kHi);
     if (!anchor || pr.r > anchor.r) anchor = { ...pr, session: s };
   }
-  let greenBox = null, greenPoly = null, pins = [], pinZones = null, greenPins = 0, pinCandidates = [];
+  let greenBox = null, greenPoly = null, sightings = [], greenPins = 0;
   let box = null, captureBox = null;
   const W = det.width, H = det.height; // the 250x304 map frame
   if (anchor && anchor.r > 0.22) {
@@ -783,31 +762,26 @@ for (let hole = 1; hole <= 21; hole++) {
     captureBox = { x0: Math.max(0, Math.round(c0.x)), y0: Math.max(0, Math.round(c0.y)),
       x1: Math.min(W - 1, Math.round(c1.x)), y1: Math.min(H - 1, Math.round(c1.y)) };
   }
-  const wt = WSR?.[hole] ?? null;
-  // projection box in map px: the WSR green's bbox (float) when known, else the
-  // capture projection. The zoom captures' green outlines match the WSR
-  // outlines in normalized shape (IoU 0.86-0.98, aspect within 3%), so
-  // bbox-normalized pins and outline carry over through either box.
-  const pb = wt ? { x0: wt.greenBox.x0 * W, y0: wt.greenBox.y0 * H, x1: wt.greenBox.x1 * W, y1: wt.greenBox.y1 * H } : captureBox;
-  if (pb) {
+  const wt = TRUTH[hole];
+  // projection box in map px: the NSS green's bbox (float; the capture
+  // projection ships beside it as captureGreenBox). The zoom captures' green
+  // outlines match the game's in normalized shape (IoU 0.86-0.98 against
+  // WSR's, which NSS's own match to 0.968-0.992), so bbox-normalized readings
+  // carry over through it.
+  const pb = { x0: wt.greenBox.x0 * W, y0: wt.greenBox.y0 * H, x1: wt.greenBox.x1 * W, y1: wt.greenBox.y1 * H };
+  {
     // integer box for the pixel loops (transplant, debug overlay)
-    box = wt ? { x0: Math.max(0, Math.round(pb.x0)), y0: Math.max(0, Math.round(pb.y0)),
-      x1: Math.min(W - 1, Math.round(pb.x1)), y1: Math.min(H - 1, Math.round(pb.y1)) } : captureBox;
-    greenBox = wt ? wt.greenBox : { x0: +(pb.x0 / W).toFixed(4), y0: +(pb.y0 / H).toFixed(4),
-      x1: +(pb.x1 / W).toFixed(4), y1: +(pb.y1 / H).toFixed(4) };
-    // pins via bbox-normalized coords — zoom-invariant across sessions —
-    // then CLUSTERED (radius below). Every pair that sees the same flag
-    // reports it, so one spot captured six times used to ship as six pins; the app deduped on merge but derived.json lied and the debug
-    // overlay was unreadable. Averaging each cluster also sharpens the
-    // estimate: more observations of a spot now means a better fix on it,
-    // not more clutter.
-    // the fused green outline, projected the same way (bbox-normalized ->
-    // map fraction). A polygon, not a rectangle: greens are lobed, and the
-    // fringe that wraps every green is a real boundary.
-    if (wt) greenPoly = wt.greenPoly;
-    else if (g.poly) greenPoly = g.poly.map(([nx, ny]) => [
-      +((pb.x0 + nx * (pb.x1 - pb.x0)) / W).toFixed(4),
-      +((pb.y0 + ny * (pb.y1 - pb.y0)) / H).toFixed(4)]);
+    box = { x0: Math.max(0, Math.round(pb.x0)), y0: Math.max(0, Math.round(pb.y0)),
+      x1: Math.min(W - 1, Math.round(pb.x1)), y1: Math.min(H - 1, Math.round(pb.y1)) };
+    greenBox = wt.greenBox;
+    // the pin sightings via bbox-normalized coords — zoom-invariant across
+    // sessions — then CLUSTERED (radius below), for the debug overlay only:
+    // the pins that ship are NSS's cups (the Pins block below), which the
+    // sightings are credited to one by one. Every pair that sees the same flag
+    // reports it, so one spot captured six times would draw six crosses.
+    // the green outline: NSS's (a polygon, not a rectangle: greens are lobed,
+    // and the fringe that wraps every green is a real boundary)
+    greenPoly = wt.greenPoly;
     // Cluster in GREEN-LOCAL space at 0.085 of the green's bbox. Repeat
     // sightings of one spot agree within 0.07 there (all holes so far), the
     // next-closest pairs sit 0.10+ apart, and distinct spots on the small
@@ -827,89 +801,78 @@ for (let hole = 1; hole <= 21; hole++) {
       const c = clusters.find((q) => Math.hypot(q.gx / q.n - p.gx, q.gy / q.n - p.gy) < PIN_T);
       if (c) { c.gx += p.gx; c.gy += p.gy; c.n++; } else clusters.push({ gx: p.gx, gy: p.gy, n: 1 });
     }
-    pins = clusters.map((c) => ({
+    sightings = clusters.map((c) => ({
       x: +((pb.x0 + (c.gx / c.n) * (pb.x1 - pb.x0)) / W).toFixed(4),
       y: +((pb.y0 + (c.gy / c.n) * (pb.y1 - pb.y0)) / H).toFixed(4), n: c.n }));
-
-    // PIN ZONES. Clustered in GREEN-LOCAL space (fraction of the green's own
-    // bbox), which is the frame the game presumably picks spots in and is
-    // comparable across holes and zoom levels. Cluster count is stable across
-    // a wide threshold range — H1 holds at 2 zones from 0.02 to 0.30, H14 and
-    // H16 at 3 — which is what discrete spawn vicinities look like rather than
-    // a uniform scatter. 0.12 sits inside that plateau for every hole so far.
-    const ZONE_T = 0.12;
-    const lab = new Array(g.pins.length).fill(-1);
-    let zn = 0;
-    for (let i = 0; i < g.pins.length; i++) {
-      if (lab[i] >= 0) continue;
-      lab[i] = zn;
-      const st = [i];
-      while (st.length) {
-        const a = st.pop();
-        for (let j = 0; j < g.pins.length; j++) {
-          if (lab[j] >= 0) continue;
-          if (Math.hypot(g.pins[a].gx - g.pins[j].gx, g.pins[a].gy - g.pins[j].gy) <= ZONE_T) { lab[j] = zn; st.push(j); }
-        }
-      }
-      zn++;
-    }
-    const bw = pb.x1 - pb.x0, bh = pb.y1 - pb.y0;
+    // (the pin zones, clusters of the sightings in green-local space, are gone
+    // with the capture-built pins: a hole's pins are its six NSS cups)
     greenPins = g.pins.length;
-    pinZones = Array.from({ length: zn }, (_, z) => {
-      const mem = g.pins.filter((_, i) => lab[i] === z);
-      const gx = mem.reduce((s, p) => s + p.gx, 0) / mem.length;
-      const gy = mem.reduce((s, p) => s + p.gy, 0) / mem.length;
-      // radius in green-local units, and the same in map fractions so the app
-      // can draw it without knowing the green's bbox
-      const rg = Math.max(...mem.map((p) => Math.hypot(p.gx - gx, p.gy - gy)));
-      return {
-        x: +((pb.x0 + gx * bw) / W).toFixed(4),
-        y: +((pb.y0 + gy * bh) / H).toFixed(4),
-        r: +(Math.max(rg * bw / W, rg * bh / H)).toFixed(4),
-        rGreen: +rg.toFixed(3), n: mem.length,
-      };
-    }).sort((a, b) => b.n - a.n);
     // debug overlay
     const dbg = { width: W, height: H, data: Buffer.from(det.data) };
     const set = (x, y) => { if (x < 0 || y < 0 || x >= W || y >= H) return; const i = (y * W + x) * 4; dbg.data[i] = 30; dbg.data[i + 1] = 120; dbg.data[i + 2] = 255; };
     for (let x = box.x0; x <= box.x1; x++) { set(x, box.y0); set(x, box.y1); }
     for (let y = box.y0; y <= box.y1; y++) { set(box.x0, y); set(box.x1, y); }
-    for (const p of pins) { const bx = Math.round(p.x * W), by = Math.round(p.y * H);
+    for (const p of sightings) { const bx = Math.round(p.x * W), by = Math.round(p.y * H);
       for (let d = -4; d <= 4; d++) { set(bx + d, by); set(bx, by + d); } }
     savePng(join(D, "boxes", `${id}.png`), dbg);
   }
   const zoomAspect = (g.panelBbox.x1 - g.panelBbox.x0) / (g.panelBbox.y1 - g.panelBbox.y0);
   const mapAspect = box ? (box.x1 - box.x0) / (box.y1 - box.y0) : null;
-  // tee (see TEE_FORWARD_YD): the detected marker while it is on the WSR pad,
-  // snapped onto the pad if it is not; no marker -> pad centre moved forward
-  let tee = meta.tee ? { x: +(meta.tee.x / W).toFixed(4), y: +(meta.tee.y / H).toFixed(4) } : null, teeNote = "";
-  if (wt?.tee) {
-    if (meta.tee) {
-      const [sx, sy, moved] = snapIntoPoly(meta.tee.x, meta.tee.y, wt.teePad.map(([x, y]) => [x * W, y * H]));
-      if (moved) { tee = { x: +(sx / W).toFixed(4), y: +(sy / H).toFixed(4) }; teeNote = " tee snapped onto WSR pad"; }
-    } else {
-      const [ex, ey] = teeAxis(wt), d = TEE_FORWARD_YD / wt.scale;
-      tee = { x: +((wt.tee.x * W + ex * d) / W).toFixed(4), y: +((wt.tee.y * H + ey * d) / H).toFixed(4) };
-      teeNote = " tee from WSR pad";
-    }
-  }
-  // ---- pins and tees from WSR's placement file (truth) + Switch readings ----
-  let teeOnline = null, pinAmbiguous = [];
-  const wp = WSRP?.[hole] ?? null;
-  // (a wsr-pins.json from before the spots were decoded has pins and starts
-  // but no spots: the capture pins and tee above stand then)
-  if (wp && wt && pb && wp.starts?.length && Array.isArray(wp.spots)) {
+  // ---- pins: NSS's six cups (truth), credited with the Switch readings; the
+  // tee; the online platform (NSS's own) ----
+  const np = NSSP[hole], npl = NSSPL[hole], reg = NSSREG[hole];
+  // the cups, and beside them what the crediting needs (world: NSS metres);
+  // yd from the tee, GlfTeeOBJ (nss-pins.json ydFromTeeObj, the flat yards in
+  // NSS metres)
+  const spots = np.cups.map((c) => ({ id: `c${c.k}`, k: c.k, x: c.x, y: c.y, label: String(c.k + 1), difficult: c.difficult,
+    yd: Math.floor(c.ydFromTeeObj), src: "nss", wsr: c.wsr ?? null, world: c.world, sessions: new Set() }));
+  // The tee: NSS's GlfTeeOBJ, where local play tees off (the head of the Pins
+  // block above; H1 included), at nss-pins.json's map point. teeNss: NSS's two
+  // tee bones for audit, GlfTeeOBJ (= tee) and Glf_RotateOBJ, where the online
+  // platform stands.
+  const tee = { x: np.tees.teeObj.x, y: np.tees.teeObj.y }, teeNote = " tee = GlfTeeOBJ";
+  const teeNss = { rotateObj: { x: np.tees.rotateObj.x, y: np.tees.rotateObj.y }, teeObj: { x: np.tees.teeObj.x, y: np.tees.teeObj.y } };
+  // where a badge is measured from (NSS metres): the local tee for a local
+  // frame, the platform's standing spots for an online one
+  const LOCAL_FROM = [np.tees.teeObj.world];
+  const PLATFORM_FROM = ["low", "high"].flatMap((t) => npl.tiers[t].map((p) => p.world));
+  // The online Survival Golf platform, NSS's own: two tiers, the high one
+  // 3.5 m behind the low and 1.568 m up, posed at the course bone
+  // Glf_RotateOBJ with that bone's own yaw. Per tier the seven spots a ball
+  // can stand on, from the player's left to the right as the player faces the
+  // green: localX = the platform-local x in metres (+x is the player's left),
+  // the four slot bones (side L2, L1, R1, R2) and the three midpoints between
+  // them (between: the two sides), where an odd group stands; x, y = map
+  // fractions through the hole's NSS transform; zYd = the mat the ball stands
+  // on and groundYd = NSS's ground under it, both in yd above the datum (NSS
+  // y 0, the WSR start's height, which is public/terrain's datum), ground =
+  // that ground's NSS surface (GolfOB under H1's outer spots); facingDeg = the
+  // bearing (deg N-up) the platform faces. The pose itself rides along so the
+  // app can place any ball on the platform exactly (src/platform.js, the
+  // decoded seating rule and the ball 0.9 m beside the stance): origin = the
+  // Glf_RotateOBJ bone in NSS metres [x, y, z] (y 0.1 on H3, 0 elsewhere),
+  // yawDeg = its Euler Y (world = origin + Ry(yaw) * local), transform = the
+  // hole's NSS -> map transform { a, b, tx, ty } (map px = a x - b z + tx,
+  // b x + a z + ty; tools/nss-registration.json at full precision, the one
+  // transform of the cups, the tee and the spots). observed = the online tee
+  // frames' median avatar (validation only).
+  const standing = (p) => ({ localX: p.localX, ...(p.side ? { side: p.side } : { between: p.between }), x: p.x, y: p.y, zYd: p.z,
+    groundYd: p.groundZ ?? null, ground: p.ground ?? null });
+  const platform = { facingDeg: npl.facingDeg, origin: [...npl.origin], yawDeg: npl.yawDeg, transform: { a: reg.a, b: reg.b, tx: reg.tx, ty: reg.ty },
+    tiers: { high: npl.tiers.high.map(standing), low: npl.tiers.low.map(standing) }, observed: null };
+  const sideOf = (p) => p.side ?? p.between.join("|");
+  const pinAmbiguous = [], pinUnmatched = [], ties = [];
+  let onlineNote = ", no online frames";
+  {
     const sc = wt.scale; // yd per map px
     const pxTo = (a, b) => Math.hypot((a.x - b.x) * W, (a.y - b.y) * H); // fractions in, map px out
     const yd = (a, b) => pxTo(a, b) * sc;
-    const start = { x: wp.starts[0].x, y: wp.starts[0].y };
-    const spots = wp.spots.map((s) => ({ id: `s${s.slots[0]}`, x: s.x, y: s.y, label: s.label, set: s.set, yd: s.yd, src: "wsr", sessions: new Set() }));
     const toMap = (p) => ({ x: (pb.x0 + p.gx * (pb.x1 - pb.x0)) / W, y: (pb.y0 + p.gy * (pb.y1 - pb.y0)) / H });
-    // the avatar: of a frame's yellow blobs, the one nearest the WSR start, if
-    // it is within reach of the teeing ground at all
+    // the avatar: of a frame's yellow blobs, the one nearest the tee, if it is
+    // within reach of the teeing ground at all
     const avatarOf = (f) => {
-      const near = (f.ptrs ?? []).map((q) => ({ x: q.x / W, y: q.y / H })).sort((a, b) => yd(a, start) - yd(b, start))[0];
-      return near && yd(near, start) <= TEE_REACH_YD ? near : null;
+      const near = (f.ptrs ?? []).map((q) => ({ x: q.x / W, y: q.y / H })).sort((a, b) => yd(a, tee) - yd(b, tee))[0];
+      return near && yd(near, tee) <= TEE_REACH_YD ? near : null;
     };
     // a round with an online tee frame was played online (Survival Golf)
     const onlineRounds = new Set((meta.teeFrames ?? []).filter((f) => f.online).map((f) => roundOf(hole, f.file)));
@@ -966,213 +929,100 @@ for (let hole = 1; hole <= 21; hole++) {
       }
       obs.push(...mine);
     }
-    // Which spot each observation shows: the nearest WSR spot within reach,
-    // unless the next one is about as close; then the badges of the local tee
-    // frames whose ball is on the start decide, against each spot's own WSR
-    // yardage, if they clearly fit one and miss the other (local play tees
-    // off from the WSR start), and otherwise nobody is credited.
-    const credit = (o, q) => { o.result = q.label; o.spot = q; q.sessions.add(o.round); for (const r of o.tee) (teeFramesUsed[r.file] ??= []).push(`pin ${q.label}`); };
-    const unmatched = [], band = [];
+    // Which cup each observation shows: the nearest within CUP_MATCH_PX,
+    // unless the next one is about as close; then the badges decide (the
+    // badge rule: a cup whose badges fit from the local tee or the platform,
+    // when the other's do not), and otherwise nobody is credited
+    // (pinAmbiguous). An observation beyond every cup credits none
+    // (pinUnmatched).
+    const seenBy = (o) => [...(o.zoom.length ? ["zoom"] : []), ...(o.tee.length ? ["tee"] : [])];
+    const credit = (o, q) => { o.result = q.id; q.sessions.add(o.round); for (const r of o.tee) (teeFramesUsed[r.file] ??= []).push(`pin ${q.id}`); };
     for (const o of obs) {
       const ds = spots.map((q) => ({ q, d: pxTo(o, q) })).sort((a, b) => a.d - b.d);
-      const teeOnly = !o.zoom.length;
-      if (!ds.length || ds[0].d * sc > PIN_MATCH_YD) {
-        // tee cups alone, out of reach of a WSR spot but not clear of it: they
-        // may repeat another round's credited reading or join a Switch-only
-        // spot below, but cannot start one
-        if (teeOnly && ds.some((q) => q.d * sc < TEE_ONLY_MIN_YD || q.d < TEE_ONLY_MIN_PX)) band.push({ o, near: ds[0].q });
-        else unmatched.push(o);
+      if (ds[0].d > CUP_MATCH_PX) {
+        o.result = `unmatched, ${ds[0].d.toFixed(2)} px from ${ds[0].q.id}`;
+        pinUnmatched.push({ x: +o.x.toFixed(4), y: +o.y.toFixed(4), nearest: ds[0].q.id, px: +ds[0].d.toFixed(2), seenBy: seenBy(o), badges: [...new Set(o.tee.map((r) => r.badge))] });
         continue;
       }
       let pick = ds[0].q;
-      if (ds[1] && ds[1].d - ds[0].d < AMBIG_PX) {
-        const loc = o.tee.filter((r) => !r.online && yd(r.p, start) <= AT_START_YD);
-        const miss = (q) => loc.length ? median(loc.map((r) => Math.abs(r.badge - q.yd))) : Infinity;
-        const m0 = miss(ds[0].q), m1 = miss(ds[1].q);
-        pick = m0 <= BADGE_FIT_YD && m1 >= BADGE_MISS_YD ? ds[0].q : m1 <= BADGE_FIT_YD && m0 >= BADGE_MISS_YD ? ds[1].q : null;
-        if (!pick) { o.result = `ambiguous ${ds[0].q.label}/${ds[1].q.label}`; pinAmbiguous.push({ x: +o.x.toFixed(4), y: +o.y.toFixed(4), spots: [ds[0].q.label, ds[1].q.label] }); continue; }
+      if (ds[1].d - ds[0].d < AMBIG_PX) {
+        const loc = o.tee.filter((r) => !r.online && yd(r.p, tee) <= AT_START_YD), onl = o.tee.filter((r) => r.online);
+        const fit = (q) => loc.filter((r) => badgeFits(r.badge, LOCAL_FROM, q.world)).length + onl.filter((r) => badgeFits(r.badge, PLATFORM_FROM, q.world)).length;
+        const f0 = fit(ds[0].q), f1 = fit(ds[1].q);
+        pick = f0 && !f1 ? ds[0].q : f1 && !f0 ? ds[1].q : null;
+        o.tie = [ds[0].q.id, ds[1].q.id];
+        if (!pick) { o.result = `ambiguous ${ds[0].q.id}/${ds[1].q.id}`; pinAmbiguous.push({ x: +o.x.toFixed(4), y: +o.y.toFixed(4), cups: o.tie }); continue; }
+        ties.push(`${pick.id} over ${pick === ds[0].q ? ds[1].q.id : ds[0].q.id}`);
       }
       credit(o, pick);
     }
-    // Spots WSR doesn't have: unmatched observations, merged across rounds.
-    // They ship on two independent readings (two rounds, or a zoom capture
-    // and a tee frame); the rest are doubt and go to pinCandidates.
-    const groups = [];
-    const place = (gr) => {
-      const z = gr.obs.filter((q) => q.zoom.length), from = z.length ? z : gr.obs;
-      const mean = (a) => a.reduce((t, v) => t + v, 0) / a.length;
-      gr.x = (z.length ? mean : median)(from.map((q) => q.x));
-      gr.y = (z.length ? mean : median)(from.map((q) => q.y));
-    };
-    for (const o of unmatched) {
-      const gr = groups.find((q) => yd(q, o) <= PIN_MATCH_YD);
-      if (gr) { gr.obs.push(o); place(gr); } else groups.push({ x: o.x, y: o.y, obs: [o] });
-    }
-    // The band: a tee cup within SAME_PIN_PX of where another round's reading
-    // was credited to a WSR spot shows that spot (H3's wind-4 round read 536
-    // yd with its cup on the very pixel of the wind-2 round's AL reading, 5.8
-    // yd from AL, and used to ship as a one-spot ambiguity); otherwise it
-    // joins a Switch-only spot in reach, or is left ambiguous.
-    const credited = obs.filter((q) => q.spot);
-    for (const { o, near } of band) {
-      const same = credited.filter((q) => q.round !== o.round && pxTo(q, o) <= SAME_PIN_PX).sort((a, b) => pxTo(a, o) - pxTo(b, o))[0];
-      const gr = groups.map((q) => ({ q, d: yd(q, o) })).sort((a, b) => a.d - b.d)[0];
-      if (same) credit(o, same.spot);
-      else if (gr && gr.d <= PIN_MATCH_YD) gr.q.obs.push(o); // joins without moving it: tee cups are coarse
-      else { o.result = `ambiguous, ${(pxTo(o, near) * sc).toFixed(1)} yd from ${near.label}`; pinAmbiguous.push({ x: +o.x.toFixed(4), y: +o.y.toFixed(4), spots: [near.label] }); }
-    }
-    const readingsOf = (gr) => new Set(gr.obs.flatMap((o) => [...(o.zoom.length ? [`${o.round}:zoom`] : []), ...(o.tee.length ? [`${o.round}:tee`] : [])])).size;
-    const sessionsOf = (gr) => new Set(gr.obs.map((o) => o.round)).size;
-    // Switch-only spots are numbered by first sighting, so a spot keeps its
-    // S-number when later rounds change which one is seen most (ranked by
-    // rounds seen, H10's S1 and S2 would swap as soon as S2 overtook S1, under
-    // the player's chosen pin)
-    const firstMs = (gr) => Math.min(...gr.obs.flatMap((o) => [...o.zoom, ...o.tee].map((r) => r.ms)));
-    const kept = groups.filter((gr) => readingsOf(gr) >= SWITCH_SPOT_MIN_READINGS)
-      .sort((a, b) => firstMs(a) - firstMs(b) || a.x - b.x);
-    const doubt = groups.filter((gr) => readingsOf(gr) < SWITCH_SPOT_MIN_READINGS);
-    kept.forEach((gr, k) => { for (const o of gr.obs) { o.result = `S${k + 1}`; for (const r of o.tee) (teeFramesUsed[r.file] ??= []).push(`pin S${k + 1}`); } });
-    for (const gr of doubt) for (const o of gr.obs) o.result = "candidate (one reading)";
     pinObservations[hole] = obs.map((o) => {
       const rs = [...o.zoom, ...o.tee];
       return { round: o.round, wind: windOf(rs[0].file), at: [+(o.x * W).toFixed(1), +(o.y * H).toFixed(1)],
-        online: onlineRounds.has(o.round), result: o.result ?? "?",
-        readings: rs.map((r) => `${r.kind} ${r.file}${r.badge != null ? ` ${r.badge}yd` : ""}`) };
+        online: onlineRounds.has(o.round), result: o.result ?? "?", ...(o.tie ? { tie: o.tie } : {}),
+        readings: rs.map((r) => `${r.kind} ${r.file}${r.badge != null ? ` ${r.badge}yd` : ""}`), badges: o.tee.map((r) => r.badge) };
     });
-    pins = [...spots.map(({ sessions, ...s }) => ({ ...s, seen: sessions.size })),
-      ...kept.map((gr, k) => ({ id: `x${k}`, x: +gr.x.toFixed(4), y: +gr.y.toFixed(4), label: `S${k + 1}`, set: null,
-        yd: Math.floor(yd(start, gr)), src: "switch", seen: sessionsOf(gr) }))];
-    pinCandidates = doubt.map((gr) => ({ x: +gr.x.toFixed(4), y: +gr.y.toFixed(4), sessions: sessionsOf(gr),
-      seenBy: [...new Set(gr.obs.flatMap((o) => [...(o.zoom.length ? ["zoom"] : []), ...(o.tee.length ? ["tee"] : [])]))],
-      badges: [...new Set(gr.obs.flatMap((o) => o.tee.map((r) => r.badge)))] }));
 
-    // Tees. Local play tees off from the WSR start. Online Survival Golf
-    // tees off from a two-tiered platform, the same object on every hole
-    // (player-confirmed): four slots on the lower tier, four on the upper,
-    // which is directly behind the lower one and raised a few feet, so a
-    // slot's upper position is its lower one moved back by one constant.
-    // The tier of each online round is judged from its frames by eye
-    // (tools/online-rounds.json: on the upper tier other players' heads show
-    // cut off by the deck edge in front; on the lower one the glass-faced
-    // upper deck and its stairs rise behind or beside the player). The
-    // offset between the tiers comes from H11, the one hole captured from
-    // both: its W6 (upper) round's median avatar stands 4.02 yd further from
-    // the green than its W0 (lower) round's, so tierOffsetYd = 4.0, +-1 yd
-    // (the avatar marker wanders ~1.5 px with the aim, 1.3 yd on H11). The
-    // offset runs along the tee -> green-centre axis (teeAxis: from the WSR
-    // tee-pad centre, where the start sits, to the green centre; the two
-    // directions differ by at most 0.64 deg, on H4, which moves the 4 yd
-    // offset by under 0.05 yd), away from the green. On a dogleg the platform faces the fairway, not
-    // the green centre, so that axis can be some degrees off: 20 deg moves
-    // the 4 yd offset by about 1.4 yd sideways, within the slot scatter.
-    // Per round, the median avatar (each frame's avatar nearest the start, as
-    // above) is where the player's tier stood; the lower tier is that point
-    // moved TIER_OFFSET_YD toward the green when the round was upper, else
-    // the point itself; the hole's lower tier is the mean over its judged
-    // rounds (H11 has two, which agree by construction of the offset) and
-    // its upper tier sits TIER_OFFSET_YD behind that. x, y stay the observed
-    // median over all the hole's online frames. The badge corrects none of
-    // it: it is the distance to the pin, and NSS keeps some spots 2-4 yd from
-    // WSR's position, so sliding the avatar to the badge distance from the
-    // WSR spot moved the tee by the spot's offset (H9's online avatars stand
-    // a median 8.6 yd from the start; slid, 3.5 yd, and the tee was
-    // withheld). Every hole with 2+ online frames ships: the lower tier sits
-    // within 2 yd of the start on H10 and H11 (and 4.6 yd beside it on H14)
-    // while the upper tier is 4 yd behind it, so no distance-from-the-start
-    // rule applies.
-    tee = { x: +start.x.toFixed(4), y: +start.y.toFixed(4) };
-    teeNote = " tee = WSR start";
+    // The online frames check the platform: per round the median avatar
+    // (each frame's avatar nearest the tee, as above) against the nearest
+    // standing spot of each tier, printed; the hole's median over all its
+    // online frames ships as platform.observed. The avatar marker wanders
+    // 1-2 px with the aim, about the spacing of the spots, so the tier a round
+    // was played from is tools/test-platform.mjs's to check, from the badges.
     const online = (meta.teeFrames ?? []).filter((f) => f.online).map((f) => ({ f, p: avatarOf(f) })).filter((q) => q.p);
-    let onlineNote = online.length >= 2 ? "" : online.length ? ", 1 online frame only" : ", no online frames";
     if (online.length >= 2) {
-      const at = { x: median(online.map(({ p }) => p.x)), y: median(online.map(({ p }) => p.y)) };
-      const [ex, ey] = teeAxis(wt); // unit vector toward the green, in map px
-      // yd behind the start (+ = away from the green) and across the axis (+ = left, seen from the tee)
-      const along = (p) => -(((p.x - start.x) * W) * ex + ((p.y - start.y) * H) * ey) * sc;
-      const lateral = (p) => (((p.x - start.x) * W) * ey - ((p.y - start.y) * H) * ex) * sc;
-      const back = (p, d) => ({ x: p.x - (ex * d / sc) / W, y: p.y - (ey * d / sc) / H }); // p moved d yd away from the green
       const byRound = new Map();
       for (const q of online) { const r = roundOf(hole, q.f.file); byRound.set(r, [...(byRound.get(r) ?? []), q]); }
-      const rounds = [...byRound.values()].map((qs) => {
-        const m = { x: median(qs.map(({ p }) => p.x)), y: median(qs.map(({ p }) => p.y)) }, wind = windOf(qs[0].f.file), tier = tierOf(hole, wind);
-        return { wind, tier, n: qs.length, m, lower: tier === "upper" ? back(m, -TIER_OFFSET_YD) : tier === "lower" ? m : null };
-      });
-      for (const wind of new Set(rounds.map((q) => String(q.wind)))) {
-        const n = rounds.filter((q) => String(q.wind) === wind).length, judged = tierEntries(hole, wind).length;
-        if (judged && n > judged) console.warn(`H${hole}: ${n} online rounds at wind ${wind} mph but tools/online-rounds.json judges ${judged}; all ${n} take its tier (${tierOf(hole, wind)}) - judge the new round, it may be the other tier`);
-      }
-      const judged = rounds.filter((q) => q.lower);
-      const mean = (a) => a.reduce((t, v) => t + v, 0) / a.length;
-      const lower = judged.length ? { x: mean(judged.map((q) => q.lower.x)), y: mean(judged.map((q) => q.lower.y)) } : null;
-      const upper = lower && back(lower, TIER_OFFSET_YD);
-      const frac = (p) => ({ x: +p.x.toFixed(4), y: +p.y.toFixed(4) });
-      teeOnline = { ...frac(at), n: online.length, rounds: roundsOf(hole, online.map(({ f }) => f.file)),
-        seen: [...new Set(judged.map((q) => q.tier))].sort(), ...(lower ? { lower: frac(lower), upper: frac(upper) } : {}) };
+      platform.observed = { x: +median(online.map(({ p }) => p.x)).toFixed(4), y: +median(online.map(({ p }) => p.y)).toFixed(4),
+        n: online.length, rounds: roundsOf(hole, online.map(({ f }) => f.file)) };
       for (const { f } of online) (teeFramesUsed[f.file] ??= []).push("online tee");
-      onlineNote = `, online platform: ${rounds.map((q) => `W${q.wind} ${q.tier ?? "tier?"} ${q.n} fr at ${along(q.m).toFixed(1)} along / ${lateral(q.m).toFixed(1)} lateral`).join("; ")}` +
-        (lower ? ` -> lower ${along(lower).toFixed(1)}, upper ${along(upper).toFixed(1)} yd behind the start` : " -> no judged tier, tiers not shipped");
-    }
+      const nearest = (m, t) => platform.tiers[t].map((p) => ({ p, d: yd(m, p) })).sort((a, b) => a.d - b.d)[0];
+      onlineNote = `, online platform: ${[...byRound.values()].map((qs) => {
+        const m = { x: median(qs.map(({ p }) => p.x)), y: median(qs.map(({ p }) => p.y)) }, lo = nearest(m, "low"), hi = nearest(m, "high");
+        return `W${windOf(qs[0].f.file)} ${qs.length} fr, median avatar ${lo.d.toFixed(1)} yd from low ${sideOf(lo.p)}, ${hi.d.toFixed(1)} from high ${sideOf(hi.p)}`;
+      }).join("; ")}`;
+    } else if (online.length) onlineNote = ", 1 online frame only";
     if (process.env.PIN_DEBUG === String(hole)) for (const o of obs)
-      console.log(`  round ${o.round} @ ${(o.x * W).toFixed(1)},${(o.y * H).toFixed(1)}: ${[...o.zoom, ...o.tee].map((r) => `${r.kind} ${r.file}${r.badge ? ` ${r.badge}yd` : ""}${r.online ? " online" : ""}`).join(" | ")}`);
-    const seenWsr = pins.filter((s) => s.src === "wsr" && s.seen).map((s) => `${s.label}x${s.seen}`).join(" ");
-    const fmt = (list) => list.map((gr) => `${(gr.x * W).toFixed(1)},${(gr.y * H).toFixed(1)} ${sessionsOf(gr)} round(s)`).join("; ");
-    console.log(`H${hole}: pins = ${spots.length} WSR spot(s) (rounds on Switch: ${seenWsr || "none"})${kept.length ? ` + ${kept.length} Switch-only (${fmt(kept)})` : ""}${doubt.length ? `; one reading only, left out: ${fmt(doubt)}` : ""}${pinAmbiguous.length ? `; ambiguous: ${pinAmbiguous.map((a) => a.spots.join("/")).join(", ")}` : ""}; tee = WSR start${onlineNote}`);
+      console.log(`  round ${o.round} @ ${(o.x * W).toFixed(1)},${(o.y * H).toFixed(1)}: ${[...o.zoom, ...o.tee].map((r) => `${r.kind} ${r.file}${r.badge ? ` ${r.badge}yd` : ""}${r.online ? " online" : ""}`).join(" | ")} -> ${o.result}`);
   }
-  // ---- trees from WSR's placement file: the ones on the map, x, y = the
-  // trunk, with the painted canopy's radius r as a fraction of the map WIDTH
-  // and its centre's offset from the trunk, dy as a fraction of the map
-  // HEIGHT (negative = north) and dx as a fraction of the WIDTH (only when
-  // the sprite stands east or west of its trunk); the app's tap rule tests
-  // the disc at x + dx, y + dy. From the quad the renderer paints where it
-  // has one (TREE_SPRITE), else from the per-kind sprite rule. For the flight
-  // check (WSR's tree collision, tools/research/wsr-tree-collision.md: radii
-  // scale with the x scale, heights with the y scale, both from the PMP
-  // object's own position) each tree also carries kind, size (x scale), sy
-  // (y scale) and z, the object's base height in yd above the hole's datum,
-  // the WSR start's height (public/terrain's datum, so z compares with
-  // src/terrain.js heightAt): wsr-pins.json meshY, which is not always the
-  // ground under the trunk (13 of the 460 on-course trees sit over a yard
-  // below it, 2 above) ----
-  let trees = null;
-  if (Array.isArray(wp?.trees) && wt?.scale) {
-    const unitsPerPx = wt.scale * UNITS_PER_YD;
-    const datumY = wp.starts?.[0]?.mesh?.[1];
-    const onMap = wp.trees.filter((t) => t.x >= -TREE_MARGIN && t.x <= 1 + TREE_MARGIN && t.y >= -TREE_MARGIN && t.y <= 1 + TREE_MARGIN);
-    const quads = paintedQuads(hole), painted = matchQuads(onMap, quads);
-    trees = onMap.map((t, i) => {
-      const q = painted.get(i);
-      const r = q ? q.r : ((TREE_CANOPY_UNITS[t.kind] ?? TREE_CANOPY_UNITS[2]) * t.size) / unitsPerPx / W;
-      const dy = q ? q.cy - t.y : -((TREE_CANOPY_UP[t.kind] ?? TREE_CANOPY_UP[2]) * t.size) / unitsPerPx / H;
-      const dx = q && Math.abs(q.cx - t.x) * W >= TREE_DX_MIN_PX ? q.cx - t.x : null;
-      // a wsr-pins.json from before sy and meshY ships without them
-      const z = t.meshY != null && datumY != null ? +((t.meshY - datumY) / UNITS_PER_YD).toFixed(2) : null;
-      return { x: +t.x.toFixed(4), y: +t.y.toFixed(4), r: +r.toFixed(4), dy: +dy.toFixed(4), ...(dx != null ? { dx: +dx.toFixed(4) } : {}), kind: t.kind,
-        size: t.size, ...(t.sy != null ? { sy: t.sy } : {}), ...(z != null ? { z } : {}), ...(TREE_OFF_LIES.has(t.lie) ? { off: true } : {}) };
-    });
-    const off = trees.filter((t) => t.off).length, on = trees.length - off;
-    const kindMismatch = [...painted].filter(([i, q]) => q.kind !== onMap[i].kind).length;
-    const quadNote = quads
-      ? `; canopy from the painted quad on ${painted.size} of ${on} on-course trees (${trees.filter((t) => t.dx != null).length} with dx${on - painted.size ? `; ${on - painted.size} with no quad within ${TREE_QUAD_MATCH} px keep the sprite rule` : ""}${kindMismatch ? `; ${kindMismatch} quad(s) of another kind than the PMP tree` : ""})`
-      : "; no painted quads (tools/wsr-map or the registration missing), all from the sprite rule";
-    const zs = trees.filter((t) => t.z != null).map((t) => t.z);
-    const zNote = zs.length ? `, base z ${Math.min(...zs).toFixed(1)} to ${Math.max(...zs).toFixed(1)} yd on the start's datum` : ", no base heights (wsr-pins.json has no meshY)";
-    console.log(`H${hole}: trees = ${trees.length} on the map of ${wp.trees.length} in the PMP (${[2, 3, 6].map((k) => `${trees.filter((t) => t.kind === k).length} of kind ${k}`).join(", ")}), ${trees.length - off} on the course, ${off} off (outer ground or water under the trunk), canopy r ${Math.min(...trees.map((t) => t.r * W)).toFixed(1)}-${Math.max(...trees.map((t) => t.r * W)).toFixed(1)} px, centred ${Math.min(...trees.map((t) => -t.dy * H)).toFixed(1)}-${Math.max(...trees.map((t) => -t.dy * H)).toFixed(1)} px north of the trunk${zNote}${quadNote}`);
+  const pins = spots.map((s) => ({ id: s.id, k: s.k, x: s.x, y: s.y, label: s.label, difficult: s.difficult, yd: s.yd, src: s.src, seen: s.sessions.size, wsr: s.wsr }));
+  const seenNss = pins.filter((s) => s.seen).map((s) => `${s.id}x${s.seen}`).join(" ");
+  console.log(`H${hole}: pins = 6 NSS cups (${pins.filter((s) => s.difficult).map((s) => s.id).join(" ") || "none"} difficult; ${pins.filter((s) => s.wsr).map((s) => `${s.id}=${s.wsr}`).join(" ") || "none"} on a WSR spot; rounds on Switch: ${seenNss || "none"})` +
+    `${ties.length ? `; ties the badges decide: ${ties.join(", ")}` : ""}${pinAmbiguous.length ? `; ambiguous: ${pinAmbiguous.map((a) => a.cups.join("/")).join(", ")}` : ""}` +
+    `${pinUnmatched.length ? `; unmatched: ${pinUnmatched.map((u) => `${u.px} px from ${u.nearest}`).join(", ")}` : ""}; tee = GlfTeeOBJ${onlineNote}`);
+  // ---- trees: NSS's own (tools/nss-trees.json, the fields listed where it
+  // is loaded), in the file's order, without its id and decode record ----
+  const trees = TREES[hole].trees.map((t) => ({ x: t.x, y: t.y, z: t.z, kind: t.kind, size: t.size, sy: t.sy, ...(t.off ? { off: true } : {}),
+    r: t.r, ...(t.dx !== undefined ? { dx: t.dx } : {}), ...(t.dy !== undefined ? { dy: t.dy } : {}), col: t.col }));
+  {
+    const off = trees.filter((t) => t.off).length, zs = trees.map((t) => t.z);
+    const kinds = [2, 3, 6].map((k) => `${trees.filter((t) => t.kind === k).length} of kind ${k}`).join(", ");
+    const caps = trees.reduce((n, t) => n + t.col.t.reduce((m, l) => m + l.length / 4, 0), 0), leaf = trees.reduce((n, t) => n + t.col.c.length, 0);
+    console.log(`H${hole}: trees = ${trees.length} NSS trees (${kinds}), ${trees.length - off} on the course, ${off} off; footprint r ${Math.min(...trees.map((t) => t.r * W)).toFixed(1)}-${Math.max(...trees.map((t) => t.r * W)).toFixed(1)} px; base z ${Math.min(...zs).toFixed(1)} to ${Math.max(...zs).toFixed(1)} yd; collision: ${caps} trunk nodes, ${leaf} canopy parts`);
   }
-  derived.holes[hole] = { scale: wt ? wt.scale : meta.scaleYdPerPx, yards: meta.yards, greenBox, greenPoly,
-    // slopeMaxPct: the steepest 9x9 cell's slope in percent (wsr-truth.json),
+  derived.holes[hole] = { scale: wt.scale, yards: meta.yards, greenBox, greenPoly,
+    // slopeMaxPct: the steepest 9x9 cell's slope in percent (nss-truth.json),
     // the scale of the quantized grid's levels, which the app's putt model
-    // needs to read a painted grid as absolute slopes (src/putt.js gridField);
-    // a capture-built grid has no absolute scale and ships none
-    grid: quantizeGrid(wt ? wt.grid : g.grid), ...(wt?.slopeMaxPct != null ? { slopeMaxPct: wt.slopeMaxPct } : {}),
-    pins, pinCandidates, pinAmbiguous, pinZones, pinObservations: greenPins,
-    greenView: greenMeta[hole] ?? null, tee, teeOnline, trees,
-    ...(wt ? { source: "wsr", wsrRev: wsrRev(wt), captureGreenBox: captureBox ? { x0: +(captureBox.x0 / W).toFixed(4), y0: +(captureBox.y0 / H).toFixed(4),
-      x1: +(captureBox.x1 / W).toFixed(4), y1: +(captureBox.y1 / H).toFixed(4) } : null } : {}) };
-  console.log(`H${hole}: k=${anchor?.k?.toFixed(2)} r=${anchor?.r?.toFixed(2)} box=${box ? `${box.x0},${box.y0}..${box.x1},${box.y1}` : "MISS"}${wt ? ` (WSR; capture box ${captureBox ? `${captureBox.x0},${captureBox.y0}..${captureBox.x1},${captureBox.y1}` : "MISS"})` : ""} aspect map=${mapAspect?.toFixed(2) ?? "-"} zoom=${zoomAspect.toFixed(2)} pins=${pins.length}${teeNote}`);
+    // needs to read a painted grid as absolute slopes (src/putt.js gridField)
+    grid: quantizeGrid(wt.grid), slopeMaxPct: wt.slopeMaxPct,
+    // pins: the six NSS cups; pinAmbiguous / pinUnmatched: the observations
+    // credited to none (a near tie the badges cannot split, or beyond every
+    // cup); pinObservations: the zoom pin readings of the hole; tee: NSS's
+    // GlfTeeOBJ, teeNss: NSS's tee bones (audit only); platform: the online
+    // tee platform (it replaced teeOnline); trees: NSS's
+    pins, pinAmbiguous, pinUnmatched, pinObservations: greenPins,
+    greenView: greenMeta[hole] ?? null, tee, teeNss, platform, trees,
+    // source "nss": the geometry (scale, green box, outline, grid) is NSS's
+    // collision; rev: its revision (geomRev), which the app's merge re-applies
+    // the geometry on (it replaced wsrRev); captureGreenBox: the capture
+    // projection, for comparison
+    source: "nss", rev: geomRev(wt, "nss"), captureGreenBox: captureBox ? { x0: +(captureBox.x0 / W).toFixed(4), y0: +(captureBox.y0 / H).toFixed(4),
+      x1: +(captureBox.x1 / W).toFixed(4), y1: +(captureBox.y1 / H).toFixed(4) } : null };
+  console.log(`H${hole}: k=${anchor?.k?.toFixed(2)} r=${anchor?.r?.toFixed(2)} box=${box.x0},${box.y0}..${box.x1},${box.y1} (NSS; capture box ${captureBox ? `${captureBox.x0},${captureBox.y0}..${captureBox.x1},${captureBox.y1}` : "MISS"}) aspect map=${mapAspect?.toFixed(2) ?? "-"} zoom=${zoomAspect.toFixed(2)} pins=${pins.length}${teeNote}`);
 
-  // The images the app ships. The hole map is the render of WSR's own minimap
+  // The images the app ships. The hole map is the render of NSS's own minimap
   // (the 250x304 frame at 2x, so a phone shows it sharp) and the zoomed green
-  // view is the renderer's crop of the WSR green box plus GT_MARGIN of it on
+  // view is the renderer's crop of the NSS green box plus GT_MARGIN of it on
   // every side at the box's true aspect, the frame the app's GreenView places
   // pins in. Without a render the hole ships what it did before 2026-10-18:
   // the median-stacked captures with the fused zoom texture transplanted into
@@ -1187,24 +1037,20 @@ for (let hole = 1; hole <= 21; hole++) {
     const gj = jpeg.encode({ data: gimg.data, width: gimg.width, height: gimg.height }, GREEN_JPEG_Q);
     greensJs.push(`  ${hole}: "data:image/jpeg;base64,${gj.data.toString("base64")}",`);
     greenBytes += gj.data.length; greensFromRender++;
-    // the crop's aspect is the WSR box's, width over height in map px, as the
+    // the crop's aspect is the NSS box's, width over height in map px, as the
     // renderer computes it. index.json records the box the crop was rendered
-    // for: it must be the truth's box exactly (a registration correction
-    // translates the box and leaves the aspect alone, and the app would then
-    // place pins and slope arrows at the new box's coordinates on the old
-    // image)
+    // for: it must be the truth's box exactly (tools/nss-truth.json greenBox;
+    // a registration correction translates the box and leaves the aspect
+    // alone, and the app would then place pins and slope arrows at the new
+    // box's coordinates on the old image)
     const ri = renderIndex[hole]?.green;
-    // without truth nothing says what the box should be: the crop is checked
-    // against its own index.json entry by its integer size (the entry's aspect
-    // is the box's in fractional map px, which the PNG's integer ratio misses
-    // at 4 dp on 20 of the 21 crops) and ships the entry's aspect
-    const aspect = wt ? +(((wt.greenBox.x1 - wt.greenBox.x0) * W) / ((wt.greenBox.y1 - wt.greenBox.y0) * H)).toFixed(4) : ri?.aspect ?? +(gimg.width / gimg.height).toFixed(4);
+    const aspect = +(((wt.greenBox.x1 - wt.greenBox.x0) * W) / ((wt.greenBox.y1 - wt.greenBox.y0) * H)).toFixed(4);
     const sameBox = (a, b) => !!a && !!b && ["x0", "y0", "x1", "y1"].every((k) => a[k] === b[k]);
-    const stale = !ri || ri.margin !== GT_MARGIN || (wt ? !sameBox(ri.box, wt.greenBox) : ri.width !== gimg.width || ri.height !== gimg.height);
-    const want = wt ? `green box ${JSON.stringify(wt.greenBox)} (margin ${GT_MARGIN})` : `a ${gimg.width}x${gimg.height} crop (margin ${GT_MARGIN}; no WSR truth for this hole, so restore its tools/wsr-truth.json entry before the rerun)`;
+    const stale = !ri || ri.margin !== GT_MARGIN || !sameBox(ri.box, wt.greenBox);
+    const want = `green box ${JSON.stringify(wt.greenBox)} (margin ${GT_MARGIN})`;
     if (stale) console.warn(ri
-      ? `H${hole}: ${id}-green.png was rendered for green box ${JSON.stringify(ri.box)} (${ri.width}x${ri.height}, aspect ${ri.aspect}, margin ${ri.margin}) but ${wt ? "the truth now gives" : "the file on disk is"} ${want}; rerun tools/render-maps.mjs`
-      : `H${hole}: ${id}-green.png has no index.json entry, so nothing says it was rendered for the truth's ${want}; rerun tools/render-maps.mjs`);
+      ? `H${hole}: ${greenFile} was rendered for green box ${JSON.stringify(ri.box)} (${ri.width}x${ri.height}, aspect ${ri.aspect}, margin ${ri.margin}) but the truth now gives ${want}; rerun python -P tools/render-nss-maps.py --holes ${hole}`
+      : `H${hole}: ${greenFile} has no index.json entry, so nothing says it was rendered for the truth's ${want}; rerun python -P tools/render-nss-maps.py --holes ${hole}`);
     greenMeta[hole] = { aspect, margin: GT_MARGIN, source: "render" };
     greenNote = `green view: render crop ${gimg.width}x${gimg.height} -> ${gj.data.length} B JPEG q${GREEN_JPEG_Q}`;
   } else if (gtex) {
@@ -1225,7 +1071,7 @@ for (let hole = 1; hole <= 21; hole++) {
   derived.holes[hole].greenView = greenMeta[hole] ?? null;
   let enc, mapNote;
   if (renderMap) {
-    const rimg = loadImage(renderMap);
+    const rimg = renderImg;
     enc = jpeg.encode({ data: rimg.data, width: rimg.width, height: rimg.height }, MAP_JPEG_Q);
     mapsFromRender++;
     mapNote = `map: render ${rimg.width}x${rimg.height} -> ${enc.data.length} B JPEG q${MAP_JPEG_Q}`;
@@ -1240,16 +1086,12 @@ for (let hole = 1; hole <= 21; hole++) {
     // means the box may be a few pixels off, and painting a whole green into
     // the wrong place is far worse than leaving the overview's own art (which
     // is already cup-free).
-    // With the WSR box the placement is known, not estimated; the capture box
-    // still needs a confident projection. Either way transplantGreen checks the
-    // texture against the overview before painting. The outline mask is the WSR
-    // outline (box-normalized) when known, else the fused capture outline.
+    // With the NSS box the placement is known, not estimated; transplantGreen
+    // still checks the texture against the overview before painting. The
+    // outline mask is the NSS outline (box-normalized).
     const img = stack();
-    if (pb && (wt || (anchor?.r ?? 0) >= 0.45)) {
-      const mask = wt ? wt.greenPoly.map(([x, y]) => [(x * W - pb.x0) / (pb.x1 - pb.x0), (y * H - pb.y0) / (pb.y1 - pb.y0)]) : g.poly ?? null;
-      transplantGreen(hole, img, pb, mask, gtex);
-    }
-    else if (box) console.log(`H${hole}: green NOT transplanted into the overview — projection correlation only ${anchor?.r?.toFixed(2)} (the zoomed green view is unaffected)`);
+    const mask = wt.greenPoly.map(([x, y]) => [(x * W - pb.x0) / (pb.x1 - pb.x0), (y * H - pb.y0) / (pb.y1 - pb.y0)]);
+    transplantGreen(hole, img, pb, mask, gtex);
     enc = jpeg.encode({ data: img.data, width: img.width, height: img.height }, 82);
     savePng(join(D, "maps", `${id}.final.png`), img);
     mapNote = `map: NO render, median-stacked captures ${img.width}x${img.height} -> ${enc.data.length} B JPEG q82`;
@@ -1269,11 +1111,12 @@ writeFileSync(join(ROOT, "src", "mapxform.js"),
 // ids ship as excludedShots, so the app deletes its stored copies). A row
 // with a position (pos: the ball on its address frame's minimap) is flown
 // over its hole's terrain along its bearing as the solver flies a club
-// (src/model.js lineProfile / simProfile at k = 1, WSR's own yards; heights
-// and surfaces from public/terrain through src/terrain.js, exactly as the
-// App's solver context reads them): elevFactor = WSR's stop over that
-// profile at the row's power and wind, the landing surfaces read from the
-// terrain, over the same shot on level fairway, and flatEnded = ended /
+// (src/model.js lineProfile / elevFlight: Nintendo Switch Sports' ball,
+// src/nsssim.js, at k = 1, from the row's lie; heights and surfaces from
+// public/terrain through src/terrain.js, exactly as the App's solver context
+// reads them): elevFactor = NSS's stop over that profile at the row's power
+// and wind, the landing surfaces read from the terrain, over the same shot
+// on level fairway, and flatEnded = ended /
 // elevFactor, the stop the shot would have had on level fairway, which the
 // club fit reads (src/model.js fitClub). A row whose frame gave neither an
 // aim nor a cup takes the line to the hole's most-seen pin (bearingFrom
@@ -1303,7 +1146,6 @@ function flyShot(r) {
   }
   const t = terrainOf(r.hole);
   if (!t || !(sc > 0)) return { ...out, elevWhy: `no terrain or scale for hole ${r.hole}` };
-  if (!WSR_CLUBS[club]) return { ...out, elevWhy: `${r.club} is not one of WSR's clubs` };
   const h0 = terrainHeightAt(t, r.pos.x, r.pos.y);
   if (h0 == null) return { ...out, elevWhy: "no terrain height under the ball" };
   const th = (bearing * Math.PI) / 180;
@@ -1313,21 +1155,31 @@ function flyShot(r) {
     heightAt: (yd) => { const h = terrainHeightAt(t, ...at(yd)); return h == null ? null : h - h0; },
   });
   if (!prof) return { ...out, elevWhy: "no terrain along the line" };
-  const q = r.power / 4, wind = { mph: r.windSpeed ?? 0, deg: r.windDeg ?? 0 };
-  const over = runWsr({ club, q, profile: simProfile(prof, 1), wind, trace: false }).stop;
-  const level = runWsr({ club, q, wind, trace: false }).stop;
-  if (!(over > 0 && level > 0)) return { ...out, elevWhy: `WSR's ball stops at ${over.toFixed(1)} yd over the terrain` };
+  const f = elevFlight({ club, power: r.power, lie: r.lie, windSpeed: r.windSpeed ?? 0, windDeg: r.windDeg ?? 0, prof });
+  if (!f) return { ...out, elevWhy: `${r.club} is not one of NSS's clubs` };
+  const { over, level } = f;
+  if (!(over > 0 && level > 0)) return { ...out, elevWhy: `NSS's ball stops at ${over.toFixed(1)} yd over the terrain` };
   const elevFactor = +(over / level).toFixed(4);
   return { ...out, elevFactor, flatEnded: +(r.ended / elevFactor).toFixed(1) };
 }
-try {
-  const shots = JSON.parse(readFileSync(join(D, "shots.json"), "utf8"));
-  const drop = new Set(excludedShots);
-  derived.shots = shots.rows.filter((r) => r.importable && !drop.has(r.id))
-    .map(({ flags, importable, spot, posWhy, ...r }) => ({ ...r, ...flyShot({ ...r, posWhy }) }));
+// Without captures/derived/shots.json the Log ships empty (a warning); with
+// it, a row that cannot be read or flown (a physics or API mismatch) fails the
+// build, so an empty or stale Log never ships silently.
+const SHOTS = join(D, "shots.json");
+if (!existsSync(SHOTS)) { console.warn(`shot rows not attached: no ${SHOTS}`); derived.shots = []; }
+else {
+  try {
+    const shots = JSON.parse(readFileSync(SHOTS, "utf8"));
+    const drop = new Set(excludedShots);
+    derived.shots = shots.rows.filter((r) => r.importable && !drop.has(r.id))
+      .map(({ flags, importable, spot, posWhy, ...r }) => ({ ...r, ...flyShot({ ...r, posWhy }) }));
+  } catch (e) {
+    console.error(`shot rows not attached: ${e.stack ?? e.message}; derived.json not written`);
+    process.exit(1);
+  }
   const flown = derived.shots.filter((r) => r.elevFactor != null);
-  console.log(`attached ${derived.shots.length} importable shot rows, ${flown.length} flown over the terrain${flown.length ? ` (elevFactor ${Math.min(...flown.map((r) => r.elevFactor))}-${Math.max(...flown.map((r) => r.elevFactor))})` : ""}; ${excludedShots.length} ids in excludedShots`);
-} catch (e) { console.warn(`shot rows not attached: ${e.message}`); derived.shots = []; }
+  console.log(`attached ${derived.shots.length} importable shot rows, ${flown.length} flown over the terrain with NSS's ball${flown.length ? ` (elevFactor ${Math.min(...flown.map((r) => r.elevFactor))}-${Math.max(...flown.map((r) => r.elevFactor))})` : ""}; ${excludedShots.length} ids in excludedShots`);
+}
 derived.excludedShots = excludedShots;
 
 mkdirSync(join(ROOT, "public"), { recursive: true });

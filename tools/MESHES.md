@@ -1,13 +1,312 @@
-# Course geometry from the WSR collision meshes
+# Course geometry: NSS's collision, and WSR's KCL meshes before it
 
-Nintendo Switch Sports golf reuses the 21 Wii Sports Resort holes, and the WSR
-collision meshes (KCL) are the exact surfaces the ball physics runs on. The 21
+Nintendo Switch Sports golf plays the 21 Wii Sports Resort holes, and since
+2026-10-24 the app's course geometry is NSS's own collision (the user: NSS's
+data replaces WSR's): the Havok meshes the Switch game's ball runs on, decoded
+from the user's NSS 1.5.0 dump (git-ignored, `tools/harness/state/eden/nss-golf-x/`:
+REPORT.md section 4, `collision/`, `verify/coll/`, each decode re-derived by an
+independent verifier). They are WSR's holes in WSR's own frame (below), with the
+Switch's course edits. WSR's collision meshes (KCL, "WSR's KCL meshes" below)
+stay in the repo for the frame they share (`tools/mesh-registration.json`), the
+Dolphin harness, the playbook and the WSR minimap renderer.
+
+## NSS's collision meshes (decoded 2026-10-24)
+
+- **Where they are.** One field shape per hole, `Fld_GolfCourseNN`, in
+  `Pack/Actor/Field_Fld_GolfCourseNN.pack.zs`: a `.bphsh` "Phive" container
+  (u16 version 1, then seven u32 offsets and sizes) holding a Havok 2021.1 TAG0
+  tagfile whose root is an `hknpMeshShape`, and a material table. The NX and
+  Win copies are byte-identical. The decoders (git-ignored Python,
+  `tools/harness/state/eden/tools/phive.py`, `nss-collision.py`,
+  `nss-leafexport.py`) write the dump's `collision/hNN.bin` + `hNN.json` (float32
+  vertices in world metres, uint32 triangles, the surface code and material per
+  triangle), `hNN-covers.bin` (the six HoleCover plugs), `hNN-leaf.*` (the
+  TreeLeaf canopies), `h03-water.*` (H3's sea) and `objects/` (the platform's
+  decks); a re-run reproduces every file byte for byte. `tools/lib/nsscol.mjs`
+  reads them for the generators.
+- **Geometry.** vertex (world m) = (int32(section.sectionOffset) +
+  Vertex16_3(u16 x, y, z)) × 1/512; a primitive is four u8 section-local
+  indices (c == d a triangle; a quad splits along a–c, which beats b–d on all 21
+  holes). 18,664–52,628 triangles a hole (H16 fewest, H7 most). Every field's
+  vertex bounds equal its ShapeParam box, and the section BVH holds every
+  primitive once. 15,021 primitives of the form (a, b, c, b), the leaf and
+  palm-leaf cards, become a triangle and its reverse: double-sided cards.
+  Duplicated triangles (H9 5,242 rock pairs, H14, H21) and coincident triangles
+  of two surfaces (H20 ob + object, rock + sand OB, glass + object; H21 leaf +
+  palm leaf) exist: tools/lib/nsscol.mjs breaks such a tie toward the hazard
+  (`TIE_ORDER`, a convention: none of the 7.3 M rays the builds cast meets one).
+- **Surfaces.** A primitive's tag (the shapeTagTable's run starts) indexes the
+  material table, and each material carries one attribute bit, the surface
+  code: 5 GolfFairway, 6 GolfRough, 7 GolfBunker, 8 GolfWaterhazard, 10 GolfOB,
+  18 GolfGreen, 24 GolfGreenEdge (the fringe), 25 GolfLeaf, 30 GolfCupside, 31
+  GolfCup, 32 GolfRock, 34 GolfGlass, 36 GolfSandOB, 37 GolfTree, 39 GolfAirOB,
+  40 GolfObject, 43 GolfPalmLeaf, 44 GolfBarrier (35 tee, 38 flag and 42 pin are
+  in no field mesh). The ball reads them as attributes 1–21 in the codes'
+  sorted order (src/nsssim.js `ATTR`; tools/nss-physics.json the response per
+  attribute). Triangle shares: trees 2–65 %, rock 13–73 % on 18 holes (none on
+  H6, H10, H16), green 1.2–4.4 %, fringe 0.4–2.2 %, fairway 1.0–5.6 %, rough
+  3.1–14.7 %, bunker 0.8–11.5 % (none on H8).
+- **The cups.** At every cup bone a real hole: a flat GolfCup bottom of r
+  0.150–0.155 m, 0.30–0.34 m below the green, its wall and a bevel of 80
+  GolfCupside triangles (the rim 0.188–0.197 m round; the wall's top follows
+  the green's slope, by up to 0.088 m round one cup), 20 GolfCup triangles; the
+  bone on the bottom within 1 mm (H20 k2 20.8 mm above). The six HoleCover
+  actors (20 green triangles each, their tops 0.298–0.339 m above the bones)
+  plug the cups not in play. Every build here closes all six; the live solver
+  opens the cup in play again (tools/lib/nss3d.mjs).
+- **Air OB** (GolfAirOB) is the fence round the course, mostly vertical walls
+  (y −50 to 100 on H1, H2, H8; other bounds on the rest; horizontal sheets on
+  H11 and H13): touching it is out of bounds. Barrier (2,760 triangles) and
+  Object (5,079) are rare; Rock is the banks, cliffs and the rocks along the
+  water.
+- **Against WSR's KCL** (at 0.4 m, through mesh = 10·nss + O): heights within
+  a median ±1.4 mm on 20 holes (H17 +10.6 mm). Classes agree inside the course
+  (fairway 0.98–1.0, green 0.995–1.0, fringe 1.0 on 15 holes); WSR's outer
+  ground reads NSS OB, sand OB or rock. The other differences are the Switch's
+  course edits: NSS sand OB or rock above WSR's water, H19's beach water (532 of
+  532 samples) where WSR had sand, H3's sea a separate actor. At the spots where
+  WSR's own minimap model (and the Switch's) drew another class over WSR's KCL
+  (H4's sand cell, H6's and H12's rough, H12's pond, the sea plane under drawn
+  OB on H3, H5, H7 and H21, H17's sand sliver, H9's sand patch; "WSR's
+  rendered minimaps" below), NSS has what the maps drew (tools/test-terrain.mjs
+  `KNOWN`). Every WSR course pixel has NSS ground except 5 of H1's 295,625, 4
+  on H3, 1 on H9, 25 on H15 and 1 on H16.
+- **Not in the field mesh** (placed by the GolfDesign Bancs or spawned by
+  code, each with its own collision): `Object_BGOBJ_TreeLeafNN`, the GolfLeaf
+  canopies of the baked trees (H1 14,632 triangles … H16 87,276; H8's as 2
+  cones and 23 spheres in its ShapeParam; TreeLeaf21 placed only by H21's
+  scenery scene, so absent in play); `Object_BGOBJ_GolfCourse03Water`, H3's sea
+  (63,321 GolfWaterhazard triangles; the other 16 water actors carry no shape);
+  the six HoleCovers; the platform's decks `BGOBJ_GlfStartObj` (32 triangles)
+  and `…High` (154), GolfObject, in the platform's own frame (tools/PINS.md);
+  two tee marks a hole (GolfObject) and H1's `Hole1StartOBJ` (barrier + air
+  OB), not used here; and the 444 actor trees (`Object_Obj_Glf_<kind>`, spawned
+  at the course model's `Obj_Glf_*` bones, nearly every tree in play), whose
+  kind meshes are in packs the dump does not hold: tools/nss-trees.json and
+  tools/lib/nss3d.mjs stand fitted per-kind shapes in for them.
+
+## The NSS frame (`tools/nss-registration.json`)
+
+NSS's world per hole is metres, y up, −z toward the green (the minimap's up),
++x right, the minimap's handedness. It is WSR's KCL frame scaled: mesh = 10·nss
++ O with a per-hole translation O (`originMesh`, `originMeshY`), no rotation
+(within 0.016°; the fits give 9.9979–10.0002 units per metre), and NSS y 0 is
+the WSR player start's height (within ±0.012 m): the datum of public/terrain
+and of every height the app reads. The hole's origin (where `Glf_RotateOBJ`
+sits on 19 holes) stands 2.0–9.1 yd behind the WSR start.
+
+Into the app's 250×304 frame: px = a·x − b·z + tx, py = b·x + a·z + ty, the
+similarity fitted on NSS's tree bones against WSR's PMP trees (residual
+0.008–0.016 px over 33–132 trees; a second bone set and a robust translation
+vote agree), written by `tools/nss-export.mjs` at full precision and read
+through `tools/lib/nssreg.mjs`. It is the one transform the cups, the tee, the
+platform, the terrain, the green truth, course3d and the maps share
+(INTEGRATION.md D1; platform.json's own map slots came through another path and
+differ by up to 0.77 px). Its yd/px equals the scale WSR's registration gave
+within 0.0002, and the frame is NSS's own minimap capture area
+(GolfMiniMapCaptureParam's AreaCenter lands at 125.4–125.9, 152.7–153.3 px).
+`tools/mesh-registration.json`'s `meshToMapFrac` stays valid for NSS's world
+through mesh = 10·nss + O: the 126 cups land 0.002–0.081 px from their NSS map
+points through it.
+
+## NSS's green truth (`tools/nss-truth.json`)
+
+    node tools/nss-truth.mjs [--collision <dump>/collision] [--registration tools/nss-registration.json] [--out tools/nss-truth.json]
+
+needs the dump and writes per hole, in wsr-truth.json's schema (less its tee):
+`scale` = 1 / (√(a² + b²) · 0.9144) yd per map px; `greenPoly`, the boundary
+of the code-18 triangles, its largest loop (the six cup rings, about 1.2 m
+round, and any loop under 5 m dropped), Douglas–Peucker 0.25 px; `greenBox`,
+its bbox; the 9×9 `grid` from 12×12 vertical rays a cell onto the green (the
+covers included, so a ray over a cup reads the green surface, not the bottom
+0.30 m down), central differences at the cells' physical spacing, normalised to
+the steepest cell; `gridPct`, `slopeMaxPct` (3.6–26.0 %), `slopeMeanPct`,
+`reliefYd`, `greenCells`. The NSS green's outer edge lies a near-constant
+0.3–1.2 px outside WSR's outline on every hole (p95 − median ≤ 0.2 px); the
+boxes agree within 0.1 px but for H9's top edge (0.82 px) and H15's (0.40).
+tools/build-derived.mjs ships it with `source: "nss"` and `rev: "nss-<hash>"`,
+and src/derivedMerge.js re-applies the geometry once over a hole stored with
+WSR's.
+
+## The terrain shipped to the app (NSS, 2026-10-25)
+
+    node tools/build-terrain.mjs [--collision <dump>/collision] [--truth tools/nss-truth.json] [--registration tools/nss-registration.json]
+         [--pins tools/nss-pins.json] [--out public/terrain] [--holes 7,16] [--allow-missing water]
+
+casts vertical rays on the field mesh with its six covers (and on H3 the sea
+actor, refused without it) through the registration; `src/terrain.js` reads
+the output:
+
+- `hNN.bin`: the ground height (int16, 0.1 yd above the datum NSS y 0;
+  `datumY` = the registration's originMeshY, the datum in WSR's KCL units) and
+  the class on a 125×152 grid over the frame, one sample per 2 map px (1.8–5.0
+  yd): the height the ray at the sample's centre lands on (at a cliff the exact
+  top or foot, not a blend), the class the majority of 4×4 rays over the cell
+  (a tie to the centre ray's class), 0 and no height where no ground lies under
+  the sample: past the end of NSS's field mesh on seven holes (H1 1,264 samples,
+  H6 1,220, H9 793, H10 760, H16 247, H19 217, H20 2); elsewhere NSS's mesh
+  reaches further than WSR's rasters did (H5 and H21 gained about 7,400–7,900
+  samples with height). On-course heights moved a median 0.024–0.030 yd from
+  the WSR build (its 0.1 yd quantisation), p90 0.05.
+- The classes keep the KCL vocabulary the app has always read, plus 17:
+  GolfFairway → 1 (the tee pads too), GolfRough → 2, GolfBunker → 3, GolfOB →
+  4, GolfGreen and the covers → 6, GolfWaterhazard → 7, GolfGreenEdge → 9,
+  GolfRock → 12 (a wall: banks, cliffs, the rocks along the water; 41–2,487
+  samples a hole on 18 holes), GolfSandOB → 17 (the Switch's beaches, out of
+  bounds where WSR's were sand; on H2, H4, H5, H7, H8, H14 and H21; `lieOf(17)`
+  = "outer"). The rays pass through leaves, palm leaves, trunks, the cups' walls
+  and bottoms, glass, objects, barriers and the air OB volumes, none of which
+  the 2D terrain carries.
+- `gNN.bin`: the green's heights every 0.5 yd over nss-truth's green box plus
+  0.12 of it on every side (63–102 × 64–90 nodes), int16 in 0.001 yd above the
+  green's mean, with the mask = the nodes whose ray lands on the green or a
+  cover; a masked node whose topmost hit is a cup (a cover left open) is
+  refused. H3's two `pits` of the WSR build are sound green on NSS's.
+- `index.json`: `source: "nss"`, the layouts, each hole's datum (and
+  `datumWsrMeshY`, the WSR start's height, which it matches within 0.12 KCL
+  units), sizes, SHA-1s, class counts, `noHeight`, `collisionSha1` (the dump
+  files read). 1,169 KB of terrain and 413 KB of green heights raw, 284 + 199
+  KB gzipped.
+
+The ground ray at the WSR start, at Glf_RotateOBJ and at GlfTeeOBJ reads 0.000
+m fairway on all 21 holes. `node tools/test-terrain.mjs` checks the files (with
+the dump it rebuilds them twice, byte-identical, and probes the collision). The
+trees' base heights `z` come from their own placements, on the same datum.
+
+## The live solver's course (`public/course3d` v2, 2026-10-25)
+
+`node tools/build-course3d.mjs` ships NSS's collision for the live solver
+(src/live3d-core.js, which flies NSS's ball on it through tools/lib/nss3d.mjs):
+per hole the field mesh with every cup closed by its cover (codes 30 and 31
+dropped), H3's sea and the TreeLeaf canopies; the vertices verbatim (float32
+NSS metres; mesh = 10·nss + O in the browser, in doubles); the model attributes
+(`ATTR_MAP`: 5→1, 6→2, 7→3, 8→7, 10→4, 18→6, 24→9; rock, glass, object and
+barrier folded into 12, which plays as Rock; 36→17 sand OB, 39→18 air OB,
+37→19 trunk, 25→20 leaf, 43→21 palm leaf; any other code refuses the build);
+the trunks, leaves and palm leaves as a separate tree pack. Dropped and logged:
+zero-area triangles, exact and reversed copies, down-facing rock / glass /
+object / barrier faces (buried undersides), and triangles wholly outside the
+crop box (the frame, every playable triangle and the air-OB fence, plus 50 m;
+no playable or fence triangle is cut). Each hNN.json carries the six cups at
+the cover's top (mesh units) and the difficult ones, the tee bones and the WSR
+start, the platform's standing spots, the 444 actor trees' bones (position,
+scale, kind), the baked trees for naming a hit, and the registration. 21 holes,
+14.4 MB (0.30–1.39 MB a hole); no palm.bin (v1's WSR palm mesh). nss3d.mjs adds
+the actor trees as per-kind shapes at their bones, the platform's decks for a
+stroke from it, and reopens the cup in play from its cover's rim (the cup's own
+rim on all 126). The 71 Eden strokes replayed on this course: the 44 rests off
+the cup within 0.0367 m, bit-identical to the fixture's own triangles, and
+every recorded holed putt holes (tools/test-live3d.mjs, tools/test-course3d.mjs).
+
+## NSS's trees (`tools/nss-trees.json`, 2026-10-25)
+
+Decoded by the dump's `nss-trees.py` (trees.md, trees.json; the tree
+verifier's verify/trees/verdicts.json corrects it): 1,495 trees on the 21 holes
+(WSR's PMP set has 1,272; 1,131 of WSR's trees have an NSS bone within 1 map
+px, 1,130 of the same family), of three collision kinds:
+
+- **1,015 baked trees.** The trunk is GolfTree in the field mesh (995
+  components, instances of six templates; 3,242 stacked duplicate triangles
+  dropped), the canopy GolfLeaf in TreeLeafNN (a broadleaf's sphere of 5.895 sx
+  centred 10.112 sy up, against WSR's 4.8 at 10.0; a conifer's 16-sided cone of
+  base radius 3.893 sx at 5.068 sy to its apex at 18.307 sy; 49 broadleaves on
+  H6/7/12/13/16/18/19 carry a six-sphere crown; H3's, H9's and H14's meshes are
+  coarse) or, for palms, GolfPalmLeaf / GolfLeaf cards in the field mesh. 89
+  trunks have no bone (H16 68): their kind and pose are registered from the
+  template.
+- **444 actor trees.** `Obj_Glf_<kind>NN` bones in the course model, where the
+  game spawns `Object_Obj_Glf_<kind>` with its own collision mesh (HardWood
+  A–D, ConiferTree A–D, PalmTree A/B); nearly every tree in play is one.
+- **36 decor trees** with no collision (H17 28, H8 4, H3 3, H15 1, all on OB
+  ground; 10 of them where WSR has a tree): dropped.
+
+The ball (trees.md, the NSO): canopies are pass-through and damp (Leaf: 0.03 /
+4 a tick off the horizontal and rising speed while inside; PalmLeaf: 0.08 a
+tick of contact); trunks are solid (ReflectionH 0.4, ReflectionV 0.1).
+`tools/nss-trees-export.mjs` exports the 1,257 trees whose collision comes
+within 0.02 of the frame (833 broadleaf, 314 conifer, 110 palm; 805 off course:
+OB, sand OB or water under the trunk; 444 actor) with their collision as
+primitives (`col`: the trunk as polylines of tapered capsules, the stem plus
+the limbs where it forks, 31,262 decoded pieces simplified to 11,060 capsules
+that hold every piece within 17.6 mm; the canopy as spheroids, cones and
+open-sheet bands with a cover fraction), dropping H21's TreeLeaf21 canopies
+(placed only by the scenery scene GolfDesign_GolfCourse21Hub, which the course
+code does not load: to be checked in Eden), the 213 bushes and the 70 ground
+sheets. build-derived ships them as derived.json `trees` (ids `t<hole>-<k>` in
+the file's order); src/trees.js checks the solver's flights against them
+(CLAUDE.md "Trees"). Their `r`, `dx`, `dy` describe the collision footprint,
+which the app's tap rule uses; the trees themselves are in NSS's minimap
+texture, so the map draws them.
+
+## NSS's minimaps (2026-10-25)
+
+    python -P tools/render-nss-maps.py [--holes 1,7] [--scales 2,3,4] [--jobs 7] [--plaid-origin centre|cupK] [--backdrop world|pane|black]
+    python -P tools/render-nss-maps.py --derive-backdrop
+
+renders the hole maps from the RomFS (git-ignored, `--romfs`) into
+`captures/derived/render-nss/` (2x, 3x, 4x and the green crop per hole, and an
+index.json with `art: "nss"`, `plaid.tileM: 2`); tools/build-derived.mjs ships
+them as src/maps.js (2x, 500×608, q78) and src/greens.js (the green crops,
+q82), tools/build-map-scales.mjs as public/maps (3x, 4x). What NSS draws:
+`Model/MiniMap_Field_Fld_GolfCourseNN.bfres.zs` holds no model, only three
+textures the game baked with its own top-down capture (GolfMiniMapCaptureParam):
+`MiniMap` (BC3, 4078–4104 texels square over AreaCenter ± AreaSize / 2; the
+trees are in it, as the capture rendered them), `Green` (the green alone with
+its height bands, lighter = higher: what the zoomed Terrain view shows) and
+`WaterMap` (a pond mask, not drawn). The layout `LGlfMiniMap` draws MiniMap
+through the user shader `Glf_MiniMap` (transcribed in the renderer; on the
+course the display is sRGB(1.2^2.2 · texel), 4.0–5.7 levels from the Switch's
+capture stacks) and, over the green, the plaid `Glf_MiniMapGreen^o` and the
+Green capture. The plaid's tile is 2 m on every hole (1.98–2.00 m measured on
+six holes' zoomed frames: the game sets its scale at runtime to GreenAreaSize
+/ 2 tiles); its phase could not be pinned from 25 zoomed frames of 14 holes, so
+the renderer centres a tile on the green area's centre (`--plaid-origin cupK`:
+on cup K). Off the course the game's pane is translucent over the live 3D view,
+which no file holds: `--backdrop world` (the default) stands flat colours in
+for OB, sea and void from `tools/nss-map-backdrop.json`, which `--derive-backdrop`
+writes from the capture stacks (a weighted median of the off-course colour
+inverted from them, the one input sampled from Switch captures); `--backdrop
+pane` uses no Switch input at all. Placement through tools/nss-registration.json;
+the green crop on nss-truth's box plus 0.12 at the box's aspect. No compass,
+flag, cup, avatar, aim line, dots, wind dial or the screen-fixed dot lattice
+(HUD, not map art). About 3.5 min for the 21 holes with `--jobs 7`; needs numpy,
+Pillow, zstandard and texture2ddecoder (scipy for `--compare` and
+`--derive-backdrop`); deterministic. Against the capture stacks: course error
+5.9 levels on average, off the course 7.7, the green 10.4. Known: about 0.5 px
+between the texture and the collision on H1, H17 and H21 (the game's own
+texture placement is kept).
+
+## Where to take it next
+
+1. (done 2026-10-24/25) NSS's collision as the course: the green truth, the
+   terrain, course3d, the trees and the minimaps above; the cups, the tee and
+   the platform (tools/PINS.md); NSS's ball on all of it (CLAUDE.md "Model").
+2. The actor trees' own kind meshes (`Object_Obj_Glf_<kind>` packs, zstd, not
+   in the dump): exporting them would replace the fitted per-kind shapes in
+   nss3d.mjs and nss-trees.json, with the yaw and the palm lean course3d lacks.
+3. course3d ships rock, glass, object and barrier as one wall attribute: the
+   NSS codes themselves would give barrier and object their own response.
+4. In Eden: H21's TreeLeaf21 (absent in play?), the plaid's anchor, the
+   platform ball point (0.9 m beside the stance), and the fit-residual check of
+   the logged shots on holes 8, 12 and 17 (the tee up to 51 m above the green
+   on H21, 20 m below it on H17).
+
+## WSR's KCL meshes (history)
+
+From 2026-10-15 to 2026-10-24 the app's geometry came from these; they remain
+the Dolphin harness's course (tools/harness/lib/model3d.mjs), the playbook's
+and the WSR minimap renderer's, and the origin of the frame NSS's world shares
+(mesh = 10·nss + O). What follows is as it was written then, with notes where
+NSS's data has since replaced it.
+
+The WSR collision meshes (KCL) are the surfaces WSR's ball runs on, and NSS's
+field meshes are the same holes in the same frame (above). The 21
 files `WS2_glf_course_<id>.kcl.obj` (exported with Wiimm's SZS Tools 2.42a,
 `wszst`) live in `captures/meshes/wsr-kcl-obj/` (gitignored, user-supplied).
 `tools/mesh-inspect.mjs` reports their geometry; `tools/mesh-heightmap.mjs`
 turns them into 16-bit RAW heightmaps + PNG previews + per-pixel surface maps.
 
-## What the meshes are
+### What the meshes are
 
 - Plain triangles (`f a b c`), no normals/UVs, CRLF line endings, 2.5k–9.5k
   triangles and 6k–21k vertices each (vertices are duplicated along seams).
@@ -22,7 +321,7 @@ turns them into 16-bit RAW heightmaps + PNG previews + per-pixel surface maps.
 - Each file is one hole plus its surroundings; most contain giant filler
   triangles (ocean / floor planes up to ±19 000 units) that must be cropped away.
 
-## Collision-type semantics (wszst group names carry the raw KCL flag)
+### Collision-type semantics (wszst group names carry the raw KCL flag)
 
 | group (type) | golf meaning | notes |
 |---|---|---|
@@ -39,7 +338,7 @@ turns them into 16-bit RAW heightmaps + PNG previews + per-pixel surface maps.
 | `item_0e_F010e` (14) | special zone | H1 only: the 6-triangle pale hexagon near the tee that the minimap also shows |
 | `fall_10_F0110` (16) | fall boundary | H14 only |
 
-## Mesh → hole mapping (`tools/mesh-holes.json`)
+### Mesh → hole mapping (`tools/mesh-holes.json`)
 
 Front nine are the "fcJP" files (Famicom Golf JP-course holes), back nine the
 "fc" files (NES Golf US-course holes), specials fcJP2/19/14 — WSR built its
@@ -65,7 +364,7 @@ the island green across a strait (fcJP7), H9 the inland lake below its green
 | 10 | fc1 | 379 | 360 | | 21 | fcJP14 | 436 | 416 |
 | 11 | fc3 | 143 | 148 | | | | | |
 
-## Tools
+### Tools
 
     node tools/mesh-inspect.mjs captures/meshes/wsr-kcl-obj/*.obj --out <dir> [--px 800] [--json report.json] [--raw] [--loop-types 1,3,6,7]
 
@@ -107,7 +406,7 @@ nodata-heavy ones because their meshes stop just outside the rough. The default
 crop (`--crop core`) is the bounding box of fairway + rough + sand + green +
 fringe plus `--pad 600` units; `--crop all` keeps every non-giant surface.
 
-## Registration to the app's map frame (`tools/mesh-registration.json`)
+### Registration to the app's map frame (`tools/mesh-registration.json`)
 
     node tools/mesh-register.mjs --heightmaps captures/meshes/heightmaps-res4 --out captures/meshes/registration \
          --json tools/mesh-registration.json [--holes 3,11] [--classify-only] [--maps captures/derived/maps]
@@ -121,10 +420,10 @@ Fits, per hole, a similarity transform (scale, rotation, translation) between
 the 250x304 minimap panel (fractional coords, the frame every app position
 lives in) and mesh units. The input is the Switch's own minimap art: the
 capture stack of each hole, `captures/derived/maps/hNN.png` (250x304, the
-flag painted out), from the `--maps` directory. Never `src/maps.js`: since
-2026-10-18 it holds the 500x608 renders of WSR's minimap model drawn through
-this very registration ("Rendered minimaps" below), so a fit against it is
-circular (on H7 it gives 12.6° of rotation at half the scale, score 0.97
+flag painted out), from the `--maps` directory. Never `src/maps.js`: it holds 500x608
+renders (from 2026-10-18 WSR's minimap model drawn through this very
+registration, "WSR's rendered minimaps" below; since 2026-10-25 NSS's own
+minimap), and a fit against the WSR ones was circular (on H7 it gives 12.6° of rotation at half the scale, score 0.97
 against 3.0); the tool refuses any image that is not 250x304, and accepts a
 `.js` module exporting `HOLE_MAPS` only for the stack-based src/maps.js of an
 older commit. Refitting all 21 holes against the stacks with today's
@@ -189,7 +488,7 @@ most holes.
 
 **The capture stacks are edited near greens, so check disagreements there
 against the unedited stacks.** (Since 2026-10-18 src/maps.js ships not the
-stacks but renders of WSR's own minimap, see "Rendered minimaps" below; the
+stacks but renders, WSR's minimap until 2026-10-25 and NSS's since; the
 stacks stay under captures/derived/maps as the Switch's own art, and the
 checks in this section were made against them.) extract-maps.mjs paints the
 flag out of every stacked map (onion inpainting), and build-derived.mjs, for a
@@ -254,7 +553,7 @@ see the next section):
   on that hole the flag flies 7–10 px downwind of its pole, so the search
   lands on the cup's rim.
 
-## The WSR truth applied to the app's data (2026-10-16)
+### The WSR truth applied to the app's data (2026-10-16; replaced by tools/nss-truth.json on 2026-10-25)
 
 The user's rule: when in doubt, the WSR data is the truth and derived data
 adjusts to it. `node tools/wsr-truth.mjs` writes `tools/wsr-truth.json`
@@ -304,13 +603,14 @@ adjusts to it. `node tools/wsr-truth.mjs` writes `tools/wsr-truth.json`
   platform, which ships as `teeOnline` with both tiers (tools/PINS.md). The
   pad rule above remains only as the fallback without `tools/wsr-pins.json`.
 
-The app picks this up through `src/derivedMerge.js`: WSR-sourced scale, green box,
+The app picked this up through `src/derivedMerge.js` (since 2026-10-25 the same
+rule with NSS's geometry, `source: "nss"` and `rev`): WSR-sourced scale, green box,
 outline and grid overwrite the stored values until the hole's marker `green.src`
 equals the hole's `wsrRev` (a hash of its WSR geometry, so a corrected truth
 re-applies while unchanged holes keep manual edits), and pipeline pins mirror derived.json on every load while
 the player's own pins stay untouched.
 
-## Pin positions (decoded 2026-10-17)
+### Pin positions (decoded 2026-10-17; the app's pins are NSS's cups since 2026-10-24)
 
 The meshes hold no pins. WSR stores them in each course archive's PMP ("Pack
 MaP") placement file, next to the KCL: the archive (Yaz0-compressed U8,
@@ -332,15 +632,14 @@ and checks each pin against the WSR green. Run on the user's disc
 green, and all 99 pins on holes 1-17 reproduce the community yardage sheet as
 floor(start-to-pin yards). The output `tools/wsr-pins.json` is committed.
 
-How WSR picks the pin is now read from `main.dol` itself (choosePin, the set
+How WSR picks the pin is read from `main.dol` itself (choosePin, the set
 chooser and the slot table), and agrees with the speedrun community's
-thresholds. That, the per-hole spot table, and what Switch Sports does
-differently are in tools/PINS.md: both sets seen, a few extra spots, and the
-online Survival Golf tee platform, two tiers 4 yd apart with the lower one on
-the start or up to 8 yd behind it, shipped on all 12 holes with online
-captures (holes 1, 2, 3, 6, 7, 12, 13, 17 and 21 have none yet).
+thresholds. That and the per-hole spot table are in tools/PINS.md ("WSR's
+spots"). What the captures once read as Switch-only spots and shifted spots
+are NSS's own cups, six per hole, and the online platform is NSS's decoded
+one (tools/PINS.md, "NSS's cups" and "The online Survival Golf platform").
 
-## Trees (decoded 2026-10-18)
+### WSR's trees (decoded 2026-10-18; derived.json's trees are NSS's since 2026-10-25)
 
 The meshes hold no trees either: their type-12 walls are banks, cliffs and
 retaining walls, along the water on most holes and at the edge of the terrain
@@ -476,10 +775,11 @@ per hole on/off: H1 11/37, H2 14/22, H3 22/64, H4 15/13, H5 24/56, H6
 17/27, H14 38/46, H15 27/47, H16 33/67, H17 14/24, H18 19/41, H19 18/40, H20
 20/0, H21 8/34.
 
-## Rendered minimaps (2026-10-18)
+### WSR's rendered minimaps (2026-10-18; the shipped maps are NSS's since 2026-10-25)
 
 `tools/render-maps.mjs` draws each hole map from the WSR data alone, and
-`tools/build-derived.mjs` ships the result as src/maps.js (the 250×304 frame
+`tools/build-derived.mjs` shipped the result until 2026-10-25 (`tools/build-map-scales.mjs
+--art wsr` still rebuilds the WSR 3x/4x set from its renders) as src/maps.js (the 250×304 frame
 at 2×, 500×608, JPEG q78) and src/greens.js (the WSR green box plus 0.12 of
 it on every side at the box's true aspect, q82). By default the art is WSR's
 own: each course archive carries `glf_map_<id>.brres`, a model of the KCL
@@ -589,78 +889,24 @@ the XLU objects' alpha are runtime state the files do not carry. A hole renders 
 `--holes` batch merges its entries into `index.json`, and a value outside
 the documented sets of `--art`/`--wsr`/`--trees` exits 1.
 
-## The terrain shipped to the app (2026-10-19)
+### The WSR terrain (2026-10-19 to 2026-10-25)
 
-The class and height rasters are gitignored, so `tools/build-terrain.mjs`
-ships what the solver needs from them under `public/terrain/` (committed),
-read by `src/terrain.js`:
+Until the NSS switch `tools/build-terrain.mjs` read the gitignored KCL class
+and height rasters (`captures/meshes/heightmaps-res4`) through
+`tools/mesh-registration.json` into the same layout of public/terrain: heights
+bilinear on the WSR start's datum, the class the majority of the raster px,
+nodata past the rasters' crop, the rasters' own nodata taking what
+map-style.json says the minimap draws there and the rasteriser's 1–2 px cracks
+closed, the green's mask the WSR outline less two H3 nodes (`pits`) whose reads
+bled into its water holes. Since 2026-10-25 it casts rays on NSS's collision
+instead ("The terrain shipped to the app (NSS)" above); the layout, the
+datum's meaning (the WSR start's height = NSS y 0) and the class vocabulary
+(plus 17, sand OB) did not change, so src/terrain.js needed no logic change.
+The WSR build's files are in git history; tools/test-terrain.mjs 6c compares
+the NSS greens against them (within 0.03 yd at every WSR mask node inside the
+NSS mask).
 
-    node tools/build-terrain.mjs [--heightmaps captures/meshes/heightmaps-res4] [--out public/terrain] [--holes 7]
-
-- `hNN.bin`: the ground height and the KCL class on a 125×152 grid over the
-  250×304 map frame, one sample per 2 map px (1.8–5.0 yd), 57,020 bytes per
-  hole. Heights are int16 in 0.1 yd above the hole's datum, the WSR player
-  start's height (the PMP start's Y, which equals the tee pad's on every hole
-  within 0.1 u; `datumY` in index.json), read bilinearly at the sample's centre;
-  against the median of the raster px in the sample's cell they differ by
-  under 0.04 yd at the median cell and 0.07–0.13 yd at the 99th percentile,
-  more only where a cell straddles a cliff or bank (it reads part way down).
-  The class is the majority of the raster px in the cell. Past the raster's
-  crop (the core surfaces plus 600 u) there is no height and class 0: up to
-  42% of the frame (H5; 28–39% on H1, H9, H10 and H21), none on eight holes.
-- `gNN.bin`: the green's heights every 0.5 yd over the WSR green box plus
-  0.12 of it on every side (63×68 to 103×87 nodes, 13–27 KB), int16 in
-  0.001 yd above the green's mean, with the WSR outline as a mask. Their 9×9
-  cell slopes reproduce `gridPct` (built from the mesh's green triangles at
-  1 u/px): the median cell within 0.1–0.5° and 1% in size on every green,
-  97–100% of the cells over 1% within 20° and 20%. The unit is 0.001 yd
-  because 0.01 yd over 0.5 yd is a 2% slope step, against 1.9 / 5.5 / 11.8%
-  at the p10 / p50 / p90 of the green cells.
-- `index.json`: the layouts, each hole's datum, file sizes and SHA-1s, and
-  sample counts by class. 1,169 KB of terrain and 415 KB of green heights
-  raw, 230 + 208 KB gzipped.
-
-Two things in the rasters are not KCL surfaces and are mended first. Their
-nodata (no surface: collision gaps, the void past the mesh, H12's ponds,
-H8's strait) takes what map-style.json says the minimap draws there, as the
-renderer's `resolveRaster` does (sea or pond → water, outer → outer ground,
-the rest the nearest class; H8's start stands in an 80×80 u gap in its tee
-pad). And the max-Y rasteriser leaves 1–2 px cracks along shared and
-T-junction triangle edges where what lies below shows through: 1,008 px over
-the 21 holes, 5–705 u deep (627 of them water; 219 round H1's zone; 11 in
-H3's green box, 16–17 yd deep: the ragged edges of the KCL water holes round
-its green, none inside the outline), which a 3×3 grey-scale closing finds
-(lifts over 5 u; it lifts concave kinks and beach alternation too, 207 px by
-2–5 u, which stay) and fills from the neighbours. The wider holes in the
-ground are in the KCL and stay, the closing trimming only their ragged edges
-(in the frame five round H3's green, 15–170 px, water 130–160 u down; one
-north of H17's green, 50 px, 230 u; a shallow one on H2). Everywhere else the
-KCL class stays, also at the spots where WSR's own model, the shipped map and
-the Switch draw another class, those the 2026-10-18 re-measurement under
-"Registration to the app's map frame" lists and the table at "Where the model
-and the KCL differ" measures (H4's sand cell, H6's and H12's rough, H12's
-pond, a sand patch behind H9's tee, the sea plane under drawn OB on H3, H5,
-H7 and H21, the beaches on H3 and H19, H17's sand sliver):
-`tools/test-terrain.mjs` records them as known differences.
-
-Checked by `node tools/test-terrain.mjs` (no gitignored file needed): the
-tee's height above the green's mean is within 0.4 m of the sidecars' tee pad
-minus the middle of the green's height range on all 21 holes (H21 51.1 m,
-H17 −19.8 m); the height at the start is 0 within 0.2 yd and its class
-fairway on every hole; every WSR pin spot (118) is green and every on-course
-trunk in the frame (455) has its lie's class; the trees in derived.json carry
-the scales and base height from wsr-pins.json; and, where the rasters are,
-two builds are byte-identical to each other and to the committed files.
-
-The trees' base heights do not come from this grid: derived.json's `z` is
-the PMP object's own height (wsr-pins.json `meshY`), which is where WSR's
-collision shapes stand. Against the ground under the trunk (the rasters,
-bilinear) it is within 1 u on 886 of the 1,356 trees the rasters reach; a
-tree on a slope is often sunk a little (p5 −6.8 u), 36 sit more than a yard
-below the ground and 15 more than a yard above it (on the course 13 and 2,
-up to 4.5 yd below on H7), and 184 stand beyond the rasters' crops.
-
-## Quirks worth knowing
+### Quirks worth knowing (WSR's KCL)
 
 - fcJP12 (H3) and fcJP6 (H2) carry extra type-6 quads sitting on the floor plane
   under water; the green finder ignores them by taking the loop with most vertices.
@@ -679,37 +925,3 @@ up to 4.5 yd below on H7), and 184 stand beyond the rasters' crops.
   such pairs into fake holes. tools/lib/obj.mjs now welds vertices within
   0.01 u. What remains are one fringe-type cell inside hole 4's green and one
   water-type cell inside hole 8's.
-
-## Where to take it next
-
-1. (done) Registration mesh → minimap, and the WSR truth applied to scale,
-   greens, pins, slope grids and tees; (done 2026-10-18) the hole maps and
-   green views rendered from WSR's own minimap model ("Rendered minimaps");
-   (done 2026-10-19) the height and class grid per hole and the fine green
-   heights under `public/terrain/` ("The terrain shipped to the app"),
-   `tools/build-terrain.mjs`, which runs when the meshes, the registration or
-   map-style.json's `regions` change (`wsr-truth.mjs`'s triggers plus the
-   style, which decides the nodata classes); (done 2026-10-20) the solver reads
-   the landing surface for the stop distance (src/model.js `solve`,
-   `ctx.surfaceAt` built in App.jsx along the shot line; per club the solver
-   scans every power from 0.4 bars to the cap for the stop on the surface its
-   own carry lands on, bisecting the surface edges, and solves each run).
-   (done 2026-10-20) the ball's height for the tree check (src/App.jsx reads
-   the line's heights through src/terrain.js `heightAt` for src/trees.js
-   `treesAlong`) and the green heights for the putts (item 2).
-2. (done 2026-10-20) The putt model on absolute slopes: src/putt.js (decision
-   D3, CLAUDE.md "Model") rolls WSR's putt over the green heights `gNN.bin`
-   (src/terrain.js `loadGreenHeights`) and, once the player edits the painted
-   grid or on a hole without heights, over the painted levels × `slopeMaxPct`
-   (the green's steepest cell, wsr-truth.json → derived.json); the 9×9 levels
-   stay per-green relative in derived.json and are scaled at read time. Left
-   to fit: the Switch's green speed (`greenSpeed`, from logged flat putts).
-3. (done 2026-10-20) Elevation for the shot model: the solver flies each club
-   over the line's height profile from `public/terrain/` (src/model.js
-   `solve` with `ctx.heightAt`, src/wsrsim.js `run({ profile })`; "Elevation"
-   in CLAUDE.md's Model), and the online platform's upper tier is
-   `ctx.ballLift` (App.jsx `UPPER_TIER_YD` = 1 yd, the player's "a few feet",
-   unmeasured: +1.3 yd of carry on a full driver). Remaining: the fit-residual
-   check of the WSR-shaped descent and bounce on holes 8/12/17 first, which
-   needs logged shots there (tee to green centre: up to 51 m down on H21,
-   20 m up on H17).

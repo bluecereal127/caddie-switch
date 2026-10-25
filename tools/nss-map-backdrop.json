@@ -1,0 +1,459 @@
+{
+ "_note": "The flat stand-ins tools/render-nss-maps.py --backdrop world composites the off-course minimap pane over (linear RGB, after P_bg's dimming): NSS draws the pane translucent over the live 3D view, which no file holds. Derived by `python -P tools/render-nss-maps.py --derive-backdrop` from the capture stacks captures/derived/maps/hNN.png (median Switch tee frames): per off-course px (pane alpha < 0.99, outside the HUD and the window's border), est = (stack - alpha * pane) / (1 - alpha) in linear light, sorted into ob / sea (filtered texel B > 0.8 G) / void (texel A >= 254); each kind's value is the weighted median of est, weights 1 - alpha, pooled over the holes with at least 200 px of it (perHole lists every hole's own), which minimises the summed |stack - composite| over those px. A kind no hole has enough of falls back to ob.",
+ "world": {
+  "ob": [
+   0.0083,
+   0.0595,
+   0.0056
+  ],
+  "sea": [
+   0.0101,
+   0.0718,
+   0.0874
+  ],
+  "void": [
+   0.003,
+   0.013,
+   0.0056
+  ]
+ },
+ "used": {
+  "ob": {
+   "holes": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21
+   ],
+   "px": 685933
+  },
+  "sea": {
+   "holes": [
+    2,
+    3,
+    4,
+    5,
+    7,
+    8,
+    13,
+    14,
+    15,
+    17,
+    18,
+    19,
+    21
+   ],
+   "px": 260973
+  },
+  "void": {
+   "holes": [
+    21
+   ],
+   "px": 763
+  }
+ },
+ "perHole": {
+  "1": {
+   "ob": {
+    "px": 51020,
+    "weight": 46142.0,
+    "wmedian": [
+     0.0071,
+     0.0424,
+     0.0107
+    ]
+   }
+  },
+  "2": {
+   "ob": {
+    "px": 24238,
+    "weight": 21590.2,
+    "wmedian": [
+     0.0113,
+     0.0504,
+     0.0088
+    ]
+   },
+   "sea": {
+    "px": 15914,
+    "weight": 13359.0,
+    "wmedian": [
+     0.0137,
+     0.0809,
+     0.0874
+    ]
+   }
+  },
+  "3": {
+   "ob": {
+    "px": 34009,
+    "weight": 28294.0,
+    "wmedian": [
+     0.0048,
+     0.0556,
+     0.004
+    ]
+   },
+   "sea": {
+    "px": 15170,
+    "weight": 12693.9,
+    "wmedian": [
+     0.0089,
+     0.0674,
+     0.0849
+    ]
+   }
+  },
+  "4": {
+   "ob": {
+    "px": 16731,
+    "weight": 13785.2,
+    "wmedian": [
+     0.0115,
+     0.0676,
+     0.0095
+    ]
+   },
+   "sea": {
+    "px": 18762,
+    "weight": 15732.7,
+    "wmedian": [
+     0.0137,
+     0.0809,
+     0.0899
+    ]
+   },
+   "void": {
+    "px": 61,
+    "weight": 61.0,
+    "wmedian": [
+     0.007,
+     0.0194,
+     0.0137
+    ]
+   }
+  },
+  "5": {
+   "ob": {
+    "px": 35369,
+    "weight": 29441.8,
+    "wmedian": [
+     0.004,
+     0.0556,
+     0.0029
+    ]
+   },
+   "sea": {
+    "px": 15217,
+    "weight": 12691.2,
+    "wmedian": [
+     0.004,
+     0.0612,
+     0.0899
+    ]
+   }
+  },
+  "6": {
+   "ob": {
+    "px": 42547,
+    "weight": 35614.5,
+    "wmedian": [
+     0.0108,
+     0.0697,
+     0.0077
+    ]
+   }
+  },
+  "7": {
+   "ob": {
+    "px": 24067,
+    "weight": 19855.9,
+    "wmedian": [
+     0.0122,
+     0.0763,
+     0.0129
+    ]
+   },
+   "sea": {
+    "px": 26786,
+    "weight": 22465.4,
+    "wmedian": [
+     0.0162,
+     0.0856,
+     0.0874
+    ]
+   }
+  },
+  "8": {
+   "ob": {
+    "px": 11724,
+    "weight": 9264.9,
+    "wmedian": [
+     0.024,
+     0.0879,
+     0.05
+    ]
+   },
+   "sea": {
+    "px": 32775,
+    "weight": 27210.6,
+    "wmedian": [
+     0.0115,
+     0.074,
+     0.0899
+    ]
+   }
+  },
+  "9": {
+   "ob": {
+    "px": 46467,
+    "weight": 38965.3,
+    "wmedian": [
+     0.0083,
+     0.0655,
+     0.004
+    ]
+   }
+  },
+  "10": {
+   "ob": {
+    "px": 47729,
+    "weight": 40076.3,
+    "wmedian": [
+     0.0066,
+     0.0635,
+     0.0048
+    ]
+   }
+  },
+  "11": {
+   "ob": {
+    "px": 31493,
+    "weight": 26262.0,
+    "wmedian": [
+     0.0166,
+     0.0572,
+     0.0043
+    ]
+   }
+  },
+  "12": {
+   "ob": {
+    "px": 52735,
+    "weight": 7906.3,
+    "wmedian": [
+     0.0233,
+     0.1251,
+     0.0504
+    ]
+   }
+  },
+  "13": {
+   "ob": {
+    "px": 16774,
+    "weight": 2496.3,
+    "wmedian": [
+     0.0117,
+     0.1176,
+     0.0267
+    ]
+   },
+   "sea": {
+    "px": 34842,
+    "weight": 29366.1,
+    "wmedian": [
+     0.0021,
+     0.0592,
+     0.0849
+    ]
+   }
+  },
+  "14": {
+   "ob": {
+    "px": 19168,
+    "weight": 15734.9,
+    "wmedian": [
+     0.0122,
+     0.074,
+     0.0083
+    ]
+   },
+   "sea": {
+    "px": 21904,
+    "weight": 18419.9,
+    "wmedian": [
+     0.0129,
+     0.0809,
+     0.0899
+    ]
+   }
+  },
+  "15": {
+   "ob": {
+    "px": 36590,
+    "weight": 30406.4,
+    "wmedian": [
+     0.0077,
+     0.0614,
+     0.0048
+    ]
+   },
+   "sea": {
+    "px": 7600,
+    "weight": 6239.8,
+    "wmedian": [
+     0.0108,
+     0.074,
+     0.0874
+    ]
+   },
+   "void": {
+    "px": 60,
+    "weight": 60.0,
+    "wmedian": [
+     0.003,
+     0.0091,
+     0.0137
+    ]
+   }
+  },
+  "16": {
+   "ob": {
+    "px": 45003,
+    "weight": 37640.8,
+    "wmedian": [
+     0.0071,
+     0.0454,
+     0.004
+    ]
+   }
+  },
+  "17": {
+   "ob": {
+    "px": 12125,
+    "weight": 1777.5,
+    "wmedian": [
+     0.0235,
+     0.1292,
+     0.0328
+    ]
+   },
+   "sea": {
+    "px": 26835,
+    "weight": 22403.3,
+    "wmedian": [
+     0.0145,
+     0.0809,
+     0.0899
+    ]
+   }
+  },
+  "18": {
+   "ob": {
+    "px": 12634,
+    "weight": 1869.8,
+    "wmedian": [
+     0.0288,
+     0.1274,
+     0.0516
+    ]
+   },
+   "sea": {
+    "px": 35144,
+    "weight": 29217.0,
+    "wmedian": [
+     0.0052,
+     0.0632,
+     0.0874
+    ]
+   }
+  },
+  "19": {
+   "ob": {
+    "px": 31576,
+    "weight": 25989.7,
+    "wmedian": [
+     0.0101,
+     0.0676,
+     0.0101
+    ]
+   },
+   "sea": {
+    "px": 4320,
+    "weight": 3516.9,
+    "wmedian": [
+     0.0129,
+     0.0763,
+     0.0874
+    ]
+   },
+   "void": {
+    "px": 9,
+    "weight": 9.0,
+    "wmedian": [
+     0.0161,
+     0.0296,
+     0.032
+    ]
+   }
+  },
+  "20": {
+   "ob": {
+    "px": 44931,
+    "weight": 37529.9,
+    "wmedian": [
+     0.0043,
+     0.0556,
+     0.0036
+    ]
+   }
+  },
+  "21": {
+   "ob": {
+    "px": 49003,
+    "weight": 41033.4,
+    "wmedian": [
+     0.0066,
+     0.0614,
+     0.0061
+    ]
+   },
+   "sea": {
+    "px": 5704,
+    "weight": 4743.6,
+    "wmedian": [
+     0.0021,
+     0.0515,
+     0.0824
+    ]
+   },
+   "void": {
+    "px": 763,
+    "weight": 763.0,
+    "wmedian": [
+     0.003,
+     0.013,
+     0.0056
+    ]
+   }
+  }
+ },
+ "holesWithoutStack": []
+}

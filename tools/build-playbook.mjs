@@ -25,6 +25,10 @@
 //   node tools/build-playbook.mjs
 // writes public/playbook/hNN.json for holes 1-18, and for each of the Special course's 19-21 once every pin
 // of it has a calm route, and public/playbook/index.json.
+// The routes stay WSR's: each pin is a WSR spot, placed from tools/wsr-pins.json's mesh position through
+// tools/mesh-registration.json. public/derived.json is not read: since 2026-10-24 its pins are NSS's six cups
+// (c0..c5, of which 7 of the 126 coincide with a WSR spot), so the check that every WSR spot is among them is
+// gone, and nothing here depends on it.
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -36,7 +40,6 @@ const SOLVE = path.join(HERE, "harness", "results", "solve");
 const SWEEP = path.join(HERE, "harness", "results", "solve-wind");
 const PINS = JSON.parse(fs.readFileSync(path.join(HERE, "wsr-pins.json"), "utf8"));
 const REG = JSON.parse(fs.readFileSync(path.join(HERE, "mesh-registration.json"), "utf8"));
-const DERIVED = JSON.parse(fs.readFileSync(path.join(ROOT, "public", "derived.json"), "utf8"));
 const MAP_W = 250, MAP_H = 304, YD = 9.144, R2D = 180 / Math.PI;
 const NEAR_YD = 1 / 3;
 // holes 19-21: the Special course, all par 4 (the game's own banners, "Hole 20: Par 4", "Hole 21: Par 4",
@@ -77,16 +80,12 @@ for (let hole = 1; hole <= 21; hole++) {
   // WSR's wind dir d moves the air along (sin, cos)(d x 45 deg) in (x, z)
   const dirs = Array.from({ length: 8 }, (_, d) => r1(bearingOf(Math.sin((d * Math.PI) / 4), Math.cos((d * Math.PI) / 4))));
   const par = PAR[hole], target = par === 3 ? 1 : 2;
-  const dPins = DERIVED.holes[hole]?.pins ?? [];
   const pins = {};
   let nRoutes = 0;
   for (const sp of PINS.holes[hole].spots) {
     const id = `s${sp.slots[0]}`;
     const pin = sp.mesh;
     const pinMap = toMap(pin);
-    const dp = dPins.find((p) => p.id === id);
-    if (!dp) fail(`h${hh(hole)}-${id}: not among derived.json's pins`);
-    else if (Math.hypot(dp.x - pinMap[0], dp.y - pinMap[1]) > 0.004) fail(`h${hh(hole)}-${id}: the pin maps to ${pinMap} but derived.json has ${dp.x}, ${dp.y}`);
     const stroke = (s) => {
       const h0 = Math.atan2(pin[0] - s.from[0], pin[2] - s.from[2]);
       const toPin = Math.hypot(s.from[0] - pin[0], s.from[2] - pin[2]) / YD;

@@ -1,159 +1,258 @@
-// The putt model: Wii Sports Resort's roll on a green (decision D3), decoded
-// from its main.dol (tools/research/wsr-ground-phase.md sections 4 and 6) and
-// run over the green's real heights (src/terrain.js loadGreenHeights, from the
-// WSR collision meshes) or, where the player edited it, the painted 9x9 slope
-// grid. Pure (no React, DOM or Node API), so tools/test-putt.mjs runs it.
+// The putt model: Nintendo Switch Sports' roll on a green (since 2026-10-25;
+// WSR's before, decision D3), the decoded NSS 1.5.0 ball (src/nsssim.js, its
+// constants tools/nss-physics.json, confirmed on 71 strokes recorded in Eden's
+// RAM: tools/harness/state/eden/nss-golf-x/flights.md 5.5 and the verifiers'
+// verdicts.json), run over the green's real heights (src/terrain.js
+// loadGreenHeights, ray casts on NSS's collision) or, where the player edited
+// it, the painted 9x9 slope grid. Pure (no React, DOM or Node API), so
+// tools/test-putt.mjs runs it.
 //
-// WSR's ball on a green is a stream of micro-bounces; per tick that comes to
-// a constant (Coulomb) deceleration A·vn* = 0.0002 u/tick², a linear drag
-// v *= 0.999 and gravity along the bisector of the surface normal and the
-// vertical, so on a slope of θ the pull down the fall line is 0.002·sin(θ/2)
-// u/tick² and the normal load (and with it the friction) scales by cos(θ/2).
-// The putter launches horizontally at v0 = 0.004 + 0.406·power^0.667 u/tick
-// and a flat green stops it at ≈ 20.5 yd × power. Units: 1 u = 0.1 m (9.144
-// u/yd), one tick = 1/240 s.
+// NSS's putt is its roll mode (mode 2 from the first tick), one 1/240 s tick:
+//   1. the move, then the contact with the green under the ball: the ball is
+//      pushed out of the plane along its normal and the velocity's part into
+//      it removed (no bounce in the roll);
+//   2. air drag, v -= 0.0025 / 4 v (0.150 /s);
+//   3. friction, |v| -= 1.3 FrictionRatioCurve(|v|) dt (1.3 m/s^2 up to 5 m/s,
+//      easing to half from 10 m/s), only while touching;
+//   4. the stop count: the horizontal speed at or under 0.005 m/s for 10
+//      frames is a rest;
+//   5. gravity, 6 m/s^2 while touching the green (10 off it), straight down:
+//      the next tick's slide turns it into 6 sin(theta) down the fall line
+//      (about 0.115 yd/s^2 a degree), except that a ball at or under 0.5 m/s
+//      more than 1 m from the cup takes it along the normal, where the slide
+//      removes all of it: a slow putt feels no slope farther than 1 m from the
+//      cup; within 0.3 m of the cup and over 0.5 m/s it is 6 + 8
+//      Hermite((0.5,1),(1,0))(d / 0.3) (AddGravityHole).
+// The putter launches at its table's speed along the aim pitched up 1.14
+// degrees (LoftDeg), so on a flat green the ball leaves the surface for a few
+// ticks (no friction, gravity 10) before the slide takes the climb out; uphill
+// past 1.14 degrees it is pressed into the green at once. This model runs
+// that tick in doubles on the slope field (the plane under the ball from its
+// gradient, the ball's height above it while it hops), and agrees with
+// src/nsssim.js's float32 engine over the same planes within 0.05 yd
+// (tools/test-putt.mjs a, b).
 //
-// What the Switch does with any of this is unmeasured, so the one Switch
-// number is `greenSpeed`, the flat roll of a full-gauge putt (WSR's 20.5 yd at
-// power 1.0 until logged flat putts fit it, fitGreenSpeed): it maps a solved
-// putt to the gauge (gaugeBars) and nothing else. The physics stays WSR's.
+// The cup: NSS's is collision (a 0.193 m rim on the green, a bevel to the 0.15
+// m wall, 0.31 m deep) with AddGravityHole above it; how far off its centre a
+// putt can pass and still drop, against its speed there, is CUP_WINDOW,
+// measured on src/nsssim.js's analytic NSS cup by tools/build-nss-shape.mjs
+// (src/nssShape.js) and checked against the putts Eden recorded (17 holed at
+// 1.1-2.5 m/s, h08s6's lip-out at 2.9 m/s 0.125 m off; tools/test-putt.mjs c).
+//
+// The Switch number is still `greenSpeed`, the flat roll of a full-gauge putt
+// (NSS's own 20.13 yd at putter power 1.0 until logged flat putts fit it,
+// fitGreenSpeed): it maps a solved putt to the gauge (gaugeBars) and nothing
+// else. The physics is NSS's.
 //
 // Frame: the putt is solved in the green box (the app's green.box, map
 // fractions): ball and cup are fractions of the box (0-1, +x right, +y down,
 // as GreenCanvas taps them) and the box is W x H yd (App's greenYd). A field
-// gives the ground's gradient there (puttField).
+// gives the ground's gradient there (puttField). The tick runs in metres.
+import { PHYSICS, curveAt } from "./nsssim.js";
+import { PUTT_ROLL_YD, CUP_WINDOW as CUP_TABLE } from "./nssShape.js";
 
-// ---- WSR's constants in yd and s ----
-const U_YD = 9.144, TICK_HZ = 240;
-const YD_S = TICK_HZ / U_YD;                 // 1 u/tick = 26.25 yd/s
-const YD_S2 = (TICK_HZ * TICK_HZ) / U_YD;    // 1 u/tick² = 6,299 yd/s²
+// ---- NSS's constants ----
+const M = 0.9144;                                    // m per yd
+const GP = PHYSICS.ground, AP = PHYSICS.air;
+export const TICK_HZ = PHYSICS.tick.substeps / PHYSICS.tick.frameS;
+const DTM = PHYSICS.tick.dt;                         // the tick, s (the game's 0.016666668 / 4)
+const DRAG_TICK = AP.airFriction / PHYSICS.tick.substeps;
+const FR_GREEN = PHYSICS.attrs[6].friction;          // AttrGreen.Friction, m/s^2
+const G_GREEN = GP.gravityPutter, G_AIR = AP.gravity;
+const STOP_VEL = GP.stopVelLen, STOP_TICKS = GP.stopVelFrame * PHYSICS.tick.substeps;
+const SLOW_V = GP.velLenForStopGravity, SLOW_DIST = GP.stopGravityDisableDist;
+const HOLE_G = GP.addGravityHole, HOLE_D = GP.addGravityHoleDist, HOLE_CURVE = GP.addGravityHoleCurve;
+const SMALL_D = GP.smallMoveForceStopDistance, SMALL_TICKS = GP.smallMoveForceStopFrame * PHYSICS.tick.substeps;
+const RATIO = GP.frictionRatioCurve;
+const LOFT = (PHYSICS.clubs.PT.loftDeg * Math.PI) / 180;
 const DEG = Math.PI / 180;
-// the green (attr 6): Coulomb A = 0.15, restitution B = 0.5; the steady
-// approach speed vn* = 0.999·0.002/(1 + 0.999·B) = 0.001332 u/tick, so
-// A·vn* = 0.0002 u/tick² = 1.259 yd/s² (1.15 m/s²) on the flat
-export const DECEL = ((0.15 * 0.999 * 0.002) / (1 + 0.999 * 0.5)) * YD_S2;
-// v *= 0.999 per tick = 0.2401 per s (it acts in the air too)
-export const DRAG = -Math.log(0.999) * TICK_HZ;
-// gravity, 0.002 u/tick² = 12.6 yd/s²; along the bisector its pull down a
-// slope of θ is G·sin(θ/2), 0.110 yd/s² per degree near 0 (a real ball's
-// g·sin θ would be 0.187), 0.087 of the flat deceleration per degree
-export const G = 0.002 * YD_S2;
-// the putter's launch speed at WSR power p (0.05-2.5 on the green), yd/s
-export const wsrPuttV0 = (p) => (0.004 + 0.406 * Math.pow(p, Math.log2(1 / 0.63))) * YD_S;
-
-// ---- the integration ----
-// 120 steps a second (WSR ticks at 240), 20 s at most; a ball under 0.05
-// yd/s is at rest (WSR's creep threshold, 0.0015 u/tick for 20 ticks, is
-// 0.04 yd/s) unless the slope under it passes CREEP_DEG and it keeps rolling.
-// The pull beats the friction past tan(θ/2) = A·0.999/(1 + 0.999·B), 11.4° on
-// a green; WSR's stop rule still rests a ball that slows to a stop up to ~15°
-// (its simulator needed 15° to start a resting ball, and stops an uphill putt
-// at 13-15° where this model's rolls back). 12° sits between the two; where
-// exactly the Switch starts a ball rolling is unmeasured.
-export const DT = 1 / 120, STEP_CAP = 2400, STOP_V = 0.05, CREEP_DEG = 12;
+// the friction ratio: 1 up to its second point (5 m/s), then the Hermite
+const RATIO_FLAT = RATIO.points[1][0];
+const ratioAt = (v) => (v <= RATIO_FLAT ? 1 : curveAt(RATIO, v));
+// the cup's pull, AddGravityHole x its curve at d / AddGravityHoleDist: the
+// file's two-point Hermite (0.5, 1, 0) (1, 0, 0) inline (curveAt otherwise)
+const HC = HOLE_CURVE.points, HOLE_PLAIN = HOLE_CURVE.type === "Hermit2D" && HC.length === 2 && !HC[0][2] && !HC[1][2];
+const holePull = (t) => {
+  if (!HOLE_PLAIN) return HOLE_G * curveAt(HOLE_CURVE, t);
+  if (t <= HC[0][0]) return HOLE_G * HC[0][1];
+  if (t >= HC[1][0]) return HOLE_G * HC[1][1];
+  const u = (t - HC[0][0]) / (HC[1][0] - HC[0][0]), u2 = u * u, u3 = u2 * u;
+  return HOLE_G * ((2 * u3 - 3 * u2 + 1) * HC[0][1] + (3 * u2 - 2 * u3) * HC[1][1]);
+};
+// in yd and s, for the readers: the green's friction below 5 m/s (1.42 yd/s^2),
+// the drag rate (0.150 /s) and the green's gravity (6.56 yd/s^2; its pull down
+// a slope of theta is G sin theta)
+export const DECEL = FR_GREEN / M;
+export const DRAG = -Math.log(1 - DRAG_TICK) * TICK_HZ;
+export const G = G_GREEN / M;
+// a putt is a tick loop of at most ForceStopFrame frames (21.7 s); a ball under
+// STOP_V (yd/s) horizontally for StopVelFrame frames is at rest
+export const DT = DTM, STEP_CAP = GP.forceStopFrame * PHYSICS.tick.substeps, STOP_V = STOP_VEL / M;
 // the dashed line's points, every 0.1 s
-const PATH_EVERY = 12;
-// A step solves dv/dt = a - DRAG·v exactly for an a held over it: v' = v·E +
-// a·C1, x' = x + v·C1 + a·C2 (E = e^(-DRAG·DT) = 0.999², WSR's drag over its
-// two ticks). An Euler step's (1 - DRAG·DT) instead loses 0.11 % of the speed
-// over a 20 yd putt's 4.6 s (548 steps) and stops it 0.01 yd short.
-const DRAG_E = Math.exp(-DRAG * DT), DRAG_C1 = (1 - DRAG_E) / DRAG, DRAG_C2 = (DT - DRAG_C1) / DRAG;
-
-// The stop distance of a ball rolling at v on a flat green: dv/dt = -DECEL -
-// DRAG·v integrates to D(v) = v/DRAG - (DECEL/DRAG²)·ln(1 + DRAG·v/DECEL).
-// WSR's v0 at power 0.1 / 0.5 / 1.0 / 2.5 gives 1.77 / 10.20 / 20.45 / 48.09
-// yd against its simulator's 1.77 / 10.21 / 20.46 / 48.12 (tools/test-putt.mjs).
-export function flatStop(v) {
-  return v > 0 ? v / DRAG - (DECEL / (DRAG * DRAG)) * Math.log(1 + (DRAG * v) / DECEL) : 0;
+const PATH_EVERY = 24;
+// the putter: power 0 .. PowerOverMaxPT (1.5) and its launch speed, the table's
+// (GolfShotVelTable PT, read at (int)(100 power)) linear between its whole
+// percents, yd/s (the game flies the lower one: a percent is 0.2 yd of flat roll,
+// so a swing between two rolls up to 0.2 yd short of this)
+export const PUTT_POWER_MAX = PHYSICS.launch.powerOverMaxPT;
+const PT_SPEEDS = PHYSICS.launchTable.PT;
+export function puttV0(p) {
+  const x = Math.max(0, Math.min(PT_SPEEDS.length, p * 100));
+  const i = Math.floor(x), f = x - i;
+  const a = i === 0 ? 0 : PT_SPEEDS[i - 1], b = i >= PT_SPEEDS.length ? PT_SPEEDS[PT_SPEEDS.length - 1] : PT_SPEEDS[i];
+  return (a + (b - a) * f) / M;
 }
-// its inverse, the speed that stops at exactly D yd on a flat green (bisection;
-// D(v) rises with v and D(60 yd/s) is 195 yd, far past any green)
+// its inverse (the table rises), power for a launch speed in yd/s
+export function puttPowerOfV0(v) {
+  const s = v * M;
+  if (!(s > 0)) return 0;
+  if (s <= PT_SPEEDS[0]) return (s / PT_SPEEDS[0]) * 0.01;
+  for (let i = 1; i < PT_SPEEDS.length; i++) if (s <= PT_SPEEDS[i]) return (i + (s - PT_SPEEDS[i - 1]) / (PT_SPEEDS[i] - PT_SPEEDS[i - 1])) / 100;
+  return PT_SPEEDS.length / 100;
+}
+
+// ---- the tick ----
+// One putt in metres: from (x, y) along the unit (ux, uy) launched at v0 m/s,
+// on grad(x yd, y yd, out) (rise per yd = per m), the cup at (cx, cy) or null.
+// Every tick calls step(px, py, x, y, sp0, sp1) with the move's segment and the
+// horizontal speed at its ends; a true return ends the putt. -> { x, y, sp, ticks,
+// rest }.
+const gr = new Float64Array(2);
+function roll(grad, x, y, ux, uy, v0, cx, cy, step) {
+  let vx = v0 * Math.cos(LOFT) * ux, vy = v0 * Math.cos(LOFT) * uy, vz = v0 * Math.sin(LOFT);
+  // the ball's height above its rest height over the plane, m (while it hops),
+  // and the last contact's normal (up before the first, as the game's M+0x78)
+  let zr = 0, nx = 0, ny = 0, nz = 1;
+  let stopT = 0, smallT = 0, ax = x, ay = y, ticks = 0, rest = false;
+  let sp = Math.sqrt(vx * vx + vy * vy);
+  const far = cx == null;
+  while (ticks < STEP_CAP) {
+    ticks++;
+    const px = x, py = y, sp0 = sp;
+    // 1. the move, then the plane under the ball
+    x += vx * DTM; y += vy * DTM;
+    grad(x / M, y / M, gr);
+    const gx = gr[0], gy = gr[1], inv = 1 / Math.sqrt(1 + gx * gx + gy * gy);
+    zr += (vz - (gx * vx + gy * vy)) * DTM;
+    const mx = -gx * inv, my = -gy * inv, mz = inv;
+    const vn = vx * mx + vy * my + vz * mz;
+    let touch = false;
+    if (zr <= 0 && vn < 0) {
+      // pushed out along the normal (the horizontal shift that leaves) and slid
+      const pen = -zr * mz;
+      x += pen * mx; y += pen * my; zr = 0;
+      vx -= vn * mx; vy -= vn * my; vz -= vn * mz;
+      nx = mx; ny = my; nz = mz; touch = true;
+    }
+    // 2. drag, 3. friction (touching), 4. the stop count
+    let s2 = vx * vx + vy * vy + vz * vz;
+    if (s2 > STOP_VEL * STOP_VEL) { const k = 1 - DRAG_TICK; vx *= k; vy *= k; vz *= k; s2 *= k * k; }
+    const s = Math.sqrt(s2);
+    if (touch && s > 0) {
+      const d = FR_GREEN * ratioAt(s) * DTM;
+      if (d >= s) { vx = 0; vy = 0; vz = 0; } else { const k = 1 - d / s; vx *= k; vy *= k; vz *= k; }
+    }
+    const h2 = vx * vx + vy * vy;
+    if (h2 <= STOP_VEL * STOP_VEL) stopT++; else stopT = 0;
+    if ((x - ax) * (x - ax) + (y - ay) * (y - ay) <= SMALL_D * SMALL_D) smallT++; else { smallT = 0; ax = x; ay = y; }
+    // 5. gravity: along the normal for a slow ball far from the cup, else down
+    // (with the cup's pull close to it)
+    let g = touch ? G_GREEN : G_AIR;
+    const dc = far ? Infinity : Math.sqrt((x - cx) * (x - cx) + (y - cy) * (y - cy));
+    if (s <= SLOW_V && nz >= 0.5 && dc > SLOW_DIST) { const k = g * DTM; vx -= nx * k; vy -= ny * k; vz -= nz * k; }
+    else { if (dc < HOLE_D && s > SLOW_V) g += holePull(dc / HOLE_D); vz -= g * DTM; }
+    sp = Math.sqrt(vx * vx + vy * vy);
+    if (step && step(px, py, x, y, sp0, sp, ticks)) return { x, y, sp, ticks, rest: false, ended: true };
+    if (stopT >= STOP_TICKS || smallT >= SMALL_TICKS) { rest = true; break; }
+  }
+  return { x, y, sp, ticks, rest, ended: false };
+}
+const FLAT_GRAD = (x, y, o) => { o[0] = 0; o[1] = 0; };
+
+// ---- the flat green ----
+// The roll of a putt launched at v yd/s on a flat green (the putter's 1.14
+// degree hop included), yd: this model's own, tabled every 0.02 m/s up to 16 m/s
+// (past PowerOverMaxPT's 10.5) once, linear between (the stop is smooth in v;
+// tools/test-putt.mjs d holds the table to a direct run within 0.002 yd).
+const FLAT_STEP = 0.02, FLAT_N = 801;
+let flatTable = null;
+function flatRows() {
+  if (flatTable) return flatTable;
+  flatTable = new Float64Array(FLAT_N);
+  for (let k = 1; k < FLAT_N; k++) {
+    const r = roll(FLAT_GRAD, 0, 0, 0, -1, k * FLAT_STEP, null, null, null);
+    flatTable[k] = Math.sqrt(r.x * r.x + r.y * r.y) / M;
+  }
+  // the hop's ticks are whole: a lower speed can roll a hair further; keep it rising
+  for (let k = 1; k < FLAT_N; k++) if (flatTable[k] < flatTable[k - 1]) flatTable[k] = flatTable[k - 1];
+  return flatTable;
+}
+export function flatStop(v) {
+  if (!(v > 0)) return 0;
+  const t = flatRows(), u = (v * M) / FLAT_STEP;
+  if (u >= FLAT_N - 1) return t[FLAT_N - 1] + (t[FLAT_N - 1] - t[FLAT_N - 2]) * (u - (FLAT_N - 1));
+  const i = Math.floor(u), f = u - i;
+  return t[i] + (t[i + 1] - t[i]) * f;
+}
+// its inverse, the launch speed (yd/s) that rolls D yd on a flat green
 export function vFlat(D) {
   if (!(D > 0)) return 0;
-  let lo = 0, hi = 60;
-  while (flatStop(hi) < D) hi *= 2;
-  for (let i = 0; i < 60; i++) { const m = (lo + hi) / 2; if (flatStop(m) < D) lo = m; else hi = m; }
-  return (lo + hi) / 2;
+  const t = flatRows();
+  if (D >= t[FLAT_N - 1]) return (((FLAT_N - 1) + (D - t[FLAT_N - 1]) / (t[FLAT_N - 1] - t[FLAT_N - 2])) * FLAT_STEP) / M;
+  let lo = 0, hi = FLAT_N - 1;
+  while (hi - lo > 1) { const m = (lo + hi) >> 1; if (t[m] < D) lo = m; else hi = m; }
+  const f = t[hi] > t[lo] ? (D - t[lo]) / (t[hi] - t[lo]) : 0;
+  return ((lo + f) * FLAT_STEP) / M;
 }
 
 // ---- the cup ----
-// WSR's cup is a pit of radius 1.5 u (0.164 yd) and depth 3 u. How far off
-// its centre a ball can pass and still drop depends on how fast it is going
-// there: measured in WSR itself (the Dolphin harness, tools/harness/REPORT.md
-// 5.2: the holed / missed edge bisected on both sides of the cup at speeds of
-// 0.9-4.5 yd/s, and traced putts in the game's own frame), 0.146 yd at 0.9
-// yd/s, 0.12 at 1.8, 0.10 at 2.7, 0.03 at 4.0 and nothing past ~4.45, the
-// same on cups of 1.2, 3.95 and 8.1 deg and on one cup from four sides (down,
-// up and across its slope both ways) to the 6 mm the bisection resolves.
-// CUP_WINDOW is that curve, [speed yd/s, half-width yd], linear between the
-// points; a ball whose path comes within cupWindow(its speed there) of the
-// centre is holed. (Before 2026-10-21 the rule was 0.15 yd at up to 4.07
-// yd/s, from the decode's simulator at ~1 m/s: right at 0.9 yd/s and 0.04-
-// 0.12 yd too generous at 2.4-4 yd/s.)
-export const CUP_WINDOW = [[0, 0.150], [0.9, 0.146], [1.0, 0.138], [1.3, 0.131], [1.8, 0.122], [2.4, 0.109], [2.7, 0.104],
-  [3.0, 0.091], [3.4, 0.078], [3.55, 0.066], [4.0, 0.032], [4.25, 0.020], [4.45, 0]];
+// CUP_WINDOW: [speed yd/s, half-width yd], linear between its points: a putt
+// whose path passes within cupWindow(its speed there) of the cup's centre
+// drops (tools/build-nss-shape.mjs, src/nssShape.js: NSS's cup in src/nsssim.js
+// on a level green; 0.215 yd up to 1.75 yd/s, under 0.18 past 2.2, 0.104 at 3.5,
+// none from 5.36). A ball at rest within CUP_R of the centre is in.
+export const CUP_WINDOW = CUP_TABLE;
+// the table's speeds are 0.1 m/s apart (rounded to 0.1 mm/s in yd/s): a direct
+// index, then the neighbour if the rounding put v past it
+const CW_DV = CUP_WINDOW[1][0] - CUP_WINDOW[0][0], CW_N = CUP_WINDOW.length;
 export function cupWindow(v) {
   if (!(v > 0)) return CUP_WINDOW[0][1];
-  for (let i = 1; i < CUP_WINDOW.length; i++) {
-    const [v1, w1] = CUP_WINDOW[i];
-    if (v <= v1) { const [v0, w0] = CUP_WINDOW[i - 1]; return w0 + ((w1 - w0) * (v - v0)) / (v1 - v0); }
-  }
-  return 0;
+  let i = Math.floor(v / CW_DV) + 1;
+  if (i >= CW_N) return 0;
+  while (i > 1 && v <= CUP_WINDOW[i - 1][0]) i--;
+  while (i < CW_N - 1 && v > CUP_WINDOW[i][0]) i++;
+  if (v > CUP_WINDOW[i][0]) return 0;
+  const [v0, w0] = CUP_WINDOW[i - 1], [v1, w1] = CUP_WINDOW[i];
+  return w0 + ((w1 - w0) * (v - v0)) / (v1 - v0);
 }
-// the widest the window gets (a ball at rest on the cup's edge) and the speed
-// past which nothing drops
+// the widest the window gets (a ball dying on the cup) and the speed past
+// which nothing drops
 export const CUP_R = CUP_WINDOW[0][1];
 export const V_CAP = CUP_WINDOW[CUP_WINDOW.length - 1][0];
-
-// ---- the launch ----
-// WSR launches the putt horizontally, so on a slope the ball does not start
-// rolling along it: downhill it leaves the surface, uphill it strikes into it,
-// and it hops a few times (restitution 0.5) for about 4·v0·tanθ/g s, with the
-// full vertical gravity in the air and a friction impulse at each landing.
-// The net is a change of the rolling speed in proportion to v0 (every term
-// scales with it). LAUNCH_HOP[k] is that change as a fraction of v0 at a slope
-// of (k - 11)° along the launch (+ uphill): the launch speed at which this
-// model stops a power-1.0 putt on a plane where WSR's own simulator does
-// (src/wsrsim.js run), against the same on a flat green (where this model
-// stops 0.013 yd short of WSR's 20.461). Across powers 0.2-2.5 the measured
-// fraction moves by under 0.004 (tools/test-putt.mjs (b) checks the stops).
-// Without it this model stops the power-1.0 putt 0.73 yd short of WSR's 28.21
-// yd down 6° and 0.71 yd past its 15.73 up 6°. Past the table it holds the
-// end value: WSR's ball does not stop down a slope over 11.4°, and up one
-// over 12° this model's ball rolls back (CREEP_DEG). Across the launch the
-// change is left out (the launch is level that way).
-const LAUNCH_HOP_FROM = -11;
-const LAUNCH_HOP = [0.0487, 0.0431, 0.0378, 0.0315, 0.0249, 0.0196, 0.0152, 0.0109, 0.0074, 0.0043, 0.0020,
-  0, -0.0022, -0.0055, -0.0098, -0.0152, -0.0210, -0.0283, -0.0369, -0.0459, -0.0565, -0.0669, -0.0792, -0.0920];
-// slope along the launch as rise per yd (+ uphill) -> the fraction of v0 gained
-export function launchHop(rise) {
-  const n = LAUNCH_HOP.length - 1;
-  const t = Math.max(0, Math.min(n, Math.atan(rise) / DEG - LAUNCH_HOP_FROM));
-  const i = Math.min(n - 1, Math.floor(t)), f = t - i;
-  return LAUNCH_HOP[i] * (1 - f) + LAUNCH_HOP[i + 1] * f;
-}
 
 // ---- the ground: slope fields ----
 // A field is { W, H, src, grad(x, y, out) }: out[0], out[1] = the ground's
 // rise per yd along +x and +y (map right, map down) at (x, y) yd from the green
 // box's top-left corner (the uphill gradient ∇h).
 
-// B4's green heights (src/terrain.js parseGreenHeights: a stepYd grid over the
-// WSR green box plus 0.12 of it, int16 in unitYd above z0Yd, mask = inside the
-// WSR green outline less the nodes tools/build-terrain.mjs leaves out as pits,
-// whose bilinear read took in a raster px of a KCL hole beside the green: two
-// on H3, which read 0.57 and 0.23 yd low beside its 16-17 yd water holes, one
-// 0.58 yd under the next node, a 115 % slope): the gradient at each node in
-// the mask by central differences over the nodes in it (one-sided at its
-// edge); a node outside takes the gradient of the nearest node inside
-// (breadth first), because the margins hold KCL holes (water 130-160 u down
-// round H3's green, a 25 yd drop at the north edge of H17's box) that would
-// read as cliffs. The mask is read as shipped: B4's belt here, which also
-// dropped a masked node beside a drop of over 1 yd to a node outside the
-// mask, went with B4b, since on the fixed grids it only discarded sound
-// nodes, eight on H3 at the rim of those holes and none elsewhere, and moved
-// the gradient there by up to 2.5 slope points. The steepest gradient a green
-// box reads is H21's 30 %, H3's 13 % (tools/test-putt.mjs g). Cached per grid.
+// The green heights (src/terrain.js parseGreenHeights: a stepYd grid over
+// tools/nss-truth.json's green box plus 0.12 of it, int16 in unitYd above
+// z0Yd, ray casts on NSS's collision; mask = the nodes whose ray lands on the
+// green, the cups closed by their covers, so no node reads a cup's bottom
+// 0.30 m down; tools/build-terrain.mjs refuses a node over an open cup): the
+// gradient at each node in the mask by central differences over the nodes in
+// it (one-sided at its edge); a node outside takes the gradient of the
+// nearest node inside (breadth first), because the margins hold banks and
+// drops off the green (8.5 yd down at the edge of H8's box, 2-3.5 yd on
+// H3, H4, H5, H7, H9, H17 and H20; on WSR's KCL, H3's water holes 16-17 yd
+// down and a 25 yd drop on H17) that would read as cliffs. The mask is read
+// as shipped. On WSR's rasters (B4b) two nodes on H3 beside those holes had
+// to be left out as pits (a bilinear read took in a raster px of the hole:
+// one 0.58 yd under the next node, a 115 % slope); NSS's rays read the green
+// there sound, and B4's belt, which dropped a masked node beside a drop of
+// over 1 yd to an unmasked one, went with B4b. The steepest gradient a green
+// box reads is H19's 32 %, then H21's 30 %, H3's 13 % (tools/test-putt.mjs g;
+// on WSR's rasters H21's 30 % was the steepest). Cached per grid.
 const gradCache = new WeakMap();
 function nodeGrads(g) {
   let c = gradCache.get(g);
@@ -205,9 +304,11 @@ export function heightField(g, box, W, H) {
 // write it) in absolute slope: a level is a band of the cell's slope against
 // the green's steepest cell (quantizeGrid: under 0.45, 0.45-0.75, 0.75 up),
 // read as the band's mean over the 1,314 non-empty cells of the 21 WSR greens
-// (tools/wsr-truth.json grid: 0.304 / 0.595 / 0.856), times the green's
-// steepest slope slopeMaxPct (derived.json, from wsr-truth.json; without one
-// the median of the 21, 11.4 %); θ = atan(pct / 100) down the painted
+// (tools/wsr-truth.json grid: 0.304 / 0.595 / 0.856; NSS's greens,
+// tools/nss-truth.json, give the same bands within 0.002), times the green's
+// steepest slope slopeMaxPct (derived.json, from the truth file
+// tools/build-derived.mjs reads, nss-truth.json once the geometry is NSS's;
+// without one the median of the 21, 11.4 %, 11.3 on NSS's); θ = atan(pct / 100) down the painted
 // direction. Constant over each cell, as the old model read it.
 const LEVEL_FRAC = [0, 0.304, 0.595, 0.856];
 export const SLOPE_MAX_PCT_DEFAULT = 11.4;
@@ -245,15 +346,13 @@ export function puttField({ green, heights = null, W, H, slopeMaxPct = null }) {
   return { ...f, src: green?.gridEdited ? "edited" : "grid" };
 }
 
+
 // ---- the sim ----
 // One putt: from ball toward cup (fractions of the box) turned angDeg
-// clockwise, launched at pw x the speed that stops at the cup on a flat green.
-// The forces: the friction DECEL·cos(θ/2) against the motion (never past a
-// stop), the drag DRAG·v, the pull G·sin(θ/2) down the fall line, the slope
-// read at the start of each step. Holed when a step's segment comes within
-// cupWindow(the ball's speed there) of the cup, or when the ball is at rest
-// within CUP_R before it steps (ball and cup put down on one spot: D = 0
-// launches it at 0; a ball that rolls to rest that close was holed by a segment).
+// clockwise, launched at pw x the speed that rolls to the cup on a flat green.
+// NSS's tick (roll above) on the field's slopes. Holed when a tick's segment
+// comes within cupWindow(the ball's horizontal speed there) of the cup, or
+// when the ball comes to rest within CUP_R of it.
 // -> { holed, best, margin, pass, endSp, path (box fractions, every 0.1 s;
 // null with trace false), D (ball to cup, yd), v0 (the launch speed the gauge
 // sets, yd/s), Dflat (its flat roll), stop (box fractions), t (s) }. best is
@@ -262,59 +361,47 @@ export function puttField({ green, heights = null, W, H, slopeMaxPct = null }) {
 // to the window's edge (best less the window at its speed there; < 0 holed),
 // pass the closest at any speed: a putt that runs over the cup at 6 yd/s
 // passes at 0 but is no near miss, it stops 6 yd past.
-const scratch = new Float64Array(2);
 export function simPutt(field, ball, cup, angDeg, pw, { trace = true } = {}) {
-  const { W, H } = field, gr = scratch;
+  const { W, H } = field;
   const D = Math.hypot((cup.x - ball.x) * W, (cup.y - ball.y) * H);
   const th = Math.atan2((cup.x - ball.x) * W, -((cup.y - ball.y) * H)) + angDeg * DEG;
   const ux = Math.sin(th), uy = -Math.cos(th);
   const v0 = pw * vFlat(D);
-  let x = ball.x * W, y = ball.y * H;
-  const cx = cup.x * W, cy = cup.y * H;
-  field.grad(x, y, gr);
-  const vL = v0 * (1 + launchHop(gr[0] * ux + gr[1] * uy));
-  let vx = ux * vL, vy = uy * vL, sp = vL;
+  const x0 = ball.x * W * M, y0 = ball.y * H * M, cx = cup.x * W * M, cy = cup.y * H * M;
   const path = trace ? [[ball.x, ball.y]] : null;
-  const creep = Math.tan(CREEP_DEG * DEG);
-  let holed = false, best = vL < V_CAP ? D : Infinity, margin = vL < V_CAP ? D - cupWindow(vL) : Infinity, pass = D, step = 0;
-  for (; step < STEP_CAP; step++) {
-    field.grad(x, y, gr);
-    const s = Math.hypot(gr[0], gr[1]);
-    if (sp < STOP_V && s <= creep) {
-      const dr = Math.hypot(x - cx, y - cy);
-      if (dr - CUP_R < margin) margin = dr - CUP_R;
-      if (dr <= CUP_R) { holed = true; x = cx; y = cy; sp = 0; }
-      break;
-    }
-    // the pull and the friction, held over the step (the friction never more
-    // than stops the ball within it)
-    const half = Math.atan(s) / 2;
-    let ax = 0, ay = 0;
-    if (s > 0) { const k = (G * Math.sin(half)) / s; ax = -k * gr[0]; ay = -k * gr[1]; }
-    if (sp > 0) { const k = Math.min(DECEL * Math.cos(half), sp / DT) / sp; ax -= k * vx; ay -= k * vy; }
-    const nvx = vx * DRAG_E + ax * DRAG_C1, nvy = vy * DRAG_E + ay * DRAG_C1;
-    const nx = x + vx * DRAG_C1 + ax * DRAG_C2, ny = y + vy * DRAG_C1 + ay * DRAG_C2;
-    const nsp = Math.hypot(nvx, nvy);
-    // the segment's closest approach to the cup, and the speed there
-    const dx = nx - x, dy = ny - y, L2 = dx * dx + dy * dy;
-    const f = L2 > 0 ? Math.min(1, Math.max(0, ((cx - x) * dx + (cy - y) * dy) / L2)) : 0;
-    const dc = Math.hypot(x + f * dx - cx, y + f * dy - cy), spc = sp + f * (nsp - sp);
+  const V_CAP_M = V_CAP * M, WM = W * M, HM = H * M;
+  let holed = false, best = v0 < V_CAP ? D : Infinity, margin = v0 < V_CAP ? D - cupWindow(v0) : Infinity, pass = D;
+  const r = roll(field.grad, x0, y0, ux, uy, v0 * M, cx, cy, (px, py, x, y, sp0, sp1, tick) => {
+    if (trace && tick % PATH_EVERY === 0) path.push([x / WM, y / HM]);
+    // the segment's closest approach to the cup (yd), and the speed there; the
+    // window is read only where it could matter (within CUP_R of a new best margin)
+    const dx = x - px, dy = y - py, L2 = dx * dx + dy * dy;
+    const f = L2 > 0 ? Math.min(1, Math.max(0, ((cx - px) * dx + (cy - py) * dy) / L2)) : 0;
+    const ex = px + f * dx - cx, ey = py + f * dy - cy, dc = Math.sqrt(ex * ex + ey * ey) / M;
     if (dc < pass) pass = dc;
-    x = nx; y = ny; vx = nvx; vy = nvy;
-    if (spc < V_CAP) {
+    const spc = sp0 + f * (sp1 - sp0);
+    if (spc < V_CAP_M) {
       if (dc < best) best = dc;
-      const m = dc - cupWindow(spc);
-      if (m < margin) margin = m;
-      if (m <= 0) { holed = true; x = cx; y = cy; vx = 0; vy = 0; sp = 0; step++; break; }
+      if (dc - CUP_R < margin) {
+        const m = dc - cupWindow(spc / M);
+        if (m < margin) margin = m;
+        if (m <= 0) { holed = true; return true; }
+      }
     }
-    sp = nsp;
-    if (trace && (step + 1) % PATH_EVERY === 0) path.push([x / W, y / H]);
+    return false;
+  });
+  let x = r.x, y = r.y, sp = r.sp;
+  if (!holed && r.rest) {
+    const dr = Math.hypot(x - cx, y - cy) / M;
+    if (dr - CUP_R < margin) margin = dr - CUP_R;
+    if (dr <= CUP_R) holed = true;
   }
-  if (trace) path.push([x / W, y / H]);
-  // a ball still fast at the 20 s cap (running away down a slope past CREEP_DEG)
-  if (!(best < Infinity)) best = Math.hypot(x - cx, y - cy);
+  if (holed) { x = cx; y = cy; sp = 0; }
+  if (trace) path.push([x / WM, y / HM]);
+  // a ball still rolling at the cap (running down a slope within 1 m of the cup)
+  if (!(best < Infinity)) best = Math.hypot(x - cx, y - cy) / M;
   if (!(margin < Infinity)) margin = best - CUP_R;
-  return { holed, best, margin, pass, endSp: sp, path, D, v0, Dflat: flatStop(v0), stop: [x / W, y / H], t: step * DT };
+  return { holed, best, margin, pass, endSp: sp / M, path, D, v0, Dflat: flatStop(v0), stop: [x / WM, y / HM], t: r.ticks * DTM };
 }
 
 // The read, in two parts. First a holing line: the angle scan ±35° (5°), then
@@ -325,32 +412,27 @@ export function simPutt(field, ball, cup, angDeg, pw, { trace = true } = {}) {
 // closest it comes to holing at its speed there: a soft near miss steers the
 // finer stages toward the line that drops, a putt racing over the cup is no
 // near miss). The 0.25° stage is there because 1° of aim is 0.35-0.52 yd
-// across at 20-30 yd, wider than the cup's window: without it 7 of 1,877
-// putts of 15-30 yd through every pin of the 21 mesh greens came back as lag
-// lines at 0.15-0.19 yd that 0.25° holes.
+// across at 20-30 yd, about the cup's window.
 //
 // Then, for a holing line, the one that forgives the strength most: the
 // player sets the aim to the line but swings the strength by feel, so of the
 // aims round it (0.1° steps out to where nothing holes, then 0.025° round the
 // best) the read takes the one whose holing strengths span the widest range
-// of WSR putter power (the gauge fills linearly in it), and the middle of
-// that range. -> { c, a (aim, deg right of the cup), p (the launch as a
-// fraction of the flat-green speed for the distance), r (that putt, traced),
-// range: { lo, hi } (the holing launches at that aim, as p), power: { lo, hi,
-// mid } (the same in WSR putter power) and Dflat: { lo, hi } (their flat
-// rolls, for the gauge) } for a holing line; a lag line has no range. Over
-// 1,358 putts of 5-20 yd through every pin of the 21 mesh greens the softest
-// holing putt (the read before 2026-10-21) sat 0.0003-0.004 of putter power
-// from its soft edge, and 237 of them missed by WSR's window; this read holed
-// all of them with 0.137-0.173 of power holing (2-3 times as wide), its power
-// 0.05-0.10 inside the nearer edge (0.2-0.4 bars), in 74 ms a solve against
-// 19. tools/harness/REPORT.md section 5.3 flies both reads in WSR.
-const PUTT_E = Math.log2(1 / 0.63);
-const powerOfV0 = (v) => { const u = v / YD_S; return u > 0.004 ? Math.pow((u - 0.004) / 0.406, 1 / PUTT_E) : 0; };
+// of putter power (the gauge fills linearly in it, 0 .. PowerOverMaxPT), and
+// the middle of that range. -> { c, a (aim, deg right of the cup), p (the
+// launch as a fraction of the flat-green speed for the distance), r (that
+// putt, traced), range: { lo, hi } (the holing launches at that aim, as p),
+// power: { lo, hi, mid } (the same in putter power) and Dflat: { lo, hi }
+// (their flat rolls, for the gauge) } for a holing line; a lag line has no
+// range.
 export function solvePutt(field, ball, cup) {
   const cost = (r, pw) => (r.holed ? -2 + pw * 0.1 : r.margin + Math.max(0, r.margin) * 0.3);
   let best = null;
+  // the putter's top launch (PowerOverMaxPT) as a fraction of the flat speed for
+  // the distance: a scan point past it plays at it
+  const vD0 = vFlat(Math.hypot((cup.x - ball.x) * field.W, (cup.y - ball.y) * field.H)), pTop = vD0 > 0 ? puttV0(PUTT_POWER_MAX) / vD0 : Infinity;
   const tryOne = (a, p) => {
+    if (p > pTop) p = pTop;
     const r = simPutt(field, ball, cup, a, p, { trace: false });
     const c = cost(r, p);
     if (!best || c < best.c) best = { c, a, p, r };
@@ -362,61 +444,73 @@ export function solvePutt(field, ball, cup) {
   for (let a = a1 - 1; a <= a1 + 1 + 1e-9; a += 0.25) for (let p = Math.max(0.5, p1 - 0.04); p <= p1 + 0.04 + 1e-9; p += 0.01) tryOne(a, p);
   const vD = vFlat(best.r.D);
   if (best.r.holed && vD > 0) {
-    // the holing strengths at aim a, as WSR putter power: the run through a
-    // holed seed, each edge stepped out by 0.02 and bisected to 0.001
-    const pwOf = (q) => wsrPuttV0(q) / vD;
+    // the holing strengths at aim a, as putter power: the run through a holed
+    // seed, each edge found in 0.02 steps (out from the seed, or from the
+    // neighbouring aim's edge g: out while it holes, in while it does not) and
+    // bisected to 0.001
+    const pwOf = (q) => puttV0(q) / vD;
     const holes = (a, q) => simPutt(field, ball, cup, a, pwOf(q), { trace: false }).holed;
-    const edge = (a, qIn, dir) => {
-      let qOut = qIn + 0.02 * dir;
-      while (qOut > 0.001 && qOut < 2.5 && holes(a, qOut)) { qIn = qOut; qOut += 0.02 * dir; }
-      if (!(qOut > 0.001 && qOut < 2.5)) return qIn;
-      for (let k = 0; k < 5; k++) { const m = (qIn + qOut) / 2; if (holes(a, m)) qIn = m; else qOut = m; }
+    const inRange = (q) => q > 0.001 && q < PUTT_POWER_MAX;
+    const edge = (a, qIn, dir, g) => {
+      let qOut;
+      if (g != null && (g - qIn) * dir > 0.02 && inRange(g)) {
+        if (holes(a, g)) { qIn = g; qOut = g + 0.02 * dir; }
+        else {
+          qOut = g;
+          for (let q = g - 0.02 * dir; (q - qIn) * dir > 0; q -= 0.02 * dir) { if (holes(a, q)) { qIn = q; break; } qOut = q; }
+        }
+      } else qOut = qIn + 0.02 * dir;
+      while (inRange(qOut) && holes(a, qOut)) { qIn = qOut; qOut += 0.02 * dir; }
+      if (!inRange(qOut)) return qIn;
+      for (let k = 0; k < 5 || Math.abs(qOut - qIn) > 0.0007; k++) { const m = (qIn + qOut) / 2; if (holes(a, m)) qIn = m; else qOut = m; }
       return qIn;
     };
-    const runAt = (a, seeds) => {
+    const runAt = (a, seeds, prev = null) => {
       const q = seeds.find((s) => s > 0 && holes(a, s));
       if (q == null) return null;
-      const lo = edge(a, q, -1), hi = edge(a, q, 1);
+      const lo = edge(a, q, -1, prev?.lo), hi = edge(a, q, 1, prev?.hi);
       return { a, lo, hi, w: hi - lo, mid: (lo + hi) / 2 };
     };
-    const q1 = powerOfV0(best.p * vD);
+    const q1 = puttPowerOfV0(best.p * vD);
     const seedsAt = (prev) => (prev ? [prev.mid, prev.lo + 0.25 * prev.w, prev.hi - 0.25 * prev.w, q1] : [q1]);
     let top = runAt(best.a, [q1]);
     // out to either side in 0.1° steps while some strength still holes
-    for (const dir of [-1, 1]) {
+    for (const dir of top ? [-1, 1] : []) {
       let prev = top;
       for (let k = 1; k <= 40 && prev; k++) {
-        const run = runAt(best.a + dir * 0.1 * k, seedsAt(prev));
+        const run = runAt(best.a + dir * 0.1 * k, seedsAt(prev), prev);
         if (run && (run.w > top.w || (run.w === top.w && run.mid < top.mid))) top = run;
         prev = run;
       }
     }
     // then 0.025° round the widest
-    const a2 = top.a;
-    for (let k = -3; k <= 3; k++) {
-      if (k === 0) continue;
-      const run = runAt(a2 + 0.025 * k, seedsAt(top));
-      if (run && run.w > top.w) top = run;
+    if (top) {
+      const a2 = top.a;
+      for (let k = -3; k <= 3; k++) {
+        if (k === 0) continue;
+        const run = runAt(a2 + 0.025 * k, seedsAt(top), top);
+        if (run && run.w > top.w) top = run;
+      }
+      const pw = pwOf(top.mid);
+      best = { c: best.c, a: top.a, p: pw, r: null, range: { lo: pwOf(top.lo), hi: pwOf(top.hi) }, power: { lo: top.lo, hi: top.hi, mid: top.mid },
+        // the range's ends as flat rolls, which gaugeBars turns into bars at the Switch's greenSpeed
+        Dflat: { lo: flatStop(puttV0(top.lo)), hi: flatStop(puttV0(top.hi)) } };
     }
-    const pw = pwOf(top.mid);
-    best = { c: best.c, a: top.a, p: pw, r: null, range: { lo: pwOf(top.lo), hi: pwOf(top.hi) }, power: { lo: top.lo, hi: top.hi, mid: top.mid },
-      // the range's ends as flat rolls, which gaugeBars turns into bars at the Switch's greenSpeed
-      Dflat: { lo: flatStop(wsrPuttV0(top.lo)), hi: flatStop(wsrPuttV0(top.hi)) } };
   }
   best.r = simPutt(field, ball, cup, best.a, best.p);
   return best;
 }
 
 // ---- the gauge ----
-// WSR's putter: power -> stop on a flat green (its simulator, wsr-ground-phase.md
-// section 6), linear between the rows; ≈ 20.5 yd x power, slightly concave.
-export const PUTT_POWER_TABLE = [[0, 0], [0.1, 1.8], [0.2, 3.8], [0.3, 6.0], [0.4, 8.1], [0.5, 10.2], [0.6, 12.3], [0.7, 14.4],
-  [0.8, 16.4], [0.9, 18.5], [1.0, 20.5], [1.25, 25.4], [1.5, 30.1], [2.0, 39.3], [2.5, 48.1]];
-// The one Switch number: the flat roll of a full-gauge (4-bar) putt, yd. WSR's
-// power 1.0 until logged flat putts fit it (WSR-shaped: the gauge -> distance
-// curve keeps WSR's form, scaled).
-export const GREEN_SPEED = 20.5;
-const T1 = 20.5;
+// NSS's putter: power -> roll on a flat green (src/nsssim.js at each whole
+// percent of GolfShotVelTable's PT row, tools/build-nss-shape.mjs
+// PUTT_ROLL_YD; the table's design rule is pct / 100 x 20 yd), linear between
+// the rows, to PowerOverMaxPT 1.5.
+export const PUTT_POWER_TABLE = [[0, 0], ...PUTT_ROLL_YD.map((yd, k) => [(k + 1) / 100, yd])];
+// The Switch number: the flat roll of a full-gauge (4-bar) putt, yd. NSS's own
+// at power 1.0 until logged flat putts fit it.
+export const GREEN_SPEED = PUTT_ROLL_YD[99];
+const T1 = GREEN_SPEED;
 export function puttRoll(p) {
   const tb = PUTT_POWER_TABLE, q = Math.max(0, p);
   for (let k = 1; k < tb.length; k++) if (q <= tb[k][0] || k === tb.length - 1) {
@@ -433,12 +527,11 @@ export function puttPower(d) {
   }
   return 0;
 }
-// the bars a putt of flat roll Dflat needs: 4·T⁻¹(Dflat / greenSpeed · 20.5)
-// (over 4 = past a full gauge: WSR's putter reaches power 2.5 on the green,
-// the Switch's gauge is unmeasured)
+// the bars a putt of flat roll Dflat needs: 4·T⁻¹(Dflat / greenSpeed · T(1))
+// (over 4 = past a full gauge: NSS's putter reads its table to power 1.5)
 export const gaugeBars = (Dflat, greenSpeed = GREEN_SPEED) => 4 * puttPower((Dflat / greenSpeed) * T1);
 // greenSpeed from logged putts ({ bars, rolled, flat }): the median of
-// rolled / (T(bars / 4) / T(1)) over the flat rows; under 2 of them, WSR's
+// rolled / (T(bars / 4) / T(1)) over the flat rows; under 2 of them, NSS's
 export function fitGreenSpeed(putts) {
   const est = (putts ?? []).filter((r) => r && r.flat !== false && r.bars > 0 && r.bars <= 4 && r.rolled > 0)
     .map((r) => (r.rolled * T1) / puttRoll(r.bars / 4)).sort((a, b) => a - b);

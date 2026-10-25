@@ -61,8 +61,9 @@
 // - a water triangle lying level inside a green or fringe (H4, H8, H19) is
 //   green (lib/kclputt.mjs: WSR's ball rolls over them).
 // Not modelled: the KCL's octree (every prism near the ball is tested, as the
-// octree's leaves hold them), the cup's own geometry (src/putt.js's measured
-// capture window on the path stands in), spin a real swing would give (the
+// octree's leaves hold them), the cup's own geometry (src/wsrPutt.js's measured
+// capture window on the path stands in: WSR's, which src/putt.js carried
+// before it became NSS's putt model), spin a real swing would give (the
 // harness's swing gives none), float32 arithmetic. Where a stroke's outcome
 // forks (a ball that just clears or just catches a bunker lip, a bank, a
 // canopy's edge) a 0.002 change of power or a few hundredths of a degree pick
@@ -78,18 +79,47 @@
 // the physics only (no Node): round-model.mjs adds the loaders that read the
 // disc (the KCL, the PMP trees, the palm) and re-exports all of this; the
 // browser (src/live3d.worker.js) registers courses built from public/course3d
-import * as P from "../../../src/putt.js";
+//
+// NSS's course (public/course3d v2, 2026-10-24: tools/build-course3d.mjs) runs
+// on the same physics. Its triangles become prisms through prismFromTri (the
+// edge planes through the triangle's edges, the face normal from its winding;
+// round-model.mjs's OBJ fallback uses it too), and its surfaces map onto the
+// KCL attributes WSR's physics knows, plus five of its own: 17 sand OB (NSS's
+// GolfSandOB, its beaches: contact and stop as a bunker, A 1.0 / B 0.001, and
+// a rest there is out of bounds), 18 air OB (GolfAirOB, the vertical fence
+// round the course: touching it ends the stroke out of bounds, hazard 2, with
+// the OB drop), 19 trunk (GolfTree), 20 leaf (GolfLeaf: the TreeLeaf
+// canopies) and 21 palm leaf (GolfPalmLeaf). The trees are a separate pack
+// (packTreeMesh), swept every tick from the ball's last position to its new
+// one against the triangles, two-sided (the leaf and palm-leaf cards are
+// double-sided in the game): a trunk the ball reaches first puts it back where
+// it touched and bounces it through WSR's object response (as the analytic
+// trunk does), a leaf multiplies its velocity by 0.98 that tick, a palm leaf
+// by 0.94 (WSR's canopy and fronds). Those are NSS's baked trees, nearly all
+// the forest off the course; the trees in play are NSS's actor trees, whose own
+// collision meshes the course does not hold yet: they come as WSR's analytic
+// trees (c.trees, the PMP trees' shapes) at their bones, which fly() tests
+// first, the tree pack only on a tick no analytic tree met. Physics guesses
+// until the NSS ball is decoded (tools/harness/state/eden/nss-golf-x/physics.md:
+// NSS's own leaf damping is 0.03 / 0.08 per tick and its trunk bounce 0.4 / 0.1). A WSR course
+// (every attribute <= 16, packed with WSR's mask, no tree mesh, 32 contacts at
+// most) runs exactly as before: the NSS branches below are never taken on it.
+import * as P from "../../../src/wsrPutt.js";
 
 export const YD = 9.144;
 const cupWindow = P.cupWindow, V_CAP = P.V_CAP;
 
-const A_TAB = [0.3, 0.4, 0.5, 1.0, 0.7, 1.0, 0.15, 1.0, 1.0, 0.3, 0.001, 0.3, 0.3, 1.0, 0.1, 0.4, 1.0];
-const B_TAB = [0.5, 0.5, 0.4, 0.001, 0.3, 0.001, 0.5, 0.001, 0.001, 0.5, 0.13, 0.5, 0.5, 0.001, 0.5, 0.5, 0.001];
+// 0-16 WSR's; 17 (NSS's sand OB) the bunker's, 18-21 (air OB, the trees: never a contact) 1.0 / 0.001
+const A_TAB = [0.3, 0.4, 0.5, 1.0, 0.7, 1.0, 0.15, 1.0, 1.0, 0.3, 0.001, 0.3, 0.3, 1.0, 0.1, 0.4, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0];
+const B_TAB = [0.5, 0.5, 0.4, 0.001, 0.3, 0.001, 0.5, 0.001, 0.001, 0.5, 0.13, 0.5, 0.5, 0.001, 0.5, 0.5, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001];
 // the contact routine's mask 0x1de5e without 14 ("glass": hole 1's pond
-// surface, which WSR's balls sank through in the 2a sweep)
-const CONTACT_MASK = 0x1de5e & ~(1 << 14);
-const STOP_MASK = 0x1ce5e;
+// surface, which WSR's balls sank through in the 2a sweep); NSS's sand OB (17)
+// is a contact and a stop too (WSR's courses have no attribute above 16)
+const WSR_CONTACT_MASK = 0x1de5e & ~(1 << 14);
+const CONTACT_MASK = WSR_CONTACT_MASK | (1 << 17);
+const STOP_MASK = 0x1ce5e | (1 << 17);
 const HAZ_MASK = (1 << 7) | (1 << 13);
+const AIR_OB = 18, TRUNK = 19, LEAF = 20, PALM_LEAF = 21;
 const LIFT_K = 0.0012, LIFT_DECAY = 0.9985, SIDE_K = 0.001, SIDE_DECAY = 0.999;
 const GRAV = 0.002, DRAG = 0.999, BALL_R = 0.5;
 const STOP_V = 0.0015, STOP_TICKS = 20, MAX_LIFE = 0x1c20;
@@ -100,7 +130,8 @@ const TCELL = 64;         // u: the trees' grid
 export const LIE_YAW_DEG = 2;   // rough and bunker, a swing without curve
 
 export const ATTR_NAME = { 0: "none", 1: "fairway", 2: "rough", 3: "bunker", 4: "ob", 5: "ob2", 6: "green", 7: "water", 8: "wood",
-  9: "fringe", 10: "green", 11: "green", 12: "wall", 13: "valley", 14: "glass", 15: "tee", 16: "bunker" };
+  9: "fringe", 10: "green", 11: "green", 12: "wall", 13: "valley", 14: "glass", 15: "tee", 16: "bunker",
+  17: "sand OB", 18: "air OB", 19: "tree", 20: "leaf", 21: "palm leaf" };
 export const HAZARD_NAME = { 0: null, 1: "water", 2: "ob", 3: "valley" };
 
 // the club blocks as WSR holds them in RAM (clubManager +0xc + 4k -> +0x18;
@@ -138,6 +169,28 @@ export function prismTri(q) {
   const kb = q.h / dot(cb, q.e3), ka = q.h / dot(ca, q.e3);
   return [q.p[0], q.p[1], q.p[2], q.p[0] + cb[0] * kb, q.p[1] + cb[1] * kb, q.p[2] + cb[2] * kb, q.p[0] + ca[0] * ka, q.p[1] + ca[1] * ka, q.p[2] + ca[2] * ka];
 }
+// and the other way: a triangle (a, b, c) as a KCL prism (the face normal from
+// the winding, (b - a) x (c - a); e1 on a-c, e2 on a-b, e3 on b-c at distance
+// h from a, each pointing away from the third vertex), its triangle kept as
+// given; null when it has no area. Norms by Math.sqrt (Math.hypot's bits are
+// the engine's), so Node and every browser build the same prisms
+export function prismFromTri(a, b, c) {
+  const ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2], vx = c[0] - a[0], vy = c[1] - a[1], vz = c[2] - a[2];
+  const fn = [uy * vz - uz * vy, uz * vx - ux * vz, ux * vy - uy * vx];
+  const m = Math.sqrt(fn[0] * fn[0] + fn[1] * fn[1] + fn[2] * fn[2]);
+  if (!(m > 1e-12)) return null;
+  fn[0] /= m; fn[1] /= m; fn[2] /= m;
+  const outward = (p, q, o) => {
+    const e = [q[0] - p[0], q[1] - p[1], q[2] - p[2]], n = cross(e, fn);
+    const l = Math.sqrt(n[0] * n[0] + n[1] * n[1] + n[2] * n[2]);
+    n[0] /= l; n[1] /= l; n[2] /= l;
+    if ((o[0] - p[0]) * n[0] + (o[1] - p[1]) * n[1] + (o[2] - p[2]) * n[2] > 0) { n[0] = -n[0]; n[1] = -n[1]; n[2] = -n[2]; }
+    return n;
+  };
+  const e1 = outward(a, c, b), e2 = outward(a, b, c), e3 = outward(b, c, a);
+  const h = ux * e3[0] + uy * e3[1] + uz * e3[2];
+  return { h, p: [a[0], a[1], a[2]], fn, e1, e2, e3, tri: [a[0], a[1], a[2], b[0], b[1], b[2], c[0], c[1], c[2]] };
+}
 
 // the embedded water of a green: water triangles sharing two vertices with
 // the green or fringe at their height (lib/kclputt.mjs embeddedWater)
@@ -155,27 +208,51 @@ function embeddedWater(prisms) {
 
 // ---- the course: prisms in flat arrays and an XZ grid ----
 const courses = new Map();
-const KEEP_MASK = CONTACT_MASK | HAZ_MASK | (1 << 5) | (1 << 14);
-export function packPrisms(prisms, thick) {
-  const keep = prisms.filter((q) => ((1 << q.attr) & KEEP_MASK) && [q.h, ...q.p, ...q.fn, ...q.e1, ...q.e2, ...q.e3].every(Number.isFinite));
+// what a WSR course keeps (its contacts, water, valley, the dead floor, glass);
+// an NSS course adds sand OB (17) and the air-OB fence (18); its trees (19-21)
+// go to packTreeMesh
+const KEEP_MASK = WSR_CONTACT_MASK | HAZ_MASK | (1 << 5) | (1 << 14);
+export const NSS_KEEP_MASK = KEEP_MASK | (1 << 17) | (1 << AIR_OB);
+export const NSS_TREE_MASK = (1 << TRUNK) | (1 << LEAF) | (1 << PALM_LEAF);
+const TREE_MASK = NSS_TREE_MASK;
+// prisms in flat arrays and an XZ grid: mask = the attributes kept; bounds
+// ({ minX, maxX, minZ, maxZ }, u) the grid's extent instead of the prisms'
+// (an NSS sea triangle reaches kilometres past the course); embedded = WSR's
+// level water inside a green read as green (an NSS course has none: off)
+export function packPrisms(prisms, thick, { mask = KEEP_MASK, bounds = null, embedded = true } = {}) {
+  const keep = prisms.filter((q) => ((1 << q.attr) & mask) && [q.h, ...q.p, ...q.fn, ...q.e1, ...q.e2, ...q.e3].every(Number.isFinite));
   const n = keep.length;
   const PV = new Float64Array(3 * n), FN = new Float64Array(3 * n), E1 = new Float64Array(3 * n), E2 = new Float64Array(3 * n), E3 = new Float64Array(3 * n);
   const H = new Float64Array(n), TRI = new Float64Array(9 * n), attr = new Uint8Array(n);
   for (const q of keep) q.tri ??= prismTri(q);
-  const emb = embeddedWater(keep);
-  let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity, minY = Infinity;
+  const emb = embedded ? embeddedWater(keep) : new Set();
   keep.forEach((q, i) => {
     for (let c = 0; c < 3; c++) { PV[3 * i + c] = q.p[c]; FN[3 * i + c] = q.fn[c]; E1[3 * i + c] = q.e1[c]; E2[3 * i + c] = q.e2[c]; E3[3 * i + c] = q.e3[c]; }
     for (let c = 0; c < 9; c++) TRI[9 * i + c] = q.tri[c];
     H[i] = q.h;
     attr[i] = emb.has(i) ? 6 : q.attr;
-    for (let k = 0; k < 3; k++) {
-      const x = q.tri[3 * k], y = q.tri[3 * k + 1], z = q.tri[3 * k + 2];
-      if (q.attr !== 5) { minX = Math.min(minX, x); maxX = Math.max(maxX, x); minZ = Math.min(minZ, z); maxZ = Math.max(maxZ, z); minY = Math.min(minY, y); }
-    }
   });
+  return packFlat({ n, PV, FN, E1, E2, E3, H, TRI, attr }, thick, { bounds });
+}
+
+// the XZ grid over prisms already in flat arrays ({ n, PV, FN, E1, E2, E3, H,
+// TRI, attr }, every one kept: packPrisms's, or course3d v2's, which
+// src/live3d-core.js writes straight from its triangles so a phone never holds
+// a hundred thousand prism objects at once); the extent is the triangles'
+// less the dead floor's (attr 5), or the bounds given
+export function packFlat(F, thick, { bounds = null } = {}) {
+  const { n, PV, FN, E1, E2, E3, H, TRI, attr } = F;
+  let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity, minY = Infinity;
+  for (let i = 0; i < n; i++) {
+    if (attr[i] === 5) continue;
+    for (let k = 0; k < 3; k++) {
+      const x = TRI[9 * i + 3 * k], y = TRI[9 * i + 3 * k + 1], z = TRI[9 * i + 3 * k + 2];
+      minX = Math.min(minX, x); maxX = Math.max(maxX, x); minZ = Math.min(minZ, z); maxZ = Math.max(maxZ, z); minY = Math.min(minY, y);
+    }
+  }
   // the grid spans the course (the dead floor reaches far past it; past the
-  // grid only the floor is under a ball)
+  // grid only the floor is under a ball), or the bounds given
+  if (bounds) ({ minX, maxX, minZ, maxZ } = bounds);
   const gx0 = Math.floor(minX / CELL) - 2, gz0 = Math.floor(minZ / CELL) - 2;
   const gw = Math.floor(maxX / CELL) + 3 - gx0, gh = Math.floor(maxZ / CELL) + 3 - gz0;
   const counts = new Int32Array(gw * gh + 1), spans = new Int32Array(4 * n);
@@ -191,6 +268,22 @@ export function packPrisms(prisms, thick) {
   const cells = new Int32Array(counts[gw * gh]), fill = counts.slice();
   for (let i = 0; i < n; i++) for (let a = spans[4 * i]; a <= spans[4 * i + 1]; a++) for (let b = spans[4 * i + 2]; b <= spans[4 * i + 3]; b++) cells[fill[b * gw + a]++] = i;
   return { n, PV, FN, E1, E2, E3, H, TRI, attr, thick, start: counts, cells, gx0, gz0, gw, gh, minY, bounds: { minX, maxX, minZ, maxZ } };
+}
+
+// NSS's trees (course3d v2's tree pack: trunks 19, leaves 20, palm leaves 21)
+// as packPrisms packs them (or packFlat, given flat arrays), plus each grid
+// cell's height range (a ball above or below every triangle of its cells skips
+// them); the triangles themselves are not kept (the sweep needs the planes and
+// edges only), nor a thickness
+export function packTreeMesh(prisms) {
+  const k = Array.isArray(prisms) ? packPrisms(prisms, 0, { mask: TREE_MASK, embedded: false }) : packFlat(prisms, 0);
+  const nc = k.gw * k.gh, cy0 = new Float64Array(nc).fill(Infinity), cy1 = new Float64Array(nc).fill(-Infinity);
+  for (let cell = 0; cell < nc; cell++) for (let j = k.start[cell]; j < k.start[cell + 1]; j++) {
+    const o = 9 * k.cells[j];
+    for (let v = 0; v < 3; v++) { const y = k.TRI[o + 3 * v + 1]; if (y < cy0[cell]) cy0[cell] = y; if (y > cy1[cell]) cy1[cell] = y; }
+  }
+  k.TRI = null; k.cy0 = cy0; k.cy1 = cy1;
+  return k;
 }
 
 // ---- the trees ----
@@ -238,10 +331,18 @@ export function loadCourse(hole) {
   return registerCourse(hole, LOADER(hole));
 }
 // a course from its prisms as the KCL holds them ({ h, p, fn, e1, e2, e3, attr }),
-// the hole's trees and the palm's mesh (false when the hole has no palm)
-export function packCourse(prisms, thick, { hole, id, src = null, trees = [], palm = false }) {
-  const c = packPrisms(prisms, thick);
+// the hole's trees and the palm's mesh (false when the hole has no palm); an
+// NSS course (course3d v2) also gives its tree pack (packTreeMesh), its keep
+// mask (NSS_KEEP_MASK), the grid's bounds, embedded: false, and hitCap (the
+// contacts a tick takes: 32 on WSR's KCL, more on NSS's finer meshes). The
+// prisms may also come already flat (packFlat's input, filtered by keepMask:
+// course3d v2 in the browser), and NSS's actor trees, whose collision meshes
+// the course does not hold, as WSR's analytic trees in `trees`
+export function packCourse(prisms, thick, { hole, id, src = null, trees = [], palm = false, treeMesh = null, keepMask = KEEP_MASK, bounds = null, embedded = true, hitCap = 32 }) {
+  const c = Array.isArray(prisms) ? packPrisms(prisms, thick, { mask: keepMask, bounds, embedded }) : packFlat(prisms, thick, { bounds });
   c.hole = hole; c.src = src;
+  // the ground a ray finds (groundAt's default): what is kept less the air-OB fence
+  c.keepMask = keepMask; c.groundMask = keepMask & ~(1 << AIR_OB); c.treeMesh = treeMesh; c.hitCap = Math.min(hitCap, HIT_MAX);
   // the contact routine's normal (0x80412508-0x8041254c): on the course named
   // "fcJP19" (hole 20) a rock wall (12) whose normal's y is under sin 63 deg
   // (nw4r's SinFIdx(44.8)) has it x 0.25, renormalised; the face normal everywhere else
@@ -289,17 +390,19 @@ function prismDepth(k, i, x, y, z, r) {
   return d > 0 ? d : 0;
 }
 
-// the prisms touching the ball (r 0.5): one grid cell holds them all
-const HITS_I = new Int32Array(32), HITS_D = new Float64Array(32);
+// the prisms touching the ball (r 0.5): one grid cell holds them all; at most
+// c.hitCap of them (32 on WSR's KCL, as before)
+const HIT_MAX = 64;
+const HITS_I = new Int32Array(HIT_MAX), HITS_D = new Float64Array(HIT_MAX);
 function query(c, x, y, z) {
   const ga = Math.floor(x / CELL) - c.gx0, gb = Math.floor(z / CELL) - c.gz0;
   if (ga < 0 || gb < 0 || ga >= c.gw || gb >= c.gh) return 0;
-  const cell = gb * c.gw + ga;
+  const cell = gb * c.gw + ga, cap = c.hitCap ?? 32;
   let n = 0;
   for (let j = c.start[cell], j1 = c.start[cell + 1]; j < j1; j++) {
     const i = c.cells[j];
     const d = prismDepth(c, i, x, y, z, BALL_R);
-    if (d > 0 && n < 32) { HITS_I[n] = i; HITS_D[n] = d; n++; }
+    if (d > 0 && n < cap) { HITS_I[n] = i; HITS_D[n] = d; n++; }
   }
   return n;
 }
@@ -320,8 +423,9 @@ function anyWithin(c, x, y, z, r, mask) {
 }
 
 // the highest surface under (x, z) below yMax with an attribute in mask
-// (default: the contacts, water, valley and the dead floor): { y, attr, i } or null
-export function groundAt(c, x, z, { yMax = Infinity, mask = KEEP_MASK } = {}) {
+// (default: the course's ground: the contacts, water, valley and the dead
+// floor; on NSS's also sand OB, not the air-OB fence): { y, attr, i } or null
+export function groundAt(c, x, z, { yMax = Infinity, mask = c.groundMask ?? KEEP_MASK } = {}) {
   const ga = Math.floor(x / CELL) - c.gx0, gb = Math.floor(z / CELL) - c.gz0;
   if (ga < 0 || gb < 0 || ga >= c.gw || gb >= c.gh) return null;
   const cell = gb * c.gw + ga;
@@ -419,6 +523,61 @@ function treeCheck(c, px, py, pz) {
   return code;
 }
 
+// NSS's mesh trees (c.treeMesh, packTreeMesh): the tick's path from (sx, sy,
+// sz) to (ex, ey, ez) swept against the tree pack's triangles, two-sided (the
+// side the path starts on faces it). A triangle is met where the ball's centre
+// comes within its radius of the plane (from further out, or already that
+// close and closing in) with the centre's foot inside the triangle grown by
+// the radius. The first trunk met decides (code 1: MT.t the fraction of the
+// path, MT.n the face toward the ball, MT.depth what the ball needs to clear
+// it there), else a palm leaf met (code 4), else a leaf (code 2), else 0.
+// MT.depth pushes the path's end back out to the radius along that face (the
+// tick's motion along the face is kept, as the KCL contact keeps it). The
+// sweep cannot step through a thin card or a trunk as a sampled test could.
+const MT = { code: 0, t: 0, nx: 0, ny: 0, nz: 0, depth: 0, i: -1, attr: 0 };
+function meshTreeHit(k, sx, sy, sz, ex, ey, ez) {
+  MT.code = 0; MT.i = -1;
+  const r = BALL_R;
+  const a0 = Math.max(0, Math.floor((Math.min(sx, ex) - r) / CELL) - k.gx0), a1 = Math.min(k.gw - 1, Math.floor((Math.max(sx, ex) + r) / CELL) - k.gx0);
+  const b0 = Math.max(0, Math.floor((Math.min(sz, ez) - r) / CELL) - k.gz0), b1 = Math.min(k.gh - 1, Math.floor((Math.max(sz, ez) + r) / CELL) - k.gz0);
+  if (a0 > a1 || b0 > b1) return 0;
+  const ylo = Math.min(sy, ey) - r, yhi = Math.max(sy, ey) + r;
+  const dx = ex - sx, dy = ey - sy, dz = ez - sz;
+  let bt = Infinity, bi = -1, bside = 0, bdepth = 0, leaf = 0;
+  for (let a = a0; a <= a1; a++) for (let b = b0; b <= b1; b++) {
+    const cell = b * k.gw + a;
+    if (yhi < k.cy0[cell] || ylo > k.cy1[cell]) continue;
+    for (let j = k.start[cell], j1 = k.start[cell + 1]; j < j1; j++) {
+      const i = k.cells[j], o = 3 * i, at = k.attr[i];
+      if (at !== TRUNK && leaf === 4) continue;
+      const fx = k.FN[o], fy = k.FN[o + 1], fz = k.FN[o + 2], qx = k.PV[o], qy = k.PV[o + 1], qz = k.PV[o + 2];
+      const dS = (sx - qx) * fx + (sy - qy) * fy + (sz - qz) * fz, dE = (ex - qx) * fx + (ey - qy) * fy + (ez - qz) * fz;
+      const side = dS >= 0 ? 1 : -1, aS = side * dS, aE = side * dE;
+      if (aE >= r) continue;
+      let t;
+      if (aS >= r) t = (aS - r) / (aS - aE);
+      else if (aE < aS) t = 0;
+      else continue;
+      if (at === TRUNK && t >= bt) continue;
+      // the centre there, its foot inside the triangle grown by r
+      const cx = sx + t * dx - qx, cy = sy + t * dy - qy, cz = sz + t * dz - qz;
+      if (cx * k.E1[o] + cy * k.E1[o + 1] + cz * k.E1[o + 2] > r) continue;
+      if (cx * k.E2[o] + cy * k.E2[o + 1] + cz * k.E2[o + 2] > r) continue;
+      if (cx * k.E3[o] + cy * k.E3[o + 1] + cz * k.E3[o + 2] - k.H[i] > r) continue;
+      if (at === TRUNK) { bt = t; bi = i; bside = side; bdepth = r - aE; }
+      else leaf = at === PALM_LEAF ? 4 : 2;
+    }
+  }
+  if (bi >= 0) {
+    const o = 3 * bi;
+    MT.code = 1; MT.t = bt; MT.i = bi; MT.attr = TRUNK; MT.depth = bdepth;
+    MT.nx = bside * k.FN[o]; MT.ny = bside * k.FN[o + 1]; MT.nz = bside * k.FN[o + 2];
+    return 1;
+  }
+  MT.code = leaf; MT.attr = leaf === 4 ? PALM_LEAF : leaf ? LEAF : 0;
+  return leaf;
+}
+
 // the flagstick's pole (0x803ffe30 -> 0x803f2340): 0.1 u + the ball's 0.5,
 // a cylinder 30 u either side of the pin's base with spherical caps
 const POLE = { nx: 0, ny: 0, nz: 0, depth: 0 };
@@ -510,7 +669,7 @@ export function fly(o) {
   const treesMet = o.trace ? [] : null;
   let drop = null;
   const maxTicks = o.maxTicks ?? 9000;
-  const checkTrees = o.trees !== false && c.trees.length > 0;
+  const checkTrees = o.trees !== false && (c.trees.length > 0 || !!c.treeMesh);
   const cupY = cup ? cup[1] + BALL_R : 0;
   let flagHit = null, cupAfterFlag = false;
   // 0x80413648(ball, n, 1, depth, R, C): pushed out along n by depth, n
@@ -528,6 +687,22 @@ export function fly(o) {
     const cap = vn * C, tm = Math.sqrt(tx * tx + ty * ty + tz * tz);
     if (cap < tm) { const sc = cap / tm; tx *= sc; ty *= sc; tz *= sc; }
     vx = tx + nx0; vy = ty; vz = tz + nz0;
+    s98 = 0; s9c = 0; bs = 0;
+  };
+  // the same response off an NSS mesh trunk's face (course3d v2), with the
+  // face's own normal, not flattened (a branch's top or underside bounces the
+  // ball up or down, where the flattened normal would stop it dead in the air;
+  // on a vertical face the two agree), and only while the ball approaches it
+  const meshTrunkResponse = (n, depth, R, C) => {
+    px += n[0] * depth; py += n[1] * depth; pz += n[2] * depth;
+    const vdn = vx * n[0] + vy * n[1] + vz * n[2], vn = -vdn;
+    if (!(vn > 0)) return;
+    let nx0 = n[0] * vdn, ny0 = n[1] * vdn, nz0 = n[2] * vdn;
+    let tx = vx - nx0, ty = vy - ny0, tz = vz - nz0;
+    nx0 *= -R; ny0 *= -R; nz0 *= -R;
+    const cap = vn * C, tm = Math.sqrt(tx * tx + ty * ty + tz * tz);
+    if (cap < tm) { const sc = cap / tm; tx *= sc; ty *= sc; tz *= sc; }
+    vx = tx + nx0; vy = ty + ny0; vz = tz + nz0;
     s98 = 0; s9c = 0; bs = 0;
   };
   while (active && lifetime < maxTicks) {
@@ -606,7 +781,7 @@ export function fly(o) {
     if (active && lifetime > MAX_LIFE) { vx = 0; vy = 0; vz = 0; active = false; outcome = "timeout"; }
     // the trees (0x804138a0, after Calc)
     if (checkTrees && active) {
-      const code = treeCheck(c, px, py, pz);
+      const code = c.trees.length ? treeCheck(c, px, py, pz) : 0;
       if (code) {
         const t = TH.tree;
         if (!firstTree) firstTree = { id: t.id, kind: t.kind, code, at: [px, py, pz], tick: lifetime };
@@ -620,6 +795,18 @@ export function fly(o) {
         else {
           const vm = Math.sqrt(vx * vx + vy * vy + vz * vz);
           if (vm > 0.8 || lifetime % 60 < 12) { const d = code === 4 ? 0.94 : 0.98; vx *= d; vy *= d; vz *= d; }
+        }
+      } else if (c.treeMesh) {
+        // NSS's mesh trees: this tick's path swept against them (meshTreeHit)
+        const mc = meshTreeHit(c.treeMesh, ox, oy, oz, px, py, pz);
+        if (mc) {
+          if (!firstTree) firstTree = { id: null, kind: MT.attr, code: mc, at: [px, py, pz], tick: lifetime, tri: mc === 1 ? MT.i : null };
+          if (treesMet && (!treesMet.length || treesMet[treesMet.length - 1].code !== mc)) treesMet.push({ id: null, code: mc, tick: lifetime });
+          if (mc === 1) meshTrunkResponse([MT.nx, MT.ny, MT.nz], MT.depth, 0.5, 0.5);
+          else {
+            const vm = Math.sqrt(vx * vx + vy * vy + vz * vz);
+            if (vm > 0.8 || lifetime % 60 < 12) { const d = mc === 4 ? 0.94 : 0.98; vx *= d; vy *= d; vz *= d; }
+          }
         }
       }
     }
@@ -669,7 +856,7 @@ export function fly(o) {
       const vx0 = vx, vz0 = vz;
       for (let j = 0; j < nh; j++) {
         const i = HITS_I[j], at = c.attr[i];
-        if (at === 7 || at === 13) { hz = at; continue; }
+        if (at === 7 || at === 13 || at === AIR_OB) { hz = at; continue; }
         if (!((1 << at) & CONTACT_MASK)) continue;
         const depth = HITS_D[j];
         const n0 = c.CN[3 * i], n1 = c.CN[3 * i + 1], n2 = c.CN[3 * i + 2];
@@ -704,7 +891,7 @@ export function fly(o) {
         s98 = 0; s9c = 0;
       }
       if (hz) {
-        hazard = hz === 7 ? 1 : 3; outcome = hz === 7 ? "water" : "valley"; active = false;
+        hazard = hz === 7 ? 1 : hz === AIR_OB ? 2 : 3; outcome = hz === 7 ? "water" : hz === AIR_OB ? "ob" : "valley"; active = false;
         if (path) path.push([px, py, pz, lifetime]);
         break;
       }
@@ -733,7 +920,7 @@ export function fly(o) {
       if (active && (lifetime & 3) === 0) {
         const g = groundAt(c, px, pz, { yMax: py + BALL_R });
         if (g && g.attr === 5) { outcome = "ob"; hazard = 2; active = false; }
-        else if (g && g.attr !== 7 && g.attr !== 12 && g.attr !== 13) drop = [px, g.y + BALL_R, pz];
+        else if (g && g.attr !== 7 && g.attr !== 12 && g.attr !== 13 && g.attr !== 17 && g.attr !== AIR_OB) drop = [px, g.y + BALL_R, pz];
       }
     }
     const ia = lifetime < 8 || attrMax === 0;
@@ -768,7 +955,8 @@ export function fly(o) {
   if (!restAttr || outcome !== "rest") { const g = groundAt(c, px, pz, { yMax: py + 2 }); restAttr = g ? g.attr : 0; }
   // 0x80400a88: a bunker within 2 u of fairway or rough lies on that
   if (outcome === "rest" && (restAttr === 3 || restAttr === 16)) { const a = anyWithin(c, px, py, pz, 2.0, (1 << 1) | (1 << 2)); if (a) restAttr = a; }
-  if (outcome === "rest" && restAttr === 4) hazard = 2;
+  // a rest on outer ground (or NSS's sand OB) is out of bounds
+  if (outcome === "rest" && (restAttr === 4 || restAttr === 17)) hazard = 2;
   return {
     rest: [px, py, pz], carry: carry ?? [px, py, pz], apexY, ticks: lifetime, outcome, hazard, restAttr, restLie: ATTR_NAME[restAttr] ?? String(restAttr),
     tree: firstTree, trees: treesMet, drop: hazard ? drop : null, path, cupPass, flagHit, bounces, groundY: g0,

@@ -1,7 +1,10 @@
 // The 3D model for Node: the physics are lib/model3d.mjs (shared with the
 // browser's live solver, src/live3d.worker.js), re-exported here whole; this
 // file adds what reads the extracted disc: the course's KCL (or the OBJ rips),
-// the PMP's trees and the palm's mesh, set as the core's course loader.
+// the PMP's trees and the palm's mesh, set as the core's course loader. It is
+// WSR's course only (the Dolphin harness plays WSR); NSS's course for the live
+// solver is public/course3d v2 (tools/build-course3d.mjs), which
+// src/live3d-core.js registers with the same model.
 // (The model's own description heads lib/model3d.mjs.)
 import fs from "node:fs";
 import path from "node:path";
@@ -9,7 +12,7 @@ import { pathToFileURL } from "node:url";
 import { ROOT, MESH_DIR, DERIVED, meshIdOf, mapToMesh, meshToMap } from "./lib/course.mjs";
 import { parseObj } from "../lib/obj.mjs";
 
-import { prismTri, packCourse, setCourseLoader } from "./lib/model3d.mjs";
+import { prismTri, prismFromTri, packCourse, setCourseLoader } from "./lib/model3d.mjs";
 export * from "./lib/model3d.mjs";
 
 const { yaz0Decode, u8Files, pmpObjects } = await import(pathToFileURL(path.join(ROOT, "tools/wsr-pins.mjs")).href);
@@ -36,23 +39,18 @@ function parseKcl(buf) {
   }
   return { thick, prisms: out };
 }
-const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
-const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
-// the same prisms from the wszst OBJ (when the disc is not extracted): edge
-// planes through the triangle's edges, the face normal from its winding
+// the same prisms from the wszst OBJ (when the disc is not extracted): each
+// triangle through model3d.mjs prismFromTri (the edge planes through its
+// edges, the face normal from its winding), as public/course3d v2's NSS
+// triangles are built in the browser
 function prismsFromObj(file) {
   const o = parseObj(file), out = [];
   for (let t = 0; t < o.tris.length / 3; t++) {
     const v = [0, 1, 2].map((k) => [0, 1, 2].map((c) => o.verts[3 * o.tris[3 * t + k] + c]));
-    const fn = cross([v[1][0] - v[0][0], v[1][1] - v[0][1], v[1][2] - v[0][2]], [v[2][0] - v[0][0], v[2][1] - v[0][1], v[2][2] - v[0][2]]);
-    const m = Math.hypot(...fn);
-    if (!(m > 1e-12)) continue;
-    for (let c = 0; c < 3; c++) fn[c] /= m;
-    // edges: e1 on v0-v2 (ca), e2 on v0-v1 (ab), e3 on v1-v2 (bc, at distance h from v0)
-    const outward = (a, b, c) => { const e = [b[0] - a[0], b[1] - a[1], b[2] - a[2]]; let q = cross(e, fn); const l = Math.hypot(...q); q = q.map((x) => x / l); if (dot([c[0] - a[0], c[1] - a[1], c[2] - a[2]], q) > 0) q = q.map((x) => -x); return q; };
-    const e1 = outward(v[0], v[2], v[1]), e2 = outward(v[0], v[1], v[2]), e3 = outward(v[1], v[2], v[0]);
-    const h = dot([v[1][0] - v[0][0], v[1][1] - v[0][1], v[1][2] - v[0][2]], e3);
-    out.push({ h, p: v[0], fn, e1, e2, e3, attr: o.groups[o.triGroup[t]].type ?? 0, tri: v.flat() });
+    const q = prismFromTri(v[0], v[1], v[2]);
+    if (!q) continue;
+    q.attr = o.groups[o.triGroup[t]].type ?? 0;
+    out.push(q);
   }
   return { thick: 5, prisms: out };
 }

@@ -1,5 +1,6 @@
 {
- "_note": "Hole maps at more than the 2x of the bundle (src/maps.js, 500x608), written by tools/build-map-scales.mjs from the renders of WSR's own minimap model (tools/render-maps.mjs --scale s): the same 250x304 map frame at s px per map px, so every fractional position in derived.json and the app's state places the same on any scale. holes[n][s] = the JPEG (file, relative to this index), its size in px, bytes and SHA-1; a hole or scale missing here has no file, and the app shows the 2x bundle image. quality: the JPEG quality per scale.",
+ "_note": "Hole maps at more than the 2x of the bundle (src/maps.js, 500x608), written by tools/build-map-scales.mjs from the renders of NSS's own minimap (tools/render-nss-maps.py: the game's baked capture textures through its layout shaders): the same 250x304 map frame at s px per map px, so every fractional position in derived.json and the app's state places the same on any scale. art: whose minimap. holes[n][s] = the JPEG (file, relative to this index), its size in px, bytes and SHA-1; a hole or scale missing here has no file, and the app shows the 2x bundle image. quality: the JPEG quality per scale.",
+ "art": "nss",
  "scales": [
   3,
   4
@@ -16,15 +17,15 @@
     "file": "h01-3x.jpg",
     "w": 750,
     "h": 912,
-    "bytes": 165379,
-    "sha1": "cc00d6a1e0f616bff9e7a9296bfaa37bc311fba1"
+    "bytes": 48686,
+    "sha1": "16aa49cd818b48a1448abf2f1bbe4470838afdae"
    },
    "4": {
     "file": "h01-4x.jpg",
     "w": 1000,
     "h": 1216,
-    "bytes": 257597,
-    "sha1": "19cebd6c0f3f8e1ff21e62c42f202fc704c8bfee"
+    "bytes": 81433,
+    "sha1": "4f6038ed62c284ff14b6a8c9dca9ef9d7a0807e3"
    }
   },
   "2": {
@@ -32,15 +33,15 @@
     "file": "h02-3x.jpg",
     "w": 750,
     "h": 912,
-    "bytes": 117092,
-    "sha1": "9b1d30bbb9c2cc92c3a5b2eea129e531613c8a20"
+    "bytes": 69032,
+    "sha1": "46339be3b3a1b7d828798ae2cec7b8f3dbc44c0f"
    },
    "4": {
     "file": "h02-4x.jpg",
     "w": 1000,
     "h": 1216,
-    "bytes": 183745,
-    "sha1": "3ba4a025f094d90b3907913d05248ec9ae98f7ff"
+    "bytes": 113255,
+    "sha1": "8bb84d50c6856e8d6ac23b20176bc2a029b72177"
    }
   },
   "3": {
@@ -48,15 +49,15 @@
     "file": "h03-3x.jpg",
     "w": 750,
     "h": 912,
-    "bytes": 156624,
-    "sha1": "874ae545a7f35eb4fc9dcb8c762328d2643e6c96"
+    "bytes": 59007,
+    "sha1": "18717df3b6f4ae460ef4cec202e27f82553269ad"
    },
    "4": {
     "file": "h03-4x.jpg",
     "w": 1000,
     "h": 1216,
-    "bytes": 249796,
-    "sha1": "3539a12e701a33c36803033c044bddae5c518f94"
+    "bytes": 96395,
+    "sha1": "028777cc4011277efef9d7451d9d63bb5643a5a6"
    }
   },
   "4": {
@@ -64,15 +65,15 @@
     "file": "h04-3x.jpg",
     "w": 750,
     "h": 912,
-    "bytes": 110376,
-    "sha1": "0df4b9ca802e376be94ffd297f2251f618237a05"
+    "bytes": 77447,
+    "sha1": "b98231f2508851aa571ab1a446247c4a99fb7ba5"
    },
    "4": {
     "file": "h04-4x.jpg",
     "w": 1000,
     "h": 1216,
-    "bytes": 177136,
-    "sha1": "6db5d3466077622bac04382c5281850d4d372f19"
+    "bytes": 127107,
+    "sha1": "2ee259e501d8578547acd58aea45061c00bf0ae3"
    }
   },
   "5": {
@@ -80,15 +81,15 @@
     "file": "h05-3x.jpg",
     "w": 750,
     "h": 912,
-    "bytes": 166422,
-    "sha1": "c8b8608fa73a8614837b5e6e39b5b1f00511fbb4"
+    "bytes": 57552,
+    "sha1": "fdf13405af655dc462d9392b0e2bf5d88bf72239"
    },
    "4": {
     "file": "h05-4x.jpg",
     "w": 1000,
     "h": 1216,
-    "bytes": 264212,
-    "sha1": "5c67994104b08e18e28fec032080b5f59a24b41d"
+    "bytes": 94984,
+    "sha1": "c8f63eb38886503d9a43d41eaf3061ceae7499d2"
    }
   },
   "6": {
@@ -96,15 +97,15 @@
     "file": "h06-3x.jpg",
     "w": 750,
     "h": 912,
-    "bytes": 159911,
-    "sha1": "58298051beba720af0c90019877b075381ef58e8"
+    "bytes": 67024,
+    "sha1": "01e9d4d52564aa9feb9e0f31e63b8845ec93865b"
    },
    "4": {
     "file": "h06-4x.jpg",
     "w": 1000,
     "h": 1216,
-    "bytes": 252404,
-    "sha1": "8f52482633db228ff30163a6795f092ceb2ed046"
+    "bytes": 113100,
+    "sha1": "e987c13a07db97b1b29cd557fe445653eb894963"
    }
   },
   "7": {
@@ -112,15 +113,15 @@
     "file": "h07-3x.jpg",
     "w": 750,
     "h": 912,
-    "bytes": 153068,
-    "sha1": "c9695675422e8f3569e28ee854e7735b2112f59d"
+    "bytes": 62268,
+    "sha1": "b7826d6619a382b244f81d57277ad5e472956234"
    },
    "4": {
     "file": "h07-4x.jpg",
     "w": 1000,
     "h": 1216,
-    "bytes": 242512,
-    "sha1": "6e8c8b38cbf9d799ab0378f66ead9e59a48ce728"
+    "bytes": 101927,
+    "sha1": "a68f2d2273ca002a196b24f9019b9b097214e867"
    }
   },
   "8": {
@@ -128,15 +129,15 @@
     "file": "h08-3x.jpg",
     "w": 750,
     "h": 912,
-    "bytes": 141373,
-    "sha1": "cf3d5aa43420f5ae5c7354537dfd36dce186732a"
+    "bytes": 72640,
+    "sha1": "99bd4d2e670beef84ca5a7bfa8a6257e75402f04"
    },
    "4": {
     "file": "h08-4x.jpg",
     "w": 1000,
     "h": 1216,
-    "bytes": 222162,
-    "sha1": "3b1c8c6d4854ffd7c41225c1c822f7f1b091e324"
+    "bytes": 118921,
+    "sha1": "e80af15becb86832875a474194af1f196ea63d22"
    }
   },
   "9": {
@@ -144,15 +145,15 @@
     "file": "h09-3x.jpg",
     "w": 750,
     "h": 912,
-    "bytes": 183768,
-    "sha1": "b3a8048991d42cd168823b21730ef1986c178694"
+    "bytes": 63934,
+    "sha1": "c107bf1328226f84ce454d1351fa17a152286627"
    },
    "4": {
     "file": "h09-4x.jpg",
     "w": 1000,
     "h": 1216,
-    "bytes": 293595,
-    "sha1": "c80e6061ee4a3aa34645e1fb2b7f00b434f541ea"
+    "bytes": 107471,
+    "sha1": "fb7ad5478ff1d9af15d79e2a481e523e061ec163"
    }
   },
   "10": {
@@ -160,15 +161,15 @@
     "file": "h10-3x.jpg",
     "w": 750,
     "h": 912,
-    "bytes": 157720,
-    "sha1": "8660a910fd6abb93777c522f68aefbe2bff8db3a"
+    "bytes": 54778,
+    "sha1": "b1b738b5ca463c563a0747a013c4b7269255a5b2"
    },
    "4": {
     "file": "h10-4x.jpg",
     "w": 1000,
     "h": 1216,
-    "bytes": 243469,
-    "sha1": "bb8d2988b0615b9a942bd2e8cff9607f8dfec97c"
+    "bytes": 93663,
+    "sha1": "dfda5857dd2f9ad07a33e4a93e39a6b5accc16ea"
    }
   },
   "11": {
@@ -176,15 +177,15 @@
     "file": "h11-3x.jpg",
     "w": 750,
     "h": 912,
-    "bytes": 134401,
-    "sha1": "1815fcee96448f43d31997b1b0e58f3382e4814f"
+    "bytes": 88386,
+    "sha1": "4e5fea2d0b131eb7e00d463352098e423632318c"
    },
    "4": {
     "file": "h11-4x.jpg",
     "w": 1000,
     "h": 1216,
-    "bytes": 210033,
-    "sha1": "54400e8bdff3ea075af6e93c03e4e78dd219b970"
+    "bytes": 150259,
+    "sha1": "71dfee632da7cd27efcd555c487bd983cc798b40"
    }
   },
   "12": {
@@ -192,15 +193,15 @@
     "file": "h12-3x.jpg",
     "w": 750,
     "h": 912,
-    "bytes": 200401,
-    "sha1": "3374b6de2f75e25a7b2e89ba751b498ca572f344"
+    "bytes": 119304,
+    "sha1": "0aaa46bac1d7211d870609e2ca3e74c2f2ef65bd"
    },
    "4": {
     "file": "h12-4x.jpg",
     "w": 1000,
     "h": 1216,
-    "bytes": 324899,
-    "sha1": "477654c87e78705af85bcbe157ce9c42851e8520"
+    "bytes": 216358,
+    "sha1": "e2ef26a53a356c77b8c5595b09508ebd1027d8ac"
    }
   },
   "13": {
@@ -208,15 +209,15 @@
     "file": "h13-3x.jpg",
     "w": 750,
     "h": 912,
-    "bytes": 102598,
-    "sha1": "dd4f7f245ce45522d014b82f4123db43a01e90ea"
+    "bytes": 78160,
+    "sha1": "0f85fa04a65a2e82b49c5273dd7b6571358a6f8e"
    },
    "4": {
     "file": "h13-4x.jpg",
     "w": 1000,
     "h": 1216,
-    "bytes": 157934,
-    "sha1": "e14fb70196fcfb2c8661300ad1dbfa0f0cbd36fe"
+    "bytes": 130807,
+    "sha1": "6cbca6c385cb7a879045da933687cd1c3641a80c"
    }
   },
   "14": {
@@ -224,15 +225,15 @@
     "file": "h14-3x.jpg",
     "w": 750,
     "h": 912,
-    "bytes": 122404,
-    "sha1": "0ca31dd71d060fd95ddf7dd9715fe4c0a738f2c6"
+    "bytes": 73978,
+    "sha1": "82ae8eece2abeb24e19fe8f744b8ab66bbdf117b"
    },
    "4": {
     "file": "h14-4x.jpg",
     "w": 1000,
     "h": 1216,
-    "bytes": 188658,
-    "sha1": "f295b3f18353f46683b4bab775ad7feb9e024d16"
+    "bytes": 121539,
+    "sha1": "759db70e565f4f8d353a85897ac0facb14e441d5"
    }
   },
   "15": {
@@ -240,15 +241,15 @@
     "file": "h15-3x.jpg",
     "w": 750,
     "h": 912,
-    "bytes": 165239,
-    "sha1": "1c8d07533a61579cfe7532dfd553e77738291630"
+    "bytes": 70013,
+    "sha1": "67fb1916b5f4c7dc8c68d7ca8c776eb814539d85"
    },
    "4": {
     "file": "h15-4x.jpg",
     "w": 1000,
     "h": 1216,
-    "bytes": 260918,
-    "sha1": "2f60d3fe8e0967254b21c34ce330ae139f37b9a9"
+    "bytes": 113795,
+    "sha1": "6dfedda092727480ea136c2c560498a22054cdf6"
    }
   },
   "16": {
@@ -256,15 +257,15 @@
     "file": "h16-3x.jpg",
     "w": 750,
     "h": 912,
-    "bytes": 146734,
-    "sha1": "ed0d13534cbab4f6f342ae14f1fc3931b951a994"
+    "bytes": 60565,
+    "sha1": "590ff9e7862efe39ff90a0fbd4abb5859cf8f1e7"
    },
    "4": {
     "file": "h16-4x.jpg",
     "w": 1000,
     "h": 1216,
-    "bytes": 224238,
-    "sha1": "79ac008e53c7a98cab63c1ee514766d5f6e752fc"
+    "bytes": 101170,
+    "sha1": "23c15ac50d5dc10daa2e0cd4d9661d8ad3d30cc2"
    }
   },
   "17": {
@@ -272,15 +273,15 @@
     "file": "h17-3x.jpg",
     "w": 750,
     "h": 912,
-    "bytes": 114107,
-    "sha1": "2b5a11fb997a410316a0d9154665e13606f87865"
+    "bytes": 88219,
+    "sha1": "1e1c5814d8106d6dbdd644e847609e2f170c005a"
    },
    "4": {
     "file": "h17-4x.jpg",
     "w": 1000,
     "h": 1216,
-    "bytes": 178183,
-    "sha1": "42622b706d7dc87105111b133cadc1f62b8a5ca2"
+    "bytes": 145102,
+    "sha1": "24316456f4d82d39f5190e3ab1e69a3706977da2"
    }
   },
   "18": {
@@ -288,15 +289,15 @@
     "file": "h18-3x.jpg",
     "w": 750,
     "h": 912,
-    "bytes": 121916,
-    "sha1": "c8aff1cafa32ebed104e852716cf801b0bbdfe05"
+    "bytes": 79437,
+    "sha1": "109cbef5efa92ed28268e0364ea7eec9a4f90bcf"
    },
    "4": {
     "file": "h18-4x.jpg",
     "w": 1000,
     "h": 1216,
-    "bytes": 188700,
-    "sha1": "28e36b60648b738081d6413764cc9c0eaa3233e6"
+    "bytes": 131782,
+    "sha1": "777ade41bd4a4ba1fa40ad848a48ace7dc402d4d"
    }
   },
   "19": {
@@ -304,15 +305,15 @@
     "file": "h19-3x.jpg",
     "w": 750,
     "h": 912,
-    "bytes": 133008,
-    "sha1": "ab206579d320538ffa53aa83a38add13d967650d"
+    "bytes": 81501,
+    "sha1": "112e363004ef1555a6b3323df6df3073e2bc9dd4"
    },
    "4": {
     "file": "h19-4x.jpg",
     "w": 1000,
     "h": 1216,
-    "bytes": 213130,
-    "sha1": "cf114dddec23f304c84e51ded90dd45d4188b1a0"
+    "bytes": 135598,
+    "sha1": "f2b0e41c706a9ca455bc6435f34c04818050d7a0"
    }
   },
   "20": {
@@ -320,15 +321,15 @@
     "file": "h20-3x.jpg",
     "w": 750,
     "h": 912,
-    "bytes": 152009,
-    "sha1": "bef9ae908ebdcddd30b4c13d130b54163eba1f31"
+    "bytes": 62695,
+    "sha1": "43c62bb53327e24e0e6f6c8dd2c737308cf54f0f"
    },
    "4": {
     "file": "h20-4x.jpg",
     "w": 1000,
     "h": 1216,
-    "bytes": 234532,
-    "sha1": "fe873a7dbe0aafbd0c060a26eb848676fb662713"
+    "bytes": 103131,
+    "sha1": "95a0ec295b2f0f86ff95078a8a9cc120d03f4857"
    }
   },
   "21": {
@@ -336,15 +337,15 @@
     "file": "h21-3x.jpg",
     "w": 750,
     "h": 912,
-    "bytes": 170166,
-    "sha1": "99fbad5cba4feeeed0118b3699ff43b3d72bb7be"
+    "bytes": 48934,
+    "sha1": "0a76388af9f612b2256f6a87e4a5e1653e1c647d"
    },
    "4": {
     "file": "h21-4x.jpg",
     "w": 1000,
     "h": 1216,
-    "bytes": 264822,
-    "sha1": "e6f4915577b36ebb530f674f98aaecf957a0c535"
+    "bytes": 78835,
+    "sha1": "607c9b5b201aa7a1882281ac3caaf60df197f264"
    }
   }
  }

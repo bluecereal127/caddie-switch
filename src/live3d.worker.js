@@ -1,21 +1,25 @@
 // The live solver off the page (src/live3d.js posts to it): each hole's course
-// fetched once from public/course3d and kept, then src/live3d-core.js's
+// fetched from public/course3d (v2, NSS's collision triangles) and built for NSS's
+// ball (src/live3d-core.js buildCourse: tools/lib/nss3d.mjs on src/nsssim.js), the
+// three most recently used kept at most (a hole is 40k-117k triangles, 12-21 MB of
+// typed arrays with its grids in Node: every hole resident could exhaust a phone), then
 // solveFrom, a progress message per club, and the result.
 import { buildCourse, solveFrom } from "./live3d-core.js";
 
+const KEEP = 3;
 const courses = new Map();
-let palm = null;
 const get = async (u, json) => { const r = await fetch(u); if (!r.ok) throw new Error(`${u}: HTTP ${r.status}`); return json ? r.json() : r.arrayBuffer(); };
 function course(hole) {
-  if (!courses.has(hole)) {
-    courses.set(hole, (async () => {
-      const hh = String(hole).padStart(2, "0");
-      const meta = await get(`/course3d/h${hh}.json`, true), bin = await get(`/course3d/h${hh}.bin`);
-      if (meta.palm && !palm) { const idx = await get("/course3d/index.json", true); palm = { meta: idx.palm, buf: await get(`/course3d/${idx.palm.bin}`) }; }
-      return buildCourse(meta, bin, palm);
-    })().catch((e) => { courses.delete(hole); throw e; }));
-  }
-  return courses.get(hole);
+  let p = courses.get(hole);
+  if (p) { courses.delete(hole); courses.set(hole, p); return p; }
+  p = (async () => {
+    const hh = String(hole).padStart(2, "0");
+    const meta = await get(`/course3d/h${hh}.json`, true), bin = await get(`/course3d/h${hh}.bin`);
+    return buildCourse(meta, bin);
+  })().catch((e) => { courses.delete(hole); throw e; });
+  courses.set(hole, p);
+  while (courses.size > KEEP) courses.delete(courses.keys().next().value);
+  return p;
 }
 self.onmessage = async ({ data }) => {
   const { id, args } = data;
