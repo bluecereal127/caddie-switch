@@ -3,13 +3,15 @@
 // (src/nsssim.js, the golf ball of Nintendo Switch Sports tick for tick, 71
 // strokes recorded in Eden replayed to 0.1 mm in the air) on NSS's own course
 // (public/course3d v2, the Switch game's collision triangles, through
-// tools/lib/nss3d.mjs: the cup in play opened, the actor trees as their kinds'
-// measured shapes, the online platform's decks), solving a shot from wherever
-// the ball is (the user, 2026-10-22: for "when i do not perfectly hit it on
-// line with the known solved route"; 2026-10-24: NSS's data and physics
-// replace WSR's). The 44 recorded strokes the model plays to a rest off the
-// cup replay on this course bit for bit as on the dump's own collision, every
-// recorded holed putt holes (tools/test-live3d.mjs).
+// tools/lib/nss3d.mjs: every cup's own walls and bottom with the cup in play
+// opened, the actor trees as their kinds' own collision meshes placed at their
+// bones, the online platform's decks) with the flagstick in the cup in play for
+// every stroke but a putt from the green (nsssim's flag: the decoded pole and
+// cloth, the cloth along the wind's angle), solving a shot from wherever the
+// ball is (the user, 2026-10-22: for "when i do not perfectly hit it on line
+// with the known solved route"; 2026-10-24: NSS's data and physics replace
+// WSR's). The recorded strokes replay on this course as on the dump's own
+// collision (tools/test-live3d.mjs).
 //
 // Frames: the NSS hole frame (metres, y up, -z toward the green; course3d's
 // mesh units are 10 nss + O) for the ball; map fractions for the app; a
@@ -21,8 +23,11 @@
 //     ground under a mesh-unit point (y in mesh units, attr course3d's)
 //   toMesh / toMap: map fractions <-> mesh units (the hole's NSS registration)
 //   windOf(meta, mph, deg): the solver's dial (deg N-up, the way it blows) as
-//     NSS's wind, { x, z } m/s in the NSS frame (windSpeedOf: the wind object's
-//     speed s for the HUD's mph, which reads floor(2.25 s))
+//     NSS's wind, { x, z, s, mph, dirRad } m/s in the NSS frame (windSpeedOf: the
+//     wind object's speed s for the HUD's mph: nsssim's HUD_MPH table, inverted;
+//     dirRad the wind object's angle, the air moving along (sin, cos)), or null in
+//     a calm; windAngleOf(meta, deg): that angle at any speed (the flag's cloth
+//     points along it, also at 0 mph)
 //   platformSpot(meta, start): the online platform's standing spot for
 //     start = { kind: "platform", tier: "low" | "high", and one of fromLeft
 //     (0-6, the seven spots from the player's left facing the green),
@@ -39,18 +44,36 @@
 //     inferred: the stroke-0 code adds the same lift when its tee test holds,
 //     slots.md section 5), or at the map spot `ball` on the ground there (0.05 m
 //     above it along the normal: a ball at rest)
-//   shot(C, { pos, lie, club, pct, heading, wind, cupKey, platform, trace })
-//     -> one stroke: nsssim.run's result plus restLie, the rest on the map and
-//     the first tree it met
+//   shot(C, { pos, lie, club, pct, heading, wind, cupKey, platform, flag,
+//     flagAngle, poleTie, flagKick, trace }) -> one stroke: nsssim.run's result plus
+//     restLie, the rest on the map, the first tree it met (met) and its first
+//     touch of the flagstick (flagMet: { part: "pole" | "cloth", tick, at, upM
+//     (the ball's centre above the cup's bone) }). flag: null (the game's rule,
+//     nsssim.flagInPlay: in for every stroke but a putt from the green) | true |
+//     false; flagAngle: the cloth's yaw without a wind (rad, the wind object's
+//     angle); poleTie, flagKick: nsssim's (which face a pole edge both faces share
+//     takes; the cloth's kick in place of the game's draw)
 //   solveFrom(C, { ball, target, cupKey, pinFrac, windMph, windDeg, clubs,
-//     start, lift }, onClub) -> { lie, lieName, liesAt, D, h0, from, cup,
+//     start, lift, flagScore }, onClub) -> { lie, lieName, liesAt, D, h0, from, cup,
 //     physics, recs }: per club the power and aim whose ball stops nearest the
 //     target (the pin unless a target is given; the cup in play, so a drop
 //     counts), with its rest, carry, lie, miss, outcome, the first tree it
-//     met, the safety of 0.04-0.08 bars either side, and the same club at
-//     full power with its aim turned for the wind; recs best first. A ball
-//     the model never brings to rest (a timeout) or that leaves the course
-//     (water, OB, air OB, a fall) scores as out of play.
+//     met, the flagstick it met (flag: { part, upM, at, uncertain: true, ties,
+//     cloth, kick, matters, otherFace, noFlag, kicks }: the pole and the cloth are
+//     modelled, but such a stroke turns on millimetres: the face Havok keeps at a
+//     pole edge (ties: the stroke's edge ties; otherFace: the same stroke with the
+//     other face) and the cloth's kick, seeded by the contact point's x (kicks: the
+//     stroke with the kick at 0.5 and at 2.5 m/s straight at the cup); noFlag: the
+//     same stroke as if the flag were out; matters: one of those holes or ends
+//     otherwise, or rests over half a yard off; null: the stroke met no part of
+//     it), the safety of 0.04-0.08 bars either side, and the same club at full
+//     power with its aim turned for the wind; recs best first: holed for sure
+//     (sure: holed with the flag out too), then by score. A ball the model never
+//     brings to rest (a timeout) or that leaves the course (water, OB, air OB, a
+//     fall) scores as out of play. flagScore "worst" (the default): a stroke that
+//     meets the flagstick scores the worse of itself, the flag out and the other
+//     pole face, so the solver never counts on the flag (a cloth catch or a pole
+//     knock-down is not a plan); "model": as the model plays it.
 // Power: NSS reads the launch speed off GolfShotVelTable at (int)(100 power),
 // so a club has one launch per percent of the gauge (0.04 bars): the solver
 // searches those percents, and reports the middle of the chosen one's window
@@ -123,22 +146,19 @@ export function mapBearing(meta, h) {
 const headingOf = (dx, dz) => Math.atan2(dx, -dz) / DEG;
 const meshOfHeading = (h) => Math.PI - h * DEG;
 
-// NSS's wind object has an integer speed s (m/s, 0-15; every recorded one is), and the
-// HUD reads it as floor(2.25 s) mph on all six recorded pairs (1 -> 2, 3 -> 6, 4 -> 9, 5 ->
-// 11, 6 -> 13, 10 -> 22: so 12 and 23 mph never show, as the captures found); a dial value
-// that no s gives is read as mph / 2.25. (The rounding is not decoded: nsssim's note.)
-export function windSpeedOf(mph) {
-  if (!(mph > 0)) return 0;
-  const k = S.PHYSICS.wind.hudMphPerS;
-  for (let s = 1; s <= S.PHYSICS.air.windVelMax; s++) if (Math.floor(k * s + 1e-9) === mph) return s;
-  return mph / k;
-}
+// NSS's wind object has a whole speed s (m/s, 0-15), which the HUD shows as nsssim's
+// HUD_MPH[s] mph (RAM's s against the HUD's text: 8 -> 17, 12 -> 26, which floor(2.25 s), the
+// earlier reading, missed); a dial value is read as the whole s whose HUD value is nearest
+export function windSpeedOf(mph) { return S.windSpeedFromHud(mph); }
 export function windOf(meta, mph, deg) {
   const s = windSpeedOf(mph);
   if (!(s > 0)) return null;
-  const H = meshHeading(meta, deg);
-  return { x: s * Math.sin(H), z: s * Math.cos(H), s, mph };
+  const H = windAngleOf(meta, deg);
+  return { x: s * Math.sin(H), z: s * Math.cos(H), s, mph, dirRad: H };
 }
+// the wind object's angle (rad; the air moves along (sin a, cos a) in x, z) for the dial's
+// bearing, at any speed: the flag's cloth points along it, also in a calm
+export function windAngleOf(meta, deg) { return meshHeading(meta, Number(deg) || 0); }
 
 // the highest solid ground under a mesh-unit point
 export function groundAt(C, X, Z) {
@@ -212,31 +232,36 @@ function treeOf(C, t) {
 
 const powerOf = (pct, cap) => Math.min(cap, (pct + 0.5) / 100);
 // one stroke: club at gauge percent pct (or power), heading deg (NSS frame), from pos
-export function shot(C, { pos, lie = TEE_LIE, club, pct = null, power = null, heading, wind = null, cupKey = null, platform = false, trace = false, track = true }) {
+export function shot(C, { pos, lie = TEE_LIE, club, pct = null, power = null, heading, wind = null, cupKey = null, platform = false, flag = null, flagAngle = 0, poleTie = "low", flagKick = null, trace = false, track = true }) {
   const { N } = C, cup = cupKey ? N.cups[cupKey] ?? null : null;
   const cap = capOf(club, lie.nss);
   if (pct == null) pct = S.pctOf(Math.min(power ?? cap, cap));
   const pw = powerOf(pct, cap);
-  let met = null;
+  // the flagstick in the cup in play: the game's rule unless told (out only for a putt from the green)
+  const flagOn = !!cup && (flag ?? S.flagInPlay(club, lie.nss));
+  let met = null, flagMet = null;
   const o = {
     club, power: pw, lie: lie.nss, start: pos, heading, wind, ground: N.ground({ cupKey: cup?.key ?? null, platform }), trace,
     cup: cup ? { x: cup.x, y: cup.y, z: cup.z } : null,
+    flag: flagOn ? { windDirRad: wind?.dirRad ?? flagAngle } : null, poleTie, ...(flagKick ? { flagKick } : {}),
     // a trunk in flight or rolling; a canopy or fronds in flight (the leaf counter and
-    // the palm leaves act on a shot only)
+    // the palm leaves act on a shot only); the pole (Pin) or the cloth (Flag)
     onTick: track ? (s) => {
-      if (met) return;
-      const part = s.a4 === A.tree ? "trunk" : s.mode !== 1 ? null : s.a8 === A.leaf ? "canopy" : s.a8 === A.palmLeaf ? "fronds" : null;
-      if (part) met = { part, tick: s.tick, at: s.p };
+      if (!met) {
+        const part = s.a4 === A.tree ? "trunk" : s.mode !== 1 ? null : s.a8 === A.leaf ? "canopy" : s.a8 === A.palmLeaf ? "fronds" : null;
+        if (part) met = { part, tick: s.tick, at: s.p };
+      }
+      if (flagOn && !flagMet && (s.a4 === A.pin || s.a8 === A.flag)) flagMet = { part: s.a4 === A.pin ? "pole" : "cloth", tick: s.tick, at: s.p, upM: s.p[1] - cup.y };
     } : null,
   };
   // the putter past full power: the launch the table gives at that percent
   if (club === "putter" && pw > 1) o.v0 = S.launchVelocity("putter", pw, heading);
   const p = S.run(o);
   const restAttr = p.outcome === "holed" ? A.cup : p.restAttr;
-  return { ...p, pct, power: pw, restLie: p.outcome === "water" ? "water" : p.outcome === "OB" && restAttr !== A.ob && restAttr !== A.sandOb ? "OB" : LIE_NAME[restAttr] ?? String(restAttr), restAttrOf: restAttr, met };
+  return { ...p, pct, power: pw, restLie: p.outcome === "water" ? "water" : p.outcome === "OB" && restAttr !== A.ob && restAttr !== A.sandOb ? "OB" : LIE_NAME[restAttr] ?? String(restAttr), restAttrOf: restAttr, met, flagOn, flagMet };
 }
 
-export function solveFrom(C, { ball = null, target = null, cupKey = null, pinKey = null, pinFrac = null, windMph = 0, windDeg = 0, clubs = null, start = null, lift = 0, onTee = false }, onClub = null) {
+export function solveFrom(C, { ball = null, target = null, cupKey = null, pinKey = null, pinFrac = null, windMph = 0, windDeg = 0, clubs = null, start = null, lift = 0, onTee = false, flagScore = "worst" }, onClub = null) {
   const { meta } = C;
   const St = ballAtStart(C, { ball, start, lift, onTee });
   const cup = cupOf(C, cupKey ?? pinKey, pinFrac);
@@ -244,19 +269,31 @@ export function solveFrom(C, { ball = null, target = null, cupKey = null, pinKey
   const tgt = target ? mapToNss(meta, target.x, target.y) : pinXZ;
   if (!tgt) throw new Error("no target and no pin");
   const pos = St.pos, lie = St.lie, platform = St.from.kind === "platform";
-  const wind = windOf(meta, windMph, windDeg);
+  const wind = windOf(meta, windMph, windDeg), flagAngle = windAngleOf(meta, windDeg);
   const dx = tgt[0] - pos[0], dz = tgt[1] - pos[2];
   const D = Math.sqrt(dx * dx + dz * dz) / M_PER_YD, h0 = headingOf(dx, dz);
   const hPin = pinXZ ? headingOf(pinXZ[0] - pos[0], pinXZ[1] - pos[2]) : h0;
   const list = clubs ?? (lie.nss === "green" ? ["putter"] : D < 40 ? [...BAG, "putter"] : BAG);
   const ux = Math.sin(h0 * DEG), uz = -Math.cos(h0 * DEG);   // the line to the target
-  const at = (club, pct, h) => {
-    const p = shot(C, { pos, lie, club, pct, heading: h, wind, cupKey: cup?.key ?? null, platform });
-    const rx = p.rest[0] - tgt[0], rz = p.rest[2] - tgt[1];
-    const miss = p.holed ? 0 : Math.sqrt(rx * rx + rz * rz) / M_PER_YD;
+  const missOf = (p) => { const rx = p.rest[0] - tgt[0], rz = p.rest[2] - tgt[1]; return p.holed ? 0 : Math.sqrt(rx * rx + rz * rz) / M_PER_YD; };
+  // a stroke's score: its miss in yd, plus OUT out of play, BUNKER_PEN in a bunker, ROUGH_PEN in the rough
+  const scoreOf = (p) => {
     const out = p.outcome !== "rest" && p.outcome !== "holed";
-    const pen = p.holed ? 0 : out || !SAFE.has(p.restAttrOf) ? OUT : p.restAttrOf === A.bunker ? BUNKER_PEN : p.restAttrOf === A.rough ? ROUGH_PEN : 0;
-    return { pct, h, p, miss, d: miss + pen, along: ((p.rest[0] - pos[0]) * ux + (p.rest[2] - pos[2]) * uz) / M_PER_YD };
+    return missOf(p) + (p.holed ? 0 : out || !SAFE.has(p.restAttrOf) ? OUT : p.restAttrOf === A.bunker ? BUNKER_PEN : p.restAttrOf === A.rough ? ROUGH_PEN : 0);
+  };
+  const at = (club, pct, h) => {
+    const one = (o) => shot(C, { pos, lie, club, pct, heading: h, wind, cupKey: cup?.key ?? null, platform, flagAngle, ...o });
+    const p = one({});
+    let d = scoreOf(p), sure = p.holed;
+    // the flagstick met: the flag never helps (flagScore "worst", the default): the stroke scores the worse of
+    // itself and the same stroke with the flag out (and, at a pole edge both faces share, with the other face),
+    // and it is holed for the ranking only when every one of them holes; so the search does not aim at the pole
+    // or the cloth (the RAM player's planner counts a hole-out through the flag as half one; the user's rule for
+    // the solved routes, 2026-10-22: no flag catches). flagScore "model" takes the flagged stroke as the model plays it
+    if (p.flagMet && flagScore !== "model") {
+      for (const q of [one({ flag: false, track: false }), ...(p.poleTies?.length ? [one({ poleTie: "high", track: false })] : [])]) { d = Math.max(d, scoreOf(q)); sure &&= q.holed; }
+    }
+    return { pct, h, p, miss: missOf(p), d, sure, along: ((p.rest[0] - pos[0]) * ux + (p.rest[2] - pos[2]) * uz) / M_PER_YD };
   };
   // the aim that turns this stroke's rest onto the target's line
   const fix = (t) => {
@@ -313,6 +350,28 @@ export function solveFrom(C, { ball = null, target = null, cupKey = null, pinKey
       for (const d of SAFE_DPCT) { const u = run(t.pct + d, t.h); if (u && !dry(u.p)) return false; }
       return true;
     };
+    // a stroke that met the flagstick: where, and what the uncertain parts would change: the other face at a
+    // pole edge both faces share (otherFace), the cloth's kick at either end of its range, 0.5 and 2.5 m/s
+    // straight at the cup (kicks: the game seeds it with the contact point's x, which a float32 ulp moves), and
+    // the flag out (noFlag), as if the model's contact were wrong; matters: one of them holes where this does
+    // not or the other way, ends another way, or rests more than half a yard off
+    const flagOf = (t) => {
+      const fm = t.p.flagMet;
+      if (!fm) return null;
+      const brief = (p) => ({ holed: p.holed, outcome: p.outcome, restLie: p.restLie, miss: missOf(p), rest: nssToMap(meta, p.rest[0], p.rest[2]), off: Math.sqrt((p.rest[0] - t.p.rest[0]) ** 2 + (p.rest[2] - t.p.rest[2]) ** 2) / M_PER_YD });
+      const again = (o) => brief(shot(C, { pos, lie, club, pct: t.pct, heading: t.h, wind, cupKey: cup?.key ?? null, platform, flagAngle, track: false, ...o }));
+      const kickAt = (v) => (cpx, cpz, q) => { const dx = q.x - cpx, dz = q.z - cpz, m = Math.sqrt(dx * dx + dz * dz) || 1; return { x: Math.fround((v * dx) / m), z: Math.fround((v * dz) / m) }; };
+      const ties = t.p.poleTies?.length ?? 0;
+      const otherFace = ties ? again({ poleTie: "high" }) : null, noFlag = again({ flag: false });
+      const kicks = t.p.flagKick ? [again({ flagKick: kickAt(S.PHYSICS.ground.flagHitAfterVelMin) }), again({ flagKick: kickAt(S.PHYSICS.ground.flagHitAfterVelMax) })] : null;
+      const alts = [otherFace, noFlag, ...(kicks ?? [])].filter(Boolean);
+      return {
+        part: fm.part, upM: fm.upM, at: nssToMap(meta, fm.at[0], fm.at[2]), uncertain: true, ties,
+        cloth: !!t.p.flagHit, kick: t.p.flagKick ? { speed: t.p.flagKick.speed, angDeg: t.p.flagKick.angDeg } : null,
+        matters: alts.some((a) => a.holed !== t.p.holed || a.outcome !== t.p.outcome || a.off > 0.5),
+        otherFace, noFlag, kicks,
+      };
+    };
     const row = (t) => {
       const rx = t.p.rest[0] - tgt[0], rz = t.p.rest[2] - tgt[1];
       const len = Math.sqrt((t.p.rest[0] - pos[0]) ** 2 + (t.p.rest[2] - pos[2]) ** 2);
@@ -323,15 +382,15 @@ export function solveFrom(C, { ball = null, target = null, cupKey = null, pinKey
         heading: meshOfHeading(t.h), bearing: mapBearing(meta, meshOfHeading(t.h)),
         aimOffTarget: angDiff(t.h, h0), aimOffFlag: angDiff(t.h, hPin),
         rest: nssToMap(meta, t.p.rest[0], t.p.rest[2]), aimTo: nssToMap(meta, pos[0] + hx * len, pos[2] + hz * len),
-        restLie: t.p.restLie, holed: t.p.holed, miss: t.miss, score: t.d, carry: t.p.carryYd,
+        restLie: t.p.restLie, holed: t.p.holed, sure: t.sure, miss: t.miss, score: t.d, carry: t.p.carryYd,
         hazard: t.p.outcome === "water" ? 1 : t.p.outcome === "OB" ? 2 : 0, outcome: t.p.outcome, safe: safe(t),
-        tree: treeOf(C, t.p.met),
+        tree: treeOf(C, t.p.met), flag: flagOf(t),
       };
     };
     const rec = { ...row(b), full: b.pct >= hi ? null : row(f) };
     recs.push(rec);
     if (onClub) onClub({ done: n + 1, of: list.length, rec });
   });
-  recs.sort((x, y) => (y.holed - x.holed) || x.score - y.score);
+  recs.sort((x, y) => (y.sure - x.sure) || x.score - y.score);
   return { lie: lie.model, lieName: LIE_LABEL[lie.model] ?? String(lie.model), liesAt: St.attr, D, h0: meshOfHeading(h0), from: St.from, cup: cup?.key ?? null, physics: PHYSICS, recs };
 }

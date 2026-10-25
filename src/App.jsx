@@ -4,7 +4,8 @@ import { GREEN_VIEWS } from "./greens.js";
 import { MAP_XFORM_V5 } from "./mapxform.js";
 import { applyDerivedHole, isPipelinePin } from "./derivedMerge.js";
 import { DEFAULT_CLUBS, GRID_N, emptyGreen, puttField, solvePutt, fitClub, solve, stopAt, LANDED, MIN_BARS, SHAPE_LABEL } from "./model.js";
-import { gaugeBars, fitGreenSpeed } from "./putt.js";
+import { gaugeBars, fitGreenSpeed, powerBars, puttAssist, PUTT_ASSIST, PUTT_POWER_MAX, PUTT_POWER_MAX_ASSIST } from "./putt.js";
+import { windSpeedFromHud } from "./nsssim.js";
 import { loadTerrain, loadGreenHeights, classAt, lieOf, heightAt } from "./terrain.js";
 import { treesAlong } from "./trees.js";
 import { contourDataUrl } from "./relief.js";
@@ -181,7 +182,21 @@ const T = {
 const COURSE_LABEL = "NSS course";
 const PHYSICS_LABEL = "NSS's physics";
 
-const fmtPow = (p) => (Math.round(p * 20) / 20).toFixed(2);
+// a rec's power, bars: the middle of the whole percent NSS launches it at
+// (src/model.js barsOfPct: every power within the percent's 0.04 bar flies the
+// same ball), or the cap itself, to the hundredth
+const fmtPow = (p) => p.toFixed(2);
+// How to swing a rec (swing-power.md 4, decoded from NSS 1.5.0's code and
+// checked in Eden's RAM): a full swing launches at the gauge's white line (the
+// top of the backswing; in the rough and sand times the lie's cap) whenever
+// the downswing's own power comes within 0.05 of it (0.2 bar), is pulled part
+// way toward it out to 0.5 (2 bars) and not at all beyond, so the backswing
+// sets the power and the downswing only has to be smooth: a hard hit from a
+// short backswing flies at its own power. (A player well over par on a hole
+// gets a wider pull: 0.12.)
+const swingLine = (r) => (r.power >= r.cap - 1e-9
+  ? `🏌 A full backswing (the white line at the top), then a smooth full swing: NSS launches it at the ${r.cap}-bar cap.`
+  : `🏌 Take it back to ${fmtPow(r.power)} bars (the gauge's white line), then a smooth full swing through: NSS launches at the line when your swing's power is within 0.2 bar of it, so don't hit harder (2 bars past the line gets no pull at all).`);
 // A rec card's carry / landing / roll line (src/model.js). The roll is
 // NSS's; a spinning club would show the range from full backspin to none
 // (D4), but src/model.js gives no spin range (rollSpin null: NSS's swing sets
@@ -223,6 +238,13 @@ const scoreName = (d) => d <= -3 ? "Albatross" : d === -2 ? "Eagle" : d === -1 ?
 const fmtVs = (d) => (d > 0 ? `+${d}` : d === 0 ? "E" : `${d}`);
 
 /* ---------------- wind dial ---------------- */
+// The wind arrow's colour band for the HUD's mph: NSS switches the minimap
+// arrow at a wind speed s over 5 and over 10 m/s (L_MiniMap/TypeWindSpeed,
+// 0x1c1abac; that the value is s is inferred from the colours), s the whole
+// speed the HUD shows as that mph (src/nsssim.js windSpeedFromHud): blue
+// through 11 mph, lime 13-22, pink from 24, as the 317 map captures with an
+// arrow measured them. 0 blue, 1 lime, 2 pink.
+const windBand = (mph) => { const w = windSpeedFromHud(mph); return w > 10 ? 2 : w > 5 ? 1 : 0; };
 function WindDial({ deg, setDeg, speed, topLabel = "PIN", bottomLabel = "YOU", size = "w-36 h-36", snap = 5 }) {
   const ref = useRef(null);
   const drag = (e) => {
@@ -237,10 +259,10 @@ function WindDial({ deg, setDeg, speed, topLabel = "PIN", bottomLabel = "YOU", s
     const up = () => { window.removeEventListener("pointermove", mv); window.removeEventListener("pointerup", up); };
     window.addEventListener("pointermove", mv); window.addEventListener("pointerup", up);
   };
-  const len = 8 + Math.min(31, speed) * 0.9;
-  // the game's bands (blue to 11 mph, lime 12-23, pink 24+; measured on the
-  // map captures, see HoleMap's badge) in colours that hold up on the sky disc
-  const wcol = speed >= 24 ? "#E5489B" : speed >= 12 ? "#A3C400" : "#3B82C4";
+  const len = 8 + Math.min(33, speed) * 0.9;
+  // the game's bands (blue to 11 mph, lime 13-22, pink 24+: windBand) in
+  // colours that hold up on the sky disc
+  const wcol = ["#3B82C4", "#A3C400", "#E5489B"][windBand(speed)];
   return (
     <svg ref={ref} viewBox="0 0 120 120" className={`${size} select-none touch-none cursor-pointer shrink-0`} onPointerDown={onDown}>
       <circle cx="60" cy="60" r="54" fill={T.sky} stroke={T.ink} strokeWidth="2.5" />
@@ -539,9 +561,12 @@ function useHoleMapSrc(n, scale) {
 // path on the map and the green. start says where the stroke starts (the
 // local tee, the player's platform ball, or the course under the ball) and
 // lift how far the ball sits above the ground there (the platform's mat).
+// shotAssist: Shot Assist as the game applies it (local play only), which cuts
+// a putt at a full gauge (the live solver runs the putter to 150 %, the
+// game's PowerOverMaxPT without it): a putter rec past 4 bars says so.
 const CLUB_LABEL = { driver: "Driver", spoon: "Spoon", "3iron": "3-iron", "5iron": "5-iron", "7iron": "7-iron", "9iron": "9-iron", wedge: "Wedge", putter: "Putter" };
 const atFrac = (p) => ({ x: p[0], y: p[1] });
-function LiveSolveCard({ hole, line, cupKey, pin, windSpeed, windDeg, start, lift, onShow }) {
+function LiveSolveCard({ hole, line, cupKey, pin, windSpeed, windDeg, start, lift, onShow, shotAssist = false }) {
   const [st, setSt] = useState({ busy: false, prog: null, res: null, err: null, sel: null });
   const startKey = start ? `${start.kind}:${start.tier ?? ""}:${start.hand ?? ""}:${start.ballLocalX ?? ""}` : "ground";
   const key = `${hole}|${line.ball?.x},${line.ball?.y}|${line.target?.x},${line.target?.y}|${cupKey ?? `${pin?.x},${pin?.y}`}|${windSpeed}|${windDeg}|${startKey}|${lift}`;
@@ -556,11 +581,24 @@ function LiveSolveCard({ hole, line, cupKey, pin, windSpeed, windDeg, start, lif
       .then((res) => { setSt({ busy: false, prog: null, res, err: null, sel: null }); setSolvedKey(k); })
       .catch((e) => setSt({ busy: false, prog: null, res: null, err: e.message, sel: null }));
   };
-  const show = (i) => { const r = st.res.recs[i]; setSt((x) => ({ ...x, sel: i })); onShow([{ from: [line.ball.x, line.ball.y], rest: r.rest, aimTo: r.aimTo, holed: r.holed }]); };
+  // a stroke the model holes only off the flagstick is not drawn as holed (sure: it holes with the flag out and
+  // with the other pole face too, src/live3d-core.js solveFrom)
+  const show = (i) => { const r = st.res.recs[i]; setSt((x) => ({ ...x, sel: i })); onShow([{ from: [line.ball.x, line.ball.y], rest: r.rest, aimTo: r.aimTo, holed: r.holed && r.sure }]); };
   const off = (d) => (Math.abs(d) < 0.05 ? "straight at" : `${Math.abs(d).toFixed(1)}° ${d > 0 ? "right" : "left"} of`);
   const toWhat = line.target ? "the target" : "the pin";
-  // a miss as a golfer says it: in, within a few yards, or so far short or long and left or right
-  const where = (r) => r.holed ? "in" : r.miss < 3 ? `${r.miss.toFixed(1)} yd from ${toWhat}` : `${Math.round(Math.abs(r.long))} yd ${r.long < 0 ? "short" : "long"}${Math.abs(r.right) >= 3 ? ` and ${Math.round(Math.abs(r.right))} yd ${r.right > 0 ? "right" : "left"}` : ""}`;
+  const partOf = (fl) => (fl?.part === "pole" ? "pole" : "flag's cloth");
+  // a miss as a golfer says it: in, within a few yards, or so far short or long and left or right; a hole-out
+  // through the flagstick as such (the model plays the pole and the cloth, but a millimetre turns them)
+  const where = (r) => r.holed ? (r.sure ? "in" : `off the ${partOf(r.flag)} into the cup`) : r.miss < 3 ? `${r.miss.toFixed(1)} yd from ${toWhat}` : `${Math.round(Math.abs(r.long))} yd ${r.long < 0 ? "short" : "long"}${Math.abs(r.right) >= 3 ? ` and ${Math.round(Math.abs(r.right))} yd ${r.right > 0 ? "right" : "left"}` : ""}`;
+  const cupText = (r) => (!r.holed ? `in the ${r.restLie}` : r.sure ? "in the cup" : "not for sure");
+  // a stroke that meets the flagstick: where, what the flag out would do, and whether that changes it (matters);
+  // nothing for a sure hole-out that only brushes the pole in the cup
+  const flagNote = (r) => {
+    const fl = r.flag;
+    if (!fl || (r.holed && r.sure && !fl.matters)) return "";
+    const out = fl.noFlag ? (fl.noFlag.holed ? "it drops with the flag out too" : `with the flag out it ends ${fl.noFlag.miss.toFixed(1)} yd from ${toWhat}`) : "";
+    return ` · ⚠ meets the ${partOf(fl)} ${fl.upM.toFixed(1)} m up${out ? ` (${out})` : ""}${fl.matters ? ": uncertain, a millimetre turns it" : ""}`;
+  };
   const from = start?.kind === "platform" ? `your ball on the platform's ${start.tier} tier` : start?.kind === "local" ? "the tee" : "the ball on the map";
   return (
     <div className="rounded-xl border-2 px-3 py-2 text-xs" style={{ borderColor: T.flag, background: "#FFF7F4" }}>
@@ -573,12 +611,12 @@ function LiveSolveCard({ hole, line, cupKey, pin, windSpeed, windDeg, start, lif
       {st.err && <div className="mt-1 font-semibold" style={{ color: T.flag }}>{st.err}</div>}
       {st.res && (
         <div className="space-y-1 mt-1.5" style={stale ? { opacity: 0.45 } : null}>
-          <div className="opacity-60 text-[10px]">Each club's best shot, the best first (a club that cannot get there shows the nearest it can) · {Math.round(st.res.D)} yd to {toWhat} · lie {({ 1: "fairway", 2: "rough", 3: "bunker", 6: "green", 9: "fringe", 15: "tee", 16: "bunker", 17: "sand OB" })[st.res.lie] ?? st.res.lie} · tap one to see it on the map</div>
+          <div className="opacity-60 text-[10px]">Each club's best shot, the best first (a club that cannot get there shows the nearest it can) · {Math.round(st.res.D)} yd to {toWhat} · lie {st.res.lieName ?? st.res.lie} · the bars are the white line to take the club back to (NSS launches at it when the swing comes within 0.2 bar) · tap one to see it on the map</div>
           {st.res.recs.slice(0, 5).map((r, i) => (
             <button key={i} onClick={() => show(i)} className="w-full text-left rounded-lg border-2 px-2 py-1"
               style={st.sel === i ? { background: T.flag, color: "#fff", borderColor: T.flag } : { borderColor: T.line, background: "#fff", color: T.ink }}>
-              <b>{CLUB_LABEL[r.club] ?? r.club}</b> <span className="mono font-bold">{r.bars.toFixed(2)}</span> bars{r.max ? " (max)" : ""} · aim {off(r.aimOffTarget)} {toWhat}{line.target && pin ? ` (${off(r.aimOffFlag)} the flag)` : ""} {i === 0 ? " · ◀ best" : ""} → {where(r)}, {r.holed ? "in the cup" : `in the ${r.restLie}`}{r.safe ? "" : " · ⚠ 0.1 bar off can find sand or water"}
-              {r.full && <div className="opacity-70 text-[10px]">at full power (4.00 max): aim {off(r.full.aimOffTarget)} {toWhat} → {where(r.full)}, {r.full.holed ? "in the cup" : `in the ${r.full.restLie}`}</div>}
+              <b>{CLUB_LABEL[r.club] ?? r.club}</b> <span className="mono font-bold">{r.bars.toFixed(2)}</span> bars{r.max ? " (max)" : ""} · aim {off(r.aimOffTarget)} {toWhat}{line.target && pin ? ` (${off(r.aimOffFlag)} the flag)` : ""} {i === 0 ? " · ◀ best" : ""} → {where(r)}, {cupText(r)}{flagNote(r)}{r.safe ? "" : " · ⚠ a percent or two either way (0.04–0.08 bar) ends in sand, water, OB or on rock"}{shotAssist && r.club === "putter" && r.bars > 4 ? " · ⚠ past a full gauge: Shot Assist cuts a putt at 4 bars" : ""}
+              {r.full && <div className="opacity-70 text-[10px]">at full power ({r.full.bars.toFixed(2)} bars, the lie's max): aim {off(r.full.aimOffTarget)} {toWhat} → {where(r.full)}, {cupText(r.full)}{flagNote(r.full)}</div>}
             </button>
           ))}
         </div>
@@ -817,9 +855,9 @@ function HoleMap({ holeNum, line, onLine, markers, onMarkers, markerMode, aimPre
     // the game's own arrow colours, so the badge can be checked against
     // the minimap at a glance. Measured on the 317 map captures with an
     // arrow: blue up to 11 mph (median RGB 2,251,228), lime from 13 to
-    // 22 (228,250,0), pink from 24 (253,107,153); 12 and 23 never seen,
-    // so the bands are taken as equal twelfths (floor(mph / 12)).
-    const col = windBadge.speed >= 24 ? "#F06BB8" : windBadge.speed >= 12 ? "#E4FA00" : "#5AC8E8";
+    // 22 (228,250,0), pink from 24 (253,107,153); the bands by NSS's own
+    // switch on the wind speed (windBand)
+    const col = ["#5AC8E8", "#E4FA00", "#F06BB8"][windBand(windBadge.speed)];
     return (
       <g transform="translate(86 80)">
         <circle r="10.5" fill="rgba(10,25,16,0.72)" stroke="rgba(255,255,255,0.7)" strokeWidth="0.7" />
@@ -1034,6 +1072,19 @@ export default function App() {
   // app state, an additive key that onlineOf sanitises (an install without
   // it reads the default: off, right-handed).
   const [online, setOnline] = useState(() => onlineOf(null));
+  // Shot Assist (Options → User Settings → Other; local play only), as the
+  // player says it is set: a root setting, an additive key (an install
+  // without it reads on). On, NSS holds every swing at the lie's cap (no red,
+  // no curve), cuts a putt at a full gauge and puts the putter assist in its
+  // widest mode (a stroke within 0.15 of the game's holing power, 0.25 inside
+  // 7 m, launches at it, out to 30 m); off, the putter assist is the normal
+  // one (0.03, 0.2 inside 3 m, out to 25 m) and a putt can run to 1.5
+  // (src/putt.js puttAssist). Online it is off whatever the setting (assistOn).
+  const [shotAssist, setShotAssist] = useState(true);
+  // the hole the Online inputs were last set or confirmed on (component state):
+  // NSS seats the group again and deals the places afresh on every hole, so a
+  // new hole asks for them again
+  const [onlineFor, setOnlineFor] = useState(null);
   const [saveState, setSaveState] = useState("");
   const [openHole, setOpenHole] = useState(null);
   const [holeMarkerEdit, setHoleMarkerEdit] = useState(false);
@@ -1136,6 +1187,7 @@ export default function App() {
         if (d.activeRound) setActiveRound(d.activeRound);
         setMapScale(mapScaleOf(d.mapScale));
         setOnline(onlineOf(d.online));
+        setShotAssist(d.shotAssist !== false);
         // mapV5: maps.js swapped from the 219x270 originals to 250x304
         // median-stacked captures; migrate stored fractional positions with
         // the per-hole registration transforms (fNew = fOld*a + b)
@@ -1208,7 +1260,7 @@ export default function App() {
   }, []);
 
   const persist = async (patch = {}) => {
-    const data = { clubs, shots, putts, greenSpeed, holesMeta, rounds, activeRound, mapScale, online, parFixV3: true, mapV4: true, treesV9: true, mapV5: true, derivedV1: true, clubsWsrV1: true, clubsNssV1: true, ...patch };
+    const data = { clubs, shots, putts, greenSpeed, holesMeta, rounds, activeRound, mapScale, online, shotAssist, parFixV3: true, mapV4: true, treesV9: true, mapV5: true, derivedV1: true, clubsWsrV1: true, clubsNssV1: true, ...patch };
     data.holesMeta = storedHolesMeta(data.holesMeta);
     try {
       await window.storage.set(STORE_KEY, JSON.stringify(data));
@@ -1310,7 +1362,7 @@ export default function App() {
   // the Online inputs: sanitised, stored, and the ball put on its new start
   const setOnlineState = (next) => {
     const o = onlineOf(next);
-    setOnline(o); persist({ online: o });
+    setOnline(o); persist({ online: o }); setOnlineFor(hole);
     const s = startOf(holesMeta[hole], o);
     if (s) { setLine({ ball: { x: s.x, y: s.y }, target: null }); setSelRec(null); }
   };
@@ -1499,26 +1551,38 @@ export default function App() {
     if (lie !== "green" || !greenNow?.box || !greenYd) return null;
     return puttField({ green: greenNow, heights: greenHeights, W: greenYd.W, H: greenYd.H });
   }, [lie, greenNow, greenYd, greenHeights]);
+  // Shot Assist as the game applies it: local play only
+  const assistOn = shotAssist && !online.on;
   const puttSolved = useMemo(() => {
     if (!puttGround || !putt.ball || !putt.cup) return null;
-    const s = solvePutt(puttGround, putt.ball, putt.cup);
+    const s = solvePutt(puttGround, putt.ball, putt.cup, { powerMax: assistOn ? PUTT_POWER_MAX_ASSIST : PUTT_POWER_MAX });
     const D = s.r.D;
     const lateral = D * Math.sin((s.a * Math.PI) / 180);
     const base = Math.atan2((putt.cup.x - putt.ball.x) * greenYd.W, -((putt.cup.y - putt.ball.y) * greenYd.H));
     const th = base + (s.a * Math.PI) / 180;
     const aimPt = { x: putt.ball.x + (Math.sin(th) * D) / greenYd.W, y: putt.ball.y - (Math.cos(th) * D) / greenYd.H };
-    return { ...s, D, lateral, aimPt };
-  }, [puttGround, putt, greenYd]);
-  // the gauge: the solved launch's flat roll (Dflat) in bars at greenSpeed, and
-  // the power against a flat putt of the same length (bars over bars; 0 with
-  // the ball on the cup, where both are 0); for a holing line also the range of
-  // strengths that still drop at its aim (solvePutt reads the middle of it)
+    // the aim window's ends as yd off the cup (the aims at which some strength still drops)
+    const aimsYd = s.aims ? { lo: D * Math.sin((s.aims.lo * Math.PI) / 180), hi: D * Math.sin((s.aims.hi * Math.PI) / 180) } : null;
+    return { ...s, D, lateral, aimPt, aimsYd };
+  }, [puttGround, putt, greenYd, assistOn]);
+  // the gauge: the solved launch in bars at greenSpeed (its whole percent's
+  // flat roll, src/putt.js powerBars), and the power against a flat putt of
+  // the same length (bars over bars; 0 with the ball on the cup, where both
+  // are 0); for a holing line also the range of strengths that still drop at
+  // its aim (solvePutt reads the middle of it), and the game's putter assist
+  // on that line (src/putt.js puttAssist: its own holing power, and the
+  // strokes it pulls exactly onto one), in bars too
   const puttSol = useMemo(() => {
     if (!puttSolved) return null;
-    const bars = gaugeBars(puttSolved.r.Dflat, greenSpeed);
-    const holeBars = puttSolved.Dflat ? { lo: gaugeBars(puttSolved.Dflat.lo, greenSpeed), hi: gaugeBars(puttSolved.Dflat.hi, greenSpeed) } : null;
-    return { ...puttSolved, bars, holeBars, power: puttSolved.D > 0 ? bars / gaugeBars(puttSolved.D, greenSpeed) : 0 };
-  }, [puttSolved, greenSpeed]);
+    const pb = (q) => powerBars(q, greenSpeed);
+    // the read's bars: the middle of its holing range on a holing line, else its own launch's flat roll
+    const bars = puttSolved.power ? pb(puttSolved.power.mid) : gaugeBars(puttSolved.r.Dflat, greenSpeed);
+    const holeBars = puttSolved.power ? { lo: pb(puttSolved.power.lo), hi: pb(puttSolved.power.hi) } : null;
+    const a = puttSolved.r.holed ? puttAssist(puttSolved.power, puttSolved.D * 0.9144, { shotAssist: assistOn }) : null;
+    const assist = a && { ...a, targetBars: pb(a.target), lowBars: a.low != null ? pb(a.launch.lo) : null,
+      snapBars: { lo: pb(Math.max(0.04, a.snap.lo)), hi: Number.isFinite(a.snap.hi) ? pb(a.snap.hi) : null } };
+    return { ...puttSolved, bars, holeBars, assist, power: puttSolved.D > 0 ? bars / gaugeBars(puttSolved.D, greenSpeed) : 0 };
+  }, [puttSolved, greenSpeed, assistOn]);
   const setScaleFromInput = () => {
     const yd = parseFloat(calInput);
     if (!geo || !yd || yd <= 0) return;
@@ -1538,9 +1602,9 @@ export default function App() {
       hole: Number(form.hole) || 0, stroke: Number(form.stroke) || 1,
       raw: { speed: sp, deg: form.windDeg },
     };
-    // gauge is 4 bars max and observed wind tops out at 31 mph — refuse
-    // impossible rows instead of silently fitting the model to typos
-    if (s.power <= 0 || s.power > 4 || s.carry <= 0 || sp < 0 || sp > 31) return;
+    // gauge is 4 bars max and NSS's wind tops out at 15 m/s, 33 mph on the
+    // HUD — refuse impossible rows instead of silently fitting the model to typos
+    if (s.power <= 0 || s.power > 4 || s.carry <= 0 || sp < 0 || sp > 33) return;
     const nextShots = [s, ...shots];
     const nextClubs = clubs.map((c) => fitClub(c, nextShots));
     setShots(nextShots); setClubs(nextClubs);
@@ -1832,6 +1896,12 @@ export default function App() {
                       {!online.on && <div className="text-[10px] opacity-60">Off: local play, the ball on the local tee. Turn it on in an online round to start from your place on the platform.</div>}
                       {online.on && (
                         <>
+                          {onlineFor !== hole && (
+                            <div className="text-[10px] font-semibold flex items-center gap-2 flex-wrap" style={{ color: "#8a6d1a" }}>
+                              <span>⚠ Hole {hole}: NSS seats the group again and deals the places afresh on every hole, so set your tier, the counts and your place for this one.</span>
+                              <button onClick={() => setOnlineFor(hole)} className={cc} style={chip(false)}>Still right</button>
+                            </div>
+                          )}
                           <div className={row}>
                             <span className={lab}>My tier</span>
                             {TIERS.map((t) => <button key={t} onClick={() => set({ tier: t })} className={cc} style={chip(o.tier === t)}>{t === "high" ? "High" : "Low"}</button>)}
@@ -1892,7 +1962,7 @@ export default function App() {
                 onPick={(id) => setCurPin(hole, id)} />
               <LiveSolveCard hole={hole} line={line} cupKey={cupKey}
                 pin={curPinObj ? { x: curPinObj.x, y: curPinObj.y } : null}
-                windSpeed={windSpeed} windDeg={windDeg} start={liveStart} lift={ballLift} onShow={setLiveRoute} />
+                windSpeed={windSpeed} windDeg={windDeg} start={liveStart} lift={ballLift} onShow={setLiveRoute} shotAssist={assistOn} />
               {activeWindRules.map((r, i) => (
                 <div key={i} className="rounded-xl border-2 px-3 py-2 text-xs font-semibold"
                   style={r.kind === "block" ? { borderColor: T.flag, background: "#FFF3F3", color: "#8C1C1C" }
@@ -1942,6 +2012,13 @@ export default function App() {
                     {[...Object.keys(LIES), "green"].map((l) => (
                       <button key={l} onClick={() => setLie(l)} className="px-2.5 py-1.5 rounded-full text-[11px] font-bold capitalize border-2" style={chip(lie === l)}>{l}</button>
                     ))}
+                  </div>
+                  {/* Shot Assist as the player has it set (the root key shotAssist) */}
+                  <div className="flex items-center gap-1 mt-2 flex-wrap">
+                    <button onClick={() => { const v = !shotAssist; setShotAssist(v); persist({ shotAssist: v }); }}
+                      title="Shot Assist (Options → User Settings → Other; local play only). On, NSS holds every swing at the lie's cap (no red, no curve), cuts a putt at a full gauge, and launches a putt within 0.15 of its own holing power on your aim at exactly that power (0.25 inside 7 m, out to 30 m). Off, the putter's pull is within 0.03 (0.2 inside 3 m, out to 25 m)."
+                      className="px-2.5 py-1 rounded-full text-[11px] font-bold border-2" style={chip(shotAssist)}>{shotAssist ? "Shot Assist: on" : "Shot Assist: off"}</button>
+                    {shotAssist && online.on && <span className="text-[10px] opacity-60">not online (local play only)</span>}
                   </div>
                 </div>
               </div>
@@ -2018,8 +2095,8 @@ export default function App() {
                     topLabel={windMode === "map" ? "N" : "AIM"} bottomLabel={windMode === "map" ? "S" : "YOU"}
                     snap={windMode === "map" ? 45 : 5} />
                   <div className="flex-1">
-                    <input type="number" min="0" max="31" step="1" className={inputCls} style={inputStyle} value={windSpeed}
-                      onChange={(e) => setWindSpeed(Math.max(0, Math.min(31, Math.round(parseFloat(e.target.value) || 0))))} />
+                    <input type="number" min="0" max="33" step="1" className={inputCls} style={inputStyle} value={windSpeed}
+                      onChange={(e) => setWindSpeed(Math.max(0, Math.min(33, Math.round(parseFloat(e.target.value) || 0))))} />
                     <div className="text-xs mt-1 opacity-70">
                       {windMode === "map"
                         ? shotBearing != null ? `Copy the minimap arrow (N-up, snaps to 8). Relative to your ${geo ? "line" : "default line to the pin"}: ${relWindDeg.toFixed(0)}°` : "Copy the minimap arrow (add a pin or draw a line to convert)."
@@ -2035,29 +2112,60 @@ export default function App() {
                 <div className="mb-4">
                   <h2 className="disp text-lg font-bold mb-2">Putt read</h2>
                   {!puttSol && <div className="rounded-2xl border-2 p-4 text-sm" style={{ borderColor: T.line, background: "#fff" }}>Place ball and cup on the green to get a read.</div>}
-                  {puttSol && (
-                    <div className="rounded-2xl border-2 p-4" style={{ borderColor: puttSol.r.holed ? T.turf : T.sand, background: "#fff" }}>
-                      <div className="disp text-base font-bold">{puttSol.r.holed ? "Makeable line found" : "Best lag line"}</div>
-                      <div className="mt-2 grid grid-cols-3 gap-2 text-center">
-                        <div>
-                          <div className="mono text-xl font-semibold">{Math.abs(puttSol.lateral) < 0.15 ? "0" : puttSol.lateral < 0 ? `${(-puttSol.lateral).toFixed(1)}L` : `${puttSol.lateral.toFixed(1)}R`}</div>
-                          <div className="text-[10px] uppercase tracking-wide opacity-60">yd aim off cup</div>
+                  {/* the read leads with the aim (the user's rule: the aim is the
+                      easy part, the strength the hard one, so the read is the
+                      aim whose holing strengths span widest, src/putt.js
+                      solvePutt), then the strength as that range in bars, then
+                      what the game's own putter assist does with it on that
+                      line (puttAssist): with Shot Assist a stroke within 0.15
+                      of its holing power (0.25 inside 7 m) launches at it */}
+                  {puttSol && (() => {
+                    const latOf = (y) => (Math.abs(y) < 0.15 ? "0" : `${Math.abs(y).toFixed(1)}${y < 0 ? "L" : "R"}`);
+                    const aimText = Math.abs(puttSol.lateral) < 0.15 ? "straight at the cup" : `${Math.abs(puttSol.lateral).toFixed(1)} yd ${puttSol.lateral < 0 ? "left" : "right"} of the cup`;
+                    const A = puttSol.assist, b2 = (x) => x.toFixed(2), enableM = PUTT_ASSIST[assistOn ? "handeHigh" : "normal"].enableM;
+                    const strokes = A ? (A.snapBars.hi == null ? `${b2(A.snapBars.lo)} bars or harder` : `${b2(A.snapBars.lo)} to ${b2(A.snapBars.hi)} bars`) : "";
+                    const lands = A ? (A.close && A.lowBars != null && A.lowBars < A.targetBars ? `inside the holing range: ${b2(A.lowBars)} bars (the softest that drops, + 0.02) for a softer stroke, up to ${b2(A.targetBars)} (its middle) for a harder one` : `${b2(A.targetBars)} bars, the middle of the holing range${A.clipped ? " up to 4 bars, as far as the game's search goes" : ""}`) : "";
+                    return (
+                      <div className="rounded-2xl border-2 p-4" style={{ borderColor: puttSol.r.holed ? T.turf : T.sand, background: "#fff" }}>
+                        <div className="disp text-base font-bold">{puttSol.r.holed ? `Aim ${aimText}` : "Best lag line"}</div>
+                        <div className="text-[11px] opacity-70">{puttSol.r.holed ? "Set the aim on the gold ✛ and hold it still: the aim matters, the strength forgives." : `No line drops from here: it comes ${puttSol.r.best.toFixed(1)} yd from the cup at best.`}</div>
+                        <div className="mt-2 grid grid-cols-3 gap-2 text-center">
+                          <div>
+                            <div className="mono text-xl font-semibold">{latOf(puttSol.lateral)}</div>
+                            <div className="text-[10px] uppercase tracking-wide opacity-60">yd aim off cup</div>
+                            {puttSol.aimsYd && Math.abs(puttSol.aimsYd.hi - puttSol.aimsYd.lo) >= 0.05 && <div className="mono text-[10px] opacity-60">drops aimed {latOf(puttSol.aimsYd.lo)}–{latOf(puttSol.aimsYd.hi)}</div>}
+                          </div>
+                          <div>
+                            <div className="mono text-xl font-semibold">≈{puttSol.bars.toFixed(2)}</div>
+                            <div className="text-[10px] uppercase tracking-wide opacity-60">gauge bars</div>
+                            {puttSol.holeBars && <div className="mono text-[10px] opacity-60">drops {b2(puttSol.holeBars.lo)}–{b2(puttSol.holeBars.hi)}</div>}
+                          </div>
+                          <div>
+                            <div className="mono text-xl font-semibold">{puttSol.D.toFixed(1)}</div>
+                            <div className="text-[10px] uppercase tracking-wide opacity-60">yd to cup</div>
+                          </div>
                         </div>
-                        <div>
-                          <div className="mono text-xl font-semibold">≈{puttSol.bars.toFixed(1)}</div>
-                          <div className="text-[10px] uppercase tracking-wide opacity-60">gauge bars</div>
-                          {puttSol.holeBars && <div className="mono text-[10px] opacity-60">drops {puttSol.holeBars.lo.toFixed(2)}–{puttSol.holeBars.hi.toFixed(2)}</div>}
-                        </div>
-                        <div>
-                          <div className="mono text-xl font-semibold">{puttSol.D.toFixed(1)}</div>
-                          <div className="text-[10px] uppercase tracking-wide opacity-60">yd to cup</div>
+                        {A && (
+                          <div className="text-[11px] font-semibold mt-2" style={{ color: T.turfDeep }}>
+                            {assistOn
+                              ? `Shot Assist closes the gap: hold the aim until the game's guide line settles (it rolls its own ghost putts along your aim), then any stroke from ${strokes} launches at exactly its holing power on that line: ${lands}.`
+                              : `${online.on ? "Online (no Shot Assist)" : "Shot Assist off"}: the game's pull is narrower (within ${A.close ? "0.2 of its holing power inside 3 m" : "0.03 of its holing power, part way out to 0.5"}): a stroke from ${strokes} launches at it (${lands})${A.close ? "" : ", so the strength is mostly yours"}. (Well over par on a hole the game widens it as Shot Assist does.)`}
+                          </div>
+                        )}
+                        {!A && puttSol.r.holed && puttSol.D * 0.9144 > enableM && (
+                          <div className="text-[11px] mt-2 opacity-70">No putter assist from {puttSol.D.toFixed(0)} yd: the game's ghost search starts inside {enableM} m ({Math.floor(enableM / 0.9144)} yd), so the strength is all yours.</div>
+                        )}
+                        {/* the search tries strengths up to a full gauge only (swing-power.md 6.2), and without
+                            Shot Assist a stroke past it gets no pull (6.1): src/putt.js puttAssist gives none */}
+                        {!A && puttSol.r.holed && puttSol.power && puttSol.power.lo > 1 && puttSol.D * 0.9144 <= enableM && (
+                          <div className="text-[11px] mt-2 opacity-70">No putter assist on this line: it needs more than a full gauge (from {b2(puttSol.holeBars.lo)} bars), the game's ghost search only tries strengths up to 4 bars, and a stroke past 4 bars gets no pull, so the strength is all yours.</div>
+                        )}
+                        <div className="text-[11px] opacity-60 mt-2">
+                          The dashed line is the simulated roll (NSS's). {puttSol.holeBars && `Of the lines that drop, this aim forgives the strength most: from ${b2(puttSol.holeBars.lo)} to ${b2(puttSol.holeBars.hi)} bars it curls in, and the read is the middle of that. `}Power {puttSol.power.toFixed(2)} of a flat putt of this length · gauge ≈ {puttSol.bars.toFixed(2)} bars{puttSol.bars > 4 ? ", past a full gauge" : ""} (greenSpeed {greenSpeed.toFixed(1)} yd per full gauge{assistOn ? "; Shot Assist cuts a putt at 4 bars" : ""}).
                         </div>
                       </div>
-                      <div className="text-[11px] opacity-60 mt-2">
-                        Aim at the gold ✛ on the green view — the dashed line is the simulated roll. {!puttSol.r.holed && `Comes ${puttSol.r.best.toFixed(1)} yd from the cup at best.`}{puttSol.holeBars && `Of the lines that drop, this aim forgives the strength most: anything from ${puttSol.holeBars.lo.toFixed(2)} to ${puttSol.holeBars.hi.toFixed(2)} bars curls in, and the read is the middle of that. `} Power {puttSol.power.toFixed(2)} of a flat putt of this length · gauge ≈ {puttSol.bars.toFixed(1)} bars{puttSol.bars > 4 ? ", past a full gauge" : ""} (NSS's roll; greenSpeed {greenSpeed.toFixed(1)} yd per full gauge).
-                      </div>
-                    </div>
-                  )}
+                    );
+                  })()}
                 </div>
               )}
               {lie !== "green" && <>
@@ -2105,10 +2213,11 @@ export default function App() {
                           <div className="text-[10px] uppercase tracking-wide opacity-60">{Math.abs(r.aim) < 0.5 ? "aim straight at target" : `yd ${r.aim < 0 ? "left" : "right"} of target`}</div>
                         </div>
                         <div>
-                          <div className="mono text-xl font-semibold">{Math.round(r.frac * 100)}%</div>
+                          <div className="mono text-xl font-semibold">{r.cap < r.club.maxPower || r.pct == null ? Math.round(r.frac * 100) : r.pct}%</div>
                           <div className="text-[10px] uppercase tracking-wide opacity-60">{r.cap < r.club.maxPower ? `of ${r.cap}-bar cap` : "of full swing"}</div>
                         </div>
                       </div>
+                      <div className="mt-2 text-[11px] font-semibold" style={{ color: T.turfDeep }}>{swingLine(r)}</div>
                       <div className="mt-3 h-3 rounded-full relative" style={{ background: T.sky, cursor: "grab", touchAction: "none" }}
                         onMouseDown={(e) => dragBar(e, r)} onTouchStart={(e) => dragBar(e, r)}
                         onClick={(e) => e.stopPropagation()}
@@ -2122,7 +2231,9 @@ export default function App() {
                       <div className="mt-2 text-[11px] font-semibold" style={{ color: HAZARD_LIE[r.landsOn] ? T.flag : T.ink }}>{recRollLine(r, dist)}</div>
                       {r.red && (
                         <div className="mt-1 text-[10px] font-semibold" style={{ color: T.flag }}>
-                          ⚠ needs the full bar — past the cap the bar goes red and the ball curves to a RANDOM side (how far is not decoded for NSS){(lie === "rough" || lie === "bunker") && " (from rough or sand NSS lets the red add up to one bar of power)"}
+                          {assistOn
+                            ? `⚠ needs the full bar: with Shot Assist NSS holds it at the ${r.cap}-bar cap (no red, no curve)`
+                            : `⚠ needs the full bar — past the cap the bar goes red and the ball curves to a RANDOM side (how far is not decoded for NSS)${lie === "rough" || lie === "bunker" ? " (from rough or sand NSS lets the red add up to one bar of power)" : ""}`}
                         </div>
                       )}
                       {(lie === "rough" || lie === "bunker") && (
@@ -2404,7 +2515,7 @@ export default function App() {
                 </div>
                 <div>
                   <label className="text-xs font-bold">Wind (mph)</label>
-                  <input type="number" min="0" max="31" className={inputCls} style={inputStyle} value={form.windSpeed} onChange={(e) => setForm({ ...form, windSpeed: e.target.value })} />
+                  <input type="number" min="0" max="33" className={inputCls} style={inputStyle} value={form.windSpeed} onChange={(e) => setForm({ ...form, windSpeed: e.target.value })} />
                 </div>
                 <div>
                   <label className="text-xs font-bold">Ended (yd)</label>
@@ -2591,13 +2702,15 @@ export default function App() {
                   <div>5. Minimap dots = flat-terrain landing points. The solver doesn't assume flat ground: it flies each club over the hole's real terrain along your line (heights from the Switch game's own collision), so downhill carries longer and uphill shorter, and the bounce and roll follow the slope. Each rec card says how far above or below you the ball lands, the map marks its landing ◆ beside the stop ●, and under the distance you see the ball's height against the tee and the target's against you.</div>
                   <div>6. Wind arrow colour, measured on the captures: blue through 11 mph, lime from 13 to 22, pink from 24 (12 and 23 mph never came up). The dials here use the same colours, split at 12 and 24.</div>
                   <div>7. Trajectory: driver lowest → spoon → irons rising with number → wedge highest. Low clubs duck under branches; high clubs clear them and feel more wind. The solver flies every club that can stop at your distance past the course's trees with NSS's own ball, against each tree's own collision from the Switch game's files (its trunk and limbs, and its canopy: round crowns, cones for the dark pointed trees, fronds for the palms; your own tree markers count as a mid-size round tree). A trunk or limb stops the shot (the ball bounces back off the bark); a canopy only slows the ball (each tick inside it keeps 99.25 % of its speed, palm fronds 92 %), so a pass through a crown costs some 10–50 yd. A shot into a trunk, or through a canopy at a cost of a yard or more, gets a 🌲 TREE badge, ranks below the clear shots and names the best one that clears that tree: a lofted iron over the canopy, or a driver or spoon under the branches. Tap it to ring the tree on the map. The trees beyond the course count too (NSS collides with every tree it places). How much a canopy pass costs is the decode's rule, to be tuned once real shots through trees are logged.</div>
-                  <div>8. Wind comes in exactly 8 directions (N/NE/E/SE/S/SW/W/NW) at integer mph, observed 0–31. The dial snaps to the 8 when set "as on minimap".</div>
+                  <div>8. Wind comes in exactly 8 directions (N/NE/E/SE/S/SW/W/NW). NSS's wind speed is a whole 0–15 m/s, which the HUD shows as 0, 2, 4, 6, 9, 11, 13, 15, 17, 20, 22, 24, 26, 29, 31 or 33 mph: type the HUD's number (one it never shows reads as the nearest). The dial snaps to the 8 when set "as on minimap".</div>
                   <div>9. All distances here are STOP distances (carry + roll), and the roll is not a fixed share. In NSS's physics (decoded from the Switch game and checked tick by tick against flights recorded in an emulator) the carry grows in step with power but the roll comes from the landing: on fairway a driver rolls ~25 yd at 4 bars and ~28 at 1 bar; at full power it rolls ~22 on a green, ~17 in rough and ~4 in a bunker. Where a landing only just slows enough to start rolling, the ball takes one bounce more and stops shorter, so the stop can step down as the power rises; the solver works around those steps. The cards show no backspin range: NSS's spin comes from the swing (a short finish on a strong swing), which the app cannot know. The solver uses NSS's stop-vs-power curve for each club, scaled to your logged distances, flies NSS's ball itself over the slope and in the wind, and reads where each shot lands from the course map. The minimap dots show flat-ground carry.</div>
-                  <div>10. You can physically swing past a capped bar — it goes red and the ball curves to a RANDOM side (how far is not decoded for NSS). On tee and fairway the red adds no power; from rough or sand NSS lets the power run up to one bar past the cap. The solver never plans on it and flags the recs that need the full bar.</div>
+                  <div>10. Without Shot Assist you can physically swing past a capped bar — it goes red and the ball curves to a RANDOM side (how far is not decoded for NSS). On tee and fairway the red adds no power; from rough or sand NSS lets the power run up to one bar past the cap. With Shot Assist (local play only; the chip under the lies) NSS holds every swing at the cap and straight. The solver never plans on the red and flags the recs that need the full bar.</div>
                   <div>11. Putts follow NSS's roll on a green (decoded from the Switch game): a steady friction plus a drag that grows with speed, and a slope pulls the ball at about 0.115 yd/s² per degree (NSS's gravity on a green is 6 m/s², not 10), except that a slow ball (under about 0.55 yd/s) more than about a yard from the cup no longer feels the slope. The putter's small loft (1.14°) hops the ball for a few ticks before it rolls, and the read includes that. The slopes come from the course's collision (heights every half yard), or from your painted grid once you edit it (Holes → the green; "use mesh heights" goes back). The cup takes a ball that passes within ~0.21 yd of its centre at up to ~1.75 yd/s, a narrower window faster and none from ~5.4 yd/s; faster ones lip out. greenSpeed is how far a full-gauge putt rolls on a flat green (20.1 yd in NSS); log a few flat putts in the putting panel and it fits yours. Off the green the putter rolls slower: fairway noticeably, sand slowest. No source in 20 years reports any per-bar flight penalty from rough/sand — caps are the whole mechanic until your logs say otherwise.</div>
                   <div>12. Backspin strength scales with swing power ("the harder you swing, the stronger the backspin" — official). Capped lies therefore also cap max spin; that alone explains weaker spin from rough/sand.</div>
                   <div>13. Pins are NSS's own six cups per hole, read straight from the Switch game's course files and numbered 1–6 (the Specials' cups too, not WSR's spots of the same numbers). The game marks 16 of them difficult (red here: H5 5, H6 6, H7 5, H8 4, H9 3, H14 6, H16 1 and 5, H17 1, H18 4, H19 2 and 6, H20 3 and 5, H21 1 and 6); online a player under its rating threshold is never drawn one (read from the code, not yet seen). Local play tees off from the local tee unless you move it (Shot Position). Online Survival Golf tees off from the same two-tier platform on every hole, the high tier 3.5 m (3.8 yd) behind the low and 1.57 m (1.7 yd) up: NSS counts the players at each hole and seats 1–4 all on the high tier, 5 as 3 high + 2 low, 6 as 3 + 3, 7 as 4 + 3 and 8 as 4 + 4 (never one alone on the low tier), every group centred (an even group on the tier's four spots 2.3 m apart, an odd one between them), and deals the places afresh each hole. Your ball sits 0.9 m (1 yd) to your dominant hand's side of where you stand, on the tier's mat. Turn Online on under the map and say your tier, how many stand on each tier, your place from the left and your hand: the ball goes there, and the solver flies it from that height. The "yd to go" badge is the authority.</div>
                   <div>14. At 0 mph the wind still HAS a direction — read it off the flag cloth on the pin.</div>
+                  <div>15. The backswing sets the power (decoded from the Switch game's code, checked in an emulator's memory): a full swing launches at the gauge's white line, the top of your backswing (4 bars at about 150°, times the lie's cap in the rough and sand), whenever the downswing's own power comes within 0.2 bar of it; out to 2 bars away it is pulled part of the way, beyond that not at all. So each rec says "take it back to N bars, then a smooth full swing": a hard hit from a short backswing flies at its own power. The game reads its table at whole percents (0.04 bar), so a rec's bars are the middle of the percent it launches and its stop is that percent's, within a yard or two of your distance.</div>
+                  <div>16. The putter assist: while you address the ball on the green and hold the aim still, the game rolls its own ghost putts along your aim and finds the holing strengths there; at the stroke it pulls yours onto them. With Shot Assist a stroke within 0.15 of its holing power (0.6 bar; 0.25 inside 7 m) launches at exactly that power, out to 30 m; without it only within 0.03 (0.2 inside 3 m), out to 25 m (well over par on a hole it widens as Shot Assist does). None from the fringe, and a swing while the guide line is still moving gets none. So the putt card leads with the aim (whose holing range is widest) and gives the strokes the assist turns into a holing one. With Shot Assist a putt is cut at a full gauge (4 bars); without it the putter runs to 6.</div>
                 </div>
               </section>
             </div>

@@ -1,7 +1,7 @@
 {
  "version": 2,
  "src": "nss",
- "_note": "NSS's collision meshes for the live solver (tools/build-course3d.mjs; src/live3d-core.js buildCourse reads them): per hole hNN.bin (V/T/A the ground pack, TV/TT/TA the tree pack; vertices in NSS metres, mesh = unitsPerM * nss + O) and hNN.json; WSR's physics (tools/harness/lib/model3d.mjs) on NSS's course",
+ "_note": "NSS's collision meshes for the live solver (tools/build-course3d.mjs; src/live3d-core.js buildCourse reads them through tools/lib/nss3d.mjs, NSS's ball src/nsssim.js flies over them): per hole hNN.bin (V/T/A the ground pack, TV/TT/TA the tree pack, KV/KT/KA the actor trees' kind meshes; vertices in NSS metres, mesh = unitsPerM * nss + O) and hNN.json (meta.trees: each actor tree's kind and placement)",
  "unitsPerM": 10,
  "thick": 5,
  "cropM": 50,
@@ -14,6 +14,8 @@
   "18": 6,
   "24": 9,
   "25": 20,
+  "30": 22,
+  "31": 23,
   "32": 12,
   "34": 12,
   "36": 17,
@@ -36,348 +38,485 @@
   "18": "air OB",
   "19": "trunk",
   "20": "leaf",
-  "21": "palm leaf"
+  "21": "palm leaf",
+  "22": "cupside",
+  "23": "cup"
  },
  "holes": {
   "1": {
    "bin": "h01.bin",
    "json": "h01.json",
-   "bytes": 537763,
-   "sha1": "b6493c2e21cb8485a07b04aaea53a2a5f4e2e1db",
-   "tris": 15490,
+   "bytes": 595131,
+   "sha1": "2fd96c0eb90270f87c7f07805a6154055cdf423a",
+   "tris": 16090,
    "treeTris": 23567,
-   "verts": 9324,
+   "verts": 9571,
    "treeVerts": 12706,
-   "actorTrees": 10
+   "actorTrees": 10,
+   "actorKinds": 4,
+   "actorTris": 6957
   },
   "2": {
    "bin": "h02.bin",
    "json": "h02.json",
-   "bytes": 297088,
-   "sha1": "a635e1e936bb1ad31b36c9dba90c0bde5debd2a1",
-   "tris": 12619,
-   "treeTris": 8088,
-   "verts": 7981,
+   "bytes": 347963,
+   "sha1": "da40dff2d23238075ebff6213eaacd56deb04d62",
+   "tris": 13219,
+   "treeTris": 8728,
+   "verts": 8227,
    "treeVerts": 4697,
-   "actorTrees": 14
+   "actorTrees": 14,
+   "actorKinds": 4,
+   "actorTris": 7875
   },
   "3": {
    "bin": "h03.bin",
    "json": "h03.json",
-   "bytes": 415701,
-   "sha1": "e6c60518c74e26057c3a11172a64a3fade32efc9",
-   "tris": 15907,
-   "treeTris": 13257,
-   "verts": 9143,
+   "bytes": 471411,
+   "sha1": "f04b90a0f7132fecbb7b46e4b6bdb422b3d9dd9a",
+   "tris": 16507,
+   "treeTris": 14588,
+   "verts": 9389,
    "treeVerts": 8486,
-   "actorTrees": 22
+   "actorTrees": 22,
+   "actorKinds": 4,
+   "actorTris": 10936
   },
   "4": {
    "bin": "h04.bin",
    "json": "h04.json",
-   "bytes": 379534,
-   "sha1": "661ab9e4208e20183639eef1342791b8e0ada591",
-   "tris": 11588,
-   "treeTris": 15578,
-   "verts": 6930,
+   "bytes": 436235,
+   "sha1": "04a53d0ba8cda98e12eb2d4199ddd61a8823d705",
+   "tris": 12188,
+   "treeTris": 17050,
+   "verts": 7176,
    "treeVerts": 8851,
-   "actorTrees": 12
+   "actorTrees": 12,
+   "actorKinds": 4,
+   "actorTris": 7874
   },
   "5": {
    "bin": "h05.bin",
    "json": "h05.json",
-   "bytes": 645748,
-   "sha1": "b1a175b3300708cc49c7f8b31386555f932988de",
-   "tris": 19176,
-   "treeTris": 27196,
-   "verts": 10838,
+   "bytes": 711822,
+   "sha1": "25945897bda19e2465c7be25e6356ca79036a07d",
+   "tris": 19776,
+   "treeTris": 28636,
+   "verts": 11084,
    "treeVerts": 15924,
-   "actorTrees": 24
+   "actorTrees": 24,
+   "actorKinds": 5,
+   "actorTris": 13493
   },
   "6": {
    "bin": "h06.bin",
    "json": "h06.json",
-   "bytes": 651982,
-   "sha1": "4a8c1739e8308cfc6ec7151065d2713d0d9a39a8",
-   "tris": 8676,
+   "bytes": 693467,
+   "sha1": "74bdf782335539dac9fcbc6d7a04b03b9b10ff6d",
+   "tris": 9276,
    "treeTris": 39982,
-   "verts": 4544,
+   "verts": 4790,
    "treeVerts": 21404,
-   "actorTrees": 32
+   "actorTrees": 32,
+   "actorKinds": 4,
+   "actorTris": 11918
   },
   "7": {
    "bin": "h07.bin",
    "json": "h07.json",
-   "bytes": 983118,
-   "sha1": "28f979cdd97abc668e0352c75ece31ddf2514613",
-   "tris": 35064,
-   "treeTris": 35766,
-   "verts": 21347,
+   "bytes": 1078356,
+   "sha1": "e336f4dc4f2f01f900cf834e4f8cc9464fe77822",
+   "tris": 35664,
+   "treeTris": 36886,
+   "verts": 21597,
    "treeVerts": 19262,
-   "actorTrees": 29
+   "actorTrees": 29,
+   "actorKinds": 6,
+   "actorTris": 18713
   },
   "8": {
    "bin": "h08.bin",
    "json": "h08.json",
-   "bytes": 571764,
-   "sha1": "6a4127dc9ccc4c2826bbf15b04728a931fe1dcc7",
-   "tris": 16578,
-   "treeTris": 25228,
-   "verts": 9545,
+   "bytes": 614565,
+   "sha1": "91a671e8addfd35e8907c35901a50f5ed7973f94",
+   "tris": 17178,
+   "treeTris": 27628,
+   "verts": 9791,
    "treeVerts": 13715,
-   "actorTrees": 18
+   "actorTrees": 18,
+   "actorKinds": 3,
+   "actorTris": 9812
   },
   "9": {
    "bin": "h09.bin",
    "json": "h09.json",
-   "bytes": 590302,
-   "sha1": "8fafa3b7bc7377fbda939e54e4b21982e9ca25c0",
-   "tris": 31290,
+   "bytes": 627430,
+   "sha1": "7fc2d84f5b15044b577b2a8d939982c021d60df1",
+   "tris": 31890,
    "treeTris": 10610,
-   "verts": 18380,
+   "verts": 18626,
    "treeVerts": 6370,
-   "actorTrees": 31
+   "actorTrees": 31,
+   "actorKinds": 3,
+   "actorTris": 11483
   },
   "10": {
    "bin": "h10.bin",
    "json": "h10.json",
-   "bytes": 657967,
-   "sha1": "f08d27fcf52d0c157c0507d6bc8295a6cc58c001",
-   "tris": 9530,
+   "bytes": 715323,
+   "sha1": "ee89d6e6db422f58d28782d6ff2a3c3a32e05888",
+   "tris": 10130,
    "treeTris": 39199,
-   "verts": 5116,
+   "verts": 5362,
    "treeVerts": 21289,
-   "actorTrees": 32
+   "actorTrees": 32,
+   "actorKinds": 4,
+   "actorTris": 31112
   },
   "11": {
    "bin": "h11.bin",
    "json": "h11.json",
-   "bytes": 787784,
-   "sha1": "f054230bbf5542b14483c8d620e6007055e5675e",
-   "tris": 9074,
+   "bytes": 804351,
+   "sha1": "5cd276dc7b80b3033780042b234db6ddfe596e7a",
+   "tris": 9674,
    "treeTris": 49396,
-   "verts": 5391,
+   "verts": 5637,
    "treeVerts": 26150,
-   "actorTrees": 22
+   "actorTrees": 22,
+   "actorKinds": 2,
+   "actorTris": 7645
   },
   "12": {
    "bin": "h12.bin",
    "json": "h12.json",
-   "bytes": 1079820,
-   "sha1": "7a65c4be5b92eec6abc3d7b6878d381c9cbf82b8",
-   "tris": 14506,
+   "bytes": 1116781,
+   "sha1": "0bce87c98fb6095ff7f7f30d167f011afc077bd7",
+   "tris": 15106,
    "treeTris": 66252,
-   "verts": 8174,
+   "verts": 8420,
    "treeVerts": 34702,
-   "actorTrees": 9
+   "actorTrees": 9,
+   "actorKinds": 3,
+   "actorTris": 3998
   },
   "13": {
    "bin": "h13.bin",
    "json": "h13.json",
-   "bytes": 679558,
-   "sha1": "cd981515d863b79e5b50f04a2938bcff53f1c8bd",
-   "tris": 5031,
+   "bytes": 696127,
+   "sha1": "a5ab88d9499c71a73c0f19b5d4752a9be558b771",
+   "tris": 5631,
    "treeTris": 45958,
-   "verts": 3064,
+   "verts": 3310,
    "treeVerts": 23822,
-   "actorTrees": 17
+   "actorTrees": 17,
+   "actorKinds": 2,
+   "actorTris": 5819
   },
   "14": {
    "bin": "h14.bin",
    "json": "h14.json",
-   "bytes": 426516,
-   "sha1": "650edf8c5afd044eb71108006fbd78504a7545e5",
-   "tris": 18667,
-   "treeTris": 11600,
-   "verts": 11070,
+   "bytes": 484907,
+   "sha1": "0325c535624fe9b4b72a4ed7b3ac189b26648048",
+   "tris": 19267,
+   "treeTris": 11748,
+   "verts": 11316,
    "treeVerts": 6817,
-   "actorTrees": 37
+   "actorTrees": 37,
+   "actorKinds": 4,
+   "actorTris": 18892
   },
   "15": {
    "bin": "h15.bin",
    "json": "h15.json",
-   "bytes": 853226,
-   "sha1": "c5796813514933192cdb29d1f417b5e9219d71a9",
-   "tris": 27001,
+   "bytes": 915105,
+   "sha1": "c5849fd169962b23352d1fc7e7aaf28a73afb3eb",
+   "tris": 27601,
    "treeTris": 34598,
-   "verts": 16595,
+   "verts": 16841,
    "treeVerts": 18574,
-   "actorTrees": 27
+   "actorTrees": 27,
+   "actorKinds": 5,
+   "actorTris": 22429
   },
   "16": {
    "bin": "h16.bin",
    "json": "h16.json",
-   "bytes": 1387042,
-   "sha1": "ea86328184706c5bd8140a08fc4b233fa8078a11",
-   "tris": 6321,
-   "treeTris": 98642,
-   "verts": 3386,
+   "bytes": 1411545,
+   "sha1": "4b55a46e3cee9035f72671500b491e1be13421a3",
+   "tris": 6924,
+   "treeTris": 99122,
+   "verts": 3635,
    "treeVerts": 50972,
-   "actorTrees": 32
+   "actorTrees": 32,
+   "actorKinds": 3,
+   "actorTris": 10824
   },
   "17": {
    "bin": "h17.bin",
    "json": "h17.json",
-   "bytes": 613897,
-   "sha1": "83822b569f24db448b570e67ea5944687bd5ddd4",
-   "tris": 28548,
+   "bytes": 630467,
+   "sha1": "78ab6bd12e5f1b34b6db7719efe542a68dd11a76",
+   "tris": 29148,
    "treeTris": 14969,
-   "verts": 17740,
+   "verts": 17986,
    "treeVerts": 8033,
-   "actorTrees": 15
+   "actorTrees": 15,
+   "actorKinds": 2,
+   "actorTris": 5242
   },
   "18": {
    "bin": "h18.bin",
    "json": "h18.json",
-   "bytes": 1008912,
-   "sha1": "362a08e6633951a1bd426a34d60202289c494f9b",
-   "tris": 35432,
+   "bytes": 1025479,
+   "sha1": "e74f77de600cbde7bef4c5a1f12336f2bd3b866a",
+   "tris": 36032,
    "treeTris": 37096,
-   "verts": 22103,
+   "verts": 22349,
    "treeVerts": 19665,
-   "actorTrees": 19
+   "actorTrees": 19,
+   "actorKinds": 2,
+   "actorTris": 6514
   },
   "19": {
    "bin": "h19.bin",
    "json": "h19.json",
-   "bytes": 756038,
-   "sha1": "a4928b799cf74f0de9c122d99041903d5e261304",
-   "tris": 18679,
-   "treeTris": 35026,
-   "verts": 11523,
+   "bytes": 837685,
+   "sha1": "47551a1097710ab5dc613070ec8b1ad00282420f",
+   "tris": 19279,
+   "treeTris": 37850,
+   "verts": 11769,
    "treeVerts": 20152,
-   "actorTrees": 17
+   "actorTrees": 17,
+   "actorKinds": 5,
+   "actorTris": 10217
   },
   "20": {
    "bin": "h20.bin",
    "json": "h20.json",
-   "bytes": 395302,
-   "sha1": "c57e650cc54ff7fab4cf1bfd09154b5be34ffb1f",
-   "tris": 21897,
+   "bytes": 457181,
+   "sha1": "28fe712077c3086c6af47db47e489ad06416091c",
+   "tris": 22497,
    "treeTris": 6086,
-   "verts": 13143,
+   "verts": 13389,
    "treeVerts": 3475,
-   "actorTrees": 18
+   "actorTrees": 18,
+   "actorKinds": 5,
+   "actorTris": 13181
   },
   "21": {
    "bin": "h21.bin",
    "json": "h21.json",
-   "bytes": 501579,
-   "sha1": "3ecd287fc66f1b2780291abb5e50e712dd2b175e",
-   "tris": 14299,
-   "treeTris": 21543,
-   "verts": 8161,
+   "bytes": 575831,
+   "sha1": "573b77fdb22915be278cd50c9c02f36aef850cf2",
+   "tris": 14899,
+   "treeTris": 27790,
+   "verts": 8407,
    "treeVerts": 12729,
-   "actorTrees": 7
+   "actorTrees": 7,
+   "actorKinds": 4,
+   "actorTris": 3585
   }
  },
  "source": {
   "1": {
    "field": "04c6f095233660beafc82f74435a81b41c84233b",
    "covers": "96de466efe7120528cb057baadc350ea25b6f9ec",
-   "leaf": "1b3492e74305c76961df74e086e10e8c852c36c3"
+   "leaf": "1b3492e74305c76961df74e086e10e8c852c36c3",
+   "actors": "f7c9e86a17b4a89eada7be17e94e8ccfe161e49e"
   },
   "2": {
    "field": "e290fb1a99303f2cdb08c0ac2d364174be1658c3",
    "covers": "3f1bc53845b8eafafdf5b3fc5b4380da0eb82140",
-   "leaf": "15481a8103a905ac043bfc8caa0cb16848811e34"
+   "leaf": "15481a8103a905ac043bfc8caa0cb16848811e34",
+   "actors": "4378d79e20884452fec8233b86cf154836752e33"
   },
   "3": {
    "field": "8269d83ea0bbe09f9cd3e438437a5a42802398a5",
    "covers": "8e2c889d250d2cf97d4c7b06846f0cc64704d567",
    "leaf": "0b6ba056f124bfa841f5283d572723bba4f54699",
-   "water": "a5c55ff4452dea6bdd0725c0ee0ccd4d7b512472"
+   "water": "a5c55ff4452dea6bdd0725c0ee0ccd4d7b512472",
+   "actors": "a8c00e61e4af953e161579af44219166c6ac1889"
   },
   "4": {
    "field": "d87b70472e0dd55bfcfc6fececc24214addf0fdb",
    "covers": "1bd972999fe65bbc2df605b51575ec4a7d80fd39",
-   "leaf": "c6d63966b8bbd4d77e7d32d7ca75907e3d94a5de"
+   "leaf": "c6d63966b8bbd4d77e7d32d7ca75907e3d94a5de",
+   "actors": "0efc7c698235f738c9286b74d3494c23683bff52"
   },
   "5": {
    "field": "e78244d13489ca35d985ea9b8ea128762a187fff",
    "covers": "0534f3433417a94c852b6d7e8e27666e80ec4ae1",
-   "leaf": "2beed087b9dece2623cbbfb231dc3a1aa944181e"
+   "leaf": "2beed087b9dece2623cbbfb231dc3a1aa944181e",
+   "actors": "0d8d4d7552a5ef74b7c9c43a253a318f5c4c8fdf"
   },
   "6": {
    "field": "f5586ff04f8b8da5ce352600a9d578d69d23b40a",
    "covers": "729c5e61f2bbe9fd01eee2ea811f902d23763b05",
-   "leaf": "13339b2c33ab08bce1452a8f4bbf755dcef7858e"
+   "leaf": "13339b2c33ab08bce1452a8f4bbf755dcef7858e",
+   "actors": "0b722d597324d742e6754316103641072fe9ffa5"
   },
   "7": {
    "field": "286fbe26f494f5e6af44b6a9aec599766805803c",
    "covers": "c029a5946fd4a7127844056cac1bfb181f8ab54c",
-   "leaf": "17c6d82b069396ef277abc21a0c50380fe84a2d8"
+   "leaf": "17c6d82b069396ef277abc21a0c50380fe84a2d8",
+   "actors": "fd5f531d195c0ae24fa81450201e863dd2aad1f3"
   },
   "8": {
    "field": "b6b86cb839b131353b8f9ab220c40dc55bffac91",
    "covers": "685fb839e8ecf83a81f003f6d50407c828fd00eb",
-   "leaf": "9d76e521d1a08dd2419eac245237dcf8f0c6b584"
+   "leaf": "9d76e521d1a08dd2419eac245237dcf8f0c6b584",
+   "actors": "2050d342fb13366f608aab4e080fe0115c0a2f5e"
   },
   "9": {
    "field": "255f0caf642f83e5535b003a5186d8977f74044e",
    "covers": "5b02b285a806e257f14dbbec3b4e4cd2611862ea",
-   "leaf": "3543c8ccca1444eaad1d33d789fe88d990c61922"
+   "leaf": "3543c8ccca1444eaad1d33d789fe88d990c61922",
+   "actors": "ad9563028671c4300c783510320a99f0594991c2"
   },
   "10": {
    "field": "485c1b4814a30f273a71f6dda389e5ade7f9d69b",
    "covers": "983cddecb260219bf0f9bdac8d8027295258a456",
-   "leaf": "e0578f871bf9fd8703cdc3e681e69a9164399091"
+   "leaf": "e0578f871bf9fd8703cdc3e681e69a9164399091",
+   "actors": "ddd4a61da108ff68db8c9fd7c7987c72395057d5"
   },
   "11": {
    "field": "42d304c96035e3e677852596cea4ccc77b213434",
    "covers": "35e6b19a6c71ae0b7ee0047941c72769af684e61",
-   "leaf": "2618cbb7b952325ce414aabfda492f32b06cb87c"
+   "leaf": "2618cbb7b952325ce414aabfda492f32b06cb87c",
+   "actors": "e0f7c54d06992328d5b5064c78ee2d17ea7606ec"
   },
   "12": {
    "field": "4319516492849fdee2aa43f97082c1b0914449c0",
    "covers": "3aa8018b4bd34b6011a9493c704b7280350a71bc",
-   "leaf": "dd37e039cd7c662c73916d12ac3e55eb9c3840c4"
+   "leaf": "dd37e039cd7c662c73916d12ac3e55eb9c3840c4",
+   "actors": "256d24d0dba32b57be6d71b9dcf88b5dfef3a4c7"
   },
   "13": {
    "field": "94067b15d562b34b2c25facf9aa1209f29925f74",
    "covers": "99150fd24d82e6c91a4c01adfa3751eecaa4ff26",
-   "leaf": "40a9617261f94e288e2f6eccaa7451128619449e"
+   "leaf": "40a9617261f94e288e2f6eccaa7451128619449e",
+   "actors": "3ef2e1d7b78438b5c47855e1b52b330ecdaf9699"
   },
   "14": {
    "field": "c20c0a68505f6057b2a5f0abd5072e652336d4a3",
    "covers": "998f7e4dceeaa769d4860dee798dd0f4e802ae77",
-   "leaf": "9375cc93a03bc79a156c1185212f2f8e09ed2d9a"
+   "leaf": "9375cc93a03bc79a156c1185212f2f8e09ed2d9a",
+   "actors": "b33c7e8d191bc0afd0afa57bdc0cbec5bd8ae58c"
   },
   "15": {
    "field": "a22adcbfb81fac6e82215266dc764a9109a5dd5b",
    "covers": "c75beabb111a5278094d9b3cb59cddcf014a42ad",
-   "leaf": "9f987e227268b3fcc5c2c88aa773ab9e02e4fc3d"
+   "leaf": "9f987e227268b3fcc5c2c88aa773ab9e02e4fc3d",
+   "actors": "b215bc17d9dce85c24520cf9d2e83b2eb00ecdfd"
   },
   "16": {
    "field": "331d3400f37a3d00bbdb1f235785e6ee75d5f612",
    "covers": "8379916f73faa7cf813e7b514959a144a870c756",
-   "leaf": "b74fbfc59f463ba2051ce86e76d31b72c6fdf3c6"
+   "leaf": "b74fbfc59f463ba2051ce86e76d31b72c6fdf3c6",
+   "actors": "9581961ffe0abdfe4acf94e791cd3520fa77ccb0"
   },
   "17": {
    "field": "eb1ee9100e65e04e9d898006b77fa1d7d34e7be2",
    "covers": "1f3d1b334382df0bb63c27da9922fb4bcdf268a2",
-   "leaf": "454979276075f3391eaf49a6ee9525511d49cc37"
+   "leaf": "454979276075f3391eaf49a6ee9525511d49cc37",
+   "actors": "246313862ff2df8118c2e7f4435867531d9db980"
   },
   "18": {
    "field": "318730c9e57ca125aad56dc7919e98a26f6bb799",
    "covers": "b6690244845c052883f5806a639ed221e8f4d05a",
-   "leaf": "d49b30068212c4a626ca746da35c0596461f72f1"
+   "leaf": "d49b30068212c4a626ca746da35c0596461f72f1",
+   "actors": "4fdbbdb914bba52cb9acab0fc86ef485cbf58a94"
   },
   "19": {
    "field": "c6eee0aea2a56cc0622503e953d54d67cd256f78",
    "covers": "2868a62c51692260dd40e38f877e05bacd56918b",
-   "leaf": "487c375fc0972e8ca4b4c3b9f5bbc3565de3b0ba"
+   "leaf": "487c375fc0972e8ca4b4c3b9f5bbc3565de3b0ba",
+   "actors": "07a616ce1c5f0f88c4cc796e66e72ae6f7af0215"
   },
   "20": {
    "field": "ee5409475ea95da3bd987fcf968f3936c5088bde",
    "covers": "1fc9f7f871cca3a4ba4c48b3cadbd568055500bf",
-   "leaf": "c35493e9bac6e8d79512143fd321796b104ff84e"
+   "leaf": "c35493e9bac6e8d79512143fd321796b104ff84e",
+   "actors": "b22116dc8f4142c5669f8149d14bb4a6fe3eb66a"
   },
   "21": {
    "field": "36d2ddc684a3bb63965917e05f0552ac1c674249",
    "covers": "7abea5cc6750aed91e0a06f893600fc5a90d0eae",
-   "leaf": "01533dff2a2efce909fad80c9f934293397cbfb4"
+   "leaf": "01533dff2a2efce909fad80c9f934293397cbfb4",
+   "actors": "b6e48b19a2b5eb978a1205289194f66f4f84a123"
   },
   "trees": "de3ca134829919dc4701f661e6ce5e8c3ac8dabe"
+ },
+ "kinds": {
+  "ConiferTreeA": {
+   "shape": "Glf_ConiferTreeAMesh_Col",
+   "nv": 989,
+   "nt": 1218,
+   "sha1": "d6c97127569f2e0be4a8c2224330d7a9d66566af",
+   "packSha1": "ffc50c240ba547ba5f6c44d8340a0d754c6cb311"
+  },
+  "ConiferTreeB": {
+   "shape": "Glf_ConiferTreeBMesh_Col",
+   "nv": 989,
+   "nt": 1218,
+   "sha1": "d6c97127569f2e0be4a8c2224330d7a9d66566af",
+   "packSha1": "3a9c67eb572c6a3d2a8ce624e070c1fbf459223e"
+  },
+  "ConiferTreeC": {
+   "shape": "Glf_ConiferTreeCMesh_Col",
+   "nv": 993,
+   "nt": 1235,
+   "sha1": "b43fd1ae0d3f2b4480df2fa01ac5fa9604a17cf1",
+   "packSha1": "424084672ead421501a6c7155a7694aca3f0086d"
+  },
+  "ConiferTreeD": {
+   "shape": "Glf_ConiferTreeDMesh_Col",
+   "nv": 993,
+   "nt": 1235,
+   "sha1": "b43fd1ae0d3f2b4480df2fa01ac5fa9604a17cf1",
+   "packSha1": "ea64abdd24ce426d6f9b03829af5c52ff18112f3"
+  },
+  "HardWoodA": {
+   "shape": "Glf_Mesh_HardWoodA_Col",
+   "nv": 174,
+   "nt": 318,
+   "sha1": "8975002dbe4aa1285e3bdaa7c3709896c6d7ee34",
+   "packSha1": "a47826681d8b7cba0ba9338e65b423be56ca7f30"
+  },
+  "HardWoodB": {
+   "shape": "Glf_Mesh_HardWoodB_Col",
+   "nv": 205,
+   "nt": 377,
+   "sha1": "2cafcc14e527288495e5c305987565dd1453b179",
+   "packSha1": "1598801102ce587c160ec7f7a0dc194184a2f532"
+  },
+  "HardWoodC": {
+   "shape": "Glf_Mesh_HardWoodC_Col",
+   "nv": 182,
+   "nt": 334,
+   "sha1": "d68c8fc9c6dc9b41088d60b761a4ac6bdd6775e5",
+   "packSha1": "c153267971e89bd03d537bfcf155700398722cf7"
+  },
+  "HardWoodD": {
+   "shape": "Glf_Mesh_HardWoodD_Col",
+   "nv": 182,
+   "nt": 334,
+   "sha1": "e9e4f4bf5c24f304036a8a0664af7f25820e6f72",
+   "packSha1": "5a63af89feb28ac8d192e20c0e3389cc08b8a24a"
+  },
+  "PalmTreeA": {
+   "shape": "Glf_Mesh_PalmTreeA_Col",
+   "nv": 351,
+   "nt": 746,
+   "sha1": "98111754b3e01e98a51a14a5fca6183c9c12f0d1",
+   "packSha1": "76b3ed791cdc9a21564d8d49e0a1361b9bc540a2"
+  },
+  "PalmTreeB": {
+   "shape": "Glf_Mesh_PalmTreeB_Col",
+   "nv": 351,
+   "nt": 746,
+   "sha1": "a56edc27752ecfe90a0b463f95f175449a89f731",
+   "packSha1": "af60730bb929bedcd0cfe6cb912b2fe3c7a03e61"
+  }
  }
 }

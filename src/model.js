@@ -19,7 +19,10 @@
 // a landing's normal speed crosses the roll switch (4 m/s) the ball takes a
 // bounce more and the stop steps DOWN as the power rises (the driver on
 // fairway 196.8 yd at 67 %, 186.7 at 68 %), so the solver works on the curve's
-// rising pieces.
+// rising pieces. The game reads the table at (int)(100 power) and flies that
+// percent (src/nsssim.js pctOf), so every power within one percent (0.04 bar)
+// launches the same ball: the solver picks whole percents and reports each at
+// the middle of its window (pctOfBars, barsOfPct).
 // Wind and terrain are flown: with the wind on the dial or the course's
 // heights along the line the solver flies NSS's ball itself (src/nsssim.js run
 // over the line's profile, the wind in the air as NSS's own law), from the
@@ -30,7 +33,7 @@
 // costs about 0.5 ms (float32 ticks at 240 Hz), so a 7-club solve over the
 // terrain takes 14 ms mean in Node, 18 in a wind (tools/test-solver.mjs h8).
 import { NSS_SHAPE, SHAPE_Q } from "./nssShape.js";
-import { run as nssRun, PHYSICS, M_PER_YD } from "./nsssim.js";
+import { run as nssRun, PHYSICS, M_PER_YD, windSpeedFromHud, pctOf } from "./nsssim.js";
 import { treeCheck, TREE_SHAPES } from "./trees.js";
 import { CUP_R, V_CAP, puttField, simPutt, solvePutt } from "./putt.js";
 
@@ -101,24 +104,33 @@ const landingSurface = (lie) => (LANDED.includes(lie) ? lie : "fairway");
 // a landing surface -> the NSS ball's attribute (src/nsssim.js ATTR)
 const ATTR_OF = { fairway: 1, rough: 2, bunker: 3, green: 6, fringe: 7 };
 
-// NSS's shape at launch power q (gauge bars / 4): linear between the table's
-// whole percents (SHAPE_Q, 0.01 apart), clamped to q in [0.01, 1]; col "S" =
-// stop on `surface`, "C" = carry, both in units of the full-power fairway stop.
-// The (1 - f, f) weights return a knot's value exactly, so S(1, fairway) = 1
-// and a full-power fairway stop is 4a to the last bit. Between two knots the
-// game flies the lower one (it reads the table at (int)(100 power)): up to one
-// step under this, 0.04 bar (the driver's 2.3 yd at full power, the wedge's
-// 0.7). A club the table lacks gets the linear model (S = C = q). `spin` is
-// kept for the callers and ignored (no spin columns: the swing's backspin is
-// not decoded).
+// The whole percent the game launches a power of `bars` at: (int)(100 power)
+// in float32 (src/nsssim.js pctOf, the launch at 0xe10b08: every power from k
+// to k + 1 % flies GolfShotVelTable's k % speed), within the clubs' 1..100 %
+// (off the putter the power cannot pass 1.0).
+const pctOfBars = (bars) => Math.min(SHAPE_Q.length, pctOf(bars / 4));
+// A whole percent as a rec reports it, bars: the middle of its window (a swing
+// anywhere in it launches the same ball, so the middle forgives 0.02 bar
+// either way), the cap itself at the cap's own percent (the power cannot pass
+// the cap: PowerMax 1 on tee and fairway, Shot Assist's cut in the rough and
+// sand, and the solver treats caps as hard).
+const barsOfPct = (k, cap) => (k >= pctOfBars(cap) ? cap : (4 * (k + 0.5)) / 100);
+
+// NSS's shape at launch power q (gauge bars / 4) as the game flies it: the
+// table's entry at the percent the game reads, (int)(100 q) (pctOfBars),
+// clamped to 1..100 %; col "S" = stop on `surface`, "C" = carry, both in units
+// of the full-power fairway stop, so S(1, fairway) = 1 and a full-power
+// fairway stop is 4a to the last bit. Between two percents the curve steps (a
+// percent is 0.04 bar: 2.6 yd of the driver's stop at the median, 0.7 of the
+// wedge's; up to 5.0 for the driver at 10 %), so the solver works on whole
+// percents. A club the table lacks gets the linear model (S = C = q). `spin`
+// is kept for the callers and ignored (no spin columns: the swing's backspin
+// is not decoded).
 function shapeAt(clubId, q, col, surface = "fairway", spin = 0) {
   const t = NSS_SHAPE[clubId];
-  const n = SHAPE_Q.length, x = Math.min(SHAPE_Q[n - 1], Math.max(SHAPE_Q[0], q));
-  if (!t) return x;
+  if (!t) return Math.min(SHAPE_Q[SHAPE_Q.length - 1], Math.max(SHAPE_Q[0], q));
   const row = col === "C" ? t.C : t.S[landingSurface(surface)];
-  const i = Math.min(n - 2, Math.max(0, Math.floor((x - SHAPE_Q[0]) / (SHAPE_Q[1] - SHAPE_Q[0]) + 1e-9)));
-  const f = Math.max(0, Math.min(1, (x - SHAPE_Q[i]) / (SHAPE_Q[i + 1] - SHAPE_Q[i])));
-  return row[i] * (1 - f) + row[i + 1] * f;
+  return row[pctOfBars(4 * q) - 1];
 }
 
 // Where a shot of `bars` stops and where it first lands, yd, on level ground
@@ -131,29 +143,6 @@ function carryOf(club, bars, wAlong = 0) {
   return 4 * club.a * (1 + club.h * wAlong) * shapeAt(club.id, bars / 4, "C");
 }
 
-// The power (bars, within [lo, hi]) whose stop on `surface` is `dist`, on a
-// rising piece of the curve: bisection to 0.005 bar, then linear inside the
-// last bracket, cut at the knot it holds if any (the curve is linear between
-// knots 0.04 bar apart, so that is exact). { p, ok }: ok false when dist
-// is out of reach (p then is the end it fell beyond).
-function powerFor(club, dist, surface, wAlong, lo, hi) {
-  const stop = (p) => stopOf(club, p, surface, 0, wAlong);
-  let sl = stop(lo), sh = stop(hi);
-  if (sl > dist) return { p: lo, ok: false };
-  if (sh < dist) return { p: hi, ok: false };
-  while (hi - lo > 0.005) {
-    const mid = (lo + hi) / 2, sm = stop(mid);
-    if (sm < dist) { lo = mid; sl = sm; } else { hi = mid; sh = sm; }
-  }
-  // a knot inside the last bracket: narrow to its side, where the curve is linear
-  const kb = Math.ceil(lo / KNOT_BARS - 1e-9) * KNOT_BARS;
-  if (kb > lo && kb < hi) { const sk = stop(kb); if (sk < dist) { lo = kb; sl = sk; } else { hi = kb; sh = sk; } }
-  const f = sh > sl ? (dist - sl) / (sh - sl) : 1;
-  return { p: lo * (1 - f) + hi * f, ok: true };
-}
-// the table's knots in bars (a whole percent: 0.04 bar)
-const KNOT_BARS = 4 * (SHAPE_Q[1] - SHAPE_Q[0]);
-
 // The stop a shot of `bars` really has on level ground in calm air: the stop
 // curve of the surface its own carry lands on (surfaceAt read at
 // carryOf(bars), a missing or other read rolling as fairway).
@@ -162,75 +151,51 @@ function landedStop(club, bars, wAlong = 0, surfaceAt = null) {
   return stopOf(club, bars, landingSurface(lie), 0, wAlong);
 }
 
-// The power scan's step and the surface-edge tolerance, bars. A 0.02-bar step
-// (half a percent; every other sample is one of the table's knots, so the
-// curve is linear between two samples on one surface) moves a seed club's
-// carry 0.3-1.2 yd, under the terrain's cells (one sample per 2 map px, 1.8-5
-// yd), so a strip of another surface shows in a sample unless the line only
-// clips a cell's corner; a solution whose carry lands on such a sliver is
-// caught by the read at its own carry (solve).
-const SCAN_STEP = 0.02, EDGE_TOL = 0.001;
-
-// f(p) = landedStop over [MIN_BARS, cap], cut into runs on which it rises on
-// one landing surface: sampled every SCAN_STEP, each change of surface between
-// two samples bisected to EDGE_TOL, and each piece between two samples (one
-// surface, linear there) kept when it rises, dropped where it falls (NSS's
-// step down where a landing takes one bounce more: the table's knots either
-// side of it are samples, so the fall is a piece of its own). Within a run f
-// rises; between runs it jumps (up onto a green, down into a bunker or at a
-// bounce more), so a distance has a solution on a run whose ends straddle it
-// and none inside a jump. -> { runs: [{ a, b, s }] (power from a to b lands on
-// s), split } (split cuts any [a, b] whose ends read sa and sb the same way).
-function landingRuns(club, cap, wAlong, readLie) {
-  const sOf = (p) => landingSurface(readLie(carryOf(club, p, wAlong)));
-  const fOf = (p, s) => stopOf(club, p, s, 0, wAlong);
-  const split = (a, sa, b, sb) => {
-    const parts = [];
-    for (let guard = 0; sa !== sb && guard < 16; guard++) {
-      let lo = a, hi = b;
-      while (hi - lo > EDGE_TOL) { const mid = (lo + hi) / 2; if (sOf(mid) === sa) lo = mid; else hi = mid; }
-      parts.push({ a, b: lo, s: sa });
-      a = hi; sa = sOf(hi);
-    }
-    parts.push({ a, b, s: sa });
-    return parts;
-  };
-  const n = Math.max(1, Math.round((cap - MIN_BARS) / SCAN_STEP));
-  const at = (k) => (k === n ? cap : MIN_BARS + k * SCAN_STEP);
+// f(k) = landedStop at each whole percent k from the solver's floor
+// (MIN_BARS) to the cap, each read where its own carry lands: { k, p (bars,
+// barsOfPct), carry, landsOn (the read), s (the landing surface), stop }. The
+// game flies nothing between two percents, so a strip of another surface no
+// percent's carry lands on is not there for any swing (a seed club's carry
+// moves 0.6-2.4 yd a percent, under the terrain's cells of 1.8-5 yd).
+function percentRows(club, cap, wAlong, readLie) {
+  const rows = [], k1 = pctOfBars(cap);
+  for (let k = pctOfBars(MIN_BARS); k <= k1; k++) {
+    const p = barsOfPct(k, cap), carry = carryOf(club, p, wAlong), landsOn = readLie(carry), s = landingSurface(landsOn);
+    rows.push({ k, p, carry, landsOn, s, stop: stopOf(club, p, s, 0, wAlong) });
+  }
+  return rows;
+}
+// f cut into runs: consecutive percents landing on one surface whose stop does
+// not fall. A change of surface starts a new run (up onto a green, down into a
+// bunker), and so does NSS's step down (a landing that takes one bounce more).
+// Within a run f rises a percent's step at a time; between runs it jumps, so a
+// distance has a solution on a run whose stops reach it (from its first
+// percent's less STOP_TOL to its last's plus STOP_TOL: the run's percent that
+// stops nearest it, the lower on a tie) and none inside a jump.
+function runsOf(rows) {
   const runs = [];
   let cur = null;
-  const add = (q) => {
-    if (!(q.b > q.a) || fOf(q.b, q.s) < fOf(q.a, q.s)) { if (cur) runs.push(cur); cur = null; return; }
-    if (cur && cur.s === q.s && cur.b === q.a) cur.b = q.b;
-    else { if (cur) runs.push(cur); cur = { a: q.a, b: q.b, s: q.s }; }
-  };
-  let prev = at(0), sp = sOf(prev);
-  if (n === 0 || cap <= MIN_BARS) return { runs: [{ a: MIN_BARS, b: cap, s: sp }], split };
-  for (let k = 1; k <= n; k++) {
-    const p = at(k), s = sOf(p);
-    for (const q of split(prev, sp, p, s)) add(q);
-    prev = p; sp = s;
+  for (const r of rows) {
+    if (cur && r.s === cur[0].s && r.stop >= cur[cur.length - 1].stop) cur.push(r);
+    else runs.push((cur = [r]));
   }
-  if (cur) runs.push(cur);
-  return { runs, split };
+  return runs;
+}
+function runSolution(run, dist) {
+  if (!(run[0].stop - STOP_TOL <= dist && dist <= run[run.length - 1].stop + STOP_TOL)) return null;
+  return run.reduce((m, r) => (Math.abs(r.stop - dist) < Math.abs(m.stop - dist) ? r : m));
 }
 
 /* ---------------- the wind ---------------- */
 // The dial's wind (mph, its direction relative to the shot: 0 = tail, 90 =
 // toward the right) as NSS's wind object: s m/s, the air moving along the
 // heading's frame. NSS draws s as a whole number 0..15 (WindVelMax) and the
-// HUD shows floor(2.25 s) mph on every recorded pair (1 -> 2, 3 -> 6, 4 -> 9,
-// 5 -> 11, 6 -> 13, 10 -> 22; flights.md 5.9: the rounding is not decoded, so
-// this is approximate): a dial value that some whole s shows is read as that
-// s, any other as mph / 2.25. NSS's wind acts in the air only, linear in s,
-// 0.33 (W across + 0.6 W along) m/s^2 per unit with the height factor 0.2 to
-// 3 m above the launch rising to 1 at 30 m.
-const HUD_K = PHYSICS.wind.hudMphPerS, WIND_MAX = PHYSICS.air.windVelMax;
-function windS(mph) {
-  if (!(mph > 0)) return 0;
-  const s = Math.ceil(mph / HUD_K - 1e-9);
-  return Math.min(WIND_MAX, Math.floor(HUD_K * s + 1e-9) === Math.round(mph) && Number.isInteger(mph) ? s : mph / HUD_K);
-}
+// HUD shows nsssim's HUD_MPH[s] (0 2 4 6 9 11 13 15 17 20 22 24 26 29 31 33:
+// RAM's s against the HUD's text, tools/nss-physics.json wind): a dial value is
+// read as the whole s whose HUD value is nearest (windSpeedFromHud). NSS's wind
+// acts in the air only, linear in s, 0.33 (W across + 0.6 W along) m/s^2 per
+// unit with the height factor 0.2 to 3 m above the launch rising to 1 at 30 m.
+function windS(mph) { return windSpeedFromHud(mph); }
 // -> { speed (mph), deg, along, cross (mph, as the fit's wAlong / wCross), s,
 // vec: the air's velocity { x, z } in the flight's frame (heading 0 = -z, +x
 // to the right) or null in calm }
@@ -332,16 +297,14 @@ function simProfile(prof, k = 1) {
   };
 }
 
-// The launch: the club's table speed at q (linear between its whole percents,
-// as shapeAt), along heading 0 pitched up by the club's loft (flights.md 4).
-// The ball's centre sits 0.05 m above the ground at rest (P1's contact radius),
-// 0.1 on a tee.
+// The launch: the club's table speed at the whole percent the game reads,
+// (int)(100 q) (src/nsssim.js pctOf, as shapeAt), along heading 0 pitched up
+// by the club's loft (flights.md 4). The ball's centre sits 0.05 m above the
+// ground at rest (P1's contact radius), 0.1 on a tee.
 const LAUNCH = {};
 for (const [id, t] of Object.entries(NSS_SHAPE)) LAUNCH[id] = { club: t.club, speeds: PHYSICS.launchTable[t.club], loft: t.loftDeg * DEG };
 function launchV0(id, q) {
-  const L = LAUNCH[id], tb = L.speeds, x = Math.max(1, Math.min(tb.length, q * 100));
-  const i = Math.min(tb.length - 1, Math.floor(x)), f = x - i;
-  const s = i >= tb.length ? tb[tb.length - 1] : tb[i - 1] + (tb[i] - tb[i - 1]) * f;
+  const L = LAUNCH[id], tb = L.speeds, s = tb[Math.min(tb.length, pctOf(q)) - 1];
   return [0, s * Math.sin(L.loft), -s * Math.cos(L.loft)];
 }
 const startHeight = (lie) => PHYSICS.ball.contactRadiusM + (lie === "tee" ? PHYSICS.ball.teeHeightM : 0);
@@ -371,40 +334,52 @@ function flyer(cl, wind, prof, ballLift, lie) {
   };
 }
 
-// The power whose flight stops at dist: from p0 (the table's solution) a
-// Newton step on the table's slope there, then secant steps through the last
-// two flights, at most REFINE_SIMS flights after p0's, inside the bracket the
-// flights have narrowed from [MIN_BARS, cap] (a step leaving it bisects it;
-// the cap's flight top is known to reach), until a flight stops within
-// AIM_TOL yd of dist. The closest flight (the cap's among them) is the answer,
-// exact within STOP_TOL yd, else flagged approx: a distance inside a jump of
-// the stop (a bounce more, a dip that catches the roll, a bank it rolls back
-// down, the carry crossing onto a green) has none closer.
-// -> the closest flight { p, carry, stop, lateral, e = stop - dist }.
-const STOP_TOL = 0.5, AIM_TOL = 0.05, REFINE_SIMS = 6;
-function refine(fly, top, cap, dist, p0, slope0) {
-  const pts = [];
-  let lo = MIN_BARS, loKnown = false, hi = cap;
-  const flyAt = (p) => {
-    const o = p === cap ? top : fly(p), e = o.stop - dist;
-    pts.push({ ...o, e });
-    if (e < 0) { if (p >= lo) { lo = p; loKnown = true; } } else if (p <= hi) hi = p;
-    return e;
+// The percent whose flight stops nearest dist: from k0 (the table's
+// solution) a step on the table's yd per percent there, then secant steps
+// through the last two flights, each rounded to a whole percent (the game
+// flies nothing between), at most REFINE_SIMS flights after k0's, inside the
+// bracket the flights have narrowed from the floor's percent to the cap's (a
+// step leaving it bisects it; the cap's flight top is known to reach), until
+// a flight stops within AIM_TOL yd of dist or two neighbouring percents
+// straddle it (none stops between them). The closest flight (the cap's among
+// them) is the answer, exact when it stops within STOP_TOL yd of dist or it
+// and its neighbour straddle dist a regular step apart (landing on one
+// surface, at most JUMP_YD apart: the table's largest step is 5.0 yd, the
+// driver at 10 %; a flight's s is the surface its carry reads), else flagged
+// approx: a distance inside a jump of the stop (a bounce more, a dip that
+// catches the roll, a bank it rolls back down, the carry crossing onto a
+// green) has none closer.
+// -> the closest flight { k, p, carry, stop, lateral, e = stop - dist, exact,
+// short (some flight stopped short of dist) }.
+const STOP_TOL = 0.5, AIM_TOL = 0.05, REFINE_SIMS = 6, JUMP_YD = 6;
+function refine(flyK, top, kLo, kHi, dist, k0, slope0) {
+  const pts = new Map();
+  let lo = kLo - 1, loKnown = false, hi = kHi, last = null, prev = null;
+  const flyAt = (k) => {
+    const x = { ...(k === kHi ? top : flyK(k)), k };
+    x.e = x.stop - dist;
+    pts.set(k, x);
+    if (x.e < 0) { if (k > lo) { lo = k; loKnown = true; } } else if (k < hi) hi = k;
+    prev = last; last = x;
+    return x.e;
   };
-  let e = flyAt(p0);
-  for (let it = 0; it < REFINE_SIMS && Math.abs(e) > AIM_TOL; it++) {
-    const b = pts[pts.length - 1], a = pts[pts.length - 2];
-    let p = a && b.e !== a.e ? b.p - (b.e * (b.p - a.p)) / (b.e - a.e) : b.p - b.e / slope0;
-    if (!(p > lo && p < hi)) {
-      // below the floor while the floor is unflown: fly the floor itself
-      if (!loKnown && !(p > lo) && !pts.some((x) => x.p === lo)) p = lo;
-      else p = (lo + hi) / 2;
-    }
-    if (pts.some((x) => x.p === p)) break;
-    e = flyAt(p);
+  let e = flyAt(k0);
+  for (let it = 0; it < REFINE_SIMS && Math.abs(e) > AIM_TOL && hi - lo > 1; it++) {
+    let k = Math.round(prev && last.e !== prev.e ? last.k - (last.e * (last.k - prev.k)) / (last.e - prev.e) : last.k - last.e / slope0);
+    // a step under half a percent: the neighbour toward dist
+    if (k === last.k) k += last.e > 0 ? -1 : 1;
+    // below the floor while the floor is unflown: fly the floor itself; else
+    // a step leaving the bracket bisects it
+    if (!(k > lo && k < hi)) k = !loKnown && k <= lo && !pts.has(kLo) ? kLo : Math.round((lo + hi) / 2);
+    if (pts.has(k)) break;
+    e = flyAt(k);
   }
-  if (!pts.some((x) => x.p === cap)) pts.push({ ...top, e: top.stop - dist });
-  return pts.reduce((m, x) => (Math.abs(x.e) < Math.abs(m.e) || (Math.abs(x.e) === Math.abs(m.e) && x.p < m.p) ? x : m));
+  if (!pts.has(kHi)) pts.set(kHi, { ...top, k: kHi, e: top.stop - dist });
+  let best = null;
+  for (const x of pts.values()) if (!best || Math.abs(x.e) < Math.abs(best.e) || (Math.abs(x.e) === Math.abs(best.e) && x.k < best.k)) best = x;
+  const nb = pts.get(best.e < 0 ? best.k + 1 : best.k - 1);
+  const straddled = !!nb && (best.e < 0 ? nb.e >= 0 : nb.e < 0) && nb.s === best.s && Math.abs(nb.stop - best.stop) <= JUMP_YD;
+  return { ...best, exact: Math.abs(best.e) <= STOP_TOL || straddled, short: loKnown };
 }
 // an approximate rec ranks after the exact ones of a like power fraction
 const APPROX_PENALTY = 1;
@@ -594,13 +569,16 @@ function elevFlight({ club, power, lie = "fairway", windSpeed = 0, windDeg = 0, 
 // ground, yd (0; the online platform's tiers); ctx.trees = the trees on
 // the line's frame (src/trees.js treesAlong), which turns on the tree check
 // ("trees" above).
-// A rec: { club, power, drift, aim, frac, cap, score, calibrated, blocked,
-// carry, roll, surface, landsOn, rollSpin (null: no spin range), red, elev,
-// tree }, tree null unless the flight hits one (checkTrees); a flown rec (the
-// wind on the dial, or heights along the line) also has stop (= carry + roll,
-// within STOP_TOL of dist unless approx) and approx, and with heights (elev
-// true) dh / dhStop = the ground's height at the carry / the stop minus the
-// ball's (yd, + uphill). drift = the flight's sideways drift at the stop (yd,
+// A rec: { club, power, pct, drift, aim, frac, cap, score, calibrated,
+// blocked, carry, roll, surface, landsOn, rollSpin (null: no spin range), red,
+// elev, tree }: pct the whole percent the game launches (power, bars, the
+// middle of its window, barsOfPct; carry + roll is that percent's stop, the
+// one nearest dist: within half a percent's step or STOP_TOL of it), tree
+// null unless the flight hits one (checkTrees); a flown rec (the wind on the
+// dial, or heights along the line) also has stop (= carry + roll, as near dist
+// as a percent gets unless approx) and approx, and with heights (elev true) dh
+// / dhStop = the ground's height at the carry / the stop minus the ball's
+// (yd, + uphill). drift = the flight's sideways drift at the stop (yd,
 // + right; 0 in calm) plus the fitted residual c x wCross x bars; aim = -drift.
 function solve(clubs, inputs, blockedRules, ctx = {}) {
   const { dist, windSpeed, relWindDeg, lie, hole, stroke } = inputs;
@@ -632,71 +610,63 @@ function solve(clubs, inputs, blockedRules, ctx = {}) {
     const denom = cl.a * (1 + cl.h * wAlong);
     if (denom <= 0 || cap < MIN_BARS) return;
     const fly = prof && NSS_SHAPE[cl.id] ? flyer(cl, wind, prof, ballLift, lie) : null;
-    // The landing surface by a power scan (landingRuns): every power from the
-    // floor to the cap with the surface its own carry lands on, on the rising
-    // pieces of the curve. maxReach is the top of f, at the end of a run (f
-    // need not rise overall: a bunker under a long carry, or a bounce more,
-    // stops it short of a shorter one's roll); flown it is the cap's flight
-    // instead (below).
-    const { runs, split } = landingRuns(cl, cap, wAlong, readLie);
-    const f = (p, s) => stopOf(cl, p, s, 0, wAlong);
-    if (!fly) for (const r of runs) reach(f(r.b, r.s), cl);
-    // The solutions: each run whose ends straddle dist, bisected on its surface
-    // and kept when the read at its own carry agrees. A strip narrower than a
-    // step that the solution's carry lands in cuts the run again around it.
-    const sols = [];
-    const tryRun = (r, depth) => {
-      if (!(f(r.a, r.s) <= dist && dist <= f(r.b, r.s))) return;
-      const { p } = powerFor(cl, dist, r.s, wAlong, r.a, r.b);
-      const landsOn = readLie(carryOf(cl, p, wAlong)), s = landingSurface(landsOn);
-      if (s === r.s) sols.push({ p, surface: s, landsOn });
-      else if (depth < 4) [...split(r.a, r.s, p, s), ...split(p, s, r.b, r.s)].forEach((q) => tryRun(q, depth + 1));
-    };
-    runs.forEach((r) => tryRun(r, 0));
-    // several solutions (a carry onto a green and a shorter one rolling up to
-    // it; either side of a bounce more): the best score, ties to the lower power
+    // The landing surface by a percent scan (percentRows): every whole percent
+    // from the floor's to the cap's with the surface its own carry lands on,
+    // cut into the curve's rising runs. maxReach is the top of f (f need not
+    // rise overall: a bunker under a long carry, or a bounce more, stops it
+    // short of a shorter one's roll); flown it is the cap's flight instead
+    // (below).
+    const rows = percentRows(cl, cap, wAlong, readLie);
+    if (!rows.length) return;
+    if (!fly) for (const r of rows) reach(r.stop, cl);
+    // The solutions: on each run that reaches dist, its percent stopping
+    // nearest it; several (a carry onto a green and a shorter one rolling up
+    // to it; either side of a bounce more): the best score, ties to the lower
+    // power
     let best = null;
-    for (const sol of sols) {
+    for (const run of runsOf(rows)) {
+      const sol = runSolution(run, dist);
+      if (!sol) continue;
       const sc = scored(cl, cap, sol.p);
       if (!best || sc.score < best.score || (sc.score === best.score && sol.p < best.p)) best = { ...sol, ...sc };
     }
     if (!fly) {
       if (!best) return;
-      const { p, surface, landsOn } = best;
-      // carry and roll at the solved power, level ground, calm (the table)
-      const carry = carryOf(cl, p, wAlong);
-      const roll = stopOf(cl, p, surface, 0, wAlong) - carry;
-      out.push({ club: cl, power: p, drift: best.drift, aim: best.aim, frac: best.frac, cap, score: best.score, calibrated: cl.shots, blocked: best.rule || null,
-        carry, roll, surface, landsOn, rollSpin: null, red: p >= cap - RED_MARGIN, elev: false, tree: null, wAlong });
+      // carry and roll at the solved percent, level ground, calm (the table)
+      const { p, k, carry, s: surface, landsOn } = best;
+      out.push({ club: cl, power: p, pct: k, drift: best.drift, aim: best.aim, frac: best.frac, cap, score: best.score, calibrated: cl.shots, blocked: best.rule || null,
+        carry, roll: best.stop - carry, surface, landsOn, rollSpin: null, red: p >= cap - RED_MARGIN, elev: false, tree: null, wAlong });
       return;
     }
     // Flown: the cap's flight is the club's reach (its surfaces read at its
     // own contacts; not below 0, where a bank in front of the ball throws it
-    // back behind), and a club whose cap stops short of dist is out of reach.
-    // The rest refines the table's best on the profile (refine); without one
-    // (dist past the table's reach, or inside a jump of its curve) it starts
-    // from the fairway curve shifted by the cap's difference between the
-    // flight and the table.
-    const top = fly(cap);
+    // back behind), and a club whose cap stops short of dist (by more than
+    // STOP_TOL) is out of reach. The rest refines the table's best on the
+    // profile (refine); without one (dist past the table's reach, or inside a
+    // jump of its curve) it starts from the fairway percent nearest dist
+    // shifted by the cap's difference between the flight and the table.
+    const flyK = (k) => { const o = fly(barsOfPct(k, cap)); return { ...o, s: landingSurface(readLie(o.carry)) }; };
+    const top = flyK(rows[rows.length - 1].k);
     reach(Math.max(0, top.stop), cl);
-    if (top.stop < dist) return;
-    const slopeOf = (p, s) => {
-      const d = Math.min(0.01, (cap - MIN_BARS) / 2), a = Math.max(MIN_BARS, Math.min(cap - 2 * d, p - d));
-      return (f(a + 2 * d, s) - f(a, s)) / (2 * d);
-    };
-    let p0, s0;
-    if (best) { p0 = best.p; s0 = best.surface; }
+    if (top.stop < dist - STOP_TOL) return;
+    let i0;
+    if (best) i0 = best.k - rows[0].k;
     else {
-      s0 = "fairway";
-      p0 = powerFor(cl, dist - (top.stop - landedStop(cl, cap, wAlong, readLie)), s0, wAlong, MIN_BARS, cap).p;
+      const dd = dist - (top.stop - landedStop(cl, cap, wAlong, readLie)), fw = (r) => Math.abs(stopOf(cl, r.p, "fairway", 0, wAlong) - dd);
+      i0 = rows.reduce((m, r, i) => (fw(r) < fw(rows[m]) ? i : m), 0);
     }
-    const r = refine(fly, top, cap, dist, p0, Math.max(1e-3, slopeOf(p0, s0) || 0));
-    const approx = Math.abs(r.e) > STOP_TOL;
-    // the floor flies past dist: the club cannot hit it that short
-    if (approx && r.e > 0 && r.p <= MIN_BARS) return;
-    const p = r.p, landsOn = readLie(r.carry), surface = landingSurface(landsOn), sc = scored(cl, cap, p, r.lateral);
+    // the table's yd per percent there, for the first step
+    const ia = Math.max(0, i0 - 1), ib = Math.min(rows.length - 1, i0 + 1);
+    const slope0 = ib > ia ? (rows[ib].stop - rows[ia].stop) / (ib - ia) : 0;
+    const r = refine(flyK, top, rows[0].k, rows[rows.length - 1].k, dist, rows[i0].k, Math.max(1e-3, slope0 || 0));
+    const approx = !r.exact;
+    // every flight past dist, the floor's among them (refine flies it before
+    // giving up below the bracket): the club cannot hit it that short (the
+    // closest may be a step's foot above the floor, the driver's 12 %)
+    if (approx && r.e > 0 && !r.short) return;
+    const p = barsOfPct(r.k, cap), landsOn = readLie(r.carry), surface = landingSurface(landsOn), sc = scored(cl, cap, p, r.lateral);
     const roll = r.stop - r.carry;
-    const rec = { club: cl, power: p, drift: sc.drift, aim: sc.aim, frac: sc.frac, cap, score: sc.score + (approx ? APPROX_PENALTY : 0), calibrated: cl.shots, blocked: sc.rule || null,
+    const rec = { club: cl, power: p, pct: r.k, drift: sc.drift, aim: sc.aim, frac: sc.frac, cap, score: sc.score + (approx ? APPROX_PENALTY : 0), calibrated: cl.shots, blocked: sc.rule || null,
       carry: r.carry, roll, surface, landsOn, rollSpin: null, red: p >= cap - RED_MARGIN, elev: !!terrain, stop: r.stop, approx, tree: null, wAlong };
     if (terrain) {
       const h0 = profHeight(terrain, 0) + ballLift;
@@ -709,7 +679,7 @@ function solve(clubs, inputs, blockedRules, ctx = {}) {
 }
 
 export {
-  DEFAULT_CLUBS, WSR_SEEDS, BUNKER_CAPS, ROUGH_CAPS, capFor, SHAPE_LABEL, LANDED, MIN_BARS, landingSurface, shapeAt, stopOf, carryOf, landedStop, stopAt, STOP_TOL,
+  DEFAULT_CLUBS, WSR_SEEDS, BUNKER_CAPS, ROUGH_CAPS, capFor, SHAPE_LABEL, LANDED, MIN_BARS, landingSurface, shapeAt, stopOf, carryOf, landedStop, stopAt, STOP_TOL, pctOfBars, barsOfPct,
   flightOf, TREE_PENALTY, lineProfile, simProfile, windOf, windS, elevFlight, launchV0,
   GRID_N, emptyGreen, CUP_R, V_CAP, puttField, simPutt, solvePutt, fitClub, solve,
 };

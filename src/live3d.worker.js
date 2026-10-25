@@ -1,9 +1,11 @@
 // The live solver off the page (src/live3d.js posts to it): each hole's course
-// fetched from public/course3d (v2, NSS's collision triangles) and built for NSS's
-// ball (src/live3d-core.js buildCourse: tools/lib/nss3d.mjs on src/nsssim.js), the
-// three most recently used kept at most (a hole is 40k-117k triangles, 12-21 MB of
-// typed arrays with its grids in Node: every hole resident could exhaust a phone), then
-// solveFrom, a progress message per club, and the result.
+// fetched from public/course3d (v2, NSS's collision triangles: the field with its
+// cups, the baked trees, the actor trees' kind meshes and their placements) and
+// built for NSS's ball (src/live3d-core.js buildCourse: tools/lib/nss3d.mjs on
+// src/nsssim.js, which places the actor trees), the three most recently used kept
+// at most (a hole is 30k-117k triangles, 0.34-1.38 MB to fetch, up to about 20 MB
+// of typed arrays with its grids in Node: every hole resident could exhaust a
+// phone), then solveFrom, a progress message per club, and the result.
 import { buildCourse, solveFrom } from "./live3d-core.js";
 
 const KEEP = 3;

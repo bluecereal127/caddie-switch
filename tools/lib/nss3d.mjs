@@ -1,54 +1,49 @@
 // NSS's course for NSS's ball: public/course3d v2 (tools/build-course3d.mjs, the
 // Switch game's own collision triangles) as the ground src/nsssim.js flies its
-// ball over (meshGround's contacts / pass callbacks), for the live solver
-// (src/live3d-core.js) and its tests. Pure ES module, no Node or DOM API: the
-// app's worker imports it.
+// ball over (meshGround's contacts / pass / leafTouch callbacks), for the live
+// solver (src/live3d-core.js) and its tests. Pure ES module, no Node or DOM API:
+// the app's worker imports it.
 //
 // What the course holds, NSS metres throughout (course3d keeps the dump's float32
 // vertices verbatim: mesh = 10 nss + O):
 //   - the ground pack and the tree pack, each course3d model attribute as the
 //     ball's attribute (ATTR_OF_MODEL: fairway, rough, bunker, OB, green, water,
-//     fringe, sand OB, air OB, the baked trunks, leaves and palm leaves). course3d
-//     folds GolfRock, GolfGlass, GolfObject and GolfBarrier into one "wall" (12);
-//     it plays as Rock here, 277,192 of the dump's 285,123 such triangles (Object
-//     5,079, Barrier 2,760, Glass 92), and the only recorded stroke that met one
-//     (h08s1) met rock;
-//   - the cups: course3d closes all six with their HoleCover plugs (20 green
-//     triangles each, the cup's walls and bottoms dropped). The cup in play is
-//     opened again: its cover out and its cup rebuilt from the cover's rim, which
-//     is the cup's own rim on all 126 cups of the dump (0 m apart): the bevel
-//     CUP.bevelM down and in to the wall's top at CUP.wallRadiusM, the wall
-//     straight down to the floor at the bone (the cover's top less CUP.depthM;
-//     tools/nss-physics.json cup, the medians over the 126);
+//     fringe, sand OB, air OB, the cups' walls and bottoms, the baked trunks,
+//     leaves and palm leaves). course3d folds GolfRock, GolfGlass, GolfObject and
+//     GolfBarrier into one "wall" (12); it plays as Rock here, 277,192 of the
+//     dump's 285,123 such triangles (Object 5,079, Barrier 2,760, Glass 92), and
+//     the only recorded stroke that met one (h08s1) met rock;
+//   - the cups: course3d carries every cup's own triangles (Cupside 22, Cup 23:
+//     the rim's bevel, the wall and the bottom, 100 a cup, as the field mesh has
+//     them) and the six HoleCover plugs (20 green triangles each). The cup in play
+//     is open, its cover out; the other five are closed by their covers, over
+//     their cups, as in the game (and as tools/test-nsssim.mjs replays over the
+//     dump). A cup's bone (the cup's bottom, the AddGravityHole centre, the
+//     flagstick's foot) is meta.bones' (the GolfCourseNNholeK bone);
 //   - NSS's actor trees (meta.trees: the Obj_Glf_<kind> bones, nearly every tree
-//     in play, whose own collision meshes the dump does not hold) as closed
-//     shapes from KIND_TEMPLATES, the per-kind medians of the eden dump's tree
-//     decode (trees.json, the actor trees' kind meshes fitted per unit of their
-//     bone's scale): the trunk a 12-sided prism of the stem's median radius from
-//     its base to its first fork (GolfTree: solid), the canopy a closed volume
-//     of GolfLeaf (broadleaf: the spheroid; conifer: the leaf core cone) that the
-//     ball's leaf counter sees entered and left, and the open sheets (a conifer's
-//     branches, a palm's fronds; GolfPalmLeaf) as a surface of revolution through
-//     their measured extent per height band, drawn at the radius of the area the
-//     sheets cover (KIND_TEMPLATES) and touched where the ball crosses it. Upright
-//     and centred on the bone: course3d carries no yaw, so a palm's lean (0.75 of
-//     its scale at the top) and the broadleaf limbs above the fork are left out.
-//     Over the recorded strokes through actor trees, which the dump cannot replay,
-//     they bring the rests from 21-116 m off to 0.01-4.6 m (one, h14s2, 38 m);
-//     no recorded stroke clear of them meets one;
+//     in play) as the game's own collision: their kind's mesh (meta.kinds, the
+//     Phive shape of Object_Obj_Glf_<kind>, in the bin's KV / KT / KA: trunk and
+//     limbs GolfTree, the crown GolfLeaf, a conifer's branches and a palm's
+//     fronds GolfPalmLeaf) placed by the bone's SRT (placeActorTree: W =
+//     float32((V * S) R^T + T), R = Rz Ry Rx of the bone's Euler angles, shipped
+//     as numbers so no engine's trigonometry enters), every vertex the eden dump's
+//     collision/hNN-actors.bin to the bit (tools/build-course3d.mjs refuses
+//     otherwise), its triangles in the dump's order, double-sided cards and all;
 //   - the online platform (BGOBJ_GlfStartObj and BGOBJ_GlfStartObjHigh, GolfObject:
 //     the dump's collision/objects, 32 + 154 triangles, embedded below in
 //     units of 1/512 m, exactly) posed at Glf_RotateOBJ with the platform's yaw,
 //     in play only for a stroke from the platform (local play has none).
 //
 // nssCourse(meta, bin, { actorTrees = true }) -> course: { meta, hole, U, O, cups
-//   (c0..c5: { x, z (the bone), y (the bone: the cover's top less CUP.depthM), top,
-//   tris (its cover's), rim, difficult }), trees (the actor trees placed), nt, ...,
-//   ground({ cupKey, platform }) -> the ground for nsssim.run (cached),
-//   topGround(x, z) -> { y, attr, ny, n, wet } | null (the highest solid ground
-//   under a point: what a ball dropped there rests on; wet = the water's surface
-//   when water lies over it) }.
-// culledGround(g, verts, tris, n): g's contacts / pass with a cheap test in front
+//   (c0..c5: { x, z, y (the bone), top (the cover's top: the green over the cup),
+//   tris (its cover's), difficult }), trees (the actor trees placed: id, kind, nss,
+//   x, y, z (the bone), tri0, tri1), nt, ..., ground({ cupKey, platform }) -> the
+//   ground for nsssim.run (cached), topGround(x, z) -> { y, attr, ny, n, wet } |
+//   null (the highest solid ground under a point: what a ball dropped there rests
+//   on; wet = the water's surface when water lies over it) }.
+// placeActorTree(kv, S, R, T) -> Float32Array: a kind's local vertices placed.
+// eulerR([rx, ry, rz]) -> R (row-major, Rz Ry Rx): what tools/build-course3d.mjs ships.
+// culledGround(g, verts, tris, n): g's contacts / pass / leafTouch with a cheap test in front
 // (a grid of the triangles' highest points): a step above every triangle near it
 // meets none, as g itself would report, so the results are g's to the bit.
 import * as S from "../../src/nsssim.js";
@@ -60,9 +55,10 @@ const A = S.ATTR;
 // course3d v2 model attribute -> the ball's attribute (src/nsssim.js ATTR)
 export const ATTR_OF_MODEL = Object.freeze({
   1: A.fairway, 2: A.rough, 3: A.bunker, 4: A.ob, 6: A.green, 7: A.water, 9: A.fringe,
-  12: A.rock, 17: A.sandOb, 18: A.airOb, 19: A.tree, 20: A.leaf, 21: A.palmLeaf,
+  12: A.rock, 17: A.sandOb, 18: A.airOb, 19: A.tree, 20: A.leaf, 21: A.palmLeaf, 22: A.cupside, 23: A.cup,
 });
-// the ball's attribute -> course3d's (the live solver reports lies in course3d's numbers)
+// the ball's attribute -> course3d's (the live solver reports lies in course3d's numbers: a ball
+// on the cup's lip or in it lies on the green)
 export const MODEL_OF_ATTR = Object.freeze({
   [A.fairway]: 1, [A.rough]: 2, [A.bunker]: 3, [A.ob]: 4, [A.green]: 6, [A.water]: 7, [A.fringe]: 9,
   [A.rock]: 12, [A.sandOb]: 17, [A.airOb]: 18, [A.tree]: 19, [A.leaf]: 20, [A.palmLeaf]: 21,
@@ -75,152 +71,43 @@ export const LIE_NAME = Object.freeze({
   [A.rock]: "rock", [A.glass]: "glass", [A.tee]: "tee", [A.sandOb]: "sand OB", [A.tree]: "tree", [A.flag]: "flag",
   [A.airOb]: "air OB", [A.object]: "platform", [A.pin]: "pin", [A.palmLeaf]: "palm leaf", [A.barrier]: "barrier",
 });
-// the solid ground a ball can come to rest on, seen from above (water is crossed)
+// the solid ground a ball can come to rest on, seen from above (water is crossed; the
+// cups' walls and bottoms are under their covers or the open hole)
 const GROUND = new Uint8Array(32);
 for (const a of [A.fairway, A.rough, A.bunker, A.ob, A.green, A.fringe, A.rock, A.sandOb, A.object]) GROUND[a] = 1;
 
 // ---------------------------------------------------------------- actor trees
 
-// Per NSS kind, per unit of the bone's scale (heights x sy above the bone, radii
-// x sx): the medians over trees.json's actor trees of that kind (444 trees; the
-// closed shapes' values spread within 0.03 of their scale): trunk [y0, y1, r]
-// (the stem's capsule: its base, the first fork, the median band radius); leaf,
-// the closed GolfLeaf canopy: spheroid [cy, rh, rv] or cone [y0, apex, r0];
-// palm, the open GolfPalmLeaf sheets (a conifer's branches, a palm's fronds):
-// lathe [[y, r], ...], the sheets' extent about the bone in 1-unit bands (the
-// median per band of each tree's profile, the farthest sheet from the band's
-// centre), closed at both ends, and cover, the share of that envelope's
-// footprint the sheets cover (coverXZ, 0.44-0.55). The sheets are cards
-// pointing every way, so a band's farthest one overstates the extent in the
-// others: the lathe is drawn at sqrt(cover) of the extent, the disc the
-// sheets' own area would fill (a line through its core meets a sheet, one
-// through the sparse rim does not; at the full extent the tee shots h06s1 and
-// h12s2, which passed by a conifer's branches untouched, met them).
-// tools/test-course3d.mjs checks the templates against trees.json when the
-// dump is there.
-export const KIND_TEMPLATES = Object.freeze({
-  HardWoodA: { trunk: [-0.4765, 5.3567, 0.8254], leaf: { spheroid: [9.3986, 7.4192, 6.3364] } },
-  HardWoodB: { trunk: [-0.4765, 4.8362, 0.8753], leaf: { spheroid: [10.0587, 7.5655, 6.069] } },
-  HardWoodC: { trunk: [-0.4765, 4.8567, 0.904], leaf: { spheroid: [9.63, 7.3057, 6.1609] } },
-  HardWoodD: { trunk: [-0.43, 4.3704, 0.7968], leaf: { spheroid: [8.971, 4.917, 5.315] } },
-  ConiferTreeA: {
-    trunk: [-0.6017, 14.2198, 0.401], leaf: { cone: [4.4941, 18.9667, 2.8665] },
-    palm: { lathe: [[3.865, 0], [4, 3.795], [5, 4.685], [6, 4.63], [7, 4.537], [8, 4.425], [9, 4.453], [10, 3.823], [11, 3.343], [12, 3.339], [13, 3.164], [14, 2.777], [15, 2.117], [16, 1.593], [17, 1.169], [18, 0.808], [19, 0.139], [19.697, 0]], cover: 0.524 },
-  },
-  ConiferTreeB: {
-    trunk: [-0.6015, 14.1984, 0.403], leaf: { cone: [4.4942, 18.9668, 2.8665] },
-    palm: { lathe: [[3.865, 0], [4, 3.628], [5, 4.67], [6, 4.634], [7, 4.584], [8, 4.4], [9, 4.453], [10, 3.909], [11, 3.469], [12, 3.34], [13, 3.154], [14, 2.792], [15, 2.142], [16, 1.613], [17, 1.15], [18, 0.808], [19, 0.194], [19.697, 0]], cover: 0.522 },
-  },
-  ConiferTreeC: {
-    trunk: [-0.6017, 14.065, 0.4], leaf: { cone: [4.494, 18.9667, 2.8667] },
-    palm: { lathe: [[3.866, 0], [4, 2.977], [5, 4.711], [6, 4.593], [7, 4.517], [8, 4.037], [9, 4.437], [10, 3.748], [11, 3.147], [12, 3.17], [13, 2.881], [14, 2.741], [15, 2.041], [16, 1.493], [17, 1.087], [18, 0.719], [19, 0.133], [19.491, 0]], cover: 0.44 },
-  },
-  ConiferTreeD: {
-    trunk: [-0.6016, 14.1984, 0.4008], leaf: { cone: [4.494, 18.9668, 2.8664] },
-    palm: { lathe: [[3.866, 0], [4, 3.496], [5, 4.56], [6, 4.632], [7, 4.504], [8, 4.08], [9, 4.436], [10, 3.908], [11, 2.628], [12, 3.176], [13, 2.752], [14, 2.728], [15, 1.748], [16, 1.496], [17, 1.084], [18, 0.764], [19, 0.104], [19.466, 0]], cover: 0.49 },
-  },
-  PalmTreeA: { trunk: [-0.9864, 12.814, 0.8214], palm: { lathe: [[7.867, 0], [8, 0.89], [9, 4.255], [10, 5.104], [11, 6.665], [12, 6.492], [13, 6.308], [14, 5.755], [15, 3.567], [16, 3.77], [17, 2.767], [17.068, 0]], cover: 0.546 } },
-  PalmTreeB: { trunk: [-0.9691, 12.6673, 0.8286], palm: { lathe: [[7.865, 0], [8, 1.144], [9, 4.759], [10, 5.473], [11, 6.685], [12, 6.385], [13, 6.4], [14, 5.7], [15, 3.655], [16, 3.686], [17, 0.195], [17.237, 0]], cover: 0.544 } },
-});
-// a tree whose NSS kind is not listed takes its family's commonest
-const FAMILY_KIND = { 2: "HardWoodA", 3: "ConiferTreeA", 6: "PalmTreeA" };
-const TRUNK_SIDES = 12, CONE_SIDES = 16, LATHE_SIDES = 12;
+// R = Rz Ry Rx of a bone's Euler angles (rad), row-major: the dump's tree decode's
+// convention (nss-trees.py euler_R). tools/build-course3d.mjs computes it and ships the
+// nine numbers, and checks the placement it gives against the dump's own (numpy's) to the
+// bit: on all 151,635 vertices of the 444 trees it is
+export function eulerR([rx, ry, rz]) {
+  const cx = Math.cos(rx), sx = Math.sin(rx), cy = Math.cos(ry), sy = Math.sin(ry), cz = Math.cos(rz), sz = Math.sin(rz);
+  const Rx = [[1, 0, 0], [0, cx, -sx], [0, sx, cx]], Ry = [[cy, 0, sy], [0, 1, 0], [-sy, 0, cy]], Rz = [[cz, -sz, 0], [sz, cz, 0], [0, 0, 1]];
+  const mm = (P, Q) => P.map((_, i) => [0, 1, 2].map((j) => P[i][0] * Q[0][j] + P[i][1] * Q[1][j] + P[i][2] * Q[2][j]));
+  return mm(mm(Rz, Ry), Rx).flat();
+}
+// a kind's local vertices kv ([n * 3]) placed by a bone's scale S, rotation R (eulerR) and
+// translation T (NSS metres): float32((v * S) R^T + T), the products and sums in doubles in
+// numpy's order (tools/nss-actortrees.py: (V * scale) @ R.T + translate, then float32)
+export function placeActorTree(kv, Sc, R, T) {
+  const n = kv.length / 3, out = new Float32Array(3 * n);
+  for (let i = 0; i < n; i++) {
+    const a = kv[3 * i] * Sc[0], b = kv[3 * i + 1] * Sc[1], c = kv[3 * i + 2] * Sc[2];
+    out[3 * i] = a * R[0] + b * R[1] + c * R[2] + T[0];
+    out[3 * i + 1] = a * R[3] + b * R[4] + c * R[5] + T[1];
+    out[3 * i + 2] = a * R[6] + b * R[7] + c * R[8] + T[2];
+  }
+  return out;
+}
 
-// a triangle soup: vertices, triangles, attributes; solid() orients a triangle of a
-// convex closed shape outward (away from an interior point), as the leaf counter
-// needs (entering = moving against the face normal)
+// a triangle soup: vertices, triangles, attributes
 function soup() {
   const v = [], t = [], a = [];
   const vert = (x, y, z) => { v.push(x, y, z); return v.length / 3 - 1; };
-  const solid = (i, j, k, attr, ix, iy, iz) => {
-    const ux = v[3 * j] - v[3 * i], uy = v[3 * j + 1] - v[3 * i + 1], uz = v[3 * j + 2] - v[3 * i + 2];
-    const wx = v[3 * k] - v[3 * i], wy = v[3 * k + 1] - v[3 * i + 1], wz = v[3 * k + 2] - v[3 * i + 2];
-    const nx = uy * wz - uz * wy, ny = uz * wx - ux * wz, nz = ux * wy - uy * wx;
-    const cx = (v[3 * i] + v[3 * j] + v[3 * k]) / 3 - ix, cy = (v[3 * i + 1] + v[3 * j + 1] + v[3 * k + 1]) / 3 - iy, cz = (v[3 * i + 2] + v[3 * j + 2] + v[3 * k + 2]) / 3 - iz;
-    if (nx * cx + ny * cy + nz * cz < 0) t.push(i, k, j); else t.push(i, j, k);
-    a.push(attr);
-  };
   const plain = (i, j, k, attr) => { t.push(i, j, k); a.push(attr); };
-  return { v, t, a, vert, solid, plain };
-}
-
-// a closed n-sided prism about a vertical axis
-function prism(m, x, z, y0, y1, r, n, attr) {
-  const b = [], u = [];
-  for (let i = 0; i < n; i++) { const q = (2 * Math.PI * i) / n; b.push(m.vert(x + r * Math.cos(q), y0, z + r * Math.sin(q))); }
-  for (let i = 0; i < n; i++) { const q = (2 * Math.PI * i) / n; u.push(m.vert(x + r * Math.cos(q), y1, z + r * Math.sin(q))); }
-  const cb = m.vert(x, y0, z), cu = m.vert(x, y1, z), iy = (y0 + y1) / 2;
-  for (let i = 0; i < n; i++) {
-    const j = (i + 1) % n;
-    m.solid(b[i], b[j], u[j], attr, x, iy, z); m.solid(b[i], u[j], u[i], attr, x, iy, z);
-    m.solid(cb, b[j], b[i], attr, x, iy, z); m.solid(cu, u[i], u[j], attr, x, iy, z);
-  }
-}
-// a closed cone: a base ring at y0 of radius r0 to the apex at y1, its base disc closed
-function cone(m, x, z, y0, y1, r0, n, attr) {
-  const b = [];
-  for (let i = 0; i < n; i++) { const q = (2 * Math.PI * i) / n; b.push(m.vert(x + r0 * Math.cos(q), y0, z + r0 * Math.sin(q))); }
-  const ap = m.vert(x, y1, z), cb = m.vert(x, y0, z), iy = y0 + (y1 - y0) / 4;
-  for (let i = 0; i < n; i++) { const j = (i + 1) % n; m.solid(b[i], b[j], ap, attr, x, iy, z); m.solid(cb, b[j], b[i], attr, x, iy, z); }
-}
-// a surface of revolution about a vertical axis through the rings [[y, r], ...]
-// (y rising; r 0 closes an end at a point), each face oriented away from the axis
-function lathe(m, x, z, rings, n, attr) {
-  const ids = rings.map(([y, r]) => {
-    if (!(r > 0)) return m.vert(x, y, z);
-    const ring = [];
-    for (let i = 0; i < n; i++) { const q = (2 * Math.PI * i) / n; ring.push(m.vert(x + r * Math.cos(q), y, z + r * Math.sin(q))); }
-    return ring;
-  });
-  const at = (k, i) => (Array.isArray(ids[k]) ? ids[k][i % n] : ids[k]);
-  for (let k = 0; k + 1 < rings.length; k++) {
-    const iy = (rings[k][0] + rings[k + 1][0]) / 2, a = Array.isArray(ids[k]), b = Array.isArray(ids[k + 1]);
-    for (let i = 0; i < n; i++) {
-      if (a) m.solid(at(k, i), at(k, i + 1), at(k + 1, i + 1), attr, x, iy, z);
-      if (b) m.solid(at(k, i), at(k + 1, i + 1), at(k + 1, i), attr, x, iy, z);
-    }
-  }
-}
-// the unit icosphere (subdivided twice: 162 vertices, 320 faces), once
-let ICO = null;
-function icosphere() {
-  if (ICO) return ICO;
-  const g = (1 + Math.sqrt(5)) / 2;
-  let V = [[-1, g, 0], [1, g, 0], [-1, -g, 0], [1, -g, 0], [0, -1, g], [0, 1, g], [0, -1, -g], [0, 1, -g], [g, 0, -1], [g, 0, 1], [-g, 0, -1], [-g, 0, 1]]
-    .map(([x, y, z]) => { const l = Math.sqrt(x * x + y * y + z * z); return [x / l, y / l, z / l]; });
-  let F = [[0, 11, 5], [0, 5, 1], [0, 1, 7], [0, 7, 10], [0, 10, 11], [1, 5, 9], [5, 11, 4], [11, 10, 2], [10, 7, 6], [7, 1, 8],
-    [3, 9, 4], [3, 4, 2], [3, 2, 6], [3, 6, 8], [3, 8, 9], [4, 9, 5], [2, 4, 11], [6, 2, 10], [8, 6, 7], [9, 8, 1]];
-  for (let s = 0; s < 2; s++) {
-    const mid = new Map(), out = [];
-    const m = (a, b) => {
-      const k = a < b ? `${a},${b}` : `${b},${a}`;
-      if (!mid.has(k)) { const p = V[a], q = V[b], x = p[0] + q[0], y = p[1] + q[1], z = p[2] + q[2], l = Math.sqrt(x * x + y * y + z * z); V.push([x / l, y / l, z / l]); mid.set(k, V.length - 1); }
-      return mid.get(k);
-    };
-    for (const [a, b, c] of F) { const ab = m(a, b), bc = m(b, c), ca = m(c, a); out.push([a, ab, ca], [b, bc, ab], [c, ca, bc], [ab, bc, ca]); }
-    F = out;
-  }
-  ICO = { V, F };
-  return ICO;
-}
-function spheroid(m, x, y, z, rh, rv, attr) {
-  const { V, F } = icosphere(), base = m.v.length / 3;
-  for (const [px, py, pz] of V) m.vert(x + rh * px, y + rv * py, z + rh * pz);
-  for (const [a, b, c] of F) m.solid(base + a, base + b, base + c, attr, x, y, z);
-}
-
-// one actor tree (meta.trees' entry, mesh units) as NSS-metre shapes into m
-function actorTree(m, t, U, O) {
-  const tpl = KIND_TEMPLATES[t.nss] ?? KIND_TEMPLATES[FAMILY_KIND[t.kind]];
-  if (!tpl) return null;
-  const x = (t.x - O[0]) / U, y = (t.base - O[1]) / U, z = (t.z - O[2]) / U, sx = t.sx, sy = t.sy;
-  const n0 = m.a.length;
-  const [ty0, ty1, tr] = tpl.trunk;
-  prism(m, x, z, y + ty0 * sy, y + ty1 * sy, tr * sx, TRUNK_SIDES, A.tree);
-  if (tpl.leaf?.spheroid) { const [cy, rh, rv] = tpl.leaf.spheroid; spheroid(m, x, y + cy * sy, z, rh * sx, rv * sy, A.leaf); }
-  if (tpl.leaf?.cone) { const [c0, c1, r0] = tpl.leaf.cone; cone(m, x, z, y + c0 * sy, y + c1 * sy, r0 * sx, CONE_SIDES, A.leaf); }
-  if (tpl.palm?.lathe) { const k = Math.sqrt(tpl.palm.cover); lathe(m, x, z, tpl.palm.lathe.map(([py, pr]) => [y + py * sy, k * pr * sx]), LATHE_SIDES, A.palmLeaf); }
-  return { id: t.id, kind: t.kind, nss: t.nss ?? null, wsr: t.wsr ?? null, x, y, z, tri0: n0, tri1: m.a.length, kindFrom: KIND_TEMPLATES[t.nss] ? "nss" : "family" };
+  return { v, t, a, vert, plain };
 }
 
 // ---------------------------------------------------------------- the platform
@@ -293,6 +180,8 @@ export function culledGround(g, verts, tris, n, { cell = 8, bigCells = 4096 } = 
     kind: "mesh",
     contacts: (o, e, r) => (may(o[0], o[1], o[2], e[0], e[1], e[2], r) ? g.contacts(o, e, r) : []),
     pass: (o, D, r) => (may(o[0], o[1], o[2], o[0] + D[0], o[1] + D[1], o[2] + D[2], r) ? g.pass(o, D, r) : []),
+    // the canopy counter's leaf contacts (meshGround's, on a mesh with Leaf triangles): the same step box as pass
+    leafTouch: g.leafTouch ? (o, D, r) => (may(o[0], o[1], o[2], o[0] + D[0], o[1] + D[1], o[2] + D[2], r) ? g.leafTouch(o, D, r) : []) : null,
     faceNormal: g.faceNormal,
     triangles: g.triangles,
   };
@@ -315,6 +204,12 @@ function joinGrounds(list) {
       if (n > 1) out.sort((p, q) => p.t - q.t);
       return out ?? [];
     },
+    // each member's leaf contacts in turn (members without Leaf triangles have none)
+    leafTouch: list.some((g) => g.leafTouch) ? (o, D, r) => {
+      let out = null;
+      for (const g of list) if (g.leafTouch) { const c = g.leafTouch(o, D, r); if (c.length) out = out ? out.concat(c) : c; }
+      return out ?? [];
+    } : null,
   };
 }
 
@@ -326,7 +221,7 @@ function meshOf(m, cell = 4) {
 
 // ---------------------------------------------------------------- the course
 
-const COVER_TRIS = 20, COVER_R_M = 0.25, HUB_M = 0.02;
+const COVER_TRIS = 20, COVER_R_M = 0.25, HUB_M = 0.02, CUP_OWN_M = 0.25, CUP_OWN_TRIS = 100;
 
 export function nssCourse(meta, bin, { actorTrees = true } = {}) {
   if (meta?.version !== 2) throw new Error(`course3d: version ${meta?.version} (the NSS ball needs v2, NSS's own triangles)`);
@@ -334,42 +229,43 @@ export function nssCourse(meta, bin, { actorTrees = true } = {}) {
   const ix = (k, t, n) => (t === "u32" ? new Uint32Array(bin, o[k], n) : new Uint16Array(bin, o[k], n));
   const GV = new Float32Array(bin, o.V, 3 * meta.nv), GT = ix("T", meta.idx, 3 * meta.nt), GA = new Uint8Array(bin, o.A, meta.nt);
   const TV = new Float32Array(bin, o.TV, 3 * meta.ntv), TT = ix("TT", meta.tidx, 3 * meta.ntt), TA = new Uint8Array(bin, o.TA, meta.ntt);
+  const kinds = meta.kinds ?? [];
+  const nkv = kinds.reduce((s, k) => s + k.nv, 0), nkt = kinds.reduce((s, k) => s + k.nt, 0);
+  const KV = nkv ? new Float32Array(bin, o.KV, 3 * nkv) : new Float32Array(0), KT = nkt ? new Uint16Array(bin, o.KT, 3 * nkt) : new Uint16Array(0), KA = nkt ? new Uint8Array(bin, o.KA, nkt) : new Uint8Array(0);
   const nssOf = (P) => [(P[0] - O[0]) / U, (P[1] - O[1]) / U, (P[2] - O[2]) / U];
-  for (const a of [...new Set(GA), ...new Set(TA)]) if (ATTR_OF_MODEL[a] == null) throw new Error(`course3d H${meta.hole}: model attribute ${a} has no NSS attribute`);
+  for (const a of [...new Set(GA), ...new Set(TA), ...new Set(KA)]) if (ATTR_OF_MODEL[a] == null) throw new Error(`course3d H${meta.hole}: model attribute ${a} has no NSS attribute`);
+  if ((meta.trees ?? []).some((t) => !t.R || !kinds[t.k])) throw new Error(`course3d H${meta.hole}: an actor tree without its kind mesh and placement (a course3d of before 2026-10-25's actor meshes: rebuild it)`);
 
-  // ---- the covers: the fan of green triangles about a hub on the cup's bone (the
-  // field's green has a hole there, so no field triangle has a vertex at the bone) ----
+  // ---- the cups: each one's cover (the fan of green triangles about a hub on the
+  // cup's bone: the field's green has a hole there) and its own triangles ----
   const cups = {};
   for (const [key, P] of Object.entries(meta.pins)) {
-    const [x, y, z] = nssOf(P);
-    cups[key] = { key, k: Number(key.slice(1)), x, z, top: y, y: y - CUP.depthM, tris: [], difficult: (meta.difficult ?? []).includes(Number(key.slice(1))) };
+    const [x, y, z] = nssOf(P), bone = meta.bones?.[key];
+    cups[key] = { key, k: Number(key.slice(1)), x, z, top: y, y: bone ? nssOf(bone)[1] : y - CUP.depthM, tris: [], own: 0, difficult: (meta.difficult ?? []).includes(Number(key.slice(1))) };
   }
   const cupList = Object.values(cups), coverOf = new Int8Array(meta.nt).fill(-1);
   for (let t = 0; t < meta.nt; t++) {
-    if (GA[t] !== 6) continue;
+    const a = GA[t];
+    if (a !== 6 && a !== 22 && a !== 23) continue;
     for (let c = 0; c < cupList.length; c++) {
       const q = cupList[c];
       let all = true, hub = false;
       for (let k = 0; k < 3 && all; k++) {
         const i = 3 * GT[3 * t + k], dx = GV[i] - q.x, dz = GV[i + 2] - q.z, d2 = dx * dx + dz * dz;
-        all = d2 <= COVER_R_M * COVER_R_M;
+        all = d2 <= (a === 6 ? COVER_R_M : CUP_OWN_M) ** 2;
         if (d2 <= HUB_M * HUB_M) hub = true;
       }
-      if (all && hub) { q.tris.push(t); coverOf[t] = c; break; }
+      if (all && a === 6 && hub) { q.tris.push(t); coverOf[t] = c; break; }
+      if (all && a !== 6) { q.own++; break; }
     }
   }
   for (const q of cupList) {
     if (q.tris.length !== COVER_TRIS) throw new Error(`course3d H${meta.hole} ${q.key}: ${q.tris.length} cover triangles, not ${COVER_TRIS}`);
-    // its rim: the cover's vertices off the hub, by angle about the bone
-    const seen = new Map();
-    for (const t of q.tris) for (let k = 0; k < 3; k++) { const i = GT[3 * t + k]; if (!seen.has(i)) seen.set(i, [GV[3 * i], GV[3 * i + 1], GV[3 * i + 2]]); }
-    const rim = [...seen.values()].filter(([x, , z]) => (x - q.x) ** 2 + (z - q.z) ** 2 > HUB_M * HUB_M);
-    if (rim.length !== COVER_TRIS) throw new Error(`course3d H${meta.hole} ${q.key}: the cover's rim has ${rim.length} vertices`);
-    rim.sort((p, r) => Math.atan2(p[2] - q.z, p[0] - q.x) - Math.atan2(r[2] - q.z, r[0] - q.x));
-    q.rim = rim;
+    if (q.own < CUP_OWN_TRIS) throw new Error(`course3d H${meta.hole} ${q.key}: ${q.own} of the cup's own triangles (Cupside, Cup), at least ${CUP_OWN_TRIS} expected`);
   }
 
-  // ---- the static course: the ground pack less the covers, the tree pack, the actor trees ----
+  // ---- the static course: the ground pack less the covers (every cup's own walls and
+  // bottom in), the tree pack, the actor trees ----
   const m = soup();
   const remap = (V, T, Aa, n, skip) => {
     const map = new Int32Array(V.length / 3).fill(-1);
@@ -384,7 +280,16 @@ export function nssCourse(meta, bin, { actorTrees = true } = {}) {
   remap(TV, TT, TA, meta.ntt, null);
   const nBaked = m.a.length - nGround;
   const trees = [];
-  if (actorTrees) for (const t of meta.trees ?? []) { const r = actorTree(m, t, U, O); if (r) trees.push(r); }
+  if (actorTrees) {
+    for (const t of meta.trees ?? []) {
+      const kd = kinds[t.k], tri0 = m.a.length;
+      const W = placeActorTree(KV.subarray(3 * kd.v0, 3 * (kd.v0 + kd.nv)), t.S, t.R, t.T);
+      const base = m.v.length / 3;
+      for (let i = 0; i < W.length; i++) m.v.push(W[i]);
+      for (let j = kd.t0; j < kd.t0 + kd.nt; j++) m.plain(base + KT[3 * j] - kd.v0, base + KT[3 * j + 1] - kd.v0, base + KT[3 * j + 2] - kd.v0, ATTR_OF_MODEL[KA[j]]);
+      trees.push({ id: t.id, kind: t.kind, nss: t.nss ?? null, wsr: t.wsr ?? null, x: t.T[0], y: t.T[1], z: t.T[2], tri0, tri1: m.a.length });
+    }
+  }
   const nActor = m.a.length - nGround - nBaked;
   const verts = Float64Array.from(m.v), tris = Uint32Array.from(m.t), attr = Uint8Array.from(m.a);
   const base = culledGround(S.meshGround({ verts, tris, attr }, { cell: 4 }), verts, tris, attr.length);
@@ -441,24 +346,6 @@ export function nssCourse(meta, bin, { actorTrees = true } = {}) {
     for (const q of cupList) {
       if (q.key === key) continue;
       for (const t of q.tris) { const ids = [0, 1, 2].map((k) => { const i = 3 * GT[3 * t + k]; return c.vert(GV[i], GV[i + 1], GV[i + 2]); }); c.plain(ids[0], ids[1], ids[2], A.green); }
-    }
-    const q = cups[key];
-    if (q) {
-      const n = q.rim.length, rim = [], wall = [], bot = [];
-      const floorY = q.y + CUP.bottomM;
-      for (const [x, y, z] of q.rim) {
-        const a = Math.atan2(z - q.z, x - q.x);
-        rim.push(c.vert(x, y, z));
-        wall.push(c.vert(q.x + CUP.wallRadiusM * Math.cos(a), y - CUP.bevelM, q.z + CUP.wallRadiusM * Math.sin(a)));
-        bot.push(c.vert(q.x + CUP.bottomRadiusM * Math.cos(a), floorY, q.z + CUP.bottomRadiusM * Math.sin(a)));
-      }
-      const hub = c.vert(q.x, floorY, q.z);
-      for (let i = 0; i < n; i++) {
-        const j = (i + 1) % n;
-        c.plain(rim[i], wall[i], rim[j], A.cupside); c.plain(rim[j], wall[i], wall[j], A.cupside);
-        c.plain(wall[i], bot[i], wall[j], A.cupside); c.plain(wall[j], bot[i], bot[j], A.cupside);
-        c.plain(hub, bot[j], bot[i], A.cup);
-      }
     }
     const g = c.a.length ? meshOf(c, 1) : null;
     cupGrounds.set(key, g);

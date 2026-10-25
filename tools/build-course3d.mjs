@@ -1,70 +1,76 @@
 // public/course3d/ v2 (GENERATED, committed): the live solver's course
-// (src/live3d.worker.js runs the harness's 3D model, tools/harness/lib/
-// model3d.mjs, on it) from NSS's own collision meshes (the git-ignored eden
+// (src/live3d.worker.js flies NSS's ball, src/nsssim.js, over it through
+// tools/lib/nss3d.mjs) from NSS's own collision meshes (the git-ignored eden
 // dump, tools/harness/state/eden/nss-golf-x/collision, read through
 // tools/lib/nsscol.mjs), on every hole 1-21:
-//   - the field mesh (Fld_GolfCourseNN) with the six HoleCover plugs closing
-//     every cup (the cup walls and bottoms, codes 30 and 31, are dropped: the
-//     model keeps src/putt.js's measured capture window, so the green runs on
-//     over each cup), H3's sea (the separate actor GolfCourse03Water, which
-//     its field mesh lacks) when the dump has collision/h03-water.*, and the
-//     TreeLeafNN canopies (collision/hNN-leaf.*);
+//   - the field mesh (Fld_GolfCourseNN) with every cup's own triangles (GolfCupside
+//     30, GolfCup 31: the rim's bevel, the wall, the bottom) and the six HoleCover
+//     plugs (nss3d.mjs takes the cup in play's cover out), H3's sea (the separate
+//     actor GolfCourse03Water, which its field mesh lacks) when the dump has
+//     collision/h03-water.*, and the TreeLeafNN canopies (collision/hNN-leaf.*);
 //   - each NSS surface code as a model attribute (ATTR_MAP below: the KCL
-//     vocabulary WSR's physics knows, plus 17 sand OB, 18 air OB, 19 trunk,
-//     20 leaf, 21 palm leaf); any other code refuses the build;
-//   - the trunks, leaves and palm leaves as a separate tree pack (the model
-//     sweeps the ball against them, two-sided; model3d.mjs meshTreeHit), the
-//     rest as the ground pack (the KCL-style one-sided prisms, 5 u thick);
-//     these are the baked trees, nearly all of them the background forest
-//     off the course;
-//   - NSS's actor trees (the dump's trees.json, source "actor": an
-//     Obj_Glf_<kind> bone where the game spawns a tree object with its own
-//     collision mesh, which the dump does not hold yet; 444 of them, nearly
-//     every tree in play) as WSR's analytic trees at their bones (meta.trees,
-//     v1's format in mesh units: x, base, z from the bone, sx sy sz its scale,
-//     kind 2 broadleaf / 3 conifer / 6 palm; no palm mesh, so a palm is WSR's
-//     trunk capsule and frond slab), with the WSR tree each stands on (within
-//     1 map px) for naming; the 36 decor trees (no collision in the game) are
-//     left out;
-//   - dropped and logged: zero-area triangles, the exact and reversed copies of
-//     a triangle (Havok's (a,b,c,b) quads are double-sided cards; the ground
-//     keeps the up-facing copy, else the first), down-facing (ny < -0.1)
-//     rock / glass / object / barrier faces (buried undersides would push a
-//     ball resting above them down through the 5 u slab), and triangles wholly
-//     outside the crop box: the map frame, every playable triangle (fairway,
-//     rough, bunker, green, fringe, the covers) and the air-OB fence, plus
-//     CROP_M on every side (no playable or fence triangle is cut: refused);
+//     vocabulary, plus 17 sand OB, 18 air OB, 19 trunk, 20 leaf, 21 palm leaf, 22
+//     Cupside, 23 Cup); any other code refuses the build;
+//   - the trunks, leaves and palm leaves as a separate tree pack, every triangle as
+//     the dump has it (Havok's (a,b,c,b) quads are double-sided cards, a triangle
+//     and its reverse: both kept, since the canopy counter counts each leaf face it
+//     touches, and a card's two faces cancel), the rest as the ground pack; these
+//     are the baked trees, nearly all of them the background forest off the course;
+//   - NSS's actor trees (the dump's trees.json, source "actor": an Obj_Glf_<kind>
+//     bone where the game spawns Object_Obj_Glf_<kind>; 444 of them, nearly every
+//     tree in play) as their kind's own collision mesh: the kinds used on the hole
+//     once each in the bin (KV float32 [nkv][3] in the actor's frame, verbatim from
+//     collision/objects/<shape>.bin, which tools/nss-actortrees.py writes from the
+//     RomFS; KT uint16 [nkt][3], each kind's own vertex range; KA uint8 [nkt]) and
+//     per tree in meta.trees its placement: the bone's scale S, rotation R (Rz Ry Rx
+//     of its Euler angles, nss3d.mjs eulerR: nine numbers, so the browser does no
+//     trigonometry) and translation T, NSS metres, as trees.json has them. nss3d.mjs
+//     placeActorTree gives float32((v S) R^T + T); every vertex of every tree is
+//     checked against the dump's collision/hNN-actors.bin (tools/nss-actortrees.py:
+//     numpy's placement, the mesh tools/test-nsssim.mjs and the Eden player fly) to
+//     the bit, with its triangles and codes, or the build refuses;
+//   - dropped and logged: zero-area triangles, in the ground pack the exact and
+//     reversed copies of a triangle (a double-sided card keeps the up-facing copy,
+//     else the first), down-facing (ny < -0.1) rock / glass / object / barrier faces
+//     (buried undersides would push a ball resting above them down through the 5 u
+//     slab), and triangles wholly outside the crop box: the map frame, every playable
+//     triangle (fairway, rough, bunker, green, fringe, the cups, the covers) and the
+//     air-OB fence, plus CROP_M on every side (no playable or fence triangle is cut:
+//     refused);
 //   - the vertices verbatim (NSS metres, float32 as the dump has them): the
 //     browser converts them to WSR mesh units in doubles (mesh = 10 nss + O,
 //     tools/nss-registration.json), so the course sits in WSR's KCL frame
 //     (tools/mesh-registration.json stays valid: the cups land 0.002-0.081 px
-//     from their NSS map spots through it), and builds the prisms with
-//     model3d.mjs prismFromTri, the same code the harness and the tests run;
+//     from their NSS map spots through it);
 //   - per hole the six cups (meta.pins.c0..c5, mesh units at the cover's top:
-//     the green surface over the cup) and the difficult ones, the tees (the
-//     WSR start, which stays the local tee, and NSS's GlfTeeOBJ and
-//     Glf_RotateOBJ for audit), the online platform's seven standing spots per
+//     the green surface over the cup; meta.bones.c0..c5, the cup's bone, its
+//     bottom: the flagstick's foot and the ball's AddGravityHole centre) and the
+//     difficult ones, the tees (the WSR start, NSS's GlfTeeOBJ, where local play
+//     tees off, and Glf_RotateOBJ), the online platform's seven standing spots per
 //     tier (tools/nss-platform.json: the mat the ball sits on, posed through
 //     Glf_RotateOBJ), the baked trees for naming a hit on the tree pack
-//     (meta.treeInfo: id, family, base), and the registration: the NSS
-//     transform (pins.json, INTEGRATION.md D1) in mesh units, the one the
-//     cups, the platform and public/terrain share.
-// Refused (exit 1) unless --allow-missing: a hole without its TreeLeaf
-// canopies (collision/hNN-leaf.*), H3 without its sea (h03-water.*), no
-// trees.json or a hole missing from it.
+//     (meta.treeInfo: id, family, base), and the registration: the NSS transform
+//     (pins.json, INTEGRATION.md D1) in mesh units, the one the cups, the platform
+//     and public/terrain share.
+// Refused (exit 1) unless --allow-missing: a hole without its TreeLeaf canopies
+// (collision/hNN-leaf.*), H3 without its sea (h03-water.*), no trees.json or a
+// hole missing from it, a kind mesh missing from collision/objects, a hole with
+// actor trees but no collision/hNN-actors.* to check them against.
 // Files: hNN.bin (little-endian, each part 4-byte aligned: V float32 [nv][3]
-// ground vertices, T uint16|uint32 [nt][3], A uint8 [nt]; TV, TT, TA the
-// same for the tree pack), hNN.json, index.json (sizes, SHA-1s, the dump's
-// SHA-1s). Deterministic: two runs write the same bytes. Rerun when the dump's
-// collision, tools/nss-*.json or this mapping changes; then node
-// tools/test-course3d.mjs and node tools/test-live3d.mjs.
+// ground vertices, T uint16|uint32 [nt][3], A uint8 [nt]; TV, TT, TA the same
+// for the tree pack; KV, KT, KA the actor trees' kind meshes), hNN.json,
+// index.json (sizes, SHA-1s, the dump's SHA-1s). Deterministic: two runs write
+// the same bytes. Rerun when the dump's collision, trees.json, the kind meshes,
+// tools/nss-*.json or this mapping changes; then node tools/test-course3d.mjs and
+// node tools/test-live3d.mjs.
 //   node tools/build-course3d.mjs [--collision <dir>] [--out <dir>] [--trees <trees.json>] [--allow-missing]
 import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
-import { loadCollision } from "./lib/nsscol.mjs";
+import { loadCollision, loadObject, readMeshBin } from "./lib/nsscol.mjs";
 import { regOf, mapToNss, nssToMesh, platformToWorld, MAP_W, MAP_H } from "./lib/nssreg.mjs";
+import { eulerR, placeActorTree } from "./lib/nss3d.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, "..");
@@ -90,21 +96,20 @@ if (!TREES_TEXT) missing(`no ${path.relative(ROOT, TREES_FILE).replace(/\\/g, "/
 const TREES = TREES_TEXT ? JSON.parse(TREES_TEXT.replace(/([:\[,]\s*)-?(?:NaN|Infinity)(?=\s*[,\]}])/g, "$1null")) : null;
 // the extras each hole must have: TreeLeaf canopies everywhere, H3's sea
 const EXPECT = (hole) => (hole === 3 ? ["leaf", "water"] : ["leaf"]);
-// trees.json's family as WSR's tree kind (the analytic shapes, model3d.mjs TREE_SHAPE)
+// trees.json's family as WSR's tree kind (the naming the app's tree markers use)
 const KIND = { broadleaf: 2, conifer: 3, palm: 6 };
 
-// NSS surface code -> model attribute (INTEGRATION.md 1.2); 30 GolfCupside and
-// 31 GolfCup are dropped (every cup is closed by its cover)
-const ATTR_MAP = { 5: 1, 6: 2, 7: 3, 8: 7, 10: 4, 18: 6, 24: 9, 32: 12, 34: 12, 40: 12, 44: 12, 36: 17, 39: 18, 37: 19, 25: 20, 43: 21 };
-const ATTR_LABEL = { 1: "fairway", 2: "rough", 3: "bunker", 4: "ob", 6: "green", 7: "water", 9: "fringe", 12: "wall", 17: "sand OB", 18: "air OB", 19: "trunk", 20: "leaf", 21: "palm leaf" };
-const DROP_CODES = new Set([30, 31]);
+// NSS surface code -> model attribute (INTEGRATION.md 1.2)
+const ATTR_MAP = { 5: 1, 6: 2, 7: 3, 8: 7, 10: 4, 18: 6, 24: 9, 32: 12, 34: 12, 40: 12, 44: 12, 36: 17, 39: 18, 37: 19, 25: 20, 43: 21, 30: 22, 31: 23 };
+const ATTR_LABEL = { 1: "fairway", 2: "rough", 3: "bunker", 4: "ob", 6: "green", 7: "water", 9: "fringe", 12: "wall", 17: "sand OB", 18: "air OB", 19: "trunk", 20: "leaf", 21: "palm leaf", 22: "cupside", 23: "cup" };
 const TREE_ATTRS = new Set([19, 20, 21]);
-const PLAY_CODES = new Set([5, 6, 7, 18, 24]);
+const TREE_CODES = new Set([37, 25, 43]);
+const PLAY_CODES = new Set([5, 6, 7, 18, 24, 30, 31]);
 const FENCE_CODE = 39;
 const BACKFACE_CODES = new Set([32, 34, 40, 44]);
 const BACKFACE_NY = -0.1;
 const CROP_M = 50;
-const THICK = 5;   // u: the ground's prism thickness (WSR's KCL); the tree pack needs none (model3d.mjs sweeps it)
+const THICK = 5;   // u: the ground's prism thickness (WSR's KCL; kept in the meta for the harness)
 const COVER_BONE_MM = 4, PIN_PX = 0.1, SLOT_PX = 0.05;
 const sha1 = (b) => crypto.createHash("sha1").update(b).digest("hex");
 const pad2 = (n) => String(n).padStart(2, "0");
@@ -151,14 +156,40 @@ function topOver(m, t0, t1, x, z) {
   return best;
 }
 
+// an actor tree kind's mesh (collision/objects/<shape>, tools/nss-actortrees.py), once
+const kindCache = new Map();
+function kindMesh(kind, shape) {
+  if (kindCache.has(kind)) return kindCache.get(kind);
+  let k = null;
+  if (!fs.existsSync(path.join(COLL, "objects", `${shape}.json`))) missing(`no collision/objects/${shape}.* (the ${kind} actor tree's mesh: python -P tools/nss-actortrees.py writes it)`);
+  else {
+    const o = loadObject(COLL, shape);
+    if (o.meta.kind !== kind) fail(`collision/objects/${shape}: kind ${o.meta.kind}, not ${kind}`);
+    for (const c of o.surface) if (!TREE_CODES.has(c)) fail(`collision/objects/${shape}: surface code ${c} (a tree's are 37, 25, 43)`);
+    if (o.nv > 65535) fail(`collision/objects/${shape}: ${o.nv} vertices`);
+    k = { kind, shape, verts: o.verts, tris: o.tris, surface: o.surface, nv: o.nv, nt: o.nt, sha1: o.sha1, packSha1: o.meta.packSha1 };
+  }
+  kindCache.set(kind, k);
+  return k;
+}
+// the dump's placed actor trees (collision/hNN-actors.*), or null
+function dumpActors(hh) {
+  const jp = path.join(COLL, `h${hh}-actors.json`), bp = path.join(COLL, `h${hh}-actors.bin`);
+  if (!fs.existsSync(jp) || !fs.existsSync(bp)) return null;
+  const meta = readJson(jp), buf = fs.readFileSync(bp);
+  if (meta.binSha1 && sha1(buf) !== meta.binSha1) fail(`collision/h${hh}-actors.bin: SHA-1 differs from its json`);
+  return { meta, sha1: sha1(buf), ...readMeshBin(buf, meta.layout, `h${hh}-actors`) };
+}
+
 fs.mkdirSync(OUT, { recursive: true });
 const index = {
   version: 2, src: "nss",
-  _note: "NSS's collision meshes for the live solver (tools/build-course3d.mjs; src/live3d-core.js buildCourse reads them): per hole hNN.bin (V/T/A the ground pack, TV/TT/TA the tree pack; vertices in NSS metres, mesh = unitsPerM * nss + O) and hNN.json; WSR's physics (tools/harness/lib/model3d.mjs) on NSS's course",
+  _note: "NSS's collision meshes for the live solver (tools/build-course3d.mjs; src/live3d-core.js buildCourse reads them through tools/lib/nss3d.mjs, NSS's ball src/nsssim.js flies over them): per hole hNN.bin (V/T/A the ground pack, TV/TT/TA the tree pack, KV/KT/KA the actor trees' kind meshes; vertices in NSS metres, mesh = unitsPerM * nss + O) and hNN.json (meta.trees: each actor tree's kind and placement)",
   unitsPerM: 10, thick: THICK, cropM: CROP_M, attrMap: ATTR_MAP, attrs: ATTR_LABEL, holes: {}, source: {},
 };
 if (TREES_TEXT) index.source.trees = sha1(TREES_TEXT);
-let total = 0;
+let total = 0, actorAll = 0, actorTris = 0;
+const kindsUsed = new Map();
 for (let hole = 1; hole <= 21; hole++) {
   const hh = pad2(hole), reg = regOf(REG, hole), O = [reg.originMesh[0], reg.originMeshY, reg.originMesh[1]], U = reg.unitsPerM;
   const m = loadCollision(COLL, hole, { covers: true, extras: ["leaf", "water"] });
@@ -168,11 +199,10 @@ for (let hole = 1; hole <= 21; hole++) {
   const code = m.surface, V = m.verts, Tr = m.tris;
   // ---- per triangle: attribute, normal, xz box ----
   const nt = m.nt, attr = new Uint8Array(nt), ny = new Float64Array(nt), box = new Float64Array(4 * nt);
-  const drop = { cup: 0, zero: 0, crop: 0, backface: 0, dup: 0 }, unknown = {};
+  const drop = { zero: 0, crop: 0, backface: 0, dup: 0 }, unknown = {};
   const keep = new Uint8Array(nt);
   for (let t = 0; t < nt; t++) {
     const c = code[t];
-    if (DROP_CODES.has(c)) { drop.cup++; continue; }
     const a = ATTR_MAP[c];
     if (a == null) { unknown[c] = (unknown[c] ?? 0) + 1; continue; }
     attr[t] = a;
@@ -207,18 +237,20 @@ for (let hole = 1; hole <= 21; hole++) {
     if (BACKFACE_CODES.has(code[t])) { keep[t] = 0; drop.backface++; }
     else if (!TREE_ATTRS.has(attr[t])) otherDown[code[t]] = (otherDown[code[t]] ?? 0) + 1;
   }
-  // ---- duplicates (the same three positions), per pack: the ground keeps the
-  // up-facing copy (then the first), the trees (two-sided) the first ----
+  // ---- duplicates in the ground pack (the same three positions): the up-facing copy
+  // kept, then the first; the tree pack keeps every copy (see the head of this file) ----
   const groups = new Map(), mixed = {};
   const pkey = (i) => `${V[3 * i]},${V[3 * i + 1]},${V[3 * i + 2]}`;
+  let treeDup = 0;
   for (let t = 0; t < nt; t++) {
     if (!keep[t]) continue;
-    const k = (TREE_ATTRS.has(attr[t]) ? "T" : "G") + [pkey(Tr[3 * t]), pkey(Tr[3 * t + 1]), pkey(Tr[3 * t + 2])].sort().join("|");
-    const g = groups.get(k);
-    if (!g) { groups.set(k, t); continue; }
     const tree = TREE_ATTRS.has(attr[t]);
+    const k = (tree ? "T" : "G") + [pkey(Tr[3 * t]), pkey(Tr[3 * t + 1]), pkey(Tr[3 * t + 2])].sort().join("|");
+    const g = groups.get(k);
+    if (g == null) { groups.set(k, t); continue; }
     if (attr[g] !== attr[t]) { const mk = `${code[g]}+${code[t]}`; mixed[mk] = (mixed[mk] ?? 0) + 1; }
-    if (!tree && ny[t] > ny[g]) { keep[g] = 0; groups.set(k, t); } else keep[t] = 0;
+    if (tree) { treeDup++; continue; }
+    if (ny[t] > ny[g]) { keep[g] = 0; groups.set(k, t); } else keep[t] = 0;
     drop.dup++;
   }
   // ---- the two packs: vertices compacted in first-use order ----
@@ -238,16 +270,76 @@ for (let hole = 1; hole <= 21; hole++) {
     return { nv, nt: at.length, wide, V: new Float32Array(verts), T: wide ? new Uint32Array(idx) : new Uint16Array(idx), A: new Uint8Array(at) };
   };
   const G = build(false), TP = build(true);
-  const { buf, offs } = pack([["V", G.V], ["T", G.T], ["A", G.A], ["TV", TP.V], ["TT", TP.T], ["TA", TP.A]]);
+  // ---- the actor trees: their kinds' meshes once, each tree's placement, checked against the dump ----
+  const th = TREES?.holes?.[hh];
+  if (TREES && !th) missing(`H${hole}: not in ${path.basename(TREES_FILE)}`);
+  const wsrOf = (t) => (t.wsr && t.wsr.distPx <= 1 ? t.wsr.id : null);
+  const trees = [], treeInfo = [], tally = { actor: {}, field: 0, none: 0 }, kinds = [], kindIx = new Map();
+  for (const t of th?.trees ?? []) {
+    if (t.source === "none") { tally.none++; continue; }
+    if (t.source === "field") {
+      const P = nssToMesh(reg, t.base);
+      treeInfo.push({ id: t.id, kind: t.family, X: r4(P[0]), Z: r4(P[2]), wsr: wsrOf(t) });
+      tally.field++;
+      continue;
+    }
+    if (t.source !== "actor") fail(`H${hole} ${t.id}: tree source ${t.source}`);
+    const kind = KIND[t.family], s = t.srt?.scale, w = t.srt?.translate, rot = t.srt?.rotEulerRad;
+    if (!kind) fail(`H${hole} ${t.id}: tree family ${t.family}`);
+    if (!(s?.length === 3 && s.every((v) => Number.isFinite(v) && v > 0) && w?.length === 3 && w.every(Number.isFinite) && rot?.length === 3 && rot.every(Number.isFinite))) fail(`H${hole} ${t.id}: actor tree without a bone's scale, rotation and translation`);
+    if (!t.kind || !t.collisionShape?.shape) fail(`H${hole} ${t.id}: actor tree without its kind's collision shape`);
+    const km = kindMesh(t.kind, t.collisionShape.shape);
+    if (!km) continue;
+    if (!kindIx.has(t.kind)) { kindIx.set(t.kind, kinds.length); kinds.push(km); }
+    const P = nssToMesh(reg, w);
+    trees.push({
+      id: t.id, kind, x: r4(P[0]), base: r4(P[1]), z: r4(P[2]), sx: r4(s[0]), sy: r4(s[1]), sz: r4(s[2]), src: "actor", nss: t.kind, wsr: wsrOf(t),
+      k: kindIx.get(t.kind), S: s, R: eulerR(rot), T: w,
+    });
+    tally.actor[t.family] = (tally.actor[t.family] ?? 0) + 1;
+  }
+  let kv0 = 0, kt0 = 0;
+  const kindMeta = kinds.map((k) => { const e = { kind: k.kind, shape: k.shape, v0: kv0, nv: k.nv, t0: kt0, nt: k.nt, sha1: k.sha1, packSha1: k.packSha1 }; kv0 += k.nv; kt0 += k.nt; return e; });
+  const KV = new Float32Array(3 * kv0), KT = new Uint16Array(3 * kt0), KA = new Uint8Array(kt0);
+  kinds.forEach((k, i) => {
+    const e = kindMeta[i];
+    KV.set(k.verts, 3 * e.v0);
+    for (let j = 0; j < 3 * k.nt; j++) KT[3 * e.t0 + j] = k.tris[j] + e.v0;
+    for (let j = 0; j < k.nt; j++) KA[e.t0 + j] = ATTR_MAP[k.surface[j]];
+    kindsUsed.set(k.kind, { shape: k.shape, nv: k.nv, nt: k.nt, sha1: k.sha1, packSha1: k.packSha1 });
+  });
+  // the placement against the dump's own placed meshes: every vertex to the bit, the triangles and codes
+  const dump = trees.length ? dumpActors(hh) : null;
+  let checked = false, placedTris = 0;
+  for (const t of trees) placedTris += kinds[t.k].nt;
+  if (trees.length && !dump) missing(`H${hole}: no collision/h${hh}-actors.* to check the ${trees.length} actor trees' placement against`);
+  if (dump) {
+    if (JSON.stringify(dump.meta.trees) !== JSON.stringify(trees.map((t) => t.id))) fail(`H${hole}: collision/h${hh}-actors.json's trees are not trees.json's actor trees in order`);
+    let v = 0, tt = 0, bad = 0, first = null;
+    for (const t of trees) {
+      const k = kinds[t.k], W = placeActorTree(k.verts, t.S, t.R, t.T);
+      for (let i = 0; i < W.length; i++) if (W[i] !== dump.verts[3 * v + i]) { bad++; first ??= `${t.id} vertex ${Math.floor(i / 3)}: ${W[i]} against ${dump.verts[3 * v + i]}`; }
+      for (let j = 0; j < k.nt; j++) {
+        for (let q = 0; q < 3; q++) if (dump.tris[3 * (tt + j) + q] !== k.tris[3 * j + q] + v) { bad++; first ??= `${t.id} triangle ${j}`; }
+        if (dump.surface[tt + j] !== k.surface[j]) { bad++; first ??= `${t.id} triangle ${j}'s code`; }
+      }
+      v += k.nv; tt += k.nt;
+    }
+    if (v !== dump.nv || tt !== dump.nt) fail(`H${hole}: ${v} vertices / ${tt} triangles placed against collision/h${hh}-actors's ${dump.nv} / ${dump.nt}`);
+    if (bad) fail(`H${hole}: the actor trees' placement differs from collision/h${hh}-actors.bin in ${bad} numbers (first: ${first})`);
+    checked = true;
+  }
+  actorAll += trees.length; actorTris += placedTris;
+  const { buf, offs } = pack([["V", G.V], ["T", G.T], ["A", G.A], ["TV", TP.V], ["TT", TP.T], ["TA", TP.A], ["KV", KV], ["KT", KT], ["KA", KA]]);
   fs.writeFileSync(path.join(OUT, `h${hh}.bin`), buf);
   const byAttr = {};
   for (const a of [...G.A, ...TP.A]) byAttr[a] = (byAttr[a] ?? 0) + 1;
   if (!byAttr[6]) fail(`H${hole}: no green`);
-  // ---- the cups: the cover's top over the bone, mesh units ----
+  // ---- the cups: the cover's top over the bone, mesh units; and the bone ----
   const { m2f, f2m } = meshReg(reg);
   const cups = PINS.holes[hole].cups;
   if (cups.length !== 6) fail(`H${hole}: ${cups.length} cups`);
-  const pins = {}, cupAudit = [];
+  const pins = {}, bones = {}, cupAudit = [];
   for (const c of cups) {
     const cv = m.covers.find((x) => x.k === c.k);
     if (!cv) fail(`H${hole} c${c.k}: no cover`);
@@ -260,6 +352,7 @@ for (let hole = 1; hole <= 21; hole++) {
     const off = pxOff(apply(m2f, P[0], P[2]), c.x, c.y);
     if (!(off <= PIN_PX)) fail(`H${hole} c${c.k}: ${off.toFixed(3)} px from its map spot`);
     pins[`c${c.k}`] = P;
+    bones[`c${c.k}`] = nssToMesh(reg, c.world).map(r4);
     cupAudit.push(+off.toFixed(4));
   }
   // ---- tees (audit: the local tee stays the WSR start, INTEGRATION.md D3) ----
@@ -281,45 +374,24 @@ for (let hole = 1; hole <= 21; hole++) {
     });
   }
   const platform = { yawDeg: ph.yawDeg, facingDeg: ph.facingDeg, origin: tm(ph.origin), tiers };
-  // ---- the trees: the actor trees as WSR's analytic trees at their bones,
-  // the baked ones (their collision in the two packs) for naming a hit ----
-  const th = TREES?.holes?.[hh];
-  if (TREES && !th) missing(`H${hole}: not in ${path.basename(TREES_FILE)}`);
-  const wsrOf = (t) => (t.wsr && t.wsr.distPx <= 1 ? t.wsr.id : null);
-  const trees = [], treeInfo = [], tally = { actor: {}, field: 0, none: 0 };
-  for (const t of th?.trees ?? []) {
-    if (t.source === "none") { tally.none++; continue; }
-    if (t.source === "field") {
-      const P = nssToMesh(reg, t.base);
-      treeInfo.push({ id: t.id, kind: t.family, X: r4(P[0]), Z: r4(P[2]), wsr: wsrOf(t) });
-      tally.field++;
-      continue;
-    }
-    if (t.source !== "actor") fail(`H${hole} ${t.id}: tree source ${t.source}`);
-    const kind = KIND[t.family], s = t.srt?.scale, w = t.srt?.translate;
-    if (!kind) fail(`H${hole} ${t.id}: tree family ${t.family}`);
-    if (!(s?.length === 3 && s.every((v) => Number.isFinite(v) && v > 0) && w?.length === 3 && w.every(Number.isFinite))) fail(`H${hole} ${t.id}: actor tree without a bone's scale and translation`);
-    const P = nssToMesh(reg, w);
-    trees.push({ id: t.id, kind, x: r4(P[0]), base: r4(P[1]), z: r4(P[2]), sx: r4(s[0]), sy: r4(s[1]), sz: r4(s[2]), src: "actor", nss: t.kind, wsr: wsrOf(t) });
-    tally.actor[t.family] = (tally.actor[t.family] ?? 0) + 1;
-  }
   const meta = {
     version: 2, src: "nss", hole, id: m.meta.shape, O, unitsPerM: U, thick: THICK,
-    nv: G.nv, nt: G.nt, idx: G.wide ? "u32" : "u16", ntv: TP.nv, ntt: TP.nt, tidx: TP.wide ? "u32" : "u16", offs, bytes: buf.length,
+    nv: G.nv, nt: G.nt, idx: G.wide ? "u32" : "u16", ntv: TP.nv, ntt: TP.nt, tidx: TP.wide ? "u32" : "u16", nkv: kv0, nkt: kt0, offs, bytes: buf.length,
     grid: [crop[0], crop[1], crop[2], crop[3]].map((v, i) => r4(U * v + (i < 2 ? O[0] : O[2]))),
-    counts: { field: m.parts.find((p) => p.name === "field").tri1, covers: m.covers.reduce((s, c) => s + c.tri1 - c.tri0, 0), leaf: m.sha1.leaf ? m.parts.find((p) => p.name === "leaf").tri1 - m.parts.find((p) => p.name === "leaf").tri0 : 0, water: m.sha1.water ? m.parts.find((p) => p.name === "water").tri1 - m.parts.find((p) => p.name === "water").tri0 : 0, dropped: drop, croppedByPart: cropByPart, mixedDuplicates: mixed, downFacingKept: otherDown, byAttr },
-    pins, difficult: cups.filter((c) => c.difficult).map((c) => c.k), tee, platform, trees, treeInfo, decorTrees: tally.none,
+    counts: { field: m.parts.find((p) => p.name === "field").tri1, covers: m.covers.reduce((s, c) => s + c.tri1 - c.tri0, 0), leaf: m.sha1.leaf ? m.parts.find((p) => p.name === "leaf").tri1 - m.parts.find((p) => p.name === "leaf").tri0 : 0, water: m.sha1.water ? m.parts.find((p) => p.name === "water").tri1 - m.parts.find((p) => p.name === "water").tri0 : 0, dropped: drop, treeCopiesKept: treeDup, croppedByPart: cropByPart, mixedDuplicates: mixed, downFacingKept: otherDown, byAttr, actors: { trees: trees.length, kinds: kinds.length, triangles: placedTris, checkedAgainstDump: checked } },
+    pins, bones, difficult: cups.filter((c) => c.difficult).map((c) => c.k), tee, platform, kinds: kindMeta, trees, treeInfo, decorTrees: tally.none,
     reg: { src: "nss", m2f, f2m },
   };
   fs.writeFileSync(path.join(OUT, `h${hh}.json`), JSON.stringify(meta));
-  index.holes[hole] = { bin: `h${hh}.bin`, json: `h${hh}.json`, bytes: buf.length, sha1: sha1(buf), tris: G.nt, treeTris: TP.nt, verts: G.nv, treeVerts: TP.nv, actorTrees: trees.length };
-  index.source[hole] = m.sha1;
+  index.holes[hole] = { bin: `h${hh}.bin`, json: `h${hh}.json`, bytes: buf.length, sha1: sha1(buf), tris: G.nt, treeTris: TP.nt, verts: G.nv, treeVerts: TP.nv, actorTrees: trees.length, actorKinds: kinds.length, actorTris: placedTris };
+  index.source[hole] = { ...m.sha1, ...(dump ? { actors: dump.sha1 } : {}) };
   total += buf.length;
   const fmt = (o) => Object.entries(o).map(([k, v]) => `${k} ${v}`).join(", ");
-  console.log(`hole ${hole}: ${G.nt} ground + ${TP.nt} tree tris (${G.nv} + ${TP.nv} verts), ${(buf.length / 1024).toFixed(0)} KB; dropped ${fmt(drop)}${Object.keys(cropByPart).length ? ` (crop: ${fmt(cropByPart)})` : ""}${Object.keys(mixed).length ? `; mixed-code duplicates ${fmt(mixed)}` : ""}${Object.keys(otherDown).length ? `; down-facing kept ${fmt(otherDown)}` : ""}; cups ${Math.max(...cupAudit).toFixed(4)} px, platform ${slotOff.toFixed(4)} px; trees: ${trees.length} actor as WSR's shapes (${fmt(tally.actor)}), ${tally.field} baked, ${tally.none} decor left out${m.sha1.leaf ? "" : "; NO leaf canopies"}`);
+  console.log(`hole ${hole}: ${G.nt} ground + ${TP.nt} tree tris (${G.nv} + ${TP.nv} verts; ${treeDup} double-sided tree copies kept) + ${trees.length} actor trees of ${kinds.length} kinds (${kt0} kind tris, ${placedTris} placed${checked ? ", the dump's to the bit" : ", NOT checked"}), ${(buf.length / 1024).toFixed(0)} KB; dropped ${fmt(drop)}${Object.keys(cropByPart).length ? ` (crop: ${fmt(cropByPart)})` : ""}${Object.keys(mixed).length ? `; mixed-code duplicates ${fmt(mixed)}` : ""}${Object.keys(otherDown).length ? `; down-facing kept ${fmt(otherDown)}` : ""}; cups ${Math.max(...cupAudit).toFixed(4)} px, platform ${slotOff.toFixed(4)} px; trees: ${fmt(tally.actor)} actor, ${tally.field} baked, ${tally.none} decor left out${m.sha1.leaf ? "" : "; NO leaf canopies"}`);
 }
+index.kinds = Object.fromEntries([...kindsUsed.entries()].sort());
 // v1's palm mesh has no place in v2
 for (const f of fs.readdirSync(OUT)) if (f === "palm.bin") fs.unlinkSync(path.join(OUT, f));
 if (missingNotes.length) index.missing = missingNotes;
 fs.writeFileSync(path.join(OUT, "index.json"), JSON.stringify(index, null, 1));
-console.log(`21 holes, ${(total / 1024 / 1024).toFixed(1)} MB${missingNotes.length ? `; built WITHOUT (--allow-missing): ${missingNotes.join("; ")}` : ""}`);
+console.log(`21 holes, ${(total / 1024 / 1024).toFixed(2)} MB (${total} bytes); ${actorAll} actor trees, ${actorTris} triangles placed from ${kindsUsed.size} kind meshes${missingNotes.length ? `; built WITHOUT (--allow-missing): ${missingNotes.join("; ")}` : ""}`);

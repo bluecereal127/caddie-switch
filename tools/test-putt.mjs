@@ -44,9 +44,24 @@
 //  g. the real greens: the steepest gradient over each box; H7 from 10 yd
 //     below cup c2 up its fall line, run straight and solved (holed); a 30 yd
 //     putt's solve time (under 100 ms); H6 from 20 yd to cup c1, holed
-//  h. the gauge: T (NSS's putter table, PUTT_POWER_TABLE) and its inverse,
-//     gaugeBars, fitGreenSpeed (the default under 2 flat rows, a fitted speed
-//     recovered, non-flat rows ignored); src/model.js re-exports the putt solver
+//  h. the gauge: the launch at the whole percent the game reads ((int)(100
+//     power) in float32: puttV0 one speed over each percent's window), T (NSS's
+//     putter table, PUTT_POWER_TABLE: the roll of a power's percent) and its
+//     inverse (the nearest percent, at the middle of its window, a full gauge
+//     at 100 %), gaugeBars, fitGreenSpeed (the default under 2 flat rows, a
+//     fitted speed recovered, non-flat rows ignored); src/model.js re-exports
+//     the putt solver
+//  i. the putter assist (swing-power.md 6): the game's targets T1 and T2 from
+//     its own holeLo / holeHi and the launch they give, against every assisted
+//     putt Eden recorded (tools/fixtures/nss-putt-assist.json: Shot Assist on,
+//     the RAM player stroking for the target: the launch percent is T2 within
+//     7 m, T1 beyond, PowerMin 0.04 at least); the modes and their distances;
+//     solvePutt with Shot Assist's power cut (1.0) and its aim window; the
+//     search's hundredths up to 1.0 only (a 19 yd flat putt without Shot
+//     Assist: T1 at most 1.0, a snap window that is one; 22 yd: none; 0.53
+//     and 0.59 fly a percent low); the read on four of Eden's short putts over
+//     the mesh green holes at least 0.8 of the percents the widest aim does in
+//     a 0.25° sweep
 import { readFileSync, readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -100,7 +115,10 @@ const nss = (alongDeg, sideDeg, v, cup = null) => {
   let worstNss = 0, worstTab = 0, lo = Infinity, hi = 0;
   const line = [];
   for (let pct = 5; pct <= 150; pct += 5) {
-    const v = puttV0(pct / 100), r = roll(plane(), v), o = nss(0, 0, v);
+    // the table's speed at pct (puttV0 at the middle of the percent's window: the
+    // game's float32 reads 1.05 as 104 %, so pct / 100 is not always pct's)
+    const v = puttV0((pct + 0.5) / 100), r = roll(plane(), v), o = nss(0, 0, v);
+    ok(v === S.PHYSICS.launchTable.PT[pct - 1] / YD, `puttV0 at ${pct} % is not the table's speed`);
     worstNss = Math.max(worstNss, Math.abs(r.along - o.along)); worstTab = Math.max(worstTab, Math.abs(r.along - PUTT_ROLL_YD[pct - 1]));
     ok(Math.abs(r.along - o.along) <= 0.02 && Math.abs(r.along - PUTT_ROLL_YD[pct - 1]) <= 0.02, `flat ${pct} %: ${r.along.toFixed(3)} yd, nsssim ${o.along.toFixed(3)}, PUTT_ROLL_YD ${PUTT_ROLL_YD[pct - 1]}`);
     if (pct <= 100) { const q = r.along / ((pct / 100) * 20); lo = Math.min(lo, q); hi = Math.max(hi, q); }
@@ -142,8 +160,10 @@ const nss = (alongDeg, sideDeg, v, cup = null) => {
 // ---- c. the cup ----
 {
   const W = P.CUP_WINDOW;
-  near(CUP_R, 0.2149, 1e-9, "CUP_R, the window at rest, yd");
-  near(V_CAP, 5.3587, 1e-9, "V_CAP, the speed past which nothing drops, yd/s");
+  // src/nssShape.js's analytic cup, from src/nsssim.js (holed = a Cup contact; a roll meeting Cupside bounces off it,
+  // one contact a tick: the decodes of 2026-10-25; before them the window was 0.2149 yd and closed at 5.3587 yd/s)
+  near(CUP_R, 0.2116, 1e-9, "CUP_R, the window at rest, yd");
+  near(V_CAP, 4.2651, 1e-9, "V_CAP, the speed past which nothing drops, yd/s");
   ok(P.cupWindow(V_CAP) === 0 && P.cupWindow(9) === 0 && P.cupWindow(0) === CUP_R, "the window: CUP_R at rest, nothing from V_CAP on");
   ok(W.every(([v, w], i, a) => i === 0 || (v > a[i - 1][0] && w <= a[i - 1][1])), "CUP_WINDOW: rising speeds, a narrowing window");
   ok(P.cupWindow(1.5) > 0.21 && P.cupWindow(2.4) < 0.16 && P.cupWindow(3.5) < 0.11, `the window's drop: ${P.cupWindow(1.5)} / ${P.cupWindow(2.4)} / ${P.cupWindow(3.5)} yd at 1.5 / 2.4 / 3.5 yd/s`);
@@ -369,14 +389,26 @@ const greenOf = (n, cupId = null) => {
 {
   near(P.GREEN_SPEED, PUTT_ROLL_YD[99], 0, "GREEN_SPEED, NSS's flat roll at putter power 1.0");
   near(P.puttRoll(1), P.GREEN_SPEED, 1e-12, "T(1)");
-  near(P.puttRoll(0.555), (PUTT_ROLL_YD[54] + PUTT_ROLL_YD[55]) / 2, 1e-9, "T(0.555) between the rows");
+  // the floor: one launch over each percent's window, the next percent's from its edge
+  ok(puttV0(0.55) === puttV0(0.555) && puttV0(0.555) === puttV0(0.5599) && puttV0(0.56) > puttV0(0.5599) && puttV0(0) === 0, "puttV0: one speed over the 55 % window");
+  ok(P.puttRoll(0.55) === PUTT_ROLL_YD[54] && P.puttRoll(0.555) === PUTT_ROLL_YD[54] && P.puttRoll(0.5599) === PUTT_ROLL_YD[54] && P.puttRoll(0.56) === PUTT_ROLL_YD[55], "T: the roll of the power's percent");
   ok(P.PUTT_POWER_TABLE.length === 151 && P.PUTT_POWER_TABLE[150][0] === 1.5, "the gauge table runs to PowerOverMaxPT 1.5");
-  for (const [p] of P.PUTT_POWER_TABLE) near(P.puttPower(P.puttRoll(p)), p, 1e-12, `T⁻¹(T(${p}))`);
+  // T's inverse: every percent's roll back to that percent, at the middle of its window (a full gauge and 150 % themselves)
+  let inv = 0;
+  for (let k = 1; k <= 150; k++) {
+    const q = P.puttPower(PUTT_ROLL_YD[k - 1]), want = k === 100 || k === 150 ? k / 100 : (k + 0.5) / 100;
+    if (q === want && S.pctOf(q) === k && P.puttRoll(q) === PUTT_ROLL_YD[k - 1]) inv++;
+    else ok(false, `T⁻¹(T(${k} %)) = ${q}, expected ${want}`);
+  }
   near(P.gaugeBars(P.GREEN_SPEED), 4, 1e-12, "a full-gauge flat putt at NSS's greenSpeed");
-  near(P.gaugeBars(P.puttRoll(0.5)), 2, 1e-12, "a half-gauge flat putt");
+  near(P.gaugeBars(P.puttRoll(0.5)), 2.02, 1e-12, "a half-gauge flat putt (the 50 % window's middle)");
   near(P.gaugeBars(18, 18), 4, 1e-12, "a full gauge at greenSpeed 18");
-  near(P.gaugeBars(flatStop(puttV0(0.73))), 4 * 0.73, 0.004, "the gauge bars of the putter's own launch at 0.73");
-  for (const p of [0.004, 0.2, 0.73, 1.1, 1.5]) near(P.puttPowerOfV0(puttV0(p)), p, 1e-9, `puttV0's inverse at ${p}`);
+  near(P.gaugeBars(flatStop(puttV0(0.73))), 4 * 0.735, 1e-12, "the gauge bars of the putter's own launch at 0.73 (its percent's middle)");
+  near(P.powerBars(0.73), 2.94, 1e-12, "powerBars at 0.73");
+  for (const p of [0.004, 0.2, 0.73, 1.1, 1.5]) {
+    const q = P.puttPowerOfV0(puttV0(p));
+    ok(puttV0(q) === puttV0(p) && S.pctOf(q) === S.pctOf(p) && (q === p || Math.abs(q - (S.pctOf(p) + 0.5) / 100) < 1e-12), `puttV0's inverse at ${p}: ${q}`);
+  }
   ok(P.fitGreenSpeed([]).greenSpeed === P.GREEN_SPEED && P.fitGreenSpeed([{ bars: 2, rolled: 9, flat: true }]).greenSpeed === P.GREEN_SPEED, "under 2 flat rows: the default");
   const gs = 18, rows = [1, 2, 3, 4, 2.5].map((b, k) => ({ id: k, hole: 1, bars: b, rolled: (P.puttRoll(b / 4) / P.GREEN_SPEED) * gs, flat: true }));
   near(P.fitGreenSpeed(rows).greenSpeed, gs, 1e-9, "greenSpeed recovered from flat rows");
@@ -384,7 +416,89 @@ const greenOf = (n, cupId = null) => {
   ok(Math.abs(P.fitGreenSpeed([{ bars: 4, rolled: 20 }, { bars: 4, rolled: 22 }]).greenSpeed - 21) < 1e-12, "the median of an even count");
   ok(M.simPutt === P.simPutt && M.solvePutt === P.solvePutt && M.CUP_R === CUP_R && M.V_CAP === V_CAP && M.puttField === puttField, "src/model.js re-exports the putt solver");
   ok(!("wsrPuttV0" in P) && !("launchHop" in P) && !("CREEP_DEG" in P), "WSR's putter pieces are gone from src/putt.js");
-  console.log(`h. gauge: ${P.GREEN_SPEED} yd = ${P.gaugeBars(P.GREEN_SPEED)} bars, ${P.puttRoll(0.5).toFixed(2)} = ${P.gaugeBars(P.puttRoll(0.5))}; greenSpeed ${gs} recovered from ${rows.length} flat rows`);
+  console.log(`h. gauge: ${P.GREEN_SPEED} yd = ${P.gaugeBars(P.GREEN_SPEED)} bars, ${P.puttRoll(0.5).toFixed(2)} = ${P.gaugeBars(P.puttRoll(0.5))}; ${inv} of 150 percents' rolls back to their percent; greenSpeed ${gs} recovered from ${rows.length} flat rows`);
+}
+
+// ---- i. the putter assist ----
+{
+  const PT = S.PHYSICS.launchTable.PT;
+  const A = P.PUTT_ASSIST;
+  ok(A.handeHigh.enableM === 30 && A.handeHigh.closeM === 7 && A.handeHigh.snap === 0.15 && A.handeHigh.snapClose === 0.25 && A.normal.enableM === 25 && A.normal.closeM === 3 && A.normal.snap === 0.03 && A.normal.snapClose === 0.2 && A.handeLow.enableM === 30 && A.handeLow.closeM === 4, "PUTT_ASSIST: swing-power.md 6's distances and curves");
+  ok(P.puttAssistMode({ shotAssist: true }) === "handeHigh" && P.puttAssistMode({ shotAssist: false }) === "normal" && P.puttAssistMode({ shotAssist: false, handicap: 4 }) === "handeHigh" && P.puttAssistMode({ shotAssist: false, handicap: 2 }) === "handeLow" && P.puttAssistMode({ shotAssist: false, handicap: 1 }) === "normal", "the assist's mode");
+  // the game's own launches: every assisted putt of the RAM player's rounds (Shot Assist on, stroked for the target)
+  let fx = null;
+  try { fx = JSON.parse(readFileSync(join(root, "tools/fixtures/nss-putt-assist.json"), "utf8")); } catch {}
+  if (fx) {
+    let n = 0, closeN = 0;
+    for (const p of fx.putts) {
+      const sp = Math.hypot(...p.v0), k = PT.findIndex((v) => Math.abs(v - sp) < 0.006) + 1;
+      const d = Math.hypot(p.cup[0] - p.start[0], p.cup[2] - p.start[2]);
+      // the holing range as solvePutt reports one: the lowest holing percent's edge to the highest's
+      const a = P.puttAssist({ lo: p.holeLo / 100 + 1e-4, hi: (p.holeHi + 1) / 100 - 1e-4 }, d, { shotAssist: true });
+      const want = a ? a.pct.lo : null;
+      ok(a && a.holeLo === p.holeLo / 100 && a.holeHi === p.holeHi / 100 && k === want && a.close === (d <= 7), `${p.tag} (${d.toFixed(2)} m, holes ${p.holeLo}-${p.holeHi} %): launched at ${k} %, the assist says ${want} % (T1 ${a?.target}, T2 ${a?.low})`);
+      n++; if (a?.close) closeN++;
+    }
+    ok(n >= 15, `the fixture's assisted putts: ${n}`);
+    console.log(`i. the putter assist: ${n} of Eden's assisted putts launched at the game's target from its own holeLo / holeHi (${closeN} within 7 m at T2 = holeLo + 0.02, PowerMin 0.04 at least; ${n - closeN} beyond at T1)`);
+  } else console.log("i. the putter assist: tools/fixtures/nss-putt-assist.json missing, the recorded launches skipped");
+  // the windows: beyond 7 m within 0.15 of T1 (every stroke past 1.0 cut to 1.0 inside it), within 7 m T2 - 0.25 .. T1 + 0.25; none past 30 m or from the fringe; without Shot Assist 0.03 / 0.2 and 25 / 3 m
+  const far = P.puttAssist({ lo: 0.6401, hi: 0.7199 }, 7.07), near7 = P.puttAssist({ lo: 0.1101, hi: 0.3499 }, 1.89), top = P.puttAssist({ lo: 0.9901, hi: 1 }, 15.65);
+  ok(far.target === 0.67 && far.low === null && Math.abs(far.snap.lo - 0.52) < 1e-12 && Math.abs(far.snap.hi - 0.82) < 1e-12, `beyond 7 m: ${JSON.stringify(far)}`);
+  ok(near7.close && near7.target === 0.23 && near7.low === 0.13 && near7.snap.lo === 0 && Math.abs(near7.snap.hi - 0.48) < 1e-12 && near7.launch.lo === 0.13 && near7.launch.hi === 0.23, `within 7 m: ${JSON.stringify(near7)}`);
+  ok(top.target === 1 && top.snap.hi === Infinity && P.puttAssist({ lo: 0.9901, hi: 1 }, 15.65, { shotAssist: false }).snap.hi === 1, "past a full gauge: every stroke cut to 1.0 with Shot Assist, none pulled without");
+  ok(P.puttAssist({ lo: 0.5, hi: 0.6 }, 30.5) === null && P.puttAssist({ lo: 0.5, hi: 0.6 }, 26, { shotAssist: false }) === null && P.puttAssist({ lo: 0.5, hi: 0.6 }, 26) !== null && P.puttAssist({ lo: 0.5, hi: 0.6 }, 5, { fringe: true }) === null && P.puttAssist(null, 5) === null, "no assist past 30 m (25 without Shot Assist), from the fringe or without a holing range");
+  const off = P.puttAssist({ lo: 0.6401, hi: 0.7199 }, 7.07, { shotAssist: false }), off3 = P.puttAssist({ lo: 0.1101, hi: 0.3499 }, 2.5, { shotAssist: false });
+  ok(off.mode === "normal" && !off.close && Math.abs(off.snap.hi - off.snap.lo - 0.06) < 1e-12 && off3.close && Math.abs(off3.snap.hi - 0.43) < 1e-12, `without Shot Assist: ${JSON.stringify(off)} / ${JSON.stringify(off3)}`);
+  // Shot Assist's cut: a 28 yd flat putt needs past a full gauge (20.13 yd); at powerMax 1 the read stops at 1.0
+  const flat = { W: 40, H: 40, src: "flat", grad(x, y, o) { o[0] = 0; o[1] = 0; } }, b = { x: 0.5, y: 0.85 }, c = { x: 0.5, y: 0.15 };
+  const free = solvePutt(flat, b, c), cut = solvePutt(flat, b, c, { powerMax: P.PUTT_POWER_MAX_ASSIST });
+  ok(free.r.holed && free.power.lo > 1 && !cut.r.holed && cut.r.v0 <= puttV0(1) + 1e-12 && !cut.power, `a 28 yd flat putt: ${free.r.holed ? `holes at ${free.power.lo.toFixed(2)}-${free.power.hi.toFixed(2)}` : "misses"} free, at powerMax 1 ${cut.r.holed ? "holes" : `stops ${cut.r.best.toFixed(1)} yd short`}`);
+  // the aim window round the read
+  const side = { W: 20, H: 20, src: "side", grad(x, y, o) { o[0] = Math.tan(2 * DEG); o[1] = 0; } }, s2 = solvePutt(side, { x: 0.5, y: 0.75 }, { x: 0.5, y: 0.25 });
+  ok(s2.aims && s2.aims.lo <= s2.a && s2.a <= s2.aims.hi && s2.aims.hi - s2.aims.lo >= 0.2, `the aim window ${JSON.stringify(s2.aims)} round aim ${s2.a}`);
+  // the game's search never tries past 1.0: a putt whose holing range runs past it (Shot Assist off, a long putt)
+  // is clipped there, and one that starts past it gets no assist; its hundredths fly their own percents (0.53 52 %)
+  const flatAt = (yd) => solvePutt(flat, { x: 0.5, y: 0.9 }, { x: 0.5, y: 0.9 - yd / 40 });
+  const s19 = flatAt(19), a19 = P.puttAssist(s19.power, 19 * YD, { shotAssist: false }), s22 = flatAt(22);
+  ok(s19.power && s19.power.hi > 1 && a19 && a19.holeHi <= 1 && a19.target <= 1 && a19.snap.lo <= a19.snap.hi, `a 19 yd flat putt, Shot Assist off (holing ${s19.power?.lo.toFixed(2)}-${s19.power?.hi.toFixed(2)}): ${JSON.stringify(a19)}`);
+  ok(s22.power && s22.power.lo > 1 && P.puttAssist(s22.power, 22 * YD, { shotAssist: false }) === null, `a 22 yd flat putt holing from ${s22.power?.lo.toFixed(2)}: no assist (no holing trial up to 1.0)`);
+  const odd = P.puttAssist({ lo: 0.5301, hi: 0.5899 }, 5);
+  ok(odd.holeLo === 0.54 && odd.holeHi === 0.59, `percents 53-58: the search's holeLo / holeHi ${odd.holeLo} / ${odd.holeHi} (0.53 flies 52 %, 0.59 58 %)`);
+  // the read on Eden's short putts, over the mesh green as App builds it: its holing window at least 0.8 of the widest
+  // any aim gives in a 0.25° sweep (until 2026-10-25 the widening stopped 4° from the softest holing putt, a dying one
+  // well off the line: r2-h06s3 read 2 percents against 24)
+  if (fx) {
+    const L = await imp("src/live3d-core.js");
+    const DER = JSON.parse(readFileSync(join(root, "public/derived.json"), "utf8")).holes;
+    const hh = (n) => String(n).padStart(2, "0");
+    const out = [];
+    for (const tag of ["r2-h02s2", "r2-h06s3", "r3-h02s2", "r3-h06s3"]) {
+      const p = fx.putts.find((q) => q.tag === tag);
+      const meta = JSON.parse(readFileSync(join(root, `public/course3d/h${hh(p.hole)}.json`), "utf8"));
+      const d = DER[p.hole], g = parseGreenHeights(readFileSync(join(root, `public/terrain/g${hh(p.hole)}.bin`)));
+      const box = d.greenBox, W = (box.x1 - box.x0) * MAP_W * d.scale, H = (box.y1 - box.y0) * MAP_H * d.scale;
+      const field = puttField({ green: { box, grid: d.grid, slopeMaxPct: d.slopeMaxPct }, heights: g, W, H });
+      const [mx, my] = L.toMap(meta, meta.unitsPerM * p.start[0] + meta.O[0], meta.unitsPerM * p.start[2] + meta.O[2]);
+      const pin = d.pins.find((q) => q.id === `c${p.cupK}`);
+      const ball = { x: (mx - box.x0) / (box.x1 - box.x0), y: (my - box.y0) / (box.y1 - box.y0) }, cup = { x: (pin.x - box.x0) / (box.x1 - box.x0), y: (pin.y - box.y0) / (box.y1 - box.y0) };
+      const s = solvePutt(field, ball, cup, { powerMax: P.PUTT_POWER_MAX_ASSIST }), vD = vFlat(s.r.D);
+      const n = s.power ? S.pctOf(s.power.hi) - S.pctOf(s.power.lo) + 1 : 0;
+      let wide = { a: null, n: 0 };
+      for (let a = -36; a <= 36; a += 0.25) {
+        let run = 0, longest = 0, miss = 0;
+        for (let k = 1; k <= 100 && miss < 12; k++) {
+          if (simPutt(field, ball, cup, a, puttV0((k + 0.5) / 100) / vD, { trace: false }).holed) { run++; miss = 0; if (run > longest) longest = run; }
+          else { run = 0; if (longest) miss++; }
+        }
+        if (longest > wide.n) wide = { a, n: longest };
+      }
+      ok(s.r.holed && n >= 0.8 * wide.n, `${tag} (${s.r.D.toFixed(2)} yd): the read ${s.a.toFixed(2)}° holes ${n} percents, the widest aim ${wide.a}° ${wide.n}`);
+      out.push(`${tag} ${s.a.toFixed(2)}° ${n} of ${wide.n}`);
+    }
+    console.log(`   the read on Eden's short putts (holing percents at the read's aim, of the widest at 0.25°): ${out.join(", ")}; a 19 yd flat putt without Shot Assist: the assist's T1 ${a19.target} (the model's range to ${s19.power.hi.toFixed(2)})`);
+  }
+  console.log(`   windows: beyond 7 m ${far.snap.lo.toFixed(2)}-${far.snap.hi.toFixed(2)} (T1 ${far.target}), within 7 m ${near7.snap.lo.toFixed(2)}-${near7.snap.hi.toFixed(2)} (T2 ${near7.low}, T1 ${near7.target}); without Shot Assist ${off.snap.lo.toFixed(2)}-${off.snap.hi.toFixed(2)}; a 28 yd flat putt holes at ${free.power.lo.toFixed(2)}-${free.power.hi.toFixed(2)} free, stops ${cut.r.best.toFixed(1)} yd short at 1.0; the 2-degree read's aims ${s2.aims.lo.toFixed(2)}-${s2.aims.hi.toFixed(2)} round ${s2.a.toFixed(2)}`);
 }
 
 console.log(fails ? `${fails} FAILURES` : "all putt checks passed");

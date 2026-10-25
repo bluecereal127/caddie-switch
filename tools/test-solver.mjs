@@ -12,31 +12,37 @@
 //     the lofts and the lie caps NSS's (RoughRatio 0.75, BunkerRatio 0.25 /
 //     0.5 / 0.75)
 //  b. the shape: S(1, fairway) = 1, the 4-bar fairway stop exactly 4a, the
-//     carry rising, the carry the same on every surface; NSS's steps down (a
-//     bounce more where a landing crosses the roll switch): every one on
-//     fairway is one more bounce in the flight itself; the generator writes
-//     the committed file byte for byte, twice
-//  c. the round trip: a distance off the table's rising pieces solves to a
-//     power whose stop is that distance; where the distance has one solution
-//     it is the power asked (within 0.01 bar); the seed clubs are NSS's own
-//     (a = stopYd / 4: k = 1 to the bit, h = c = 0, CarryMaxYard and LoftDeg
-//     carried): the driver at NSS's 265.6 yd at 4.00 flat and over a level
-//     profile
-//  d. surfaces: each landing surface's rec stops at the distance on that
-//     surface; water, OB, walls and no read solve as fairway; no spin range
-//     (rollSpin null). The power scan: a distance inside the jump up onto a
-//     green gets no rec; inside NSS's step down (a bounce more) the solution
-//     either side is found and the better scored taken; a strip narrower than a
-//     scan step under a solution's carry is not shipped. Real holes: the App's
-//     default line over the committed terrain on every hole, from the tee and
-//     from rough, every 5 yd: every rec on the surface its carry reads, its
-//     stop the distance. Synthetic holes of random strips (1,000 distances
-//     over ten with strips 2-25 yd wide, 300 over three down to 0.2 yd) against
-//     a 0.001-bar trace cut into rising runs: every rec stops within 0.01 yd on
-//     its carry's surface, on a club whose trace reaches the distance; on the
-//     wide holes every reaching club gets a rec with the trace's best score
-//     and maxReach is the traces' top. One calm solve with 7 clubs under 10 ms
-//  e. caps: rough 3 bars, bunker per BUNKER_CAPS; `red` exactly from cap - 0.1;
+//     carry rising, the carry the same on every surface; the floor: the stop,
+//     the carry and the launch are the table's at the whole percent the game
+//     reads ((int)(100 power) in float32), one value over each percent's
+//     window, and a rec's power (the middle of its window, the cap at the
+//     cap's) launches its percent; NSS's steps down (a bounce more where a
+//     landing crosses the roll switch): every one on fairway is one more
+//     bounce in the flight itself; the generator writes the committed file
+//     byte for byte, twice
+//  c. the round trip: a percent's stop solves to that percent where the
+//     distance has one solution (exactly its stop), else to the best-scored
+//     solution of an independent percent-by-percent trace (runs that do not
+//     fall on one surface, the percent nearest the distance on each run that
+//     reaches it within STOP_TOL); the seed clubs are NSS's own (a = stopYd /
+//     4: k = 1 to the bit, h = c = 0, CarryMaxYard and LoftDeg carried): the
+//     driver at NSS's 265.6 yd at 4.00 flat and over a level profile
+//  d. surfaces: each landing surface's rec is the trace's on that surface;
+//     water, OB, walls and no read solve as fairway; no spin range (rollSpin
+//     null). The percent scan: a distance inside the jump up onto a green gets
+//     no rec; inside NSS's step down (a bounce more) the solution either side
+//     is found and the better scored taken; a green strip under one percent's
+//     carry and no other's turns that percent's landing green. Real holes: the
+//     App's default line over the committed terrain on every hole, from the
+//     tee and from rough, every 5 yd: every rec on the surface its carry
+//     reads, the trace's best percent. Synthetic holes of random strips (1,000
+//     distances over ten with strips 2-25 yd wide, 300 over three down to 0.2
+//     yd) against the percent trace: every rec on its carry's surface, the
+//     trace's best percent for its club, every club the trace has a solution
+//     for gets one, and maxReach is the traces' top. One calm solve with 7
+//     clubs under 10 ms
+//  e. caps: rough 3 bars, bunker per BUNKER_CAPS; `red` exactly from cap - 0.1
+//     (the first percent whose power reaches it red, the one below not);
 //     nothing past the reach
 //  f. fitClub recovers a and h (the residual over NSS's wind) from rows made
 //     by NSS's flights at 2-4 bars in -10..10 mph along, with and without
@@ -46,16 +52,18 @@
 //     src/model.js): a fixed grid of putts over painted grids gives the
 //     outputs recorded when the NSS model was written (tools/test-putt.mjs is
 //     its acceptance; this pins the numbers so a change to them is seen)
-//  h. wind and elevation: the dial's mph as NSS's s (floor(2.25 s)'s inverse);
+//  h. wind and elevation: the dial's mph as NSS's s (the HUD table's inverse);
 //     a tailwind takes less power, a crosswind aims against its drift, the
-//     flown rec stops at the distance (elev false without heights); a level
+//     flown rec stops as near the distance as a percent gets (elev false
+//     without heights); a level
 //     profile flies the plane, a 10 yd drop behind the ball changes nothing,
 //     a 3-degree profile flies the tilted plane; a digest of 40 solver flights;
 //     a full driver over a 20 yd step (down: carries over 10 yd further, dh <
 //     0; up: shorter, dh > 0); H21 and H17 on the default line over the
 //     committed terrain (H21 carries further and lands below, H17 less and
-//     above); a level profile gives the table's power within 0.01 bar; H21's
-//     round trip (within 0.02 bar); stopAt is the rec's stop (with the solve's
+//     above); a level profile gives the table's percent; H21's round trip
+//     (its own percent, or one stopping within STOP_TOL of it); stopAt is the
+//     rec's stop (with the solve's
 //     wind), maxReach the top cap flight, ballLift, no heights in calm solves
 //     flat, a bank gets the closest flight flagged approx; a 7-club solve on
 //     H21's line within the budget
@@ -73,7 +81,7 @@ const imp = (p) => import(pathToFileURL(join(root, p)).href);
 const S = await imp("src/nsssim.js");
 const { NSS_SHAPE, SHAPE_Q, SHAPE_SURFACES } = await imp("src/nssShape.js");
 const M = await imp("src/model.js");
-const { DEFAULT_CLUBS, BUNKER_CAPS, capFor, landingSurface, stopOf, carryOf, landedStop, stopAt, STOP_TOL, solve, fitClub, simPutt, solvePutt, simProfile, lineProfile, windS, windOf } = M;
+const { DEFAULT_CLUBS, BUNKER_CAPS, capFor, landingSurface, stopOf, carryOf, landedStop, stopAt, STOP_TOL, pctOfBars, barsOfPct, solve, fitClub, simPutt, solvePutt, simProfile, lineProfile, windS, windOf, launchV0 } = M;
 const { gridField } = await imp("src/putt.js");
 let fails = 0; const ok = (c, msg) => { if (!c) { fails++; console.log("FAIL:", msg); } };
 const near = (got, want, tol, what) => ok(Math.abs(got - want) <= tol, `${what}: ${Number(got).toFixed(3)}, expected ${want} ± ${tol}`);
@@ -84,6 +92,29 @@ const ask = (clubs, dist, lie = "fairway", ctx = {}, wind = {}) =>
   solve(clubs, { dist, windSpeed: wind.speed ?? 0, relWindDeg: wind.deg ?? 0, lie, hole: 0, stroke: 1 }, [], ctx);
 // NSS's ball on a level plane of one attribute, from rest, at a whole percent
 const plane = (attr) => ({ heightAt: () => 0, normalAt: () => [0, 1, 0], attrAt: () => attr });
+// the game's percent for a power in bars ((int)(100 power) in float32, src/nsssim.js
+// pctOf) and a percent as a rec reports it: the middle of its window, the cap at the cap's
+const pctOfB = (bars) => Math.min(100, S.pctOf(bars / 4));
+const barsOfK = (k, cap) => (k >= pctOfB(cap) ? cap : (4 * (k + 0.5)) / 100);
+// The percent trace, apart from the solver: a club's percents from the solver's
+// floor (0.4 bars) to the cap, each on the surface its own carry reads
+// (fairway without surfaceAt), cut into runs that do not fall on one surface;
+// a distance's solutions: on each run reaching it (within STOP_TOL past its
+// ends) the percent stopping nearest it (the lower on a tie)
+const pctRuns = (cl, cap, surfaceAt = null) => {
+  const runs = [];
+  let cur = null;
+  for (let k = pctOfB(0.4); k <= pctOfB(cap); k++) {
+    const p = barsOfK(k, cap), carry = carryOf(cl, p), sf = landingSurface(surfaceAt ? surfaceAt(carry) : null), r = { k, p, carry, s: sf, stop: stopOf(cl, p, sf) };
+    if (cur && cur[0].s === sf && r.stop >= cur[cur.length - 1].stop) cur.push(r); else runs.push((cur = [r]));
+  }
+  return runs;
+};
+const solutionsIn = (runs, d) => runs.filter((run) => run[0].stop - STOP_TOL <= d && d <= run[run.length - 1].stop + STOP_TOL)
+  .map((run) => run.reduce((m, r) => (Math.abs(r.stop - d) < Math.abs(m.stop - d) ? r : m)));
+const solutionsOf = (cl, d, cap = 4, surfaceAt = null) => solutionsIn(pctRuns(cl, cap, surfaceAt), d);
+const scoreOf = (p, cap) => Math.abs(p / cap - 0.8) + (p / cap > 0.97 ? 0.5 : 0);
+const bestOf = (sols, cap) => sols.reduce((b, x) => (!b || scoreOf(x.p, cap) < scoreOf(b.p, cap) || (scoreOf(x.p, cap) === scoreOf(b.p, cap) && x.p < b.p) ? x : b), null);
 const flyPct = (id, pct, attr = 1) => {
   const t = NSS_SHAPE[id], v = S.PHYSICS.launchTable[t.club][pct - 1], L = t.loftDeg * DEG;
   return S.run({ club: t.club, v0: [0, v * Math.sin(L), -v * Math.cos(L)], lie: "fairway", start: [0, 0.05, 0], heading: 0, ground: plane(attr) });
@@ -166,6 +197,26 @@ const flyPct = (id, pct, attr = 1) => {
   }
   ok(steps > 0 && stepsBounce === steps, `fairway steps down: ${stepsBounce} of ${steps} are a bounce more`);
   const dS = NSS_SHAPE.driver;
+  // the floor: one stop, carry and launch over each percent's window (the game
+  // reads the table at (int)(100 power)), the next percent's from its edge, and a
+  // rec's power (barsOfPct) launches its own percent
+  {
+    let windows = 0;
+    for (const id of IDS) {
+      const cl = byId[id], t = NSS_SHAPE[id], tb = S.PHYSICS.launchTable[t.club];
+      for (let k = 1; k <= 100; k++) {
+        // (the window's low edge a hair in: the game's float32 reads 0.53 and 0.59 as 52 and 58 %)
+        const lo = (4 * (k + 0.001)) / 100, mid = barsOfPct(k, 4), hiB = (4 * (k + 0.999)) / 100, sk = 4 * cl.a * t.S.fairway[k - 1], ck = 4 * cl.a * t.C[k - 1];
+        const same = [lo, mid, hiB].filter((b) => b <= 4).every((b) => stopOf(cl, b) === sk && carryOf(cl, b) === ck && pctOfBars(b) === k && -launchV0(id, b / 4)[2] === tb[k - 1] * Math.cos(t.loftDeg * DEG));
+        ok(same, `${id} at ${k} %: the stop, carry or launch is not the table's over the window`);
+        ok(pctOfBars(mid) === k && (k === 100 ? mid === 4 : Math.abs(mid - (4 * (k + 0.5)) / 100) < 1e-15), `${id}: barsOfPct(${k}) = ${mid} does not launch ${k} %`);
+        if (same) windows++;
+      }
+      for (const cap of [3, 2, 1]) ok(barsOfPct(pctOfBars(cap), cap) === cap, `barsOfPct at the ${cap}-bar cap's percent is not the cap`);
+    }
+    ok(stopOf(byId.driver, 2.41) === stopOf(byId.driver, 2.43) && stopOf(byId.driver, 2.44) > stopOf(byId.driver, 2.43), "the driver's 60 % window: one stop, the next from 2.44 bars");
+    console.log(`floor: ${windows} percent windows (7 clubs x 100) one stop, carry and launch from edge to edge; barsOfPct launches its percent`);
+  }
   near(dS.S.fairway[24] * dS.stopYd, 89.1, 0.1, "driver at 1 bar on fairway");
   near(dS.S.fairway[49] * dS.stopYd, 154.8, 0.1, "driver at 2 bars on fairway");
   near(dS.S.fairway[74] * dS.stopYd, 203.7, 0.1, "driver at 3 bars on fairway");
@@ -186,31 +237,22 @@ const flyPct = (id, pct, attr = 1) => {
 }
 
 // ---- c. the round trip ----
-// a club's solutions for d on the table (fairway, calm): every rising piece
-// between two 0.001-bar samples that straddles it
-const solutionsOf = (cl, d, cap = 4) => {
-  const out = [], n = Math.round((cap - 0.4) / 0.001);
-  let pp = 0.4, fp = stopOf(cl, pp);
-  for (let k = 1; k <= n; k++) {
-    const p = k === n ? cap : 0.4 + k * 0.001, f = stopOf(cl, p);
-    if (f >= fp && fp <= d && d <= f) out.push(pp + ((d - fp) / (f - fp || 1)) * (p - pp));
-    pp = p; fp = f;
-  }
-  return out.filter((x, i, a) => i === 0 || x - a[i - 1] > 0.02);
-};
+// a percent's stop (fairway, calm) solves to that percent where the trace has
+// one solution there, else to the trace's best scored
 {
-  let worstTrip = 0, unique = 0, many = 0;
+  let unique = 0, many = 0;
   for (const cl of DEFAULT_CLUBS) for (let p = 1; p <= 4; p += 0.25) {
-    const d = stopOf(cl, p), { recs } = ask([cl], d);
+    const k = pctOfB(p), d = stopOf(cl, p), { recs } = ask([cl], d);
     const sols = solutionsOf(cl, d);
     ok(recs.length === 1, `${cl.id} at ${p} bars: no rec`);
-    if (!recs[0]) continue;
-    ok(Math.abs(stopOf(cl, recs[0].power) - d) < 1e-6, `${cl.id} at ${p} bars: the rec's stop ${stopOf(cl, recs[0].power)} is not ${d}`);
-    if (sols.length === 1) { unique++; worstTrip = Math.max(worstTrip, Math.abs(recs[0].power - p)); near(recs[0].power, p, 0.01, `${cl.id} round trip at ${p} bars`); }
+    const r = recs[0];
+    if (!r) continue;
+    ok(r.pct === pctOfBars(r.power) && r.power === barsOfPct(r.pct, 4) && Math.abs(r.carry + r.roll - stopOf(cl, r.power)) < 1e-9, `${cl.id} at ${p} bars: the rec's power ${r.power} is not its percent ${r.pct}'s, or its stop not that percent's`);
+    if (sols.length === 1) { unique++; ok(r.pct === k && Math.abs(r.carry + r.roll - d) < 1e-9, `${cl.id} round trip at ${p} bars (${k} %): ${r.pct} %`); }
     else {
       many++;
-      const best = sols.reduce((b, x) => (Math.abs(x / 4 - 0.8) < Math.abs(b / 4 - 0.8) ? x : b));
-      near(recs[0].power, best, 0.01, `${cl.id} at ${p} bars (${sols.length} solutions ${sols.map((x) => x.toFixed(2)).join(" / ")}): not the best scored`);
+      const best = bestOf(sols, 4);
+      ok(r.pct === best.k, `${cl.id} at ${p} bars (${sols.length} solutions ${sols.map((x) => `${x.k} %`).join(" / ")}): ${r.pct} %, not the best scored ${best.k} %`);
     }
   }
   // the seeds are NSS's own: k = 4a / stopYd is 1 to the bit, h = c = 0
@@ -225,7 +267,7 @@ const solutionsOf = (cl, d, cap = 4) => {
   ok(r && Math.abs(r.power - 4) < 1e-9 && Math.abs(r.carry + r.roll - sd) < 1e-9 && r.elev === false && r.stop == null, `driver at ${sd} yd: ${r?.power}, expected 4.00 flat`);
   const rl = ask([byId.driver], sd, "fairway", { heightAt: () => 0, surfaceAt: () => "fairway" }).recs[0];
   ok(rl && rl.elev && Math.abs(rl.power - 4) < 0.01 && Math.abs(rl.stop - sd) <= STOP_TOL, `driver at ${sd} yd over a level profile: ${rl ? `${rl.power.toFixed(4)} bars, stop ${rl.stop.toFixed(3)}` : "no rec"}, expected 4.00`);
-  console.log(`round trip: 7 clubs x 13 powers: ${unique} with one solution, worst ${worstTrip.toExponential(2)} bar; ${many} with more (a step down between), the best scored taken; k = 1: the driver to NSS's ${sd} yd needs ${r?.power.toFixed(4)} bars flat, ${rl?.power.toFixed(4)} over a level profile (stop ${rl?.stop.toFixed(3)})`);
+  console.log(`round trip: 7 clubs x 13 powers: ${unique} with one solution, each its own percent and stop; ${many} with more (a step down between, or a run's end within STOP_TOL), the best scored taken; k = 1: the driver to NSS's ${sd} yd needs ${r?.power.toFixed(4)} bars flat, ${rl?.power.toFixed(4)} over a level profile (stop ${rl?.stop.toFixed(3)})`);
 }
 
 // ---- d. surfaces ----
@@ -233,14 +275,14 @@ const solutionsOf = (cl, d, cap = 4) => {
   const dr = byId.driver, at = (s) => ask([dr], 200, "fairway", { surfaceAt: () => s }).recs[0];
   const out = {};
   for (const s of ["green", "fairway", "rough", "fringe", "bunker"]) {
-    const x = at(s);
-    ok(x && x.surface === s && Math.abs(stopOf(dr, x.power, s) - 200) < 0.01, `driver at 200 yd on ${s}: ${x ? `${x.power.toFixed(3)} on ${x.surface}` : "no rec"}`);
+    const x = at(s), b = bestOf(solutionsOf(dr, 200, 4, () => s), 4);
+    ok(x && x.surface === s && b && x.pct === b.k && Math.abs(stopOf(dr, x.power, s) - 200) <= 3, `driver at 200 yd on ${s}: ${x ? `${x.pct} % on ${x.surface}, stops ${stopOf(dr, x.power, s).toFixed(2)}` : "no rec"}, the trace ${b ? `${b.k} %` : "none"}`);
     out[s] = x;
   }
   // full power: the green's bounce takes more pace than the fairway's (ReflectionH 0.5 / 0.6), rough's and the bunker's far more
   const sf = (s) => stopOf(dr, 4, s);
   ok(sf("fringe") > sf("fairway") && sf("fairway") > sf("green") && sf("green") > sf("rough") && sf("rough") > sf("bunker"), `driver full-power stops fringe ${sf("fringe").toFixed(1)} / fairway ${sf("fairway").toFixed(1)} / green ${sf("green").toFixed(1)} / rough ${sf("rough").toFixed(1)} / bunker ${sf("bunker").toFixed(1)} not in that order`);
-  console.log(`surfaces: the driver to 200 yd needs ${Object.values(out).filter(Boolean).map((x) => `${x.power.toFixed(2)} bars on ${x.surface} (carry ${x.carry.toFixed(0)}, roll ${x.roll.toFixed(0)})`).join(", ")}`);
+  console.log(`surfaces: the driver to 200 yd needs ${Object.values(out).filter(Boolean).map((x) => `${x.power.toFixed(2)} bars (${x.pct} %) on ${x.surface} (carry ${x.carry.toFixed(0)}, roll ${x.roll.toFixed(0)}, stops ${(x.carry + x.roll).toFixed(1)})`).join(", ")}`);
   const f = out.fairway;
   for (const s of ["water", "outer", "wall", null, undefined]) {
     const x = ask([dr], 200, "fairway", { surfaceAt: () => s }).recs[0];
@@ -268,19 +310,18 @@ const solutionsOf = (cl, d, cap = 4) => {
     ok(top > bottom + 5, `the driver's step at 67-68 %: ${top.toFixed(1)} -> ${bottom.toFixed(1)}`);
     const sols = solutionsOf(dr, d);
     const x = ask([dr], d).recs[0];
-    ok(sols.length === 2 && x && Math.abs(stopOf(dr, x.power) - d) < 1e-6 && Math.abs(x.power - sols[1]) < 0.01, `inside the driver's step at ${d.toFixed(1)} yd: solutions ${sols.map((s) => s.toFixed(3)).join(" / ")}, rec ${x?.power.toFixed(3)}`);
-    console.log(`step: the driver's 67 % stops ${top.toFixed(1)}, 68 % ${bottom.toFixed(1)} (a bounce more); ${d.toFixed(1)} yd solves at ${sols.map((s) => s.toFixed(3)).join(" or ")} bars, the rec ${x?.power.toFixed(3)}`);
+    ok(sols.length === 2 && x && x.pct === sols[1].k && x.pct === bestOf(sols, 4).k, `inside the driver's step at ${d.toFixed(1)} yd: solutions ${sols.map((s) => `${s.k} %`).join(" / ")}, rec ${x?.pct} %`);
+    console.log(`step: the driver's 67 % stops ${top.toFixed(1)}, 68 % ${bottom.toFixed(1)} (a bounce more); ${d.toFixed(1)} yd solves at ${sols.map((s) => `${s.k} % (${s.p.toFixed(2)} bars, stops ${s.stop.toFixed(1)})`).join(" or ")}, the rec ${x?.pct} %`);
   }
-  // a green strip 0.3 yd wide, narrower than one 0.02-bar step of the driver's
-  // carry, under the carry of the fairway solution at 2.51 bars: that solution
-  // lands on the green, where it would roll further, so it must not ship as a
-  // fairway rec
+  // a green strip 0.3 yd wide under the carry of the driver's 62 % and no
+  // other percent's: 62 % lands on the green, where it would roll further, so
+  // it must not ship as a fairway rec at the fairway stop of 62 %
   {
-    const c0 = carryOf(dr, 2.51), d0 = stopOf(dr, 2.51);
+    const p0 = barsOfK(62, 4), c0 = carryOf(dr, p0), d0 = stopOf(dr, p0);
     const hidden = (yd) => (Math.abs(yd - c0) <= 0.15 ? "green" : "fairway");
-    ok(hidden(carryOf(dr, 2.5)) === "fairway" && hidden(carryOf(dr, 2.52)) === "fairway", "the hidden-strip case: the scan's samples either side should read fairway");
+    ok(hidden(carryOf(dr, barsOfK(61, 4))) === "fairway" && hidden(carryOf(dr, barsOfK(63, 4))) === "fairway", "the hidden-strip case: the neighbouring percents' carries should read fairway");
     const x = ask([dr], d0, "tee", { surfaceAt: hidden }).recs[0];
-    ok(!x || hidden(x.carry) === x.surface, `a fairway solution whose carry lands on a hidden green strip shipped (${x?.power.toFixed(3)} bars on ${x?.surface}, carry reads ${x ? hidden(x.carry) : ""})`);
+    ok(!x || (hidden(x.carry) === x.surface && !(x.pct === 62 && x.surface === "fairway")), `a fairway solution whose carry lands on a hidden green strip shipped (${x?.pct} % on ${x?.surface}, carry reads ${x ? hidden(x.carry) : ""})`);
   }
 }
 
@@ -299,39 +340,38 @@ const lineGeo = (n) => {
 };
 const lineOf = (n) => { const { t, at } = lineGeo(n); return (yd) => lieOf(classAt(t, ...at(yd))); };
 {
-  let recs = 0, edges = 0;
+  let recs = 0, edges = 0, worst = 0;
   const seen = {};
   for (let n = 1; n <= 21; n++) {
     const surfaceAt = lineOf(n);
     for (const lie of ["tee", "rough"]) for (let d = 30; d <= 270; d += 5) {
       for (const r of ask(DEFAULT_CLUBS, d, lie, { surfaceAt }).recs) {
         recs++;
-        const read = landingSurface(surfaceAt(r.carry));
-        ok(read === r.surface && Math.abs(landedStop(r.club, r.power, 0, surfaceAt) - d) <= 0.01, `H${n} from ${lie} at ${d} yd: ${r.club.id} ${r.power.toFixed(3)} on ${r.surface}, its carry reads ${read}, stops ${landedStop(r.club, r.power, 0, surfaceAt).toFixed(3)}`);
+        const read = landingSurface(surfaceAt(r.carry)), best = bestOf(solutionsOf(r.club, d, capFor(r.club, lie), surfaceAt), capFor(r.club, lie));
+        const stop = landedStop(r.club, r.power, 0, surfaceAt);
+        worst = Math.max(worst, Math.abs(stop - d));
+        ok(read === r.surface && best && r.pct === best.k && Math.abs(stop - r.carry - r.roll) < 1e-9, `H${n} from ${lie} at ${d} yd: ${r.club.id} ${r.pct} % on ${r.surface}, its carry reads ${read}, stops ${stop.toFixed(3)}; the trace ${best ? `${best.k} %` : "none"}`);
         if (r.surface !== "fairway") { edges++; seen[r.surface] = (seen[r.surface] ?? 0) + 1; }
       }
     }
   }
-  console.log(`holes: the default lines of all 21 holes from the tee and rough at 30-270 yd: ${recs} recs on the surface their carry reads, ${edges} off fairway (${Object.entries(seen).map(([s, k]) => `${s} ${k}`).join(", ")})`);
+  console.log(`holes: the default lines of all 21 holes from the tee and rough at 30-270 yd: ${recs} recs on the surface their carry reads, the trace's percent, stopping within ${worst.toFixed(2)} yd of the distance; ${edges} off fairway (${Object.entries(seen).map(([s, k]) => `${s} ${k}`).join(", ")})`);
 }
 
 // ---- d, synthetic holes: random strips of every surface (and water / OB /
 // no read, which roll as fairway) along the line, 1,000 random distances from
 // random lies over ten holes whose strips are 2-25 yd wide and 300 more over
-// three holes with strips down to 0.2 yd, which a step can jump. Each club's f is
-// traced apart from the solver on a 0.001-bar grid, in runs on which it rises
-// on one surface. Every rec: within 0.01 yd of the distance, on the surface
-// read at its own carry, on a club whose trace reaches the distance. On the
-// wide-strip holes also: every club whose trace reaches the distance (by 0.1
-// yd inside a run) gets a rec, and that rec's score is the best of the
-// trace's solutions; maxReach is the traces' top. ----
+// three holes with strips down to 0.2 yd, narrower than a percent's step of
+// the carry. Each club's percents are traced apart from the solver (pctRuns).
+// Every rec: on the surface read at its own carry, the trace's best-scored
+// solution for its club; every club with a solution in the trace gets that
+// rec; maxReach is the traces' top. ----
 {
   let seed = 4242;
   const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;   // Park-Miller: exact in doubles
   const KINDS = ["fairway", "rough", "green", "fringe", "bunker", "water", "outer", null];
   const LIES = ["tee", "rough", "bunker"];
-  const scoreOf = (p, cap) => Math.abs(p / cap - 0.8) + (p / cap > 0.97 ? 0.5 : 0);
-  const tally = { wide: { recs: 0, found: 0, empty: 0 }, narrow: { recs: 0, found: 0, missed: 0, empty: 0 } };
+  const tally = { wide: { recs: 0, found: 0, empty: 0 }, narrow: { recs: 0, found: 0, empty: 0 } };
   let worst = 0, ms = 0, calls = 0;
   const hole = (minW, nDist, kind) => {
     const strips = [];
@@ -343,25 +383,8 @@ const lineOf = (n) => { const { t, at } = lineGeo(n); return (yd) => lieOf(class
     const trace = {};
     for (const lie of LIES) {
       trace[lie] = {};
-      for (const cl of DEFAULT_CLUBS) {
-        const cap = capFor(cl, lie), runs = [];
-        let last = null;
-        for (let k = 0; ; k++) {
-          const p = Math.min(cap, 0.4 + k * 0.001), s = landingSurface(surfaceAt(carryOf(cl, p))), f = landedStop(cl, p, 0, surfaceAt);
-          if (last && last.s === s && f >= last.fb) { last.pb = p; last.fb = f; last.pts.push([p, f]); }
-          else { last = { s, pa: p, pb: p, fa: f, fb: f, pts: [[p, f]] }; runs.push(last); }
-          if (p >= cap) break;
-        }
-        trace[lie][cl.id] = { cap, runs };
-      }
+      for (const cl of DEFAULT_CLUBS) { const cap = capFor(cl, lie); trace[lie][cl.id] = { cap, runs: pctRuns(cl, cap, surfaceAt) }; }
     }
-    const reaching = (t, d, margin) => t.runs.filter((r) => r.fa + margin <= d && d <= r.fb - margin);
-    const powerIn = (r, d) => {
-      const i = r.pts.findIndex(([, f]) => f >= d);
-      if (i <= 0) return r.pts[Math.max(0, i)][0];
-      const [p0, f0] = r.pts[i - 1], [p1, f1] = r.pts[i];
-      return f1 > f0 ? p0 + ((d - f0) / (f1 - f0)) * (p1 - p0) : p1;
-    };
     const T = tally[kind];
     for (let k = 0; k < nDist; k++) {
       const lie = LIES[Math.floor(rnd() * LIES.length)], d = 15 + 250 * rnd();
@@ -371,35 +394,30 @@ const lineOf = (n) => { const { t, at } = lineGeo(n); return (yd) => lieOf(class
       if (!o.recs.length) T.empty++;
       for (const r of o.recs) {
         T.recs++;
-        const err = Math.abs(landedStop(r.club, r.power, 0, surfaceAt) - d);
-        worst = Math.max(worst, err);
-        ok(err <= 0.01, `strips (${kind}): ${r.club.id} from ${lie} at ${d.toFixed(2)} yd stops ${err.toFixed(4)} yd off`);
+        const t = trace[lie][r.club.id], best = bestOf(solutionsIn(t.runs, d), t.cap);
+        worst = Math.max(worst, Math.abs(landedStop(r.club, r.power, 0, surfaceAt) - d));
         ok(landingSurface(surfaceAt(r.carry)) === r.surface && landingSurface(r.landsOn) === r.surface, `strips (${kind}): ${r.club.id} from ${lie} at ${d.toFixed(2)} yd solved on ${r.surface}, its carry reads ${surfaceAt(r.carry)}`);
-        ok(reaching(trace[lie][r.club.id], d, -0.05).length > 0, `strips (${kind}): ${r.club.id} from ${lie} at ${d.toFixed(2)} yd has a rec where its curve never reaches the distance`);
+        ok(best && r.pct === best.k, `strips (${kind}): ${r.club.id} from ${lie} at ${d.toFixed(2)} yd: ${r.pct} %, the trace's best ${best ? `${best.k} %` : "none"}`);
       }
       for (const cl of DEFAULT_CLUBS) {
-        const t = trace[lie][cl.id], sols = reaching(t, d, 0.1);
-        if (!sols.length) continue;
-        const best = Math.min(...sols.map((r) => scoreOf(powerIn(r, d), t.cap)));
+        const t = trace[lie][cl.id], best = bestOf(solutionsIn(t.runs, d), t.cap);
+        if (!best) continue;
         const one = ask([cl], d, lie, { surfaceAt }).recs[0];
-        if (kind === "wide") {
-          ok(one && Math.abs(landedStop(cl, one.power, 0, surfaceAt) - d) <= 0.01, `strips (wide): ${cl.id} from ${lie} at ${d.toFixed(2)} yd reaches the distance on its curve but gets no rec`);
-          ok(one && one.score <= best + 0.005, `strips (wide): ${cl.id} from ${lie} at ${d.toFixed(2)} yd: rec score ${one?.score.toFixed(4)}, the trace has a solution scoring ${best.toFixed(4)}`);
-        }
-        if (one && one.score <= best + 0.005) T.found++; else if (kind === "narrow") T.missed++;
+        ok(one && one.pct === best.k, `strips (${kind}): ${cl.id} from ${lie} at ${d.toFixed(2)} yd: the trace's best is ${best.k} %, the solver's ${one ? `${one.pct} %` : "none"}`);
+        if (one && one.pct === best.k) T.found++;
       }
     }
-    if (kind === "wide") for (const lie of LIES) {
-      const top = Math.max(...DEFAULT_CLUBS.flatMap((cl) => trace[lie][cl.id].runs.map((r) => r.fb)));
+    for (const lie of LIES) {
+      const top = Math.max(...DEFAULT_CLUBS.flatMap((cl) => trace[lie][cl.id].runs.map((r) => r[r.length - 1].stop)));
       const mr = ask(DEFAULT_CLUBS, 100, lie, { surfaceAt }).maxReach.yd;
-      ok(Math.abs(mr - top) <= 0.2, `strips (wide): maxReach from ${lie} ${mr.toFixed(2)} yd, the traced curves top at ${top.toFixed(2)}`);
+      ok(Math.abs(mr - top) < 1e-9, `strips (${kind}): maxReach from ${lie} ${mr.toFixed(2)} yd, the traced percents top at ${top.toFixed(2)}`);
     }
   };
   for (let h = 0; h < 10; h++) hole(2, 100, "wide");
   for (let h = 0; h < 3; h++) hole(0.2, 100, "narrow");
   ok(ms / calls < 10, `a calm solve with 7 clubs takes ${(ms / calls).toFixed(2)} ms`);
   const { wide: A, narrow: B } = tally;
-  console.log(`strips: 10 holes x 100 distances (strips 2-25 yd): ${A.recs} recs, ${A.found} single-club bests found, ${A.empty} empty panels; 3 x 100 with strips down to 0.2 yd: ${B.recs} recs, ${B.found} bests found, ${B.missed} missed (a strip inside one step), ${B.empty} empty; every rec within ${worst.toExponential(2)} yd on its own carry's surface; a calm solve with 7 clubs ${(ms / calls).toFixed(3)} ms per call`);
+  console.log(`strips: 10 holes x 100 distances (strips 2-25 yd): ${A.recs} recs, ${A.found} single-club bests found, ${A.empty} empty panels; 3 x 100 with strips down to 0.2 yd: ${B.recs} recs, ${B.found} bests found, ${B.empty} empty; every rec the trace's percent on its own carry's surface, within ${worst.toFixed(2)} yd of the distance; a calm solve with 7 clubs ${(ms / calls).toFixed(3)} ms per call`);
 }
 
 // ---- e. caps and red ----
@@ -409,12 +427,15 @@ for (const cl of DEFAULT_CLUBS) {
     for (let d = 10; d <= 280; d += 5) for (const r of ask([cl], d, lie).recs) { maxP = Math.max(maxP, r.power); if (r.red !== (r.power >= cap - 0.1)) redOk = false; }
     ok(maxP <= cap + 1e-9, `${cl.id} from ${lie}: power ${maxP.toFixed(3)} above the ${cap}-bar cap`);
     ok(redOk, `${cl.id} from ${lie}: red not exactly power >= cap - 0.1`);
-    // the threshold itself, a hair either side, where the distance has one solution there
-    for (const [dp, want] of [[0.001, true], [-0.001, false]]) {
-      const p = cap - 0.1 + dp, d = stopOf(cl, p), sols = solutionsOf(cl, d, cap);
+    // the threshold itself: the first percent whose power reaches cap - 0.1 and
+    // the one below, where the distance has one solution there
+    let kr = pctOfB(0.4);
+    while (barsOfK(kr, cap) < cap - 0.1) kr++;
+    for (const [k, want] of [[kr, true], [kr - 1, false]]) {
+      const p = barsOfK(k, cap), d = stopOf(cl, p), sols = solutionsOf(cl, d, cap);
       if (sols.length !== 1) continue;
       const r = ask([cl], d, lie).recs[0];
-      ok(r && r.red === want, `${cl.id} from ${lie}: ${p.toFixed(3)} bars ${want ? "not " : ""}flagged red`);
+      ok(r && r.pct === k && r.red === want, `${cl.id} from ${lie}: ${k} % (${p.toFixed(3)} bars) ${want ? "not " : ""}flagged red`);
     }
     const reach = ask([cl], 10, lie).maxReach.yd;
     ok(ask([cl], reach + 1, lie).recs.length === 0, `${cl.id} from ${lie}: a distance past the reach still gets a rec`);
@@ -483,16 +504,20 @@ for (const cl of DEFAULT_CLUBS) {
   }
   const json = JSON.stringify({ sims, solves });
   const sha = createHash("sha256").update(json).digest("hex");
-  const REC = { sha: "a528c556a2131cbfb352128e3382fb4ddb6ce7a469c940883c9949fe2fa513c1", len: 476201 };
+  // (the cup window src/nssShape.js holds: narrower since src/nsssim.js's cup decodes of 2026-10-25;
+  // the putter's launch at its whole percent, and the read's aim window, since the same day; the read's runs
+  // stepped in whole percents, its widening out to ±35° and the middle of its widest aims, also that day: the 24
+  // solves read the same percents, 23 the same aim (one 0.01° apart) and 23 the same aim window (one end 0.1° apart))
+  const REC = { sha: "1f457037253618ad2d7ea70b6d254c784a993d4aad5e24286afaaed7814d342a", len: 485087 };
   ok(sha === REC.sha && json.length === REC.len, `putts differ from the recorded ones (sha256 ${sha}, ${json.length} bytes)`);
   console.log(`putts: ${sims.length} simPutt + ${solves.length} solvePutt runs (${sims.filter((x) => x.r.holed).length} + ${solves.filter((x) => x.r.r.holed).length} holed) ${sha.slice(0, 12)}…, ${json.length} bytes`);
 }
 
 // ---- h. wind and elevation ----
 {
-  // h0. the wind: the dial's mph read as NSS's s (floor(2.25 s) on the recorded pairs)
-  for (const [mph, s] of [[0, 0], [2, 1], [6, 3], [9, 4], [11, 5], [13, 6], [22, 10], [31, 14], [33, 15]]) ok(windS(mph) === s, `windS(${mph}) = ${windS(mph)}, expected ${s}`);
-  near(windS(8), 8 / 2.25, 1e-12, "windS(8): no whole s shows 8 mph, so mph / 2.25");
+  // h0. the wind: the dial's mph read as NSS's s (nsssim's HUD_MPH: RAM's s against the HUD's text)
+  for (const [mph, s] of [[0, 0], [2, 1], [4, 2], [6, 3], [9, 4], [11, 5], [13, 6], [15, 7], [17, 8], [20, 9], [22, 10], [24, 11], [26, 12], [29, 13], [31, 14], [33, 15]]) ok(windS(mph) === s, `windS(${mph}) = ${windS(mph)}, expected ${s}`);
+  ok(windS(8) === 4 && windS(18) === 8 && windS(27) === 12, `windS off the HUD's values: the nearest whole s (8 -> ${windS(8)}, 18 -> ${windS(18)}, 27 -> ${windS(27)})`);
   const w = windOf(11, 90);
   ok(w.s === 5 && Math.abs(w.vec.x - 5) < 1e-12 && Math.abs(w.vec.z) < 1e-12 && Math.abs(w.cross - 11) < 1e-12, `windOf(11 mph, 90): ${JSON.stringify(w)}`);
   const dr = byId.driver, calm = ask([dr], 220, "tee").recs[0];
@@ -502,7 +527,7 @@ for (const cl of DEFAULT_CLUBS) {
   if (calm && tail && head && right && left) {
     ok(tail.power < calm.power && calm.power < head.power, `the driver to 220 yd: tail ${tail.power.toFixed(3)} / calm ${calm.power.toFixed(3)} / head ${head.power.toFixed(3)} bars`);
     ok(right.aim < -1 && left.aim > 1 && Math.abs(right.aim + left.aim) < 0.05, `crosswind aims: right ${right.aim.toFixed(2)}, left ${left.aim.toFixed(2)} yd`);
-    ok([tail, head, right, left].every((r) => r.elev === false && Math.abs(r.stop - 220) <= STOP_TOL && !r.approx), "windy recs without heights: flown, elev false, stopping at the distance");
+    ok([tail, head, right, left].every((r) => r.elev === false && Math.abs(r.stop - 220) <= 3 && !r.approx), `windy recs without heights: flown, elev false, stopping within a percent of the distance (${[tail, head, right, left].map((r) => r.stop.toFixed(2)).join(" / ")})`);
     // stopAt with the solve's wind is the rec's stop (the rec card's bar)
     const ctxW = {}, rw = ask([dr], 220, "tee", ctxW, { speed: 13, deg: 90 }).recs[0];
     ok(Math.abs(stopAt(dr, rw.power, 0, ctxW) - rw.stop) < 1e-9, "stopAt with the last solve's wind is not the windy rec's stop");
@@ -553,7 +578,9 @@ for (const cl of DEFAULT_CLUBS) {
       rows.push([stopAt(cl, bars, 0, ctx), f.carry, f.k, f.path.length, f.path[f.path.length - 1]]);
     }
     const json = JSON.stringify(rows), sha = createHash("sha256").update(json).digest("hex");
-    const REC = { sha: "b9f9a539300946f290104548d15ef03cce936f8ad62082cfbc52de9246f669df", len: 4139 };
+    // (the HUD's wind as nsssim's table since 2026-10-25: a dial value off it reads as the nearest whole s, not mph / 2.25;
+    // the launch at the whole percent the game reads, not between two, since the same day)
+    const REC = { sha: "59d147928a41049478112cd0152af29a0b78ce4bff4650d281ec040feb5cc8a1", len: 4141 };
     ok(sha === REC.sha && json.length === REC.len, `the solver's flights differ from the recorded ones (sha256 ${sha}, ${json.length} bytes)`);
     console.log(`flights: 40 solver flights ${sha.slice(0, 12)}…, ${json.length} bytes`);
   }
@@ -595,42 +622,48 @@ for (const cl of DEFAULT_CLUBS) {
   if (hole[21] && hole[17]) console.log(`holes: the full driver carries ${carryOf(dr, 4).toFixed(1)} / stops ${stopOf(dr, 4).toFixed(1)} yd on level ground; on H21's line ${hole[21].carry.toFixed(1)} / ${hole[21].stop.toFixed(1)}, landing ${(-hole[21].dh).toFixed(1)} yd below the tee on ${hole[21].surface}; on H17's ${hole[17].carry.toFixed(1)} / ${hole[17].stop.toFixed(1)}, ${hole[17].dh.toFixed(1)} yd above (stopping ${hole[17].dhStop.toFixed(1)} above)`);
 
   // h5. a level profile changes nothing in calm air: every flat rec comes back
-  // at the table's power (within 0.01 bar: the table interpolates the flights
-  // between whole percents, the flight at the table's power can stop a little
-  // off, which the refinement trims), for 7 clubs, 5 landing surfaces, 3 lies
-  // and distances 20-258 yd. The profile may add a rec the table has not (a
-  // distance within STOP_TOL past a floor or a step's foot): counted
+  // at the table's percent (the flight at a percent is the table's entry, to
+  // its 5 decimals), for 7 clubs, 5 landing surfaces, 3 lies and distances
+  // 20-258 yd; where it does not (a percent of a like stop across a step
+  // down, the refinement starting from the table's) the flown percent stops no
+  // farther from the distance than the table's by more than 0.01 yd. The
+  // profile may add a rec the table has not (a distance within STOP_TOL past a
+  // floor or a step's foot): counted
   {
-    let n = 0, worst = 0, extra = 0, moved = 0;
+    let n = 0, same = 0, moved = 0, worse = 0, extra = 0;
     for (const s of ["fairway", "rough", "green", "fringe", "bunker"]) for (const lie of ["fairway", "rough", "bunker"]) for (const cl of DEFAULT_CLUBS) for (let d = 20; d <= 260; d += 7) {
       const a = ask([cl], d, lie, { surfaceAt: () => s }).recs[0], b = ask([cl], d, lie, lvl(s)).recs[0];
       ok(a == null || (a.elev === false && b && b.elev === true), `${cl.id} from ${lie} at ${d} yd on ${s}: the level profile ${b ? "flags" : "drops"} the flat rec`);
       if (a && b) {
         n++;
-        const diff = Math.abs(a.power - b.power);
-        // across a step down two powers stop there: the flight may settle on the other piece
-        if (diff > 0.01 && Math.abs(stopOf(cl, b.power, s) - d) < 0.5) moved++;
-        else worst = Math.max(worst, diff);
+        if (a.pct === b.pct) same++;
+        else {
+          moved++;
+          const ea = Math.abs(stopOf(cl, a.power, s) - d), eb = Math.abs(stopOf(cl, b.power, s) - d);
+          if (eb > ea + 0.01) { worse++; ok(false, `${cl.id} from ${lie} at ${d} yd on ${s}: the level profile's ${b.pct} % stops ${eb.toFixed(3)} off, the table's ${a.pct} % ${ea.toFixed(3)}`); }
+        }
       } else if (b) extra++;
     }
-    ok(worst <= 0.01, `a level profile moves a flat rec by ${worst.toFixed(4)} bar`);
-    console.log(`level profile: ${n} recs at the table's power (worst ${worst.toExponential(1)} bar; ${moved} on the other side of a step down); ${extra} more within ${STOP_TOL} yd past a floor or a step's foot`);
+    console.log(`level profile: ${same} of ${n} recs at the table's percent, ${moved} at another no farther off (${worse} worse); ${extra} more within ${STOP_TOL} yd past a floor or a step's foot`);
   }
 
   // h6. H21's round trip: every exact rec (7 clubs from the tee at 30-260 yd)
-  // solved again at its own stop comes back at its power within 0.02 bar
+  // solved again at its own stop comes back at its percent, or at one whose
+  // flight stops within STOP_TOL of it (the terrain's stop need not rise
+  // percent by percent)
   {
-    let n = 0, worst = 0;
+    let n = 0, same = 0, worst = 0;
     for (const cl of DEFAULT_CLUBS) for (let d = 30; d <= 260; d += 10) {
       const r = ask([cl], d, "tee", g21).recs[0];
       if (!r || r.approx) continue;
       const r2 = ask([cl], r.stop, "tee", g21).recs[0];
       n++;
-      const diff = r2 ? Math.abs(r2.power - r.power) : Infinity;
-      worst = Math.max(worst, diff);
-      ok(diff <= 0.02, `H21 round trip: ${cl.id} at ${d} yd ${r.power.toFixed(3)} bars stops ${r.stop.toFixed(2)}, which solves to ${r2 ? r2.power.toFixed(3) : "nothing"}`);
+      if (r2 && r2.pct === r.pct) { same++; ok(r2.stop === r.stop, `H21 round trip: ${cl.id} at ${r.pct} % flies differently`); continue; }
+      const off = r2 ? Math.abs(r2.stop - r.stop) : Infinity;
+      worst = Math.max(worst, off);
+      ok(off <= STOP_TOL, `H21 round trip: ${cl.id} at ${d} yd ${r.pct} % stops ${r.stop.toFixed(2)}, which solves to ${r2 ? `${r2.pct} % stopping ${r2.stop.toFixed(2)}` : "nothing"}`);
     }
-    console.log(`H21 round trip: ${n} recs solved again at their own stop, worst ${worst.toFixed(4)} bar`);
+    console.log(`H21 round trip: ${n} recs solved again at their own stop, ${same} at their own percent, the rest stopping within ${worst.toFixed(3)} yd of it`);
   }
 
   // h7. the rest of the contract: the rec's stop is stopAt's (the rec card's

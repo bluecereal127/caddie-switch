@@ -82,6 +82,11 @@
     "forceStopPosY": -70,
     "cupsideReflectionMaxVelY": 2,
     "leafTimerS": 0.5,
+    "cupsideReachM": 0.5,
+    "cupGreenNormalY": 0.1,
+    "cupGreenGroundTicks": 3,
+    "groundTickAttrs": [1, 2, 3, 4, 5, 6, 7, 9, 10, 13, 14],
+    "zeroSpinAttrs": [3, 9, 12, 14, 15, 18, 19, 21],
     "softLiftM": 0.005,
     "softRestitution": 0.3,
     "softAttrs": [3, 5, 14, 19],
@@ -89,7 +94,7 @@
     "flagHitAfterVelMin": 0.5,
     "flagHitAfterVelMax": 2.5,
     "hitPinFlagHeightFromCupPos": 0.37,
-    "_note": "roll when |vin . n| < FieldResistanceEnableSpeed, the pass-through contact's speed < it and |vin.y| < it (the third condition: verdicts.json roll_switch); a roll airborne for GroundLeaveTimeForAirMode s is a shot again; roll tick: drag, friction (Friction[attr] FrictionRatioCurve(|v|) dt), pull-back, stop count, gravity (GravityPutter on the green; along -n at |v| <= VelLenForStopGravity with n.y >= 0.5 farther than StopGravityDisableDist from the cup; + AddGravityHole AddGravityHoleCurve(d / AddGravityHoleDist) within AddGravityHoleDist, in flight and in a roll faster than VelLenForStopGravity: verdicts.json corrections). leafTimerS: the 0.5 s a canopy entry keeps the leaf counter (0xd38f10, trees.md). softAttrs (bunker, OB, sand OB, the pin): a shot's contact with one sets the ball down softLiftM farther out than the 0.05 m contact radius and turns its velocity back at softRestitution (measured on the recordings, not decoded; every other surface, and a roll on any, slides: restitution 0). The FlagHit* and HitPinFlag* values are not modelled."
+    "_note": "roll when |vin . n| < FieldResistanceEnableSpeed, the pass-through contact's speed < it and |vin.y| < it (the third condition: verdicts.json roll_switch); a roll airborne for GroundLeaveTimeForAirMode s is a shot again; roll tick: drag, friction (Friction[attr] FrictionRatioCurve(|v|) dt), pull-back, stop count, gravity (GravityPutter on the green; along -n at |v| <= VelLenForStopGravity with n.y >= 0.5 farther than StopGravityDisableDist from the cup; + AddGravityHole AddGravityHoleCurve(d / AddGravityHoleDist) within AddGravityHoleDist, in flight and in a roll faster than VelLenForStopGravity: verdicts.json corrections). leafTimerS: the 0.5 s a canopy entry keeps the leaf counter (0xd38f10, trees.md). softAttrs (bunker, OB, sand OB, the pin): a shot's contact with one sets the ball down softLiftM farther out than the 0.05 m contact radius and turns its velocity back at softRestitution (measured on the recordings, not decoded; every other surface, and a roll on any, slides: restitution 0). FlagHit*: the cloth's kick on the stroke's first ground contact after a cloth hit, on the green (0xd3fee4..0xd404c4); HitPinFlagHeightFromCupPos: a pin or flag contact at least this high over the cup's bone sets M+0x102, after which the cloth is passed through (0xd39900..0xd39b6c)."
   },
   "backspin": {
     "reflectionMin": 0.6,
@@ -554,7 +559,20 @@
     "depthRangeM": [0.2988, 0.3381]
   },
   "wind": {
-    "hudMphPerS": 2.25,
-    "_note": "the HUD's mph against the wind object's s (m/s) on the recorded round: 1 -> 2, 3 -> 6, 4 -> 9, 5 -> 11, 6 -> 13, 10 -> 22 = floor(2.25 s); the code's converter is 2.237 (0x1bf21fc) and neither its floor nor its round fits all six: the rounding is open"
+    "hudMphPerS": 2.237,
+    "hudMph": [0, 2, 4, 6, 9, 11, 13, 15, 17, 20, 22, 24, 26, 29, 31, 33],
+    "_note": "the HUD's mph for each whole s (m/s, 0..15) of the wind object. Against RAM's s on the RAM player's address frames (tools/harness/state/eden/lab/rplay/frames, rounds 2 and 3 of 2026-10-25): 1 -> 2 (h11, h15), 2 -> 4 (h06, h09), 4 -> 9 (h07, h10, h12), 5 -> 11 (h13), 6 -> 13 (h08), 7 -> 15 (h14, r3 h04), 8 -> 17 (h05), 9 -> 20 (h16), 15 -> 33 (h18); flights.md 5.9's round adds 3 -> 6 and 10 -> 22; 26 mph showed (pink) on a round with no RAM read. Every value is floor(2.237 s + d) with 0.052 < d < 0.104 (2.237: the converter at 0x1bf21fc; the text box's rounding is not traced); floor(2.25 s) gives 18 for s 8 and 27 for 12, floor(2.237 s) 8 for 4. s 11..14 (24, 26, 29, 31) are the rule's, 26 seen without its s."
+  },
+  "flag": {
+    "unitM": 0.001953125,
+    "verts512": [[-4,1534,-13], [-11,1534,-8], [-2,1541,-6], [-14,1534,0], [-5,1541,-4], [11,0,8], [4,0,13], [0,0,0], [14,0,0], [-4,1534,13], [-5,1541,4], [-11,1534,8], [-6,1541,0], [11,1534,8], [2,1541,6], [4,1534,13], [-4,0,13], [14,1534,0], [11,1534,-8], [6,1541,0], [4,1534,-13], [5,1541,-4], [5,1541,4], [0,1525,-516], [0,1525,0], [0,969,0], [0,969,-516], [-4,0,-13], [4,0,-13], [-11,0,-8], [-14,0,0], [11,0,-8], [-11,0,8]],
+    "tris": [[0,1,2], [1,3,4], [5,6,7], [5,7,8], [9,10,11], [12,3,11], [13,14,15], [6,15,9], [6,9,16], [17,18,19], [18,20,21], [17,22,13], [8,17,13], [8,13,5], [5,13,15], [5,15,6], [23,24,25], [23,25,26], [27,0,20], [27,20,28], [29,27,7], [29,7,30], [0,27,29], [0,29,1], [1,29,30], [1,30,3], [28,7,27], [7,28,31], [7,31,8], [18,31,28], [18,28,20], [31,18,17], [31,17,8], [7,16,32], [7,32,30], [6,16,7], [16,9,11], [16,11,32], [32,11,3], [32,3,30]],
+    "clothTris": [16, 17],
+    "source": {
+      "file": "RomFS Pack/Actor/Object_BGOBJ_GlfPin.pack.zs: Phive/Shape/Dcc/BGOBJ_GlfPin_Anim_col.Nin_NX_NVN.bphsh",
+      "packSha1": "bd2fd36868122d155052b6948cb3197ccf4d4e0b",
+      "shapeSha1": "f2badbd1ab9888501e8065f52e6e0e9a9bbfa67d"
+    },
+    "_note": "the pole: one face acts a tick, the nearest one the incoming velocity approaches (at a vertical edge both faces are as near and the game's choice is not decoded: src/nsssim.js run's poleTie); a shot meeting it is set at the face's closest point to the end of the move, out along the face normal by contactRadiusM + softLiftM, and bounces as the Pin (soft) surface; the cloth zeroes v (not u) once (M+0x103, 0xd39b8c..0xd39ca8). Present for every stroke but the putter's from the green (31 recorded putts, 19 through the pole's place, met nothing; why is not decoded)"
   }
 }

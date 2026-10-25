@@ -2,11 +2,14 @@
 // from the game's code and RomFS (tools/harness/state/eden/nss-golf-x/physics.md)
 // and confirmed against 71 strokes recorded in Eden's RAM (flights.md, and the
 // verifiers' corrections in verify/flights/verdicts.json, which override the
-// decode where they differ). Every constant comes from tools/nss-physics.json
-// (tools/nss-physics-export.mjs: GolfBallMoveParam, GolfPlayerClubParam, the
-// code defaults the file leaves to the class, and GolfShotVelTable read from
-// Eden's RAM), copied into the block below by that exporter; tools/test-nsssim.mjs
-// checks the copy and replays the recorded strokes.
+// decode where they differ) and against the RAM player's rounds of 2026-10-25 (the
+// cup, the bounce, the flagstick, the canopy counter and the HUD's wind decoded then:
+// the putter assist's ghost balls, the pole contacts, the strong winds). Every constant
+// comes from tools/nss-physics.json (tools/nss-physics-export.mjs: GolfBallMoveParam,
+// GolfPlayerClubParam, the code defaults the file leaves to the class, GolfShotVelTable
+// read from Eden's RAM, the contact record's code constants and the flagstick's shape),
+// copied into the block below by that exporter; tools/test-nsssim.mjs checks the copy
+// and replays the recorded strokes.
 //
 // Pure ES module, no Node or DOM API: the app, its worker and the tools share it.
 // src/wsrsim.js (Wii Sports Resort's ball) stays as it was, for history.
@@ -24,65 +27,116 @@
 //   1. move: pos += v dt, then the solid triangles the move meets (meshGround's
 //      contacts: the ones the ball's 0.05 m sphere overlaps at the end of the move,
 //      face, edge or corner, and the ones it touched on the way coming from clear of
-//      them), deepest first, each acting only while the velocity still approaches it:
-//      the ball pushed out along the triangle's FACE normal to 0.05 m (NSS reports a
-//      face normal for every contact) and the velocity's part into it removed. The
-//      tick's contact (M+0xa4, the normal M+0x78, the bounce's) is the acting one the
-//      incoming velocity met most head-on. A shot meeting bunker, OB or sand OB is set
-//      down 0.005 m farther out and turned back at a restitution of 0.3 by the move
-//      itself (Havok's material: measured, the dump has no material table). The
-//      pre-move velocity is the contact's incoming velocity vin; u = the post-move v.
+//      them; a Cupside one farther than 0.5 m from the active cup is none: the move's
+//      query callback 0xd34400..0xd34468 and the contact record 0xd38f68..0xd38fbc drop
+//      it). A shot (mode 1): deepest first, each acting only while the velocity still
+//      approaches it: the ball pushed out along the triangle's FACE normal to 0.05 m (NSS
+//      reports a face normal for every contact) and the velocity's part into it removed.
+//      The tick's contact (M+0xa4, the normal M+0x78, the bounce's) is the acting one the
+//      incoming velocity met most head-on. A shot meeting bunker, OB, sand OB or the pin
+//      is set down 0.005 m farther out and turned back at a restitution of 0.3 by the move
+//      itself (Havok's material: measured, the dump has no material table). A roll or a
+//      putt (mode 2): one contact a tick from the course, the deepest (at a tie, a shared
+//      edge or corner, the one that is not Cupside, then the deeper plane), pushed out by
+//      its depth along its face normal whether or not the ball approaches it; only an
+//      approaching one slides the ball and is the tick's contact (the putter assist's
+//      ghost paths of 2026-10-25, every tick from RAM). The pre-move velocity is the
+//      contact's incoming velocity vin; u = the post-move v.
+//      The flagstick (run's flag; flagMesh: the Phive shape BGOBJ_GlfPin_Anim_col, a
+//      decagonal pole from the cup's bone to 2.996 m and the cloth, one quad 1.0078 m
+//      downwind of it, 1.89..2.98 m up, along the wind object's angle) is its own body:
+//      one pole face a tick, the first the move's swept sphere touches of those the
+//      velocity approaches (at a vertical edge two are touched at once and the game's
+//      choice is not decoded: poleTie); a shot meeting it is set at the face's closest
+//      point out by 0.055 m (a face only touched on the way: where the sweep touches it,
+//      out by 0.005 m) and bounces as the Pin, a roll
+//      against it in the cup slides along it after the course's contact. It is in for
+//      every stroke but a putt from the green (flagInPlay; no recorded putt met it).
 //      Pass-through surfaces (water, leaf, flag, air OB, palm leaf) are crossed: water
-//      sets the water line, leaf faces count the canopy, palm leaves damp.
-//   2. a shot (mode 1) touching ground switches to the roll (mode 2) when the incoming
-//      normal speed, the pass-through contact's speed and |vin.y| are all below
-//      FieldResistanceEnableSpeed (4 m/s) (0xd39f84..0xd3a0b4: the third condition is
-//      the verifiers' correction); at the switch the backspin pull-back P = -d 28
-//      b^0.737 max(d . a, 0) is stored (d the incoming horizontal direction, a M+0xf4:
-//      the post-move velocity of the stroke's first contact, the launch velocity
-//      before it). A roll with no contact for GroundLeaveTimeForAirMode (0.2 s; a
-//      pass-through contact holds the count) is a shot again.
+//      sets the water line, palm leaves damp, the cloth zeroes v (not u) once (M+0x103)
+//      unless a pin or flag contact at least 0.37 m over the bone came first (M+0x102,
+//      not for the putter); the canopy counter M+0xdc (0xd38ecc..0xd38f10): each leaf
+//      contact whose normal is not the one the last tick counted, +1 moving against it
+//      (the 0.5 s timer M+0xe0 set), -1 along it (the timer stopped at a count <= 0; not
+//      clamped), in a shot only; the stored normal is cleared every tick (0xd38b64), and
+//      the timer runs down at the top of the tick and clears the count at zero (0xd38940).
+//      The leaf contacts are, on a mesh, the Leaf triangles the step's sphere touches
+//      (meshGround.leafTouch: fitted, not decoded), else the leaf faces crossed.
+//   2. the record: a contact with bunker, Cupside, glass, sand OB, tree, object, the pin
+//      or a barrier, or the flag's or water's volume, zeroes the backspin and the
+//      pull-back (0xd396d8..0xd39700, 0xd39a2c); M+0xbc counts the stroke's
+//      ground-contact ticks (any contact but none, leaf, rock, glass, tree, flag, air OB,
+//      object, pin, palm leaf, barrier: 0xd39a44); M+0xac, the last surface touched, is
+//      sticky once Cup and records Cupside as Green (0xd39674..0xd396d4). A shot (mode 1)
+//      touching ground switches to the roll (mode 2) when the incoming normal speed, the
+//      pass-through contact's speed and |vin.y| are all below FieldResistanceEnableSpeed
+//      (4 m/s) (0xd39f84..0xd3a0b4: the third condition is the verifiers' correction); at
+//      the switch the backspin pull-back P = -d 28 b^0.737 max(d . a, 0) is stored (d the
+//      incoming horizontal direction, a M+0xf4: the post-move velocity of the stroke's
+//      first contact, the launch velocity before it). A roll with no contact for
+//      GroundLeaveTimeForAirMode (0.2 s; a pass-through contact holds the count) is a shot
+//      again.
 //   3. mode 1: gravity 10 (+ AddGravityHole within 0.3 m of the cup), wind
 //      (|W| = s, 0.2 below 3 m above the launch rising to 1 at 30 m; 0.33 (W across
 //      + 0.6 W along u's heading)), drag (0.0025 per frame), water friction under the
 //      water line, leaf damping (1 - 0.03/4 per tick on the horizontal and rising
-//      vertical speed while inside a canopy), palm-leaf damping (1 - 0.08 per touching
-//      tick), lift 0.0012 hop |u| / 4 along normalize(-ux uy, ux^2 + uz^2, -uy uz),
+//      vertical speed while the counter is 1 or more), palm-leaf damping (1 - 0.08 per
+//      touching tick), lift 0.0012 hop |u| / 4 along normalize(-ux uy, ux^2 + uz^2, -uy uz),
 //      the hop decay (0.999632597 a tick: the game's approximate pow, read in RAM), side
-//      spin and its decay. On a contact tick the bounce REPLACES all of that but the
-//      decays: v = ReflectionH vt - ReflectionV k vn (vin split about n; k = 1 - 0.4
-//      b^1.737 with backspin b; Cupside caps v.y at 2 m/s).
-//   4. mode 2: drag, water, friction |v| -= Friction[attr] FrictionRatioCurve(|v|) dt
-//      (to 0 at most; the tick's contact surface, none when airborne), the backspin
-//      pull-back v += r P_plane dt (r = BackSpinAngleRatioCurve of the angle between P
-//      and the ball-to-cup direction; P decays by the surface's BackSpinResist^(1/4)),
-//      the stop count (horizontal |v| <= StopVelLen for StopVelFrame = 10 frames:
-//      rest), then gravity: 6 on the green, 10 elsewhere, + AddGravityHole while |v| >
-//      0.5 within 0.3 m of the cup; at |v| <= 0.5 with n.y >= 0.5 more than 1 m from
-//      the cup it acts along -n (no downhill pull: a slow ball stops on a slope).
-// The putter launches in mode 2. Stops also after 1300 frames, below y -70, or within
-// 0.2 m of one spot for 180 frames.
+//      spin and its decay. On a contact tick the bounce (0xd3f910) REPLACES all of that
+//      but the decays: v = ReflectionH vt - ReflectionV k vn (vin split about n; k = 1 -
+//      0.4 b^1.737 with backspin b), Green's ReflectionH / V instead of the contact's on
+//      the cup's bevel (a near Cupside face with n.y > 0.1 that became the tick's contact:
+//      M+0x108) in the stroke's first two ground-contact ticks (0xd3f958..0xd3f984), plus
+//      the cloth's kick on the stroke's first ground contact, on the green, after a cloth
+//      hit (flagKick: 0.5..2.5 m/s toward the cup turned by up to 20 deg, from sead::Random
+//      seeded with the contact point's x, 0xd3fee4..0xd404c4), and v.y at most
+//      CupsideReflectionMaxVelY (2 m/s) when the contact is Cupside (0xd404d0).
+//   4. mode 2: drag, water, a Cupside contact's bounce (0xd3ab74..0xd3ab8c calls
+//      0xd3f910: v = 0.999 vt - 0.13 vn from the incoming velocity, v.y at most 2 m/s),
+//      friction |v| -= Friction[attr] FrictionRatioCurve(|v|) dt (to 0 at most; the tick's
+//      contact surface, none when airborne), the backspin pull-back v += r P_plane dt (r =
+//      BackSpinAngleRatioCurve of the angle between P and the ball-to-cup direction; P
+//      decays by the surface's BackSpinResist^(1/4)), the stop count (horizontal |v| <=
+//      StopVelLen for StopVelFrame = 10 frames: rest), then gravity: 6 on the green, 10
+//      elsewhere, + AddGravityHole while |v| > 0.5 within 0.3 m of the cup; at |v| <= 0.5
+//      with n.y >= 0.5 more than 1 m from the cup it acts along -n (no downhill pull: a
+//      slow ball stops on a slope).
+// The putter launches in mode 2. Holed: the first tick whose contact is Cup (the cup's
+// bottom): the putter assist's ghost run marks it so (S+0x8a, 0xd45e74 / 0xd45f4c) and stops
+// there (stopAtCup; 0xd45d18..0xd45d48), the real ball sets M+0x100 (0xd39838); a ball on the
+// lip (Cupside) is not holed. Stops also after 1300 frames, below y -70, or within 0.2 m of
+// one spot for 180 frames.
 //
-// What the replays of tools/test-nsssim.mjs show (over the dump's collision): every
-// flight lands within 0.1 mm; the 44 strokes played to a rest off the cup end within
-// 0.04 m of the recorded rest (median 0.8 mm); all 17 holed putts hole. Over a height
-// field read off the same mesh with the analytic cup (heightGround, cupMesh: the route
-// a terrain grid takes) all 23 recorded putts end as recorded. The game's own
-// contact differs from this model's on about 1 % of rolling ticks, the tick a ball rolls
-// off a face over a convex edge: half the time the game still counts that face
-// (27 against 30 such ticks, alike in every measured way), so long rolls and the cup's
-// walls can amplify a sub-millimetre difference.
+// What the replays show (tools/test-nsssim.mjs, over the dump's collision with the actor
+// trees' canopies, the flag in for the non-putter strokes): every flight lands within
+// 0.1 mm; the 51 strokes played to a rest off the cup end within 0.042 m of the recorded
+// rest (median 0.5 mm; the six through actor canopies within 0.02 m); all 17 holed putts
+// hole, 13 at rest within 5 mm of the recorded spot in the cup; h08s6's lip-out lips out
+// (0.07 m from its rest). Of the putter assist's 99 ghost balls of 2026-10-25 87 hole or
+// miss as the game's; the 15 assisted putts' holing runs match the game's holeLo..holeHi to
+// 1 pct at the low end and 4 at the high (all 12 misses and the high ends' excess are fast
+// putts the model holds and the game rejects: Havok's choice between two triangles that
+// share the deepest edge point, which this model guesses, and its keeping the green face
+// a tick longer as the ball rolls off the rim). The 16 recorded pole contacts: the velocity
+// after within 3 mm/s on 14 (the two misses edge ties). Over a height field read off the
+// same mesh with the analytic cup (heightGround, cupMesh: the route a terrain grid takes)
+// all 23 recorded putts end as recorded. The game's own contact differs from this model's
+// on about 1 % of rolling ticks, the tick a ball rolls off a face over a convex edge: half
+// the time the game still counts that face (27 against 30 such ticks, alike in every
+// measured way), so long rolls and the cup's walls can amplify a sub-millimetre difference.
 //
-// Not modelled (not decoded, or not exercised by the recordings): the flagstick and
-// the pin (a flag hit zeroes v and deflects the ball randomly on the next green
-// contact), the actor trees' meshes (Obj_Glf_*: not in the dump; a mesh ground built
-// without them misses those canopies), side spin from curve (0 on every recorded swing;
-// the law is in, untested), over-swing randomness, the swing's own backspin (b is an
-// input), the green-substitution flags (M+0x108). The HUD's wind (mph ~ floor(2.25 s))
-// is a helper only.
+// Not modelled (not decoded, or not exercised by the recordings): side spin from curve (0 on
+// every recorded swing; the law is in, untested), over-swing randomness, the swing's own
+// backspin (b is an input), which face Havok keeps at a pole edge or at a shared edge of
+// the course in a roll, the canopy counter in a roll (RAM moves it there; counting it made
+// h17s1 worse), StopVelFrame x 10 while the last surface is the pin (0xd3c97c), b *= k at
+// the bounces after the first switch to the roll (M+0x4c, 0xd3feb8), why the flag is out
+// for putts. The HUD's wind is a table (HUD_MPH: RAM's s against the HUD's own text; the
+// text box's rounding is not traced).
 
 // <nss-physics> generated by tools/nss-physics-export.mjs from tools/nss-physics.json; do not edit by hand
-export const PHYSICS = {"_note":"NSS 1.5.0's golf ball, every constant src/nsssim.js uses. GENERATED by tools/nss-physics-export.mjs from the git-ignored eden dump (GolfBallMoveParam and GolfPlayerClubParam from the RomFS, the class defaults the file omits from the decoded .nso, GolfShotVelTable from Eden's RAM, the cup from the collision). Laws: tools/harness/state/eden/nss-golf-x/physics.md, flights.md and verify/flights/verdicts.json (the corrections there override the decode). Units m, s, m/s; float32 values as the shortest decimal that reads back to the same float32.","source":{"game":"NSS 1.5.0","moveParam":{"file":"RomFS Pack/Actor/GolfBall.pack.zs: Parameter/GolfBallMoveParam/Default.elsa__parameter__GolfBallMoveParam.bgyml","sha1":"5f34037a1c475d17d696f086524faf09886c11c9"},"clubParam":{"file":"RomFS Pack/Actor/GolfPlayer.pack.zs: Parameter/GolfPlayerClubParam/GolfPlayer.elsa__parameter__GolfPlayerClubParam.bgyml","sha1":"435069ebe0a596b4ef073115919349f79adb3797"},"codeDefaults":{"file":"physics.json (the .nso's class defaults)","sha1":"9c5a1709504978aae9631ad89d69de0b28f86093"},"launchTable":{"file":"GolfShotVelTable.json (Eden RAM 0x2073C937140 (System/CombinationDataTableData/GolfShotVelTable.pp__CombinationDataTableData.bgyml, NSS 1.5.0, loaded in a local golf round))","sha1":"81f0dc88e1e4e4be9c5e51e74b75382d90c50f78"},"cups":{"file":"collision/hNN.bin (tools/lib/nsscol.mjs) at the cups of tools/nss-pins.json"}},"tick":{"frameS":0.01666666753590107,"substeps":4,"dt":0.004166666883975267,"_note":"dt = the game's 0.016666668 / 4; the step 0xd388d8 runs 4 times a 60 Hz frame"},"ball":{"contactRadiusM":0.05,"phiveRadiusM":0.056,"teeHeightM":0.05,"_note":"the ground contact is the centre less 0.050 m along the normal (9,624 contact samples, median 0.05000001); a ball on a tee starts 0.1000 m above the mesh, at rest 0.05"},"air":{"gravity":10,"airFriction":0.0025,"hopSpinK":0.0012,"hopSpinResist":0.9985,"hopDecayTick":0.9996325969696045,"sideSpinK":0.0015,"sideSpinResist":0.9985,"sideDecayTick":0.9996325969696045,"windK":0.33,"windFwdK":0.6,"windBias":0.5,"windVelMax":15,"windHeight":30,"windEffectCurve":{"type":"Linear2D","maxX":1,"points":[[0,0.2],[0.1,0.2],[1,1]]},"_note":"drag v -= AirFriction / 4 v a tick while |v| > StopVelLen; lift along normalize(-ux uy, ux^2 + uz^2, -uy uz) * HopSpinK * hop * |u| / 4; hop *= hopDecayTick (the RAM value; HopSpinResist^(1/4) would be 0.999624789); wind |W| = WindVelMax (s / WindVelMax)^log2(1 / WindBias) = s, times WindEffectCurve((y - y_launch) / WindHeight), v += WindK (W_across + WindFwdK W_along) dt about u's heading, shots only"},"ground":{"gravityPutter":6,"fieldResistanceEnableSpeed":4,"groundLeaveTimeForAirMode":0.2,"frictionRatioCurve":{"type":"Hermit2D","maxX":15,"points":[[0,1,0],[5,1,0],[7.5,0.75,-0.7884906],[10,0.5,0]]},"velLenForStopGravity":0.5,"stopGravityDisableDist":1,"addGravityHole":8,"addGravityHoleDist":0.3,"addGravityHoleCurve":{"type":"Hermit2D","maxX":1,"points":[[0.5,1,0],[1,0,0]]},"noGravityVelLen":0.001,"stopVelLen":0.005,"stopVelFrame":10,"smallMoveForceStopDistance":0.2,"smallMoveForceStopFrame":180,"forceStopFrame":1300,"forceStopPosY":-70,"cupsideReflectionMaxVelY":2,"leafTimerS":0.5,"softLiftM":0.005,"softRestitution":0.3,"softAttrs":[3,5,14,19],"flagHitAfterAngleRange":20,"flagHitAfterVelMin":0.5,"flagHitAfterVelMax":2.5,"hitPinFlagHeightFromCupPos":0.37,"_note":"roll when |vin . n| < FieldResistanceEnableSpeed, the pass-through contact's speed < it and |vin.y| < it (the third condition: verdicts.json roll_switch); a roll airborne for GroundLeaveTimeForAirMode s is a shot again; roll tick: drag, friction (Friction[attr] FrictionRatioCurve(|v|) dt), pull-back, stop count, gravity (GravityPutter on the green; along -n at |v| <= VelLenForStopGravity with n.y >= 0.5 farther than StopGravityDisableDist from the cup; + AddGravityHole AddGravityHoleCurve(d / AddGravityHoleDist) within AddGravityHoleDist, in flight and in a roll faster than VelLenForStopGravity: verdicts.json corrections). leafTimerS: the 0.5 s a canopy entry keeps the leaf counter (0xd38f10, trees.md). softAttrs (bunker, OB, sand OB, the pin): a shot's contact with one sets the ball down softLiftM farther out than the 0.05 m contact radius and turns its velocity back at softRestitution (measured on the recordings, not decoded; every other surface, and a roll on any, slides: restitution 0). The FlagHit* and HitPinFlag* values are not modelled."},"backspin":{"reflectionMin":0.6,"reflectionBias":0.6,"initVelK":28,"initVelRatioMax":1,"backwardVelocityMax":18,"angleRatioCurve":{"type":"Linear2D","maxX":30,"points":[[0,1.3],[1,1.2],[5,1.2],[30,1]]},"_note":"bounce factor k = 1 + (reflectionMin - 1) b b^log2(1 / reflectionBias) = 1 - 0.4 b^1.737; at the roll switch P = -d initVelK min(b, initVelRatioMax)^log2(1 / reflectionBias) max(d . a, 0) (d the incoming horizontal direction, a M+0xf4: the post-move velocity of the stroke's first contact, the launch velocity before it; |P| 2.2399 / 4.9604 on the two chips); in the roll v += r P_plane dt, r = angleRatioCurve(the angle between P and the ball-to-cup direction, deg), P *= the surface's backSpinDecayTick. BackSpinK (0.1) and BackSpinInitVelBias (0.655) have no reader in the ball code."},"attrs":{"0":{"name":"Default","code":null,"block":"AttrDefault","reflectionH":0.5,"reflectionV":0.5,"friction":0,"backSpinResist":null,"backSpinDecayTick":1,"backSpinDecayFrom":"no BackSpinResist: no decay (assumed)","pass":false},"1":{"name":"Fairway","code":5,"block":"AttrFairway","reflectionH":0.6,"reflectionV":0.37,"friction":3.5,"backSpinResist":0.95,"backSpinDecayTick":0.98745035,"backSpinDecayFrom":"RAM, the pull-back's decay on the green (verdicts.json)","pass":false},"2":{"name":"Rough","code":6,"block":"AttrRough","reflectionH":0.53,"reflectionV":0.32,"friction":7,"backSpinResist":0.9,"backSpinDecayTick":0.9740037399747248,"backSpinDecayFrom":"R^(1/4) (the game's approximate pow not measured for this R)","pass":false},"3":{"name":"Bunker","code":7,"block":"AttrBunker","reflectionH":0.27,"reflectionV":0.1,"friction":10,"backSpinResist":null,"backSpinDecayTick":1,"backSpinDecayFrom":"no BackSpinResist: no decay (assumed)","pass":false},"4":{"name":"Water","code":8,"block":"AttrWater","reflectionH":0,"reflectionV":0,"friction":0.1,"backSpinResist":null,"backSpinDecayTick":1,"backSpinDecayFrom":"no BackSpinResist: no decay (assumed)","pass":true},"5":{"name":"OB","code":10,"block":"AttrOB","reflectionH":0.4,"reflectionV":0.24,"friction":8,"backSpinResist":null,"backSpinDecayTick":1,"backSpinDecayFrom":"no BackSpinResist: no decay (assumed)","pass":false},"6":{"name":"Green","code":18,"block":"AttrGreen","reflectionH":0.5,"reflectionV":0.37,"friction":1.3,"backSpinResist":0.95,"backSpinDecayTick":0.98745035,"backSpinDecayFrom":"RAM, the pull-back's decay on the green (verdicts.json)","pass":false},"7":{"name":"Color","code":24,"block":"AttrColor","reflectionH":0.6,"reflectionV":0.37,"friction":2.6,"backSpinResist":0.94,"backSpinDecayTick":0.9846501765874599,"backSpinDecayFrom":"R^(1/4) (the game's approximate pow not measured for this R)","pass":false},"8":{"name":"Leaf","code":25,"block":"AttrLeaf","reflectionH":0.5,"reflectionV":0.5,"friction":0.03,"backSpinResist":null,"backSpinDecayTick":1,"backSpinDecayFrom":"no BackSpinResist: no decay (assumed)","pass":true},"9":{"name":"Cupside","code":30,"block":"AttrCupside","reflectionH":0.999,"reflectionV":0.13,"friction":0,"backSpinResist":0.95,"backSpinDecayTick":0.98745035,"backSpinDecayFrom":"RAM, the pull-back's decay on the green (verdicts.json)","pass":false},"10":{"name":"Cup","code":31,"block":"AttrCup","reflectionH":0.5,"reflectionV":0,"friction":0.5,"backSpinResist":null,"backSpinDecayTick":1,"backSpinDecayFrom":"no BackSpinResist: no decay (assumed)","pass":false},"11":{"name":"Rock","code":32,"block":"AttrRock","reflectionH":0.5,"reflectionV":0.5,"friction":0.5,"backSpinResist":null,"backSpinDecayTick":1,"backSpinDecayFrom":"no BackSpinResist: no decay (assumed)","pass":false},"12":{"name":"Glass","code":34,"block":"AttrDefault","reflectionH":0.5,"reflectionV":0.5,"friction":0,"backSpinResist":null,"backSpinDecayTick":1,"backSpinDecayFrom":"no BackSpinResist: no decay (assumed)","pass":false},"13":{"name":"Tee","code":35,"block":"AttrDefault","reflectionH":0.5,"reflectionV":0.5,"friction":0,"backSpinResist":null,"backSpinDecayTick":1,"backSpinDecayFrom":"no BackSpinResist: no decay (assumed)","pass":false},"14":{"name":"SandOB","code":36,"block":"AttrSandOB","reflectionH":0.4,"reflectionV":0.1,"friction":7,"backSpinResist":null,"backSpinDecayTick":1,"backSpinDecayFrom":"no BackSpinResist: no decay (assumed)","pass":false},"15":{"name":"Tree","code":37,"block":"AttrTree","reflectionH":0.4,"reflectionV":0.1,"friction":0,"backSpinResist":null,"backSpinDecayTick":1,"backSpinDecayFrom":"no BackSpinResist: no decay (assumed)","pass":false},"16":{"name":"Flag","code":38,"block":"AttrDefault","reflectionH":0.5,"reflectionV":0.5,"friction":0,"backSpinResist":null,"backSpinDecayTick":1,"backSpinDecayFrom":"no BackSpinResist: no decay (assumed)","pass":true},"17":{"name":"AirOB","code":39,"block":"AttrDefault","reflectionH":0.5,"reflectionV":0.5,"friction":0,"backSpinResist":null,"backSpinDecayTick":1,"backSpinDecayFrom":"no BackSpinResist: no decay (assumed)","pass":true},"18":{"name":"Object","code":40,"block":"AttrObject","reflectionH":0.5,"reflectionV":0.5,"friction":0.05,"backSpinResist":null,"backSpinDecayTick":1,"backSpinDecayFrom":"no BackSpinResist: no decay (assumed)","pass":false},"19":{"name":"Pin","code":42,"block":"AttrPin","reflectionH":0.8,"reflectionV":0.4,"friction":0,"backSpinResist":null,"backSpinDecayTick":1,"backSpinDecayFrom":"no BackSpinResist: no decay (assumed)","pass":false},"20":{"name":"PalmLeaf","code":43,"block":"AttrPalmLeaf","reflectionH":0.5,"reflectionV":0.5,"friction":0.08,"backSpinResist":null,"backSpinDecayTick":1,"backSpinDecayFrom":"no BackSpinResist: no decay (assumed)","pass":true},"21":{"name":"Barrier","code":44,"block":"AttrBarrier","reflectionH":0.3,"reflectionV":0.1,"friction":0,"backSpinResist":null,"backSpinDecayTick":1,"backSpinDecayFrom":"no BackSpinResist: no decay (assumed)","pass":false}},"codes":{"5":1,"6":2,"7":3,"8":4,"10":5,"18":6,"24":7,"25":8,"30":9,"31":10,"32":11,"34":12,"35":13,"36":14,"37":15,"38":16,"39":17,"40":18,"42":19,"43":20,"44":21},"passAttrs":[4,8,16,17,20],"clubs":{"WD1":{"index":0,"app":"driver","carryMaxYard":240,"loftDeg":10.5,"hopSpinRatio":3,"sideSpinRatio":1,"backSpinRatio":1,"roughRatio":0.75,"bunkerRatio":0.25,"powerMin":0.08,"roughDiffDeg":8,"bunkerDiffDeg":20,"roughCurveMax":1.6,"bunkerCurveMax":1.2},"WD3":{"index":1,"app":"spoon","carryMaxYard":220,"loftDeg":12,"hopSpinRatio":3,"sideSpinRatio":1,"backSpinRatio":1,"roughRatio":0.75,"bunkerRatio":0.25,"powerMin":0.08,"roughDiffDeg":8,"bunkerDiffDeg":20,"roughCurveMax":1.6,"bunkerCurveMax":1.2},"IR3":{"index":2,"app":"3iron","carryMaxYard":190,"loftDeg":25,"hopSpinRatio":1,"sideSpinRatio":1,"backSpinRatio":1,"roughRatio":0.75,"bunkerRatio":0.5,"powerMin":0.08,"roughDiffDeg":4,"bunkerDiffDeg":12,"roughCurveMax":1.8,"bunkerCurveMax":1.4},"IR5":{"index":3,"app":"5iron","carryMaxYard":160,"loftDeg":28,"hopSpinRatio":1,"sideSpinRatio":1,"backSpinRatio":1,"roughRatio":0.75,"bunkerRatio":0.5,"powerMin":0.08,"roughDiffDeg":4,"bunkerDiffDeg":12,"roughCurveMax":1.8,"bunkerCurveMax":1.4},"IR7":{"index":4,"app":"7iron","carryMaxYard":130,"loftDeg":29,"hopSpinRatio":1,"sideSpinRatio":1,"backSpinRatio":1,"roughRatio":0.75,"bunkerRatio":0.5,"powerMin":0.08,"roughDiffDeg":4,"bunkerDiffDeg":12,"roughCurveMax":1.8,"bunkerCurveMax":1.4},"IR9":{"index":5,"app":"9iron","carryMaxYard":100,"loftDeg":34,"hopSpinRatio":1,"sideSpinRatio":1,"backSpinRatio":1,"roughRatio":0.75,"bunkerRatio":0.5,"powerMin":0.08,"roughDiffDeg":4,"bunkerDiffDeg":12,"roughCurveMax":1.8,"bunkerCurveMax":1.4},"SW":{"index":6,"app":"wedge","carryMaxYard":55,"loftDeg":40,"hopSpinRatio":1,"sideSpinRatio":1,"backSpinRatio":1,"roughRatio":0.75,"bunkerRatio":0.75,"powerMin":0.08,"roughDiffDeg":2,"bunkerDiffDeg":8,"roughCurveMax":1.8,"bunkerCurveMax":1.6},"PT":{"index":7,"app":"putter","carryMaxYard":20,"loftDeg":1.14,"hopSpinRatio":1,"sideSpinRatio":1,"backSpinRatio":1,"roughRatio":1,"bunkerRatio":1,"powerMin":0.04,"roughDiffDeg":0,"bunkerDiffDeg":0,"roughCurveMax":2,"bunkerCurveMax":2}},"launch":{"keyClamp":[0.01,1.5],"powerMax":1,"powerOverMaxAdd":0.25,"powerOverMaxPT":1.5,"_note":"speed = launchTable[club][pct - 1], pct = (int)(100.0f * clamp(power, 0.01, 1.5)) in float32 (0xe10b08..0xe10b38); along the aim pitched up by loftDeg; hop = hopSpinRatio (not scaled by power); the lie only caps the power (rough roughRatio, bunker bunkerRatio), the speed is the table's at the capped power"},"launchTable":{"WD1":[7.8,10.4,12.4,14,15.5,16.7,17.8,18.8,19.8,20.7,21.5,22.3,23,23.8,24.4,25.1,25.7,26.3,26.9,27.5,28.1,28.6,29.1,29.7,30.2,30.7,31.2,31.6,32.1,32.6,33,33.4,33.9,34.3,34.7,35.2,35.6,36,36.4,36.8,37.2,37.6,38,38.4,38.8,39.1,39.5,39.9,40.3,40.6,41,41.4,41.7,42.1,42.4,42.8,43.1,43.5,43.9,44.2,44.6,44.9,45.2,45.6,45.9,46.3,46.6,47,47.3,47.6,48,48.3,48.6,49,49.3,49.7,50,50.3,50.7,51,51.3,51.7,52,52.3,52.6,53,53.3,53.6,54,54.3,54.6,55,55.3,55.6,56,56.3,56.6,57,57.3,57.6,57.9,58.3,58.6,58.9,59.3,59.6,59.9,60.3,60.6,61,61.3,61.6,62,62.3,62.6,63,63.3,63.6,64,64.3,64.7,65,65.3,65.7,66,66.4,66.7,67,67.4,67.7,68.1,68.4,68.8,69.1,69.5,69.8,70.1,70.5,70.8,71.2,71.5,71.9,72.2,72.6,72.9,73.3,73.7,74,74.4,74.7],"WD3":[7.2,9.5,11.4,12.9,14.2,15.3,16.4,17.4,18.3,19.1,19.9,20.6,21.3,22,22.7,23.3,23.9,24.5,25.1,25.6,26.2,26.7,27.2,27.7,28.2,28.7,29.1,29.6,30,30.5,30.9,31.3,31.7,32.2,32.6,33,33.4,33.8,34.2,34.6,34.9,35.3,35.7,36.1,36.4,36.8,37.2,37.5,37.9,38.2,38.6,38.9,39.3,39.6,40,40.3,40.7,41,41.3,41.7,42,42.3,42.7,43,43.3,43.7,44,44.3,44.6,44.9,45.3,45.6,45.9,46.2,46.5,46.9,47.2,47.5,47.8,48.1,48.5,48.8,49.1,49.4,49.7,50,50.3,50.6,51,51.3,51.6,51.9,52.2,52.5,52.8,53.2,53.5,53.8,54.1,54.4,54.7,55,55.3,55.7,56,56.3,56.6,56.9,57.2,57.5,57.8,58.2,58.5,58.8,59.1,59.4,59.7,60.1,60.4,60.7,61,61.3,61.6,62,62.3,62.6,62.9,63.2,63.5,63.9,64.2,64.5,64.8,65.2,65.5,65.8,66.1,66.4,66.8,67.1,67.4,67.7,68.1,68.4,68.7,69,69.4,69.7,70,70.4],"IR3":[5.2,7.1,8.6,9.9,11,12,13,13.9,14.8,15.6,16.3,17.1,17.8,18.5,19.1,19.8,20.4,21.1,21.7,22.2,22.8,23.4,23.9,24.5,25,25.5,26,26.5,27,27.5,28,28.5,29,29.5,29.9,30.4,30.8,31.3,31.7,32.2,32.6,33,33.5,33.9,34.3,34.7,35.1,35.5,36,36.4,36.8,37.2,37.6,37.9,38.3,38.7,39.1,39.5,39.9,40.3,40.6,41,41.4,41.8,42.1,42.5,42.9,43.2,43.6,43.9,44.3,44.7,45,45.4,45.7,46.1,46.4,46.8,47.1,47.5,47.8,48.2,48.5,48.9,49.2,49.5,49.9,50.2,50.5,50.9,51.2,51.5,51.9,52.2,52.5,52.9,53.2,53.5,53.9,54.2,54.5,54.8,55.2,55.5,55.8,56.1,56.4,56.7,57.1,57.4,57.7,58,58.3,58.7,59,59.3,59.6,59.9,60.2,60.5,60.9,61.2,61.5,61.8,62.1,62.4,62.7,63,63.3,63.6,63.9,64.2,64.5,64.9,65.2,65.5,65.8,66.1,66.4,66.7,67,67.3,67.6,67.9,68.2,68.5,68.8,69.1,69.4,69.7],"IR5":[4.7,6.3,7.6,8.8,9.8,10.7,11.6,12.4,13.1,13.8,14.5,15.2,15.8,16.4,17,17.6,18.2,18.7,19.2,19.8,20.3,20.8,21.3,21.8,22.2,22.7,23.2,23.6,24.1,24.5,24.9,25.4,25.8,26.2,26.6,27,27.4,27.8,28.2,28.6,29,29.4,29.8,30.2,30.5,30.9,31.3,31.6,32,32.4,32.7,33.1,33.4,33.8,34.1,34.5,34.8,35.2,35.5,35.9,36.2,36.5,36.9,37.2,37.5,37.8,38.2,38.5,38.8,39.1,39.5,39.8,40.1,40.4,40.7,41.1,41.4,41.7,42,42.3,42.6,42.9,43.2,43.5,43.8,44.1,44.4,44.7,45,45.3,45.6,45.9,46.2,46.5,46.8,47.1,47.4,47.7,48,48.3,48.6,48.8,49.1,49.4,49.7,50,50.3,50.6,50.8,51.1,51.4,51.7,52,52.2,52.5,52.8,53.1,53.4,53.7,53.9,54.2,54.5,54.8,55,55.3,55.6,55.9,56.1,56.4,56.7,56.9,57.2,57.5,57.8,58,58.3,58.6,58.8,59.1,59.4,59.7,59.9,60.2,60.4,60.7,61,61.2,61.5,61.8,62],"IR7":[4.2,5.7,6.9,7.9,8.8,9.6,10.3,11,11.7,12.3,13,13.5,14.1,14.6,15.2,15.7,16.2,16.7,17.1,17.6,18.1,18.5,18.9,19.4,19.8,20.2,20.6,21,21.4,21.8,22.2,22.5,22.9,23.3,23.6,24,24.4,24.7,25.1,25.4,25.7,26.1,26.4,26.8,27.1,27.4,27.7,28.1,28.4,28.7,29,29.3,29.6,29.9,30.2,30.5,30.8,31.1,31.4,31.7,32,32.3,32.6,32.9,33.2,33.5,33.8,34.1,34.3,34.6,34.9,35.2,35.5,35.7,36,36.3,36.5,36.8,37.1,37.4,37.6,37.9,38.2,38.4,38.7,38.9,39.2,39.5,39.7,40,40.2,40.5,40.7,41,41.3,41.5,41.8,42,42.3,42.5,42.8,43,43.3,43.5,43.8,44,44.3,44.5,44.8,45,45.2,45.5,45.7,46,46.2,46.4,46.7,46.9,47.2,47.4,47.6,47.9,48.1,48.3,48.6,48.8,49,49.3,49.5,49.8,50,50.2,50.4,50.7,50.9,51.2,51.4,51.6,51.8,52.1,52.3,52.5,52.7,53,53.2,53.4,53.7,53.9,54.1,54.3],"IR9":[3.7,4.9,5.9,6.7,7.4,8.1,8.8,9.4,9.9,10.4,11,11.5,11.9,12.4,12.8,13.3,13.7,14.1,14.5,14.9,15.3,15.7,16,16.4,16.8,17.1,17.4,17.8,18.1,18.4,18.8,19.1,19.4,19.7,20,20.3,20.6,20.9,21.2,21.5,21.8,22.1,22.4,22.7,23,23.2,23.5,23.8,24.1,24.3,24.6,24.9,25.1,25.4,25.7,25.9,26.2,26.4,26.7,26.9,27.2,27.4,27.7,27.9,28.2,28.4,28.7,28.9,29.1,29.4,29.6,29.8,30.1,30.3,30.5,30.8,31,31.2,31.5,31.7,31.9,32.1,32.4,32.6,32.8,33,33.3,33.5,33.7,33.9,34.1,34.4,34.6,34.8,35,35.2,35.4,35.7,35.9,36.1,36.3,36.5,36.7,36.9,37.1,37.4,37.6,37.8,38,38.2,38.4,38.6,38.8,39,39.2,39.4,39.6,39.8,40,40.2,40.4,40.6,40.8,41,41.2,41.4,41.6,41.8,42,42.2,42.4,42.6,42.8,43,43.2,43.4,43.6,43.8,44,44.2,44.4,44.6,44.8,45,45.1,45.3,45.5,45.7,45.9,46.1],"SW":[2.8,3.7,4.4,5,5.5,6,6.4,6.8,7.2,7.6,8,8.3,8.7,9,9.3,9.6,9.9,10.2,10.5,10.8,11,11.3,11.6,11.8,12.1,12.3,12.6,12.8,13.1,13.3,13.5,13.7,14,14.2,14.4,14.6,14.8,15.1,15.3,15.5,15.7,15.9,16.1,16.3,16.5,16.7,16.9,17.1,17.2,17.4,17.6,17.8,18,18.2,18.4,18.5,18.7,18.9,19.1,19.2,19.4,19.6,19.8,20,20.1,20.3,20.4,20.6,20.8,21,21.1,21.3,21.5,21.6,21.8,21.9,22.1,22.3,22.4,22.6,22.7,22.9,23,23.2,23.4,23.5,23.7,23.8,24,24.1,24.3,24.4,24.6,24.7,24.9,25,25.2,25.3,25.5,25.6,25.8,25.9,26.1,26.2,26.3,26.5,26.6,26.8,26.9,27.1,27.2,27.3,27.5,27.6,27.8,27.9,28,28.2,28.3,28.5,28.6,28.7,28.9,29,29.1,29.3,29.4,29.5,29.7,29.8,30,30.1,30.2,30.4,30.5,30.6,30.7,30.9,31,31.1,31.3,31.4,31.5,31.7,31.8,31.9,32.1,32.2,32.3,32.4],"PT":[0.7,1.02,1.26,1.46,1.64,1.8,1.96,2.1,2.24,2.36,2.48,2.6,2.72,2.84,2.94,3.06,3.16,3.26,3.36,3.46,3.56,3.64,3.74,3.82,3.92,4,4.08,4.16,4.26,4.34,4.42,4.5,4.58,4.66,4.74,4.82,4.88,4.96,5.04,5.12,5.18,5.26,5.34,5.4,5.48,5.54,5.62,5.68,5.74,5.82,5.88,5.96,6.02,6.08,6.14,6.22,6.28,6.34,6.4,6.46,6.54,6.6,6.66,6.72,6.78,6.84,6.9,6.96,7,7.06,7.12,7.18,7.24,7.28,7.34,7.4,7.44,7.5,7.54,7.6,7.64,7.7,7.74,7.8,7.84,7.88,7.94,7.98,8.02,8.08,8.12,8.16,8.2,8.26,8.3,8.34,8.38,8.42,8.48,8.52,8.56,8.6,8.64,8.68,8.72,8.76,8.8,8.86,8.9,8.94,8.98,9.02,9.06,9.1,9.14,9.18,9.22,9.26,9.3,9.34,9.38,9.42,9.46,9.5,9.54,9.58,9.62,9.66,9.7,9.74,9.78,9.82,9.86,9.9,9.94,9.98,10.02,10.06,10.1,10.14,10.16,10.2,10.24,10.28,10.32,10.36,10.4,10.44,10.48,10.52]},"cup":{"_note":"the median NSS cup over the 126 of the collision dump, relative to its bone (GolfCourseNNholeK, the cup bottom): a 20-sided hole: the rim (Cupside) on the green at rimRadiusM, depthM above the bone (the rim follows the green's slope: depthRangeM); a bevel (Cupside) bevelM down and in to the wall's top at wallRadiusM; the wall (Cupside) straight down to the flat Cup bottom (bottomRadiusM) at bottomM above the bone. src/nsssim.js cupMesh cuts it into a height field.","cups":126,"rimRadiusM":0.1931,"depthM":0.3098,"bevelM":0.043,"wallRadiusM":0.15,"bottomRadiusM":0.15,"bottomM":-0.0002,"rimRadiusRangeM":[0.1889,0.1955],"depthRangeM":[0.2988,0.3381]},"wind":{"hudMphPerS":2.25,"_note":"the HUD's mph against the wind object's s (m/s) on the recorded round: 1 -> 2, 3 -> 6, 4 -> 9, 5 -> 11, 6 -> 13, 10 -> 22 = floor(2.25 s); the code's converter is 2.237 (0x1bf21fc) and neither its floor nor its round fits all six: the rounding is open"}};
+export const PHYSICS = {"_note":"NSS 1.5.0's golf ball, every constant src/nsssim.js uses. GENERATED by tools/nss-physics-export.mjs from the git-ignored eden dump (GolfBallMoveParam and GolfPlayerClubParam from the RomFS, the class defaults the file omits from the decoded .nso, GolfShotVelTable from Eden's RAM, the cup from the collision). Laws: tools/harness/state/eden/nss-golf-x/physics.md, flights.md and verify/flights/verdicts.json (the corrections there override the decode). Units m, s, m/s; float32 values as the shortest decimal that reads back to the same float32.","source":{"game":"NSS 1.5.0","moveParam":{"file":"RomFS Pack/Actor/GolfBall.pack.zs: Parameter/GolfBallMoveParam/Default.elsa__parameter__GolfBallMoveParam.bgyml","sha1":"5f34037a1c475d17d696f086524faf09886c11c9"},"clubParam":{"file":"RomFS Pack/Actor/GolfPlayer.pack.zs: Parameter/GolfPlayerClubParam/GolfPlayer.elsa__parameter__GolfPlayerClubParam.bgyml","sha1":"435069ebe0a596b4ef073115919349f79adb3797"},"codeDefaults":{"file":"physics.json (the .nso's class defaults)","sha1":"9c5a1709504978aae9631ad89d69de0b28f86093"},"launchTable":{"file":"GolfShotVelTable.json (Eden RAM 0x2073C937140 (System/CombinationDataTableData/GolfShotVelTable.pp__CombinationDataTableData.bgyml, NSS 1.5.0, loaded in a local golf round))","sha1":"81f0dc88e1e4e4be9c5e51e74b75382d90c50f78"},"cups":{"file":"collision/hNN.bin (tools/lib/nsscol.mjs) at the cups of tools/nss-pins.json"}},"tick":{"frameS":0.01666666753590107,"substeps":4,"dt":0.004166666883975267,"_note":"dt = the game's 0.016666668 / 4; the step 0xd388d8 runs 4 times a 60 Hz frame"},"ball":{"contactRadiusM":0.05,"phiveRadiusM":0.056,"teeHeightM":0.05,"_note":"the ground contact is the centre less 0.050 m along the normal (9,624 contact samples, median 0.05000001); a ball on a tee starts 0.1000 m above the mesh, at rest 0.05"},"air":{"gravity":10,"airFriction":0.0025,"hopSpinK":0.0012,"hopSpinResist":0.9985,"hopDecayTick":0.9996325969696045,"sideSpinK":0.0015,"sideSpinResist":0.9985,"sideDecayTick":0.9996325969696045,"windK":0.33,"windFwdK":0.6,"windBias":0.5,"windVelMax":15,"windHeight":30,"windEffectCurve":{"type":"Linear2D","maxX":1,"points":[[0,0.2],[0.1,0.2],[1,1]]},"_note":"drag v -= AirFriction / 4 v a tick while |v| > StopVelLen; lift along normalize(-ux uy, ux^2 + uz^2, -uy uz) * HopSpinK * hop * |u| / 4; hop *= hopDecayTick (the RAM value; HopSpinResist^(1/4) would be 0.999624789); wind |W| = WindVelMax (s / WindVelMax)^log2(1 / WindBias) = s, times WindEffectCurve((y - y_launch) / WindHeight), v += WindK (W_across + WindFwdK W_along) dt about u's heading, shots only"},"ground":{"gravityPutter":6,"fieldResistanceEnableSpeed":4,"groundLeaveTimeForAirMode":0.2,"frictionRatioCurve":{"type":"Hermit2D","maxX":15,"points":[[0,1,0],[5,1,0],[7.5,0.75,-0.7884906],[10,0.5,0]]},"velLenForStopGravity":0.5,"stopGravityDisableDist":1,"addGravityHole":8,"addGravityHoleDist":0.3,"addGravityHoleCurve":{"type":"Hermit2D","maxX":1,"points":[[0.5,1,0],[1,0,0]]},"noGravityVelLen":0.001,"stopVelLen":0.005,"stopVelFrame":10,"smallMoveForceStopDistance":0.2,"smallMoveForceStopFrame":180,"forceStopFrame":1300,"forceStopPosY":-70,"cupsideReflectionMaxVelY":2,"leafTimerS":0.5,"cupsideReachM":0.5,"cupGreenNormalY":0.1,"cupGreenGroundTicks":3,"groundTickAttrs":[1,2,3,4,5,6,7,9,10,13,14],"zeroSpinAttrs":[3,9,12,14,15,18,19,21],"softLiftM":0.005,"softRestitution":0.3,"softAttrs":[3,5,14,19],"flagHitAfterAngleRange":20,"flagHitAfterVelMin":0.5,"flagHitAfterVelMax":2.5,"hitPinFlagHeightFromCupPos":0.37,"_note":"roll when |vin . n| < FieldResistanceEnableSpeed, the pass-through contact's speed < it and |vin.y| < it (the third condition: verdicts.json roll_switch); a roll airborne for GroundLeaveTimeForAirMode s is a shot again; roll tick: drag, friction (Friction[attr] FrictionRatioCurve(|v|) dt), pull-back, stop count, gravity (GravityPutter on the green; along -n at |v| <= VelLenForStopGravity with n.y >= 0.5 farther than StopGravityDisableDist from the cup; + AddGravityHole AddGravityHoleCurve(d / AddGravityHoleDist) within AddGravityHoleDist, in flight and in a roll faster than VelLenForStopGravity: verdicts.json corrections). leafTimerS: the 0.5 s a canopy entry keeps the leaf counter (0xd38f10, trees.md). softAttrs (bunker, OB, sand OB, the pin): a shot's contact with one sets the ball down softLiftM farther out than the 0.05 m contact radius and turns its velocity back at softRestitution (measured on the recordings, not decoded; every other surface, and a roll on any, slides: restitution 0). FlagHit*: the cloth's kick on the stroke's first ground contact after a cloth hit, on the green (0xd3fee4..0xd404c4); HitPinFlagHeightFromCupPos: a pin or flag contact at least this high over the cup's bone sets M+0x102, after which the cloth is passed through (0xd39900..0xd39b6c)."},"backspin":{"reflectionMin":0.6,"reflectionBias":0.6,"initVelK":28,"initVelRatioMax":1,"backwardVelocityMax":18,"angleRatioCurve":{"type":"Linear2D","maxX":30,"points":[[0,1.3],[1,1.2],[5,1.2],[30,1]]},"_note":"bounce factor k = 1 + (reflectionMin - 1) b b^log2(1 / reflectionBias) = 1 - 0.4 b^1.737; at the roll switch P = -d initVelK min(b, initVelRatioMax)^log2(1 / reflectionBias) max(d . a, 0) (d the incoming horizontal direction, a M+0xf4: the post-move velocity of the stroke's first contact, the launch velocity before it; |P| 2.2399 / 4.9604 on the two chips); in the roll v += r P_plane dt, r = angleRatioCurve(the angle between P and the ball-to-cup direction, deg), P *= the surface's backSpinDecayTick. BackSpinK (0.1) and BackSpinInitVelBias (0.655) have no reader in the ball code."},"attrs":{"0":{"name":"Default","code":null,"block":"AttrDefault","reflectionH":0.5,"reflectionV":0.5,"friction":0,"backSpinResist":null,"backSpinDecayTick":1,"backSpinDecayFrom":"no BackSpinResist: no decay (assumed)","pass":false},"1":{"name":"Fairway","code":5,"block":"AttrFairway","reflectionH":0.6,"reflectionV":0.37,"friction":3.5,"backSpinResist":0.95,"backSpinDecayTick":0.98745035,"backSpinDecayFrom":"RAM, the pull-back's decay on the green (verdicts.json)","pass":false},"2":{"name":"Rough","code":6,"block":"AttrRough","reflectionH":0.53,"reflectionV":0.32,"friction":7,"backSpinResist":0.9,"backSpinDecayTick":0.9740037399747248,"backSpinDecayFrom":"R^(1/4) (the game's approximate pow not measured for this R)","pass":false},"3":{"name":"Bunker","code":7,"block":"AttrBunker","reflectionH":0.27,"reflectionV":0.1,"friction":10,"backSpinResist":null,"backSpinDecayTick":1,"backSpinDecayFrom":"no BackSpinResist: no decay (assumed)","pass":false},"4":{"name":"Water","code":8,"block":"AttrWater","reflectionH":0,"reflectionV":0,"friction":0.1,"backSpinResist":null,"backSpinDecayTick":1,"backSpinDecayFrom":"no BackSpinResist: no decay (assumed)","pass":true},"5":{"name":"OB","code":10,"block":"AttrOB","reflectionH":0.4,"reflectionV":0.24,"friction":8,"backSpinResist":null,"backSpinDecayTick":1,"backSpinDecayFrom":"no BackSpinResist: no decay (assumed)","pass":false},"6":{"name":"Green","code":18,"block":"AttrGreen","reflectionH":0.5,"reflectionV":0.37,"friction":1.3,"backSpinResist":0.95,"backSpinDecayTick":0.98745035,"backSpinDecayFrom":"RAM, the pull-back's decay on the green (verdicts.json)","pass":false},"7":{"name":"Color","code":24,"block":"AttrColor","reflectionH":0.6,"reflectionV":0.37,"friction":2.6,"backSpinResist":0.94,"backSpinDecayTick":0.9846501765874599,"backSpinDecayFrom":"R^(1/4) (the game's approximate pow not measured for this R)","pass":false},"8":{"name":"Leaf","code":25,"block":"AttrLeaf","reflectionH":0.5,"reflectionV":0.5,"friction":0.03,"backSpinResist":null,"backSpinDecayTick":1,"backSpinDecayFrom":"no BackSpinResist: no decay (assumed)","pass":true},"9":{"name":"Cupside","code":30,"block":"AttrCupside","reflectionH":0.999,"reflectionV":0.13,"friction":0,"backSpinResist":0.95,"backSpinDecayTick":0.98745035,"backSpinDecayFrom":"RAM, the pull-back's decay on the green (verdicts.json)","pass":false},"10":{"name":"Cup","code":31,"block":"AttrCup","reflectionH":0.5,"reflectionV":0,"friction":0.5,"backSpinResist":null,"backSpinDecayTick":1,"backSpinDecayFrom":"no BackSpinResist: no decay (assumed)","pass":false},"11":{"name":"Rock","code":32,"block":"AttrRock","reflectionH":0.5,"reflectionV":0.5,"friction":0.5,"backSpinResist":null,"backSpinDecayTick":1,"backSpinDecayFrom":"no BackSpinResist: no decay (assumed)","pass":false},"12":{"name":"Glass","code":34,"block":"AttrDefault","reflectionH":0.5,"reflectionV":0.5,"friction":0,"backSpinResist":null,"backSpinDecayTick":1,"backSpinDecayFrom":"no BackSpinResist: no decay (assumed)","pass":false},"13":{"name":"Tee","code":35,"block":"AttrDefault","reflectionH":0.5,"reflectionV":0.5,"friction":0,"backSpinResist":null,"backSpinDecayTick":1,"backSpinDecayFrom":"no BackSpinResist: no decay (assumed)","pass":false},"14":{"name":"SandOB","code":36,"block":"AttrSandOB","reflectionH":0.4,"reflectionV":0.1,"friction":7,"backSpinResist":null,"backSpinDecayTick":1,"backSpinDecayFrom":"no BackSpinResist: no decay (assumed)","pass":false},"15":{"name":"Tree","code":37,"block":"AttrTree","reflectionH":0.4,"reflectionV":0.1,"friction":0,"backSpinResist":null,"backSpinDecayTick":1,"backSpinDecayFrom":"no BackSpinResist: no decay (assumed)","pass":false},"16":{"name":"Flag","code":38,"block":"AttrDefault","reflectionH":0.5,"reflectionV":0.5,"friction":0,"backSpinResist":null,"backSpinDecayTick":1,"backSpinDecayFrom":"no BackSpinResist: no decay (assumed)","pass":true},"17":{"name":"AirOB","code":39,"block":"AttrDefault","reflectionH":0.5,"reflectionV":0.5,"friction":0,"backSpinResist":null,"backSpinDecayTick":1,"backSpinDecayFrom":"no BackSpinResist: no decay (assumed)","pass":true},"18":{"name":"Object","code":40,"block":"AttrObject","reflectionH":0.5,"reflectionV":0.5,"friction":0.05,"backSpinResist":null,"backSpinDecayTick":1,"backSpinDecayFrom":"no BackSpinResist: no decay (assumed)","pass":false},"19":{"name":"Pin","code":42,"block":"AttrPin","reflectionH":0.8,"reflectionV":0.4,"friction":0,"backSpinResist":null,"backSpinDecayTick":1,"backSpinDecayFrom":"no BackSpinResist: no decay (assumed)","pass":false},"20":{"name":"PalmLeaf","code":43,"block":"AttrPalmLeaf","reflectionH":0.5,"reflectionV":0.5,"friction":0.08,"backSpinResist":null,"backSpinDecayTick":1,"backSpinDecayFrom":"no BackSpinResist: no decay (assumed)","pass":true},"21":{"name":"Barrier","code":44,"block":"AttrBarrier","reflectionH":0.3,"reflectionV":0.1,"friction":0,"backSpinResist":null,"backSpinDecayTick":1,"backSpinDecayFrom":"no BackSpinResist: no decay (assumed)","pass":false}},"codes":{"5":1,"6":2,"7":3,"8":4,"10":5,"18":6,"24":7,"25":8,"30":9,"31":10,"32":11,"34":12,"35":13,"36":14,"37":15,"38":16,"39":17,"40":18,"42":19,"43":20,"44":21},"passAttrs":[4,8,16,17,20],"clubs":{"WD1":{"index":0,"app":"driver","carryMaxYard":240,"loftDeg":10.5,"hopSpinRatio":3,"sideSpinRatio":1,"backSpinRatio":1,"roughRatio":0.75,"bunkerRatio":0.25,"powerMin":0.08,"roughDiffDeg":8,"bunkerDiffDeg":20,"roughCurveMax":1.6,"bunkerCurveMax":1.2},"WD3":{"index":1,"app":"spoon","carryMaxYard":220,"loftDeg":12,"hopSpinRatio":3,"sideSpinRatio":1,"backSpinRatio":1,"roughRatio":0.75,"bunkerRatio":0.25,"powerMin":0.08,"roughDiffDeg":8,"bunkerDiffDeg":20,"roughCurveMax":1.6,"bunkerCurveMax":1.2},"IR3":{"index":2,"app":"3iron","carryMaxYard":190,"loftDeg":25,"hopSpinRatio":1,"sideSpinRatio":1,"backSpinRatio":1,"roughRatio":0.75,"bunkerRatio":0.5,"powerMin":0.08,"roughDiffDeg":4,"bunkerDiffDeg":12,"roughCurveMax":1.8,"bunkerCurveMax":1.4},"IR5":{"index":3,"app":"5iron","carryMaxYard":160,"loftDeg":28,"hopSpinRatio":1,"sideSpinRatio":1,"backSpinRatio":1,"roughRatio":0.75,"bunkerRatio":0.5,"powerMin":0.08,"roughDiffDeg":4,"bunkerDiffDeg":12,"roughCurveMax":1.8,"bunkerCurveMax":1.4},"IR7":{"index":4,"app":"7iron","carryMaxYard":130,"loftDeg":29,"hopSpinRatio":1,"sideSpinRatio":1,"backSpinRatio":1,"roughRatio":0.75,"bunkerRatio":0.5,"powerMin":0.08,"roughDiffDeg":4,"bunkerDiffDeg":12,"roughCurveMax":1.8,"bunkerCurveMax":1.4},"IR9":{"index":5,"app":"9iron","carryMaxYard":100,"loftDeg":34,"hopSpinRatio":1,"sideSpinRatio":1,"backSpinRatio":1,"roughRatio":0.75,"bunkerRatio":0.5,"powerMin":0.08,"roughDiffDeg":4,"bunkerDiffDeg":12,"roughCurveMax":1.8,"bunkerCurveMax":1.4},"SW":{"index":6,"app":"wedge","carryMaxYard":55,"loftDeg":40,"hopSpinRatio":1,"sideSpinRatio":1,"backSpinRatio":1,"roughRatio":0.75,"bunkerRatio":0.75,"powerMin":0.08,"roughDiffDeg":2,"bunkerDiffDeg":8,"roughCurveMax":1.8,"bunkerCurveMax":1.6},"PT":{"index":7,"app":"putter","carryMaxYard":20,"loftDeg":1.14,"hopSpinRatio":1,"sideSpinRatio":1,"backSpinRatio":1,"roughRatio":1,"bunkerRatio":1,"powerMin":0.04,"roughDiffDeg":0,"bunkerDiffDeg":0,"roughCurveMax":2,"bunkerCurveMax":2}},"launch":{"keyClamp":[0.01,1.5],"powerMax":1,"powerOverMaxAdd":0.25,"powerOverMaxPT":1.5,"_note":"speed = launchTable[club][pct - 1], pct = (int)(100.0f * clamp(power, 0.01, 1.5)) in float32 (0xe10b08..0xe10b38); along the aim pitched up by loftDeg; hop = hopSpinRatio (not scaled by power); the lie only caps the power (rough roughRatio, bunker bunkerRatio), the speed is the table's at the capped power"},"launchTable":{"WD1":[7.8,10.4,12.4,14,15.5,16.7,17.8,18.8,19.8,20.7,21.5,22.3,23,23.8,24.4,25.1,25.7,26.3,26.9,27.5,28.1,28.6,29.1,29.7,30.2,30.7,31.2,31.6,32.1,32.6,33,33.4,33.9,34.3,34.7,35.2,35.6,36,36.4,36.8,37.2,37.6,38,38.4,38.8,39.1,39.5,39.9,40.3,40.6,41,41.4,41.7,42.1,42.4,42.8,43.1,43.5,43.9,44.2,44.6,44.9,45.2,45.6,45.9,46.3,46.6,47,47.3,47.6,48,48.3,48.6,49,49.3,49.7,50,50.3,50.7,51,51.3,51.7,52,52.3,52.6,53,53.3,53.6,54,54.3,54.6,55,55.3,55.6,56,56.3,56.6,57,57.3,57.6,57.9,58.3,58.6,58.9,59.3,59.6,59.9,60.3,60.6,61,61.3,61.6,62,62.3,62.6,63,63.3,63.6,64,64.3,64.7,65,65.3,65.7,66,66.4,66.7,67,67.4,67.7,68.1,68.4,68.8,69.1,69.5,69.8,70.1,70.5,70.8,71.2,71.5,71.9,72.2,72.6,72.9,73.3,73.7,74,74.4,74.7],"WD3":[7.2,9.5,11.4,12.9,14.2,15.3,16.4,17.4,18.3,19.1,19.9,20.6,21.3,22,22.7,23.3,23.9,24.5,25.1,25.6,26.2,26.7,27.2,27.7,28.2,28.7,29.1,29.6,30,30.5,30.9,31.3,31.7,32.2,32.6,33,33.4,33.8,34.2,34.6,34.9,35.3,35.7,36.1,36.4,36.8,37.2,37.5,37.9,38.2,38.6,38.9,39.3,39.6,40,40.3,40.7,41,41.3,41.7,42,42.3,42.7,43,43.3,43.7,44,44.3,44.6,44.9,45.3,45.6,45.9,46.2,46.5,46.9,47.2,47.5,47.8,48.1,48.5,48.8,49.1,49.4,49.7,50,50.3,50.6,51,51.3,51.6,51.9,52.2,52.5,52.8,53.2,53.5,53.8,54.1,54.4,54.7,55,55.3,55.7,56,56.3,56.6,56.9,57.2,57.5,57.8,58.2,58.5,58.8,59.1,59.4,59.7,60.1,60.4,60.7,61,61.3,61.6,62,62.3,62.6,62.9,63.2,63.5,63.9,64.2,64.5,64.8,65.2,65.5,65.8,66.1,66.4,66.8,67.1,67.4,67.7,68.1,68.4,68.7,69,69.4,69.7,70,70.4],"IR3":[5.2,7.1,8.6,9.9,11,12,13,13.9,14.8,15.6,16.3,17.1,17.8,18.5,19.1,19.8,20.4,21.1,21.7,22.2,22.8,23.4,23.9,24.5,25,25.5,26,26.5,27,27.5,28,28.5,29,29.5,29.9,30.4,30.8,31.3,31.7,32.2,32.6,33,33.5,33.9,34.3,34.7,35.1,35.5,36,36.4,36.8,37.2,37.6,37.9,38.3,38.7,39.1,39.5,39.9,40.3,40.6,41,41.4,41.8,42.1,42.5,42.9,43.2,43.6,43.9,44.3,44.7,45,45.4,45.7,46.1,46.4,46.8,47.1,47.5,47.8,48.2,48.5,48.9,49.2,49.5,49.9,50.2,50.5,50.9,51.2,51.5,51.9,52.2,52.5,52.9,53.2,53.5,53.9,54.2,54.5,54.8,55.2,55.5,55.8,56.1,56.4,56.7,57.1,57.4,57.7,58,58.3,58.7,59,59.3,59.6,59.9,60.2,60.5,60.9,61.2,61.5,61.8,62.1,62.4,62.7,63,63.3,63.6,63.9,64.2,64.5,64.9,65.2,65.5,65.8,66.1,66.4,66.7,67,67.3,67.6,67.9,68.2,68.5,68.8,69.1,69.4,69.7],"IR5":[4.7,6.3,7.6,8.8,9.8,10.7,11.6,12.4,13.1,13.8,14.5,15.2,15.8,16.4,17,17.6,18.2,18.7,19.2,19.8,20.3,20.8,21.3,21.8,22.2,22.7,23.2,23.6,24.1,24.5,24.9,25.4,25.8,26.2,26.6,27,27.4,27.8,28.2,28.6,29,29.4,29.8,30.2,30.5,30.9,31.3,31.6,32,32.4,32.7,33.1,33.4,33.8,34.1,34.5,34.8,35.2,35.5,35.9,36.2,36.5,36.9,37.2,37.5,37.8,38.2,38.5,38.8,39.1,39.5,39.8,40.1,40.4,40.7,41.1,41.4,41.7,42,42.3,42.6,42.9,43.2,43.5,43.8,44.1,44.4,44.7,45,45.3,45.6,45.9,46.2,46.5,46.8,47.1,47.4,47.7,48,48.3,48.6,48.8,49.1,49.4,49.7,50,50.3,50.6,50.8,51.1,51.4,51.7,52,52.2,52.5,52.8,53.1,53.4,53.7,53.9,54.2,54.5,54.8,55,55.3,55.6,55.9,56.1,56.4,56.7,56.9,57.2,57.5,57.8,58,58.3,58.6,58.8,59.1,59.4,59.7,59.9,60.2,60.4,60.7,61,61.2,61.5,61.8,62],"IR7":[4.2,5.7,6.9,7.9,8.8,9.6,10.3,11,11.7,12.3,13,13.5,14.1,14.6,15.2,15.7,16.2,16.7,17.1,17.6,18.1,18.5,18.9,19.4,19.8,20.2,20.6,21,21.4,21.8,22.2,22.5,22.9,23.3,23.6,24,24.4,24.7,25.1,25.4,25.7,26.1,26.4,26.8,27.1,27.4,27.7,28.1,28.4,28.7,29,29.3,29.6,29.9,30.2,30.5,30.8,31.1,31.4,31.7,32,32.3,32.6,32.9,33.2,33.5,33.8,34.1,34.3,34.6,34.9,35.2,35.5,35.7,36,36.3,36.5,36.8,37.1,37.4,37.6,37.9,38.2,38.4,38.7,38.9,39.2,39.5,39.7,40,40.2,40.5,40.7,41,41.3,41.5,41.8,42,42.3,42.5,42.8,43,43.3,43.5,43.8,44,44.3,44.5,44.8,45,45.2,45.5,45.7,46,46.2,46.4,46.7,46.9,47.2,47.4,47.6,47.9,48.1,48.3,48.6,48.8,49,49.3,49.5,49.8,50,50.2,50.4,50.7,50.9,51.2,51.4,51.6,51.8,52.1,52.3,52.5,52.7,53,53.2,53.4,53.7,53.9,54.1,54.3],"IR9":[3.7,4.9,5.9,6.7,7.4,8.1,8.8,9.4,9.9,10.4,11,11.5,11.9,12.4,12.8,13.3,13.7,14.1,14.5,14.9,15.3,15.7,16,16.4,16.8,17.1,17.4,17.8,18.1,18.4,18.8,19.1,19.4,19.7,20,20.3,20.6,20.9,21.2,21.5,21.8,22.1,22.4,22.7,23,23.2,23.5,23.8,24.1,24.3,24.6,24.9,25.1,25.4,25.7,25.9,26.2,26.4,26.7,26.9,27.2,27.4,27.7,27.9,28.2,28.4,28.7,28.9,29.1,29.4,29.6,29.8,30.1,30.3,30.5,30.8,31,31.2,31.5,31.7,31.9,32.1,32.4,32.6,32.8,33,33.3,33.5,33.7,33.9,34.1,34.4,34.6,34.8,35,35.2,35.4,35.7,35.9,36.1,36.3,36.5,36.7,36.9,37.1,37.4,37.6,37.8,38,38.2,38.4,38.6,38.8,39,39.2,39.4,39.6,39.8,40,40.2,40.4,40.6,40.8,41,41.2,41.4,41.6,41.8,42,42.2,42.4,42.6,42.8,43,43.2,43.4,43.6,43.8,44,44.2,44.4,44.6,44.8,45,45.1,45.3,45.5,45.7,45.9,46.1],"SW":[2.8,3.7,4.4,5,5.5,6,6.4,6.8,7.2,7.6,8,8.3,8.7,9,9.3,9.6,9.9,10.2,10.5,10.8,11,11.3,11.6,11.8,12.1,12.3,12.6,12.8,13.1,13.3,13.5,13.7,14,14.2,14.4,14.6,14.8,15.1,15.3,15.5,15.7,15.9,16.1,16.3,16.5,16.7,16.9,17.1,17.2,17.4,17.6,17.8,18,18.2,18.4,18.5,18.7,18.9,19.1,19.2,19.4,19.6,19.8,20,20.1,20.3,20.4,20.6,20.8,21,21.1,21.3,21.5,21.6,21.8,21.9,22.1,22.3,22.4,22.6,22.7,22.9,23,23.2,23.4,23.5,23.7,23.8,24,24.1,24.3,24.4,24.6,24.7,24.9,25,25.2,25.3,25.5,25.6,25.8,25.9,26.1,26.2,26.3,26.5,26.6,26.8,26.9,27.1,27.2,27.3,27.5,27.6,27.8,27.9,28,28.2,28.3,28.5,28.6,28.7,28.9,29,29.1,29.3,29.4,29.5,29.7,29.8,30,30.1,30.2,30.4,30.5,30.6,30.7,30.9,31,31.1,31.3,31.4,31.5,31.7,31.8,31.9,32.1,32.2,32.3,32.4],"PT":[0.7,1.02,1.26,1.46,1.64,1.8,1.96,2.1,2.24,2.36,2.48,2.6,2.72,2.84,2.94,3.06,3.16,3.26,3.36,3.46,3.56,3.64,3.74,3.82,3.92,4,4.08,4.16,4.26,4.34,4.42,4.5,4.58,4.66,4.74,4.82,4.88,4.96,5.04,5.12,5.18,5.26,5.34,5.4,5.48,5.54,5.62,5.68,5.74,5.82,5.88,5.96,6.02,6.08,6.14,6.22,6.28,6.34,6.4,6.46,6.54,6.6,6.66,6.72,6.78,6.84,6.9,6.96,7,7.06,7.12,7.18,7.24,7.28,7.34,7.4,7.44,7.5,7.54,7.6,7.64,7.7,7.74,7.8,7.84,7.88,7.94,7.98,8.02,8.08,8.12,8.16,8.2,8.26,8.3,8.34,8.38,8.42,8.48,8.52,8.56,8.6,8.64,8.68,8.72,8.76,8.8,8.86,8.9,8.94,8.98,9.02,9.06,9.1,9.14,9.18,9.22,9.26,9.3,9.34,9.38,9.42,9.46,9.5,9.54,9.58,9.62,9.66,9.7,9.74,9.78,9.82,9.86,9.9,9.94,9.98,10.02,10.06,10.1,10.14,10.16,10.2,10.24,10.28,10.32,10.36,10.4,10.44,10.48,10.52]},"cup":{"_note":"the median NSS cup over the 126 of the collision dump, relative to its bone (GolfCourseNNholeK, the cup bottom): a 20-sided hole: the rim (Cupside) on the green at rimRadiusM, depthM above the bone (the rim follows the green's slope: depthRangeM); a bevel (Cupside) bevelM down and in to the wall's top at wallRadiusM; the wall (Cupside) straight down to the flat Cup bottom (bottomRadiusM) at bottomM above the bone. src/nsssim.js cupMesh cuts it into a height field.","cups":126,"rimRadiusM":0.1931,"depthM":0.3098,"bevelM":0.043,"wallRadiusM":0.15,"bottomRadiusM":0.15,"bottomM":-0.0002,"rimRadiusRangeM":[0.1889,0.1955],"depthRangeM":[0.2988,0.3381]},"wind":{"hudMphPerS":2.237,"hudMph":[0,2,4,6,9,11,13,15,17,20,22,24,26,29,31,33],"_note":"the HUD's mph for each whole s (m/s, 0..15) of the wind object. Against RAM's s on the RAM player's address frames (tools/harness/state/eden/lab/rplay/frames, rounds 2 and 3 of 2026-10-25): 1 -> 2 (h11, h15), 2 -> 4 (h06, h09), 4 -> 9 (h07, h10, h12), 5 -> 11 (h13), 6 -> 13 (h08), 7 -> 15 (h14, r3 h04), 8 -> 17 (h05), 9 -> 20 (h16), 15 -> 33 (h18); flights.md 5.9's round adds 3 -> 6 and 10 -> 22; 26 mph showed (pink) on a round with no RAM read. Every value is floor(2.237 s + d) with 0.052 < d < 0.104 (2.237: the converter at 0x1bf21fc; the text box's rounding is not traced); floor(2.25 s) gives 18 for s 8 and 27 for 12, floor(2.237 s) 8 for 4. s 11..14 (24, 26, 29, 31) are the rule's, 26 seen without its s."},"flag":{"unitM":0.001953125,"verts512":[[-4,1534,-13],[-11,1534,-8],[-2,1541,-6],[-14,1534,0],[-5,1541,-4],[11,0,8],[4,0,13],[0,0,0],[14,0,0],[-4,1534,13],[-5,1541,4],[-11,1534,8],[-6,1541,0],[11,1534,8],[2,1541,6],[4,1534,13],[-4,0,13],[14,1534,0],[11,1534,-8],[6,1541,0],[4,1534,-13],[5,1541,-4],[5,1541,4],[0,1525,-516],[0,1525,0],[0,969,0],[0,969,-516],[-4,0,-13],[4,0,-13],[-11,0,-8],[-14,0,0],[11,0,-8],[-11,0,8]],"tris":[[0,1,2],[1,3,4],[5,6,7],[5,7,8],[9,10,11],[12,3,11],[13,14,15],[6,15,9],[6,9,16],[17,18,19],[18,20,21],[17,22,13],[8,17,13],[8,13,5],[5,13,15],[5,15,6],[23,24,25],[23,25,26],[27,0,20],[27,20,28],[29,27,7],[29,7,30],[0,27,29],[0,29,1],[1,29,30],[1,30,3],[28,7,27],[7,28,31],[7,31,8],[18,31,28],[18,28,20],[31,18,17],[31,17,8],[7,16,32],[7,32,30],[6,16,7],[16,9,11],[16,11,32],[32,11,3],[32,3,30]],"clothTris":[16,17],"source":{"file":"RomFS Pack/Actor/Object_BGOBJ_GlfPin.pack.zs: Phive/Shape/Dcc/BGOBJ_GlfPin_Anim_col.Nin_NX_NVN.bphsh","packSha1":"bd2fd36868122d155052b6948cb3197ccf4d4e0b","shapeSha1":"f2badbd1ab9888501e8065f52e6e0e9a9bbfa67d"},"_note":"the pole: one face acts a tick, the nearest one the incoming velocity approaches (at a vertical edge both faces are as near and the game's choice is not decoded: src/nsssim.js run's poleTie); a shot meeting it is set at the face's closest point to the end of the move, out along the face normal by contactRadiusM + softLiftM, and bounces as the Pin (soft) surface; the cloth zeroes v (not u) once (M+0x103, 0xd39b8c..0xd39ca8). Present for every stroke but the putter's from the green (31 recorded putts, 19 through the pole's place, met nothing; why is not decoded)"}};
 // </nss-physics>
 
 const P = PHYSICS;
@@ -163,9 +217,12 @@ export function launchSpeed(club, power) {
   return P.launchTable[c][pctOf(power) - 1];
 }
 // the gauge's cap on a lie: rough RoughRatio, bunker BunkerRatio (the lies only
-// cap the power: the speed is the fairway table's at the capped power, flights.md 4)
+// cap the power: the speed is the fairway table's at the capped power, flights.md 4);
+// the putter's is its PowerMax, PowerOverMaxPT 1.5 on every lie (0xe10fdc; its
+// lie ratios are 1, so Shot Assist cuts a putt at 1.0: swing-power.md 1, 6.1)
 export function capFor(club, lie) {
   const c = P.clubs[clubOf(club)];
+  if (clubOf(club) === "PT") return P.launch.powerOverMaxPT;
   const a = typeof lie === "number" ? lie : LIE_ATTR[lie] ?? 1;
   if (a === 2) return c.roughRatio;
   if (a === 3) return c.bunkerRatio;
@@ -195,11 +252,28 @@ export function windVector(w) {
   const a = w.dirRad ?? 0;
   return { x: m * Math.sin(a), z: m * Math.cos(a) };
 }
-// the minimap's wind (mph, the bearing it blows toward, deg N-up) -> { x, z };
-// s = mph / 2.25 (the HUD reads floor(2.25 s) on every recorded pair; the
-// rounding is not decoded, so this is approximate)
+// The HUD's wind. NSS's wind object holds a whole s (m/s, 0..15) and the HUD shows
+// HUD_MPH[s] mph (tools/nss-physics.json wind: RAM's s against the HUD's own text on the
+// RAM player's frames, 1 -> 2 ... 8 -> 17, 9 -> 20, 15 -> 33; the rest floor(2.237 s + d),
+// 0.052 < d < 0.104, the one rule that gives every value seen; floor(2.25 s), the earlier
+// reading, shows 18 for 8 and 27 for 12)
+export const HUD_MPH = Object.freeze(P.wind.hudMph.slice());
+// s (m/s) -> the HUD's mph
+export function hudMphOf(s) {
+  return HUD_MPH[Math.min(HUD_MPH.length - 1, Math.max(0, Math.round(s)))];
+}
+// the HUD's mph -> the wind object's s: the whole s whose HUD value is nearest (each HUD
+// value gives its own s, and so does the RAM reader's 2.237 s; a value the HUD never
+// shows, as 8 or 18, the nearer neighbour, ties the lower; any wind at all is s >= 1)
+export function windSpeedFromHud(mph) {
+  if (!(mph > 0)) return 0;
+  let best = 1;
+  for (let s = 2; s < HUD_MPH.length; s++) if (Math.abs(HUD_MPH[s] - mph) < Math.abs(HUD_MPH[best] - mph)) best = s;
+  return best;
+}
+// the minimap's wind (mph, the bearing it blows toward, deg N-up) -> { x, z } (m/s), or null
 export function windFromHud(mph, towardDeg) {
-  const s = mph / P.wind.hudMphPerS;
+  const s = windSpeedFromHud(mph);
   if (!(s > 0)) return null;
   const t = towardDeg * DEG;
   return { x: s * Math.sin(t), z: -s * Math.cos(t) };
@@ -323,22 +397,65 @@ function closestOnTri(ax, ay, az, bx, by, bz, cx, cy, cz, px, py, pz, q) {
   q[0] = ax + abx * v + acx * w; q[1] = ay + aby * v + acy * w; q[2] = az + abz * v + acz * w;
 }
 
+// the squared distance between the segments p0p1 and q0q1 (Ericson 5.1.9)
+function segSegDist2(p0, p1, q0, q1) {
+  const d1x = p1[0] - p0[0], d1y = p1[1] - p0[1], d1z = p1[2] - p0[2], d2x = q1[0] - q0[0], d2y = q1[1] - q0[1], d2z = q1[2] - q0[2];
+  const rx = p0[0] - q0[0], ry = p0[1] - q0[1], rz = p0[2] - q0[2];
+  const a = d1x * d1x + d1y * d1y + d1z * d1z, e = d2x * d2x + d2y * d2y + d2z * d2z, f = d2x * rx + d2y * ry + d2z * rz;
+  let s, t;
+  if (a <= 1e-18 && e <= 1e-18) { s = 0; t = 0; }
+  else if (a <= 1e-18) { s = 0; t = Math.min(1, Math.max(0, f / e)); }
+  else {
+    const c = d1x * rx + d1y * ry + d1z * rz;
+    if (e <= 1e-18) { t = 0; s = Math.min(1, Math.max(0, -c / a)); }
+    else {
+      const b = d1x * d2x + d1y * d2y + d1z * d2z, den = a * e - b * b;
+      s = den !== 0 ? Math.min(1, Math.max(0, (b * f - c * e) / den)) : 0;
+      t = (b * s + f) / e;
+      if (t < 0) { t = 0; s = Math.min(1, Math.max(0, -c / a)); } else if (t > 1) { t = 1; s = Math.min(1, Math.max(0, (b - c) / a)); }
+    }
+  }
+  const x = rx + d1x * s - d2x * t, y = ry + d1y * s - d2y * t, z = rz + d1z * s - d2z * t;
+  return x * x + y * y + z * z;
+}
+// the squared distance between the segment o..e and the triangle abc (unit face normal f)
+const _cq = [0, 0, 0], _A = [0, 0, 0], _B = [0, 0, 0], _C = [0, 0, 0];
+function segTriDist2(ax, ay, az, bx, by, bz, cx, cy, cz, fx, fy, fz, o, e) {
+  const d0 = (o[0] - ax) * fx + (o[1] - ay) * fy + (o[2] - az) * fz, d1 = (e[0] - ax) * fx + (e[1] - ay) * fy + (e[2] - az) * fz;
+  if ((d0 > 0) !== (d1 > 0)) {
+    const t = d0 / (d0 - d1);
+    if (inTri(ax, ay, az, bx, by, bz, cx, cy, cz, fx, fy, fz, o[0] + (e[0] - o[0]) * t, o[1] + (e[1] - o[1]) * t, o[2] + (e[2] - o[2]) * t)) return 0;
+  }
+  let best = Infinity;
+  for (const p of [o, e]) {
+    closestOnTri(ax, ay, az, bx, by, bz, cx, cy, cz, p[0], p[1], p[2], _cq);
+    const x = p[0] - _cq[0], y = p[1] - _cq[1], z = p[2] - _cq[2];
+    if (x * x + y * y + z * z < best) best = x * x + y * y + z * z;
+  }
+  _A[0] = ax; _A[1] = ay; _A[2] = az; _B[0] = bx; _B[1] = by; _B[2] = bz; _C[0] = cx; _C[1] = cy; _C[2] = cz;
+  return Math.min(best, segSegDist2(o, e, _A, _B), segSegDist2(o, e, _B, _C), segSegDist2(o, e, _C, _A));
+}
+
 // A triangle mesh as the ball's ground: { verts: Float32Array | Float64Array
 // [V * 3] (NSS metres), tris: Uint32Array [T * 3], attr: Uint8Array [T] (the
 // ball's attribute ids: ATTR_OF_CODE of the collision codes) }, gridded over x/z
 // (cell m). contacts(o, e, r): the solid triangles a move from o to e meets;
-// pass(o, D, r): the pass-through ones (PASS) a step crosses; faceNormal(t).
-// skip(t) drops triangle t (the active cup's cover). Pure;
+// pass(o, D, r): the pass-through ones (PASS) a step crosses; leafTouch(o, D, r): the Leaf
+// triangles the step's sphere touches (the canopy counter's contacts; only on a mesh with
+// Leaf triangles); faceNormal(t). skip(t) drops triangle t (the active cup's cover);
+// closest: contacts also carry q, the triangle's point closest to the end of the move (the
+// flagstick's ground: a shot meeting the pole is set there). Pure;
 // tools/test-nsssim.mjs builds it from tools/lib/nsscol.mjs's loadCollision and
 // from the fixture's triangle subsets.
-export function meshGround({ verts, tris, attr }, { cell = 2, skip = null } = {}) {
+export function meshGround({ verts, tris, attr }, { cell = 2, skip = null, closest = false } = {}) {
   const nt = attr.length;
   const V = verts, Tr = tris;
   const fn = new Float64Array(nt * 3), box = new Float64Array(nt * 6);
   const keep = new Uint8Array(nt);
-  let x0 = Infinity, z0 = Infinity, x1 = -Infinity, z1 = -Infinity;
+  let x0 = Infinity, z0 = Infinity, x1 = -Infinity, z1 = -Infinity, hasLeaf = false;
   for (let t = 0; t < nt; t++) {
     if (skip && skip(t)) continue;
+    if (attr[t] === ATTR.leaf) hasLeaf = true;
     const a = Tr[t * 3] * 3, b = Tr[t * 3 + 1] * 3, c = Tr[t * 3 + 2] * 3;
     const ux = V[b] - V[a], uy = V[b + 1] - V[a + 1], uz = V[b + 2] - V[a + 2];
     const wx = V[c] - V[a], wy = V[c + 1] - V[a + 1], wz = V[c + 2] - V[a + 2];
@@ -379,8 +496,12 @@ export function meshGround({ verts, tris, attr }, { cell = 2, skip = null } = {}
   const stamp = new Uint32Array(nt);
   let gen = 0;
   const cand = [];
+  // the last query (pass and leafTouch ask for the same step: one candidate list)
+  let mox = NaN, moy = NaN, moz = NaN, mex = NaN, mey = NaN, mez = NaN, mr = NaN;
   // the triangles whose boxes, grown by r, meet the box of the step, by index
   function candidates(ox, oy, oz, ex, ey, ez, r) {
+    if (ox === mox && oy === moy && oz === moz && ex === mex && ey === mey && ez === mez && r === mr) return cand;
+    mox = ox; moy = oy; moz = oz; mex = ex; mey = ey; mez = ez; mr = r;
     if (++gen === 0xffffffff) { stamp.fill(0); gen = 1; }
     cand.length = 0;
     const bx0 = Math.min(ox, ex) - r, bx1 = Math.max(ox, ex) + r, by0 = Math.min(oy, ey) - r, by1 = Math.max(oy, ey) + r;
@@ -413,9 +534,10 @@ export function meshGround({ verts, tris, attr }, { cell = 2, skip = null } = {}
     // sphere touches on the way coming from clear of them (farther than r + CLEAR_M at
     // o), each reported with its own face normal on o's side and e's distance from that
     // plane, and its true distance from e (Infinity when only touched on the way):
-    // [{ tri, n, d, dist, attr }]. run() lets them act deepest first (dist, ties to the
-    // deeper plane, the touched-only last), each while the velocity still approaches it,
-    // and takes the one the incoming velocity meets most head-on as the tick's contact.
+    // [{ tri, n, d, dist, attr, q (closest: the point at e) }]. In a shot run() lets them act
+    // deepest first (dist, ties to the deeper plane, the touched-only last), each while the
+    // velocity still approaches it, and takes the one the incoming velocity meets most
+    // head-on as the tick's contact; in a roll only the deepest acts (run, mode 2).
     // The rules, all from the recordings: NSS reports a face's normal for every contact
     // (8,343 of the 8,368 distinct contact records carry a triangle's exact face normal;
     // the rest are the flagstick and the leaf volumes); h14s3's landing was pushed out
@@ -441,18 +563,28 @@ export function meshGround({ verts, tris, attr }, { cell = 2, skip = null } = {}
         closestOnTri(V[a], V[a + 1], V[a + 2], V[b], V[b + 1], V[b + 2], V[c], V[c + 1], V[c + 2], e[0], e[1], e[2], q);
         let qx = e[0] - q[0], qy = e[1] - q[1], qz = e[2] - q[2];
         let dist = Math.sqrt(qx * qx + qy * qy + qz * qz);
+        const cq = closest ? [q[0], q[1], q[2]] : null;   // the closest point at e
+        // closest (the flagstick): the swept sphere's first touch of the face along the move (t in [0, 1], -1 when
+        // none) and the side it touches from (the touch normal against the face normal)
+        let tt = -1, tn = 0;
+        if (closest) { tt = tsweep(t, o, D, r, 1); if (tt >= 0) tn = buf.n[0] * fn[t * 3] + buf.n[1] * fn[t * 3 + 1] + buf.n[2] * fn[t * 3 + 2]; }
         if (!(dist < r)) {
           closestOnTri(V[a], V[a + 1], V[a + 2], V[b], V[b + 1], V[b + 2], V[c], V[c + 1], V[c + 2], o[0], o[1], o[2], q);
           qx = o[0] - q[0]; qy = o[1] - q[1]; qz = o[2] - q[2];
           if (qx * qx + qy * qy + qz * qz < (r + CLEAR_M) * (r + CLEAR_M)) continue;
-          if (tsweep(t, o, D, r, 1) < 0) continue;
+          if ((closest ? tt : tsweep(t, o, D, r, 1)) < 0) continue;
           dist = Infinity;   // touched on the way only
         }
         const fx = fn[t * 3], fy = fn[t * 3 + 1], fz = fn[t * 3 + 2];
         const d0 = (o[0] - V[a]) * fx + (o[1] - V[a + 1]) * fy + (o[2] - V[a + 2]) * fz;
         const d1 = (e[0] - V[a]) * fx + (e[1] - V[a + 1]) * fy + (e[2] - V[a + 2]) * fz;
-        const sg = d0 >= 0 ? 1 : -1;
-        out.push({ tri: t, n: [sg * fx, sg * fy, sg * fz], d: sg * d1, dist, attr: attr[t] });
+        // the normal on o's side of the face's plane; on the flagstick the side the sweep touches it from (a fast
+        // ball's move can end past the pole's axis, where o is behind the far faces' planes: oriented by o they
+        // point inward and look approached)
+        const sg = tt >= 0 ? (tn >= 0 ? 1 : -1) : d0 >= 0 ? 1 : -1;
+        const ct = { tri: t, n: [sg * fx, sg * fy, sg * fz], d: sg * d1, dist, attr: attr[t] };
+        if (cq) { ct.q = cq; ct.t = tt; }
+        out.push(ct);
       }
       return out;
     },
@@ -479,6 +611,23 @@ export function meshGround({ verts, tris, attr }, { cell = 2, skip = null } = {}
       out.sort((p, q) => p.t - q.t || p.tri - q.tri);
       return out;
     },
+    // the Leaf triangles the sphere (radius r) touches anywhere on the step from o by D (the step's segment within
+    // r of the triangle: its face, an edge or a corner), by index: [{ tri, n (the face normal) }]: the canopy
+    // counter's contacts (fitted, not decoded: Havok's leaf contact set; on the recorded canopies the counter they
+    // give is the game's M+0xdc at every sample of 5 of the 11 canopy strokes and the damping on 10)
+    leafTouch: hasLeaf ? (o, D, r) => {
+      const e = [o[0] + D[0], o[1] + D[1], o[2] + D[2]];
+      const list = candidates(o[0], o[1], o[2], e[0], e[1], e[2], r);
+      const out = [];
+      for (let i = 0; i < list.length; i++) {
+        const t = list[i];
+        if (attr[t] !== ATTR.leaf) continue;
+        const a = Tr[t * 3] * 3, b = Tr[t * 3 + 1] * 3, c = Tr[t * 3 + 2] * 3;
+        if (segTriDist2(V[a], V[a + 1], V[a + 2], V[b], V[b + 1], V[b + 2], V[c], V[c + 1], V[c + 2], fn[t * 3], fn[t * 3 + 1], fn[t * 3 + 2], o, e) < r * r)
+          out.push({ tri: t, n: [fn[t * 3], fn[t * 3 + 1], fn[t * 3 + 2]] });
+      }
+      return out;
+    } : null,
     faceNormal: (t) => [fn[t * 3], fn[t * 3 + 1], fn[t * 3 + 2]],
     triangles: nt,
   };
@@ -486,6 +635,18 @@ export function meshGround({ verts, tris, attr }, { cell = 2, skip = null } = {}
 // the order the move's contacts act in: the deepest first (the smallest true distance;
 // at a tie, a shared edge or corner, the deeper plane), the ones only touched on the way last
 const deepestFirst = (p, q) => (Math.abs(p.dist - q.dist) <= TIE_DIST_M || (p.dist === Infinity && q.dist === Infinity) ? p.d - q.d : p.dist - q.dist);
+// the roll's one contact: the deepest; at a tie (a shared edge or corner) the one that is not Cupside (the green
+// at the rim: 223 of the 311 rim ties of the putter assist's ghost paths), then the deeper plane. Which triangle
+// Havok's query keeps at a tie is not decoded: between two Cupside faces (the wall and the bevel) the paths split
+// about evenly
+const deepestFirstRoll = (p, q) => (Math.abs(p.dist - q.dist) <= TIE_DIST_M || (p.dist === Infinity && q.dist === Infinity)
+  ? ((p.attr === ATTR.cupside) - (q.attr === ATTR.cupside)) || p.d - q.d : p.dist - q.dist);
+// the contacts that count the stroke's ground-contact ticks (M+0xbc; tools/nss-physics.json ground.groundTickAttrs)
+const GROUND_TICK = new Uint8Array(32);
+for (const a of P.ground.groundTickAttrs) GROUND_TICK[a] = 1;
+// the contacts that zero the backspin and the pull-back (ground.zeroSpinAttrs)
+const ZERO_SPIN = new Uint8Array(32);
+for (const a of P.ground.zeroSpinAttrs) ZERO_SPIN[a] = 1;
 
 // A height field as the ground: { heightAt(x, z) -> y | null, normalAt(x, z) ->
 // [nx, ny, nz], attrAt(x, z) -> attribute id } (NSS metres). A move is tested
@@ -562,6 +723,114 @@ export function cupMesh(cup, { segments = 20, surfaceAt = null } = {}) {
   return { verts: new Float64Array(verts), tris: new Uint32Array(tris), attr: new Uint8Array(attr) };
 }
 
+// ---------------------------------------------------------------- the flagstick
+
+// The flagstick (Object_BGOBJ_GlfPin; tools/nss-physics.json flag: its Phive collision shape
+// BGOBJ_GlfPin_Anim_col, exactly): a decagonal pole (Pin) of circumradius 0.0273 m (apothems
+// 0.0252-0.0256) from the cup's bone (y 0) to 2.996 m with a cap to 3.010, and the cloth
+// (Flag, pass-through), one quad in the pole's plane from the axis out 1.0078 m, 1.8926..2.9785 m
+// up. Placed at the active cup's bone, yawed so the cloth points downwind: the model's -z along
+// (sin a, 0, cos a), a = the wind object's angle (also when its speed is 0).
+export function flagMesh(cup, { windDirRad = 0, pole = true, cloth = true } = {}) {
+  const FL = P.flag, c = Math.cos(windDirRad), s = Math.sin(windDirRad);
+  const verts = [], tris = [], attr = [];
+  for (const [x, y, z] of FL.verts512) {
+    const X = x * FL.unitM, Y = y * FL.unitM, Z = z * FL.unitM;
+    // R_y(a + pi): (x, z) -> (-x cos a - z sin a, x sin a - z cos a)
+    verts.push(cup.x - X * c - Z * s, cup.y + Y, cup.z + X * s - Z * c);
+  }
+  FL.tris.forEach((t, i) => {
+    const isCloth = FL.clothTris.includes(i);
+    if (isCloth ? !cloth : !pole) return;
+    tris.push(...t); attr.push(isCloth ? ATTR.flag : ATTR.pin);
+  });
+  return { verts: new Float64Array(verts), tris: new Uint32Array(tris), attr: new Uint8Array(attr) };
+}
+// the flag as its own ground (meshGround over flagMesh, with the closest points), cached by cup and yaw
+const flagGrounds = new Map();
+export function flagGround(cup, windDirRad = 0) {
+  const key = `${cup.x},${cup.y},${cup.z},${windDirRad}`;
+  let g = flagGrounds.get(key);
+  if (!g) {
+    if (flagGrounds.size > 64) flagGrounds.clear();
+    g = meshGround(flagMesh(cup, { windDirRad }), { cell: 0.25, closest: true });
+    flagGrounds.set(key, g);
+  }
+  return g;
+}
+// is the flag in the cup for this stroke? Not for the putter on the green (Green or Cupside):
+// 31 recorded putts from 0.4 to 8.3 m, 19 through the pole's place, met nothing; every
+// recorded stroke from off the green that came near it met it. A putter from the fringe: not
+// recorded (in, inferred)
+export function flagInPlay(club, lie) {
+  const a = typeof lie === "number" ? lie : LIE_ATTR[lie] ?? 1;
+  return !(clubOf(club) === "PT" && (a === ATTR.green || a === ATTR.cupside));
+}
+// The cloth's kick (0xd3fee4..0xd404c4), added to the bounce of the stroke's first ground contact, on the
+// green, after a cloth hit: the horizontal direction from the contact point (M+0x6c: the ball's centre less
+// 0.05 m along the contact normal) to the cup, turned by an angle in [-FlagHitAfterAngleRange, +range) deg
+// (x' = x cos + z sin, z' = z cos - x sin), times a speed in [FlagHitAfterVelMin, VelMax), both drawn from
+// sead::Random (xorshift128; init x_i = 0x6c078965 (x_(i-1) ^ x_(i-1) >> 30) + i; a draw's unit value the
+// float of 0x3f800000 | u >> 9, less 1) seeded with fcvtzu(f32(contact x) * 1e6) (a negative x seeds 0). h01s3
+// (flights/raw): seed 88183192, 16.982 deg, 1.2615 m/s, the recorded bounce to 2.2e-4 m/s
+// -> { seed, angDeg, speed, x, z } (the kick's m/s)
+const _ku = new Uint32Array(1), _kf = new Float32Array(_ku.buffer);
+const unit01 = (r) => { _ku[0] = (0x3f800000 | (r >>> 9)) >>> 0; return Math.fround(_kf[0] - 1); };
+function seadInit(seed) {
+  const st = [0, 0, 0, 0];
+  let x = seed >>> 0;
+  for (let i = 0; i < 4; i++) { x = (Math.imul(0x6c078965, (x ^ (x >>> 30)) >>> 0) + i + 1) >>> 0; st[i] = x; }
+  return st;
+}
+function seadU32(st) {
+  const t = (st[0] ^ (st[0] << 11)) >>> 0;
+  const w = (st[3] ^ (st[3] >>> 19) ^ t ^ (t >>> 8)) >>> 0;
+  st[0] = st[1]; st[1] = st[2]; st[2] = st[3]; st[3] = w;
+  return w;
+}
+export function flagKick(cpx, cpz, cup) {
+  const F = Math.fround;
+  let dx = F(F(cup.x) - F(cpx)), dz = F(F(cup.z) - F(cpz));
+  const m = F(Math.sqrt(F(F(dx * dx) + F(dz * dz))));
+  if (m > 0) { const inv = F(1 / m); dx = F(dx * inv); dz = F(dz * inv); }
+  const sv = F(F(cpx) * F(1e6));
+  const seed = !(sv > 0) ? 0 : sv >= 4294967295 ? 0xffffffff : Math.trunc(sv) >>> 0;
+  const st = seadInit(seed);
+  const R = F(G.flagHitAfterAngleRange), vmin = F(G.flagHitAfterVelMin), vmax = F(G.flagHitAfterVelMax);
+  const ang = F(F(unit01(seadU32(st)) * F(R + R)) - R);
+  const rad = F(ang * F(0.017453292));
+  const A = F(Math.cos(rad)), B = F(Math.sin(rad));
+  const kx = F(F(dx * A) + F(dz * B)), kz = F(F(dz * A) - F(dx * B));
+  const sp = F(vmin + F(unit01(seadU32(st)) * F(vmax - vmin)));
+  return { seed, angDeg: ang, speed: sp, x: F(kx * sp), z: F(kz * sp) };
+}
+// the pole's one contact a tick, among the faces the incoming velocity approaches (letting every overlapped
+// face act, deepest first, put the ball 1-9 cm off on 8 of the 16 recorded contacts): the face the move's swept
+// sphere touches first (the smallest time of impact t; a face it already overlaps and moves into touches at 0).
+// (Until 2026-10-25 the face nearest the end of the move: a ball faster than ~12 m/s whose move ends past the
+// axis took a far face, its normal oriented by o pointing inward, and was deflected to the wrong side, through
+// the pole: of 920 synthetic off-centre hits per speed on a flat green, none at 8 m/s, 12 at 12, 124 at 16, 383 at
+// 25; now none. The recorded contacts, all at 8 m/s or less but r4 h10s2's dead-centre 25 m/s, are unchanged.) At a vertical edge two faces share (about 2/3 of the
+// directions a ball can meet the decagon from) both are touched at the same t, and which the game takes is not
+// known: of 6 recorded ties, the lower triangle (the shape's primitive order) on 4, the higher on 2 (h01s3 643,
+// h08s1 1489). tie "low" (default) or "high"; pick.tie marks a tie
+function polePick(fc, vx, vy, vz, tie) {
+  let pick = null, tied = false;
+  for (let k = 0; k < fc.length; k++) {
+    const c = fc[k];
+    if (c.attr !== ATTR.pin || !(c.t >= 0) || !(vx * c.n[0] + vy * c.n[1] + vz * c.n[2] < 0)) continue;
+    if (!pick || c.t < pick.t - 1e-9) { pick = c; tied = false; continue; }
+    if (Math.abs(c.t - pick.t) > 1e-9) continue;
+    if (c.n[0] !== pick.n[0] || c.n[2] !== pick.n[2]) tied = true;   // another face (not the quad's other half)
+    if (tie === "high" ? c.tri > pick.tri : c.tri < pick.tri) pick = c;
+  }
+  if (pick) pick.tie = tied;
+  return pick;
+}
+// the flag's reach: the cloth's free edge from the axis, its top over the bone (m)
+const FLAG_REACH_M = Math.max(...P.flag.verts512.map(([x, , z]) => Math.hypot(x, z))) * P.flag.unitM;
+const FLAG_TOP_M = Math.max(...P.flag.verts512.map((v) => v[1])) * P.flag.unitM;
+
 // A shot line's profile as a height field: profile.heightAt(s) (m, NSS y or
 // relative to the ball's ground), profile.attrAt(s) (attribute id, or
 // profile.surfaceAt(s) a lie name), s metres along the heading from the start;
@@ -599,13 +868,26 @@ export { ATTR_NAME };
 //   ground    meshGround(...) | heightGround(...) | { heightAt, normalAt, attrAt }
 //   profile   instead of ground: { heightAt(s), attrAt(s) | surfaceAt(s) } (profileGround)
 //   cup       { x, y, z } the active cup's bone (AddGravityHole, stop-gravity, the
-//             pull-back's angle; on a height field also the cup's hole, cupMesh)
+//             pull-back's angle, the Cupside reach and the bevel's green bounce; on a
+//             height field also the cup's hole, cupMesh)
+//   flag      null (default) | true | { windDirRad }: the flagstick in the active cup (cup
+//             required), the cloth's yaw the wind object's angle (default o.wind's dirRad,
+//             or its x, z; the game yaws it in a calm too, so with neither run throws);
+//             flagInPlay(club, lie) says when the game has it in (not for a putt from the green)
+//   poleTie   "low" (default) | "high": the face taken at a pole edge both faces share (the
+//             game's rule is not known: run both where poleTies says it mattered)
+//   flagKick  (cpx, cpz, cup) -> { x, z }: replaces the cloth kick's draw (a planner sampling
+//             its range; the game's own draw is flagKick)
+//   resume    { groundCount, flagHit, pinHigh }: a stroke continued from a recorded mid-stroke
+//             state (M+0xbc, M+0x103, M+0x102)
 //   trace     true: path = [tick, x, y, z, mode, contact attribute] every tick (a
 //             number n: every n ticks)
 //   v0, hop0, side0, yRef   a recorded launch (the shot record), replacing the
 //             club / power / heading launch
 //   stopAtHazard  true (default): the run ends where the ball first meets water or air
 //             OB (the game penalises it there); false flies on (under the water)
+//   stopAtCup true: the run ends at the first Cup contact (the putter assist's ghost run
+//             does; the rest is then the ball's spot at that tick)
 //   maxTicks  default ForceStopFrame frames
 //   onMove(state), onTick(state)  per-tick hooks (diagnostics)
 // Returns, in metres (and yd where named): carry (horizontal, start to the first
@@ -613,9 +895,12 @@ export { ATTR_NAME };
 // restAttr, lateral (m, + right of the heading), apex (m above the start, before the
 // first contact), flightTicks (to the first contact), firstContact { tick, pos, attr },
 // bounces (shot contacts that bounced), rollTick (the switch to the roll), ticks,
-// holed, outcome (rest | holed | water | OB | timeout | fell), hazard (where water or
-// air OB was first met), end (the hazard's point for water / OB, else the rest),
-// pullBack (the backspin pull-back P as stored at the switch to the roll, or null), path.
+// holed (a tick's contact was Cup), holedTick, outcome (rest | holed | water | OB |
+// timeout | fell), hazard (where water or air OB was first met), end (the hazard's point
+// for water / OB, else the rest), pullBack (the backspin pull-back P as stored at the switch
+// to the roll, or null), path, pinHigh (M+0x102), flagHit ({ tick, pos } or null), flagKick
+// ({ tick, seed, angDeg, speed, x, z } or null), poleTies (the ticks whose pole contact was an
+// edge tie: the other face would deflect the ball differently).
 //
 // The ball's state is float32, as the game's (every operation rounded with
 // Math.fround): flown from a recorded launch it lands on the recording's last airborne
@@ -639,7 +924,7 @@ export function run(o) {
   const W = windVector(o.wind);
   const Wx0 = W ? F(W.x) : 0, Wz0 = W ? F(W.z) : 0;
   const cup = o.cup ?? null;
-  const stopAtHazard = o.stopAtHazard ?? true;
+  const stopAtHazard = o.stopAtHazard ?? true, stopAtCup = o.stopAtCup ?? false;
   const maxTicks = o.maxTicks ?? G.forceStopFrame * N_SUB;
   const traceEvery = o.trace === true ? 1 : o.trace > 0 ? o.trace | 0 : 0;
   const yRef = F(o.yRef ?? start[1]);   // the wind's height reference (M+0xc): the launch y
@@ -647,15 +932,29 @@ export function run(o) {
   const headingRad = Math.atan2(v0[0], -v0[2]);
   const onTick = o.onTick ?? null, onMove = o.onMove ?? null;
   const contacts = o.contacts ? [] : null;
+  const leafTouch = ground.leafTouch ?? null;
+  // the flagstick (o.flag: true, or { windDirRad }: the cloth's yaw, default the wind's angle, also at 0 m/s). The
+  // game turns the flag to the wind object's angle in a calm too, so a flag whose yaw is not known is refused, not
+  // flown at yaw 0 (round 4 h10s2, s 0 at 4.712 rad: at yaw 0 the model holed it off the cloth 2.41 m up; at the
+  // wind's angle it bounces off the pole and rests 0.024 m from the game's ball, 13.6 m back on the fairway)
+  let flagG = null;
+  if (o.flag && cup) {
+    const wa = o.wind ? (Number.isFinite(o.wind.dirRad) ? o.wind.dirRad : (o.wind.x || o.wind.z) ? Math.atan2(o.wind.x ?? 0, o.wind.z ?? 0) : null) : null;
+    const flagYaw = Number.isFinite(o.flag.windDirRad) ? o.flag.windDirRad : wa;
+    if (flagYaw == null) throw new Error("nsssim.run: the flag is in but its yaw is not known: pass flag: { windDirRad } or a wind with dirRad (the wind object's angle, also at 0 m/s)");
+    flagG = flagGround(cup, flagYaw);
+  }
+  const poleTie = o.poleTie ?? "low", kickOf = o.flagKick ?? flagKick;
 
   // float32 constants
   const dt = F(DT), grav = F(A.gravity), gPutt = F(G.gravityPutter);
   const drag = F(F(A.airFriction) / N_SUB), waterK = F(F(P.attrs[ATTR.water].friction) / N_SUB);
   const hopK = F(A.hopSpinK), hopD = F(A.hopDecayTick), sideK = F(A.sideSpinK), sideD = F(A.sideDecayTick);
   const windK = F(A.windK), windF = F(A.windFwdK), windH = F(A.windHeight);
-  const leafF = F(P.attrs[ATTR.leaf].friction), palmF = F(P.attrs[ATTR.palmLeaf].friction);
+  const leafF = F(P.attrs[ATTR.leaf].friction), palmF = F(P.attrs[ATTR.palmLeaf].friction), leafT = F(G.leafTimerS);
   const stop2 = F(F(G.stopVelLen) * F(G.stopVelLen)), resist = F(G.fieldResistanceEnableSpeed);
   const softLift = F(G.softLiftM), softK = F(1 + G.softRestitution);
+  const cupsideCap = F(G.cupsideReflectionMaxVelY), pinHighY = cup ? F(F(cup.y) + F(G.hitPinFlagHeightFromCupPos)) : 0;
 
   let px = F(start[0]), py = F(start[1]), pz = F(start[2]);
   let vx = F(v0[0]), vy = F(v0[1]), vz = F(v0[2]);
@@ -670,34 +969,118 @@ export function run(o) {
   let lastAttr = lieA;                        // the last surface touched (M+0xac)
   let tSince = 0;                             // s since the last contact (M+0xb8)
   let stopFrames = 0, smallFrames = 0, ax = px, az = pz, ay = py;
-  let leafCount = 0, leafTimer = 0, leafNx = NaN, leafNy = NaN, leafNz = NaN;
+  // the canopy counter M+0xdc, its timer M+0xe0, the leaf normal the last tick counted (M+0xe4)
+  let leafCount = 0, leafTimer = 0, leafPrev = null;
   let waterY = null;
   let bounces = 0, apex = 0, firstContact = null, rollTick = null, hazard = null, outcome = null, pullBack = null;
+  // the stroke's ground-contact ticks (M+0xbc), M+0x102 (a pin or flag contact at or above
+  // HitPinFlagHeightFromCupPos over the bone), M+0x103 (the cloth hit), M+0x108 (this tick's
+  // contact met the cup's bevel), the first Cup contact (M+0x100)
+  let groundCount = o.resume?.groundCount ?? 0, pinHigh = !!o.resume?.pinHigh;
+  let flagHit = o.resume?.flagHit ? (typeof o.resume.flagHit === "object" ? o.resume.flagHit : { tick: 0, pos: null }) : null;
+  let cupGreen = false, holedTick = null, flagKicked = null;
+  const poleTies = [];
   const path = traceEvery ? [[0, px, py, pz, mode, 0]] : null;
   const O = [0, 0, 0], E = [0, 0, 0], D = [0, 0, 0];
   const cupHoriz = cup ? (x, z) => Math.sqrt((x - cup.x) * (x - cup.x) + (z - cup.z) * (z - cup.z)) : () => Infinity;
   const holeG = (dc) => F(F(G.addGravityHole) * F(curveAt(G.addGravityHoleCurve, dc / G.addGravityHoleDist)));
   let tick = 0, restAttr = lieA;
+  // the canopy counter (0xd38ecc..0xd38f10, 0xd39048..0xd39054): a leaf contact whose normal is not the one the
+  // last tick counted counts +1 moving against it (and sets the timer to leafTimerS), -1 along it (at a count <= 0
+  // the timer stops; the count is not clamped: RAM reads -1 .. -6), and stores its normal; the stored normal is
+  // cleared every tick, so a face touched on consecutive ticks counts on the 1st, 3rd, 5th ... (h09s2-WD1 of
+  // 2026-10-25: three ticks on one face, RAM's count 2, the timer set again on the third). Shots only: RAM moves it
+  // in a roll too (h17s1-dr to -1), but counting there puts h17s1 further off, so that part is not decoded
+  let prevLeaf = null;
+  const countLeaf = (n, cn) => {
+    if (prevLeaf && n[0] === prevLeaf[0] && n[1] === prevLeaf[1] && n[2] === prevLeaf[2]) return;
+    leafPrev = n;
+    if (cn < 0) { leafCount++; leafTimer = leafT; }
+    else { leafCount--; if (leafCount <= 0) leafTimer = 0; }
+  };
 
   while (tick < maxTicks) {
     tick++;
+    // the canopy timer runs down at the top of the tick (0xd38940..0xd38974: at zero it clears the counter); the
+    // last tick's leaf normal is taken and cleared (0xd38b64..0xd38b74)
+    if (leafTimer > 0) { leafTimer = F(leafTimer - dt); if (leafTimer <= 0) { leafTimer = 0; leafCount = 0; } }
+    prevLeaf = leafPrev; leafPrev = null;
     // ---- 1. move ----
-    // pos += v dt; then the triangles the move meets (meshGround contacts), deepest
-    // first (the smallest true distance; at a tie the deeper plane; the ones only
-    // touched on the way last), each acting only while the velocity still approaches
-    // it: the ball pushed out along its face normal to r and the velocity's part into it
-    // removed (a slide), or, a shot meeting a soft surface (bunker, OB, sand OB), set
-    // down softLiftM farther out and turned back at a restitution of 0.3. The tick's
-    // contact (M+0xa4, M+0x78, the bounce's normal) is the acting one the incoming
-    // velocity met most head-on. All measured on the recordings (meshGround contacts).
+    // pos += v dt; then the triangles the move meets (meshGround contacts; a Cupside one farther than
+    // cupsideReachM from the active cup is none: the move's query callback 0xd34400..0xd34468 drops it).
+    // A shot (mode 1): deepest first (the smallest true distance; at a tie the deeper plane; the ones only
+    // touched on the way last), each acting only while the velocity still approaches it: the ball pushed out
+    // along its face normal to r and the velocity's part into it removed (a slide), or, a shot meeting a soft
+    // surface (bunker, OB, sand OB, the pin), set down softLiftM farther out and turned back at a restitution of
+    // 0.3 (the pole: at the face's closest point, out by r + softLiftM). The tick's contact (M+0xa4, M+0x78, the
+    // bounce's normal) is the acting one the incoming velocity met most head-on. A roll (mode 2): one contact a
+    // tick, the deepest (at a tie the one that is not Cupside, then the deeper plane), pushed out by its depth
+    // along its face normal whether or not the ball approaches it; only an approaching one slides the ball and
+    // is the tick's contact (the putter assist's ghost paths, every tick from RAM: of 733 roll ticks overlapping
+    // two or more triangles at distinct depths, 726 slid along the deepest's face normal and none along two; of
+    // 112 Cupside bounces off a face contact all came off the deepest, often not the most head-on one; h06's ghost
+    // was pushed 7.04 mm, its depth, along the wall's face normal at the wall-bevel edge; a receding deepest
+    // pushes the ball and leaves no contact). Measured on the recordings (meshGround contacts).
     const ivx = vx, ivy = vy, ivz = vz;      // the incoming velocity (M+0x90)
     const opx = px, opy = py, opz = pz;
     px = F(px + F(vx * dt)); py = F(py + F(vy * dt)); pz = F(pz + F(vz * dt));
     if (onMove) onMove({ tick, o: [opx, opy, opz], e: [px, py, pz], vin: [ivx, ivy, ivz], mode });
     O[0] = opx; O[1] = opy; O[2] = opz; E[0] = px; E[1] = py; E[2] = pz;
     let hit = null;
-    const cs = ground.contacts(O, E, R);
-    if (cs.length) {
+    cupGreen = false;
+    let cs = ground.contacts(O, E, R);
+    if (cup && cs.length && cupHoriz(px, pz) > G.cupsideReachM) {
+      let far = false;
+      for (let k = 0; k < cs.length; k++) if (cs[k].attr === ATTR.cupside) { far = true; break; }
+      if (far) cs = cs.filter((c) => c.attr !== ATTR.cupside);
+    }
+    // the flagstick, its own body: one pole face a tick (polePick), beside the course's contacts (only near it:
+    // every point of the step is within its length of o; the cloth's edge is FLAG_REACH_M out)
+    let nearFlag = false, pole = null;
+    if (flagG) {
+      const stepM = Math.sqrt((ivx * dt) * (ivx * dt) + (ivy * dt) * (ivy * dt) + (ivz * dt) * (ivz * dt));
+      nearFlag = cupHoriz(opx, opz) - stepM < FLAG_REACH_M + 2 * R && Math.min(opy, py) - cup.y < FLAG_TOP_M + 2 * R;
+    }
+    if (nearFlag) {
+      pole = polePick(flagG.contacts(O, E, R), ivx, ivy, ivz, poleTie);
+      if (pole) { pole.pole = true; if (pole.tie) poleTies.push(tick); if (mode === 1) cs = cs.concat([pole]); }
+    }
+    if (mode === 2) {
+      // the course's one contact
+      if (cs.length) {
+        if (cs.length > 1) cs.sort(deepestFirstRoll);
+        const c = cs[0];
+        const n0 = F(c.n[0]), n1 = F(c.n[1]), n2 = F(c.n[2]);
+        if (c.dist < R) {
+          // the depth: the true distance (an edge or corner's), or the plane's when the centre is past it
+          const push = F(R - (c.d < 0 ? c.d : c.dist));
+          if (push > 0) { px = F(px + F(push * n0)); py = F(py + F(push * n1)); pz = F(pz + F(push * n2)); }
+        }
+        const vn = F(F(F(vx * n0) + F(vy * n1)) + F(vz * n2));
+        if (vn < 0) {
+          vx = F(vx - F(vn * n0)); vy = F(vy - F(vn * n1)); vz = F(vz - F(vn * n2));
+          hit = { n0, n1, n2, attr: c.attr, ap: -F(F(F(ivx * n0) + F(ivy * n1)) + F(ivz * n2)), tri: c.tri };
+          if (c.attr === ATTR.cupside && cup) cupGreen = n1 > G.cupGreenNormalY;
+        }
+      }
+      // and the pole's, after it: a roll in the cup against the pole slides along the face it moves into, pushed
+      // to r from its plane (the 11 recorded in-cup pole contacts: the velocity after within 2.4 mm/s; taking the
+      // deeper of the pole and the course as the tick's one contact put three of them 0.15-0.47 m/s off)
+      if (pole) {
+        const n0 = F(pole.n[0]), n1 = F(pole.n[1]), n2 = F(pole.n[2]);
+        const vn = F(F(F(vx * n0) + F(vy * n1)) + F(vz * n2));
+        if (vn < 0) {
+          if (pole.dist < R) {
+            const d = pole.d + (px - E[0]) * n0 + (py - E[1]) * n1 + (pz - E[2]) * n2;
+            const push = F(R - d);
+            if (push > 0) { px = F(px + F(push * n0)); py = F(py + F(push * n1)); pz = F(pz + F(push * n2)); }
+          }
+          vx = F(vx - F(vn * n0)); vy = F(vy - F(vn * n1)); vz = F(vz - F(vn * n2));
+          const ap = -F(F(F(ivx * n0) + F(ivy * n1)) + F(ivz * n2));
+          if (!hit || ap > hit.ap) hit = { n0, n1, n2, attr: pole.attr, ap, tri: pole.tri };
+        }
+      }
+    } else if (cs.length) {
       if (cs.length > 1) cs.sort(deepestFirst);
       for (let k = 0; k < cs.length; k++) {
         const c = cs[k];
@@ -705,8 +1088,18 @@ export function run(o) {
         const vn = F(F(F(vx * n0) + F(vy * n1)) + F(vz * n2));
         if (!(vn < 0)) continue;
         const ap = -F(F(F(ivx * n0) + F(ivy * n1)) + F(ivz * n2));
-        const soft = mode === 1 && SOFT[c.attr] === 1;
-        if (c.dist < R) {
+        const soft = SOFT[c.attr] === 1;
+        if (c.pole && soft && c.dist < R) {
+          // a shot meeting the pole: the ball set at the face's closest point to the end of the move, out along
+          // the face's normal by r + softLift (at an edge the edge's point, not e pushed out: h10s2, h12s2 to
+          // 0.06 mm)
+          px = F(c.q[0] + (R + softLift) * n0); py = F(c.q[1] + (R + softLift) * n1); pz = F(c.q[2] + (R + softLift) * n2);
+        } else if (c.pole && soft) {
+          // a pole face only touched on the way (a fast ball's move clears it by its end): the ball set where the
+          // swept sphere first touches it, out along its normal by softLift (left at e it would pass through)
+          const k = c.t;
+          px = F(O[0] + (E[0] - O[0]) * k + softLift * n0); py = F(O[1] + (E[1] - O[1]) * k + softLift * n1); pz = F(O[2] + (E[2] - O[2]) * k + softLift * n2);
+        } else if (c.dist < R) {
           // e's distance from this plane after the pushes so far
           const d = c.d + (px - E[0]) * n0 + (py - E[1]) * n1 + (pz - E[2]) * n2;
           const push = F((soft ? R + softLift : R) - d);
@@ -714,29 +1107,33 @@ export function run(o) {
         }
         const kv = soft ? F(softK * vn) : vn;
         vx = F(vx - F(kv * n0)); vy = F(vy - F(kv * n1)); vz = F(vz - F(kv * n2));
-        if (!hit || ap > hit.ap) hit = { n0, n1, n2, attr: c.attr, ap, tri: c.tri };
+        if (!hit || ap > hit.ap) {
+          hit = { n0, n1, n2, attr: c.attr, ap, tri: c.tri };
+          // M+0x108 (0xd3936c..0xd393ac): each near Cupside face that becomes the tick's contact sets it to
+          // n.y > cupGreenNormalY (the bevel, not the wall); another surface becoming the contact afterwards
+          // leaves it as it is
+          if (c.attr === ATTR.cupside && cup) cupGreen = n1 > G.cupGreenNormalY;
+        }
       }
     }
     const ux = vx, uy = vy, uz = vz;          // u: the post-move velocity
     // the pass-through surfaces this step crosses (the move before any push-out)
-    let a8 = 0, a0 = 0, palm = false;
+    let a8 = 0, a0 = 0, palm = false, a8n = null;
     D[0] = ivx * dt; D[1] = ivy * dt; D[2] = ivz * dt;
-    const crossed = ground.pass(O, D, R);
+    let crossed = ground.pass(O, D, R);
+    if (nearFlag) { const fp = flagG.pass(O, D, R); if (fp.length) crossed = crossed.concat(fp).sort((p, q) => p.t - q.t); }
+    // the canopy's leaf contacts: on a mesh, the Leaf triangles the step's sphere touches (leafTouch), else the
+    // pass-through leaf faces
+    if (leafTouch && mode === 1) {
+      const lt = leafTouch(O, D, R);
+      for (let k = 0; k < lt.length; k++) { const n = lt[k].n; countLeaf(n, ivx * n[0] + ivy * n[1] + ivz * n[2]); }
+    }
     for (let k = 0; k < crossed.length; k++) {
       const c = crossed[k], a = c.attr;
       const cn = ivx * c.n[0] + ivy * c.n[1] + ivz * c.n[2];
-      if (!a8) { a8 = a; a0 = Math.abs(cn); }
-      if (a === ATTR.leaf) {
-        // the canopy counter (0xd38ec4..0xd38ef4): +1 entering a face of a leaf volume,
-        // -1 leaving, on each new face; an entry holds the count for leafTimerS. It runs
-        // in shot mode only: h17s1's roll crossed a ground leaf sheet and flew on
-        // undamped once it was a shot again
-        if (mode === 1 && (c.n[0] !== leafNx || c.n[1] !== leafNy || c.n[2] !== leafNz)) {
-          leafNx = c.n[0]; leafNy = c.n[1]; leafNz = c.n[2];
-          if (cn < 0) { leafCount++; leafTimer = F(G.leafTimerS); }
-          else { leafCount--; if (leafCount <= 0) { leafCount = 0; leafTimer = 0; } }
-        }
-      } else if (a === ATTR.palmLeaf) palm = true;
+      if (!a8) { a8 = a; a0 = Math.abs(cn); a8n = c.n; }
+      if (a === ATTR.leaf) { if (!leafTouch && mode === 1) countLeaf(c.n, cn); }
+      else if (a === ATTR.palmLeaf) palm = true;
       else if (a === ATTR.water) {
         if (waterY == null) { waterY = c.q[1]; lastAttr = ATTR.water; }
         if (!hazard) hazard = { tick, kind: "water", pos: [px, py, pz] };
@@ -744,15 +1141,37 @@ export function run(o) {
         if (!hazard) hazard = { tick, kind: "OB", pos: [px, py, pz] };
       }
     }
-    if (leafTimer > 0) { leafTimer = F(leafTimer - dt); if (leafTimer <= 0) { leafTimer = 0; leafCount = 0; } }
     // ---- 2. contact bookkeeping ----
+    const ha = hit ? hit.attr : 0;
+    // the spin (0xd396d8..0xd39700): zeroed by a contact with bunker, Cupside, glass, sand OB, tree, object, the
+    // pin or a barrier, or by the flag's or water's volume
+    if (ZERO_SPIN[ha] || a8 === ATTR.flag || a8 === ATTR.water) { bs = 0; Px = 0; Py = 0; Pz = 0; }
+    // the pin and the flag (0xd397ec..0xd39ca8)
+    if (cup && (ha === ATTR.pin || a8 === ATTR.flag)) {
+      const wasHigh = pinHigh;
+      if (!wasHigh && !putter) {
+        // the contact point M+0x70: the centre less r along the contact's normal (the solid one's, else the pass one's)
+        const cny = hit ? hit.n1 : a8n ? F(a8n[1]) : 1;
+        if (F(py - F(cny * R)) >= pinHighY) pinHigh = true;
+      }
+      if (a8 === ATTR.flag) {
+        if (!wasHigh && ha !== ATTR.pin) {
+          // the cloth hit: v (not u) zeroed once (M+0x103), the flag's reaction played (0xd5ba2c)
+          if (!flagHit) { vx = 0; vy = 0; vz = 0; flagHit = { tick, pos: [px, py, pz] }; }
+        } else a8 = 0;   // a cloth contact after a high pin or flag contact, or with the pin: ignored
+      }
+    }
+    if (hit && GROUND_TICK[ha]) groundCount++;
     let a4 = 0;
     if (hit) {
-      a4 = hit.attr; nx = hit.n0; ny = hit.n1; nz = hit.n2;
-      if (waterY == null) lastAttr = a4;
+      a4 = ha; nx = hit.n0; ny = hit.n1; nz = hit.n2;
+      // M+0xac: sticky once Cup (0xd39674), Cupside recorded as Green (0xd396a4..0xd396ac)
+      if (waterY == null && lastAttr !== ATTR.cup) lastAttr = a4 === ATTR.cupside ? ATTR.green : a4;
       tSince = 0;
       if (contacts) contacts.push({ tick, attr: a4, vol: a8, n: [nx, ny, nz], vin: [ivx, ivy, ivz], mode, tri: hit.tri });
       if (!firstContact) { firstContact = { tick, pos: [px, py, pz], attr: a4 }; lvx = ux; lvz = uz; }
+      // holed: the tick's contact is Cup (the cup's bottom; 0xd39838..0xd39858 M+0x100, the ghost run's S+0x8a)
+      if (a4 === ATTR.cup && holedTick == null) holedTick = tick;
     } else if (a8) {
       // a pass-through contact holds the time since the last contact (M+0xb8: h16s2's
       // canopy ticks 274 and 275 add nothing to it; h17s1's roll, leaving the ground at
@@ -762,6 +1181,7 @@ export function run(o) {
       if (!firstContact && a8 !== ATTR.leaf && a8 !== ATTR.palmLeaf) firstContact = { tick, pos: [px, py, pz], attr: a8 };
     } else tSince = F(tSince + dt);
     if (hazard && stopAtHazard) { outcome = hazard.kind; restAttr = a8 || a4; break; }
+    if (stopAtCup && holedTick != null) { outcome = "holed"; restAttr = ATTR.cup; if (traceEvery) path.push([tick, px, py, pz, mode, a4]); break; }
     let bounce = false;
     if (mode === 1 && hit) {
       // the switch to the roll (0xd39cb8..0xd3a0c0, the |vin.y| condition 0xd39f84..)
@@ -785,13 +1205,24 @@ export function run(o) {
     // ---- 3. forces ----
     if (mode === 1) {
       if (bounce) {
-        // v' = RH vt - RV k vn from the incoming velocity, replacing this tick's forces
+        // v' = RH vt - RV k vn from the incoming velocity, replacing this tick's forces (0xd3f910)
         const vdn = F(F(F(ivx * nx) + F(ivy * ny)) + F(ivz * nz));
         const vnx = F(vdn * nx), vny = F(vdn * ny), vnz = F(vdn * nz);
         const k = bs > 0 ? F(1 + (B.reflectionMin - 1) * bs * Math.pow(bs, Math.log2(1 / B.reflectionBias))) : 1;
-        const rh = F(RH[a4]), rv = F(F(RV[a4]) * k);
+        // Green's coefficients on the cup's bevel in the stroke's first two ground-contact ticks (M+0x108,
+        // 0xd3f958..0xd3f984: r1 h10s2 of 2026-10-25 came off the pole onto the bevel, n.y 0.706, and left with
+        // Green's and the Cupside cap, to the bit)
+        const ra = cupGreen && groundCount < G.cupGreenGroundTicks ? ATTR.green : a4;
+        const rh = F(RH[ra]), rv = F(F(RV[ra]) * k);
         vx = F(F(rh * F(ivx - vnx)) - F(rv * vnx)); vy = F(F(rh * F(ivy - vny)) - F(rv * vny)); vz = F(F(rh * F(ivz - vnz)) - F(rv * vnz));
-        if (a4 === ATTR.cupside && vy > G.cupsideReflectionMaxVelY) vy = F(G.cupsideReflectionMaxVelY);
+        // the cloth's kick: the stroke's first ground contact, on the green, after a cloth hit (0xd3fee4..0xd404c4)
+        if (flagHit && a4 === ATTR.green && groundCount === 1 && cup) {
+          const kick = kickOf(F(px - F(nx * R)), F(pz - F(nz * R)), cup);
+          vx = F(vx + F(kick.x)); vz = F(vz + F(kick.z));
+          flagKicked = { tick, ...kick };
+        }
+        // the cap goes by the contact's own surface (0xd404d0)
+        if (a4 === ATTR.cupside && vy > cupsideCap) vy = cupsideCap;
         bounces++;
         hop = F(hop * hopD); side = F(side * sideD);
       } else {
@@ -836,9 +1267,20 @@ export function run(o) {
         side = F(side * sideD);
       }
     } else {
-      // roll (mode 2): drag, water, friction, the pull-back, the stop count, gravity
+      // roll (mode 2): drag, water, a Cupside contact's bounce, friction, the pull-back, the stop count, gravity
       if (F(F(F(vx * vx) + F(vy * vy)) + F(vz * vz)) > stop2) { vx = F(vx - F(drag * vx)); vy = F(vy - F(drag * vy)); vz = F(vz - F(drag * vz)); }
       if (waterY != null && py < waterY) { vx = F(vx - F(waterK * vx)); vy = F(vy - F(waterK * vy)); vz = F(vz - F(waterK * vz)); }
+      if (a4 === ATTR.cupside) {
+        // a roll touching Cupside bounces (0xd3ab74..0xd3ab8c calls the bounce 0xd3f910): v = RH vt - RV vn from
+        // the incoming velocity (k = 1: the backspin term is a shot's), v.y at most CupsideReflectionMaxVelY;
+        // h15s3's putt met the cup's far wall at (-1.043, -2.293, 2.182) and left at (0.224, -2.291, -0.238) plus
+        // the tick's gravity
+        const vdn = F(F(F(ivx * nx) + F(ivy * ny)) + F(ivz * nz));
+        const vnx = F(vdn * nx), vny = F(vdn * ny), vnz = F(vdn * nz);
+        const rh = F(RH[ATTR.cupside]), rv = F(RV[ATTR.cupside]);
+        vx = F(F(rh * F(ivx - vnx)) - F(rv * vnx)); vy = F(F(rh * F(ivy - vny)) - F(rv * vny)); vz = F(F(rh * F(ivz - vnz)) - F(rv * vnz));
+        if (vy > cupsideCap) vy = cupsideCap;
+      }
       const sp = F(Math.sqrt(F(F(F(vx * vx) + F(vy * vy)) + F(vz * vz))));
       const fr = FR[a4];
       if (fr > 0 && sp > 0) {
@@ -883,11 +1325,14 @@ export function run(o) {
     if (!firstContact && py - start[1] > apex) apex = py - start[1];
     if (py < G.forceStopPosY) { outcome = "fell"; break; }
     if (traceEvery && tick % traceEvery === 0) path.push([tick, px, py, pz, mode, a4]);
-    if (onTick) onTick({ tick, p: [px, py, pz], v: [vx, vy, vz], mode, a4, a8, n: [nx, ny, nz], hop, P: [Px, Py, Pz] });
+    if (onTick) onTick({ tick, p: [px, py, pz], v: [vx, vy, vz], mode, a4, a8, n: [nx, ny, nz], hop, P: [Px, Py, Pz], leaf: leafCount, groundCount });
   }
   if (!outcome) outcome = "timeout";
+  // holed: a tick's contact was Cup (the ghost run marks it so and stops there; the real ball raises the cup-in
+  // event); a ball on the lip (Cupside) is not
+  if (holedTick != null && outcome !== "water" && outcome !== "OB") outcome = "holed";
   if (outcome === "rest") {
-    if (restAttr === ATTR.cup || restAttr === ATTR.cupside) outcome = "holed";
+    if (restAttr === ATTR.cup) outcome = "holed";
     else if (cup && cupHoriz(px, pz) < P.cup.rimRadiusM && py < cup.y + P.cup.depthM - R) outcome = "holed";
     else if (waterY != null) outcome = "water";
     else if (restAttr === ATTR.ob || restAttr === ATTR.sandOb) outcome = "OB";
@@ -902,6 +1347,7 @@ export function run(o) {
     carry, carryYd: carry / M_PER_YD, stop, stopYd: stop / M_PER_YD,
     rest: [px, py, pz], restAttr, lateral: (px - start[0]) * -hz + (pz - start[2]) * hx,
     apex, flightTicks: firstContact ? firstContact.tick : tick, firstContact, bounces, rollTick, ticks: tick,
-    holed: outcome === "holed", outcome, hazard, end, pullBack, path, contacts,
+    holed: outcome === "holed", holedTick, outcome, hazard, end, pullBack, path, contacts,
+    pinHigh, flagHit, flagKick: flagKicked, poleTies,
   };
 }

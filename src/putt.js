@@ -48,7 +48,7 @@
 // fractions): ball and cup are fractions of the box (0-1, +x right, +y down,
 // as GreenCanvas taps them) and the box is W x H yd (App's greenYd). A field
 // gives the ground's gradient there (puttField). The tick runs in metres.
-import { PHYSICS, curveAt } from "./nsssim.js";
+import { PHYSICS, curveAt, pctOf } from "./nsssim.js";
 import { PUTT_ROLL_YD, CUP_WINDOW as CUP_TABLE } from "./nssShape.js";
 
 // ---- NSS's constants ----
@@ -90,25 +90,35 @@ export const G = G_GREEN / M;
 export const DT = DTM, STEP_CAP = GP.forceStopFrame * PHYSICS.tick.substeps, STOP_V = STOP_VEL / M;
 // the dashed line's points, every 0.1 s
 const PATH_EVERY = 24;
-// the putter: power 0 .. PowerOverMaxPT (1.5) and its launch speed, the table's
-// (GolfShotVelTable PT, read at (int)(100 power)) linear between its whole
-// percents, yd/s (the game flies the lower one: a percent is 0.2 yd of flat roll,
-// so a swing between two rolls up to 0.2 yd short of this)
+// the putter: power 0 .. PowerOverMaxPT (1.5) and its launch speed, yd/s: the
+// table's (GolfShotVelTable PT) at the whole percent the game reads, (int)(100
+// power) in float32 (src/nsssim.js pctOf: every power from k to k + 1 % launches
+// the k % speed; a percent is about 0.2 yd of flat roll). 0 for no power.
+// With Shot Assist the game cuts the putter's power at 1.0 (its lie cap; the
+// assist's ghost search never tries past 1.0 either), without it the swing
+// runs to PowerOverMaxPT (swing-power.md sections 1 and 6.1).
 export const PUTT_POWER_MAX = PHYSICS.launch.powerOverMaxPT;
+export const PUTT_POWER_MAX_ASSIST = PHYSICS.launch.powerMax;
 const PT_SPEEDS = PHYSICS.launchTable.PT;
+const PT_N = PT_SPEEDS.length;
+const pctOfPutt = (p) => Math.min(PT_N, pctOf(p));
 export function puttV0(p) {
-  const x = Math.max(0, Math.min(PT_SPEEDS.length, p * 100));
-  const i = Math.floor(x), f = x - i;
-  const a = i === 0 ? 0 : PT_SPEEDS[i - 1], b = i >= PT_SPEEDS.length ? PT_SPEEDS[PT_SPEEDS.length - 1] : PT_SPEEDS[i];
-  return (a + (b - a) * f) / M;
+  if (!(p > 0)) return 0;
+  return PT_SPEEDS[pctOfPutt(p) - 1] / M;
 }
-// its inverse (the table rises), power for a launch speed in yd/s
+// A whole percent as the putt card reports it, putter power: the middle of
+// its window (a stroke anywhere in it launches the same ball), the gauge's
+// own value at 100 % and 150 % (a full gauge, and PowerOverMaxPT)
+const powerOfPct = (k) => (k === 100 || k === PT_N ? k / 100 : (k + 0.5) / 100);
+// the inverse of puttV0 (the table rises): the percent whose launch speed is
+// nearest v yd/s, as powerOfPct reports it (0 for no speed)
 export function puttPowerOfV0(v) {
   const s = v * M;
   if (!(s > 0)) return 0;
-  if (s <= PT_SPEEDS[0]) return (s / PT_SPEEDS[0]) * 0.01;
-  for (let i = 1; i < PT_SPEEDS.length; i++) if (s <= PT_SPEEDS[i]) return (i + (s - PT_SPEEDS[i - 1]) / (PT_SPEEDS[i] - PT_SPEEDS[i - 1])) / 100;
-  return PT_SPEEDS.length / 100;
+  let k = 1;
+  while (k < PT_N && PT_SPEEDS[k] <= s) k++;
+  if (k < PT_N && Math.abs(PT_SPEEDS[k] - s) < Math.abs(PT_SPEEDS[k - 1] - s)) k++;
+  return powerOfPct(k);
 }
 
 // ---- the tick ----
@@ -416,87 +426,138 @@ export function simPutt(field, ball, cup, angDeg, pw, { trace = true } = {}) {
 //
 // Then, for a holing line, the one that forgives the strength most: the
 // player sets the aim to the line but swings the strength by feel, so of the
-// aims round it (0.1° steps out to where nothing holes, then 0.025° round the
-// best) the read takes the one whose holing strengths span the widest range
-// of putter power (the gauge fills linearly in it, 0 .. PowerOverMaxPT), and
-// the middle of that range. -> { c, a (aim, deg right of the cup), p (the
-// launch as a fraction of the flat-green speed for the distance), r (that
-// putt, traced), range: { lo, hi } (the holing launches at that aim, as p),
-// power: { lo, hi, mid } (the same in putter power) and Dflat: { lo, hi }
-// (their flat rolls, for the gauge) } for a holing line; a lag line has no
+// aims round it (0.1° steps out to where nothing holes or to ±35°, from that
+// line and from the coarse scan's aim that holed the most launches) the read
+// takes the one whose holing strengths span the most whole percents of
+// putter power (the gauge fills linearly in it, 0 .. powerMax), the middle of
+// the aims side by side that span as many, then 0.025° round it for a wider
+// one, and the middle of that range. The game flies whole percents (puttV0),
+// so a range is a run of whole percents and its edges are percent edges
+// (lo / hi 0.0005 inside them). On short putts the softest holing putt, the
+// first part's line, is a dying one well off the line, and the aims that
+// forgive most lie far from it: r2-h06s3 (2.1 yd, Eden) read -17.2° with 2
+// holing percents until 2026-10-25, the widest aim, -0.8°, holes 24. powerMax: the
+// putter's top power, PowerOverMaxPT 1.5 by default, 1.0 with Shot Assist
+// (PUTT_POWER_MAX_ASSIST: the game cuts the putt there). -> { c, a (aim, deg
+// right of the cup), p (the launch as a fraction of the flat-green speed for
+// the distance: a whole percent's), r (that putt, traced), range: { lo, hi }
+// (the holing launches at that aim, as p), power: { lo, hi, mid } (the same
+// in putter power), Dflat: { lo, hi } (their flat rolls, for the gauge) and
+// aims: { lo, hi } (the aims round it, 0.1° apart, at which some strength
+// holes: how far the aim may stray) } for a holing line; a lag line has no
 // range.
-export function solvePutt(field, ball, cup) {
+const AIM_MAX = 35;   // the read's aims, deg either side of the line to the cup
+export function solvePutt(field, ball, cup, { powerMax = PUTT_POWER_MAX } = {}) {
   const cost = (r, pw) => (r.holed ? -2 + pw * 0.1 : r.margin + Math.max(0, r.margin) * 0.3);
   let best = null;
-  // the putter's top launch (PowerOverMaxPT) as a fraction of the flat speed for
-  // the distance: a scan point past it plays at it
-  const vD0 = vFlat(Math.hypot((cup.x - ball.x) * field.W, (cup.y - ball.y) * field.H)), pTop = vD0 > 0 ? puttV0(PUTT_POWER_MAX) / vD0 : Infinity;
-  const tryOne = (a, p) => {
+  // the putter's top launch (powerMax) as a fraction of the flat speed for the
+  // distance: a scan point past it plays at it
+  const vD0 = vFlat(Math.hypot((cup.x - ball.x) * field.W, (cup.y - ball.y) * field.H)), pTop = vD0 > 0 ? puttV0(powerMax) / vD0 : Infinity;
+  // the coarse scan's holing launches per aim (distinct, after the cut at pTop)
+  const coarse = new Map();
+  const tryOne = (a, p, scan = false) => {
     if (p > pTop) p = pTop;
     const r = simPutt(field, ball, cup, a, p, { trace: false });
     const c = cost(r, p);
+    if (scan && r.holed) { if (!coarse.has(a)) coarse.set(a, new Set()); coarse.get(a).add(p); }
     if (!best || c < best.c) best = { c, a, p, r };
   };
-  for (let a = -35; a <= 35; a += 5) for (let p = 0.7; p <= 1.55; p += 0.085) tryOne(a, p);
+  for (let a = -AIM_MAX; a <= AIM_MAX; a += 5) for (let p = 0.7; p <= 1.55; p += 0.085) tryOne(a, p, true);
   const { a: a0, p: p0 } = best;
   for (let a = a0 - 4; a <= a0 + 4; a += 1) for (let p = Math.max(0.5, p0 - 0.08); p <= p0 + 0.08; p += 0.02) tryOne(a, p);
   const { a: a1, p: p1 } = best;
   for (let a = a1 - 1; a <= a1 + 1 + 1e-9; a += 0.25) for (let p = Math.max(0.5, p1 - 0.04); p <= p1 + 0.04 + 1e-9; p += 0.01) tryOne(a, p);
   const vD = vFlat(best.r.D);
   if (best.r.holed && vD > 0) {
-    // the holing strengths at aim a, as putter power: the run through a holed
-    // seed, each edge found in 0.02 steps (out from the seed, or from the
-    // neighbouring aim's edge g: out while it holes, in while it does not) and
-    // bisected to 0.001
+    // the holing strengths at aim a: the game flies whole percents (puttV0), so
+    // they are a run of whole percents kLo..kHi, the run through a holing seed
+    // percent, each end stepped a percent at a time (out from the seed, or from
+    // the neighbouring aim's end g: out while it holes, in while it does not);
+    // as putter power lo / hi, 0.0005 inside the run's outer percents' edges
+    // (so pctOf reads them back to kLo / kHi), n = its percents
     const pwOf = (q) => puttV0(q) / vD;
-    const holes = (a, q) => simPutt(field, ball, cup, a, pwOf(q), { trace: false }).holed;
-    const inRange = (q) => q > 0.001 && q < PUTT_POWER_MAX;
-    const edge = (a, qIn, dir, g) => {
-      let qOut;
-      if (g != null && (g - qIn) * dir > 0.02 && inRange(g)) {
-        if (holes(a, g)) { qIn = g; qOut = g + 0.02 * dir; }
-        else {
-          qOut = g;
-          for (let q = g - 0.02 * dir; (q - qIn) * dir > 0; q -= 0.02 * dir) { if (holes(a, q)) { qIn = q; break; } qOut = q; }
-        }
-      } else qOut = qIn + 0.02 * dir;
-      while (inRange(qOut) && holes(a, qOut)) { qIn = qOut; qOut += 0.02 * dir; }
-      if (!inRange(qOut)) return qIn;
-      for (let k = 0; k < 5 || Math.abs(qOut - qIn) > 0.0007; k++) { const m = (qIn + qOut) / 2; if (holes(a, m)) qIn = m; else qOut = m; }
-      return qIn;
-    };
+    const kTop = Math.min(PT_N, pctOf(powerMax));
+    const holesK = (a, k) => k >= 1 && k <= kTop && simPutt(field, ball, cup, a, pwOf(Math.min(powerMax, (k + 0.5) / 100)), { trace: false }).holed;
     const runAt = (a, seeds, prev = null) => {
-      const q = seeds.find((s) => s > 0 && holes(a, s));
-      if (q == null) return null;
-      const lo = edge(a, q, -1, prev?.lo), hi = edge(a, q, 1, prev?.hi);
-      return { a, lo, hi, w: hi - lo, mid: (lo + hi) / 2 };
+      const k0 = seeds.find((k) => holesK(a, k));
+      if (k0 == null) return null;
+      const end = (dir, g) => {
+        let k = k0;
+        if (g != null && (g - k0) * dir > 0) {
+          if (holesK(a, g)) k = g;
+          else { for (let j = g - dir; (j - k0) * dir > 0; j -= dir) if (holesK(a, j)) return j; return k0; }
+        }
+        while (holesK(a, k + dir)) k += dir;
+        return k;
+      };
+      const kLo = end(-1, prev?.kLo), kHi = end(1, prev?.kHi);
+      const lo = kLo / 100 + 0.0005, hi = Math.min(powerMax, (kHi + 1) / 100 - 0.0005);
+      return { a, kLo, kHi, n: kHi - kLo + 1, lo, hi, w: hi - lo, mid: (lo + hi) / 2 };
     };
-    const q1 = puttPowerOfV0(best.p * vD);
-    const seedsAt = (prev) => (prev ? [prev.mid, prev.lo + 0.25 * prev.w, prev.hi - 0.25 * prev.w, q1] : [q1]);
-    let top = runAt(best.a, [q1]);
-    // out to either side in 0.1° steps while some strength still holes
-    for (const dir of top ? [-1, 1] : []) {
-      let prev = top;
-      for (let k = 1; k <= 40 && prev; k++) {
-        const run = runAt(best.a + dir * 0.1 * k, seedsAt(prev), prev);
-        if (run && (run.w > top.w || (run.w === top.w && run.mid < top.mid))) top = run;
-        prev = run;
+    // the percent nearest the holing launch the scan found, and its neighbours
+    // (the scan's speed is continuous; the game flies whole percents)
+    const k1 = pctOf(Math.min(powerMax, puttPowerOfV0(best.p * vD))), k1s = [k1, k1 + 1, k1 - 1];
+    const seedsAt = (prev) => (prev ? [pctOf(prev.mid), Math.round(prev.kLo + 0.25 * (prev.n - 1)), Math.round(prev.kHi - 0.25 * (prev.n - 1)), ...k1s] : k1s);
+    // the widest run (most percents), and every run the widening met (for the plateau of aims as wide as it)
+    let top = null;
+    const spans = [], runs = [];
+    const wider = (run) => !top || run.n > top.n;
+    // from a holing run at aim a0, out to either side in 0.1° steps while some strength still holes, as far as the
+    // first stage's ±AIM_MAX (until 2026-10-25 at most 40 steps, ±4°: on short putts the softest holing putt, the
+    // first stage's pick, is a dying one at an extreme aim, and the near-straight aims that hole 3-5 times the
+    // strengths lay beyond it: Eden's r2-h06s3 read -17.2° with 4-6 % against -1°'s 5-28 %)
+    const widen = (seed) => {
+      if (wider(seed)) top = seed;
+      runs.push(seed);
+      const span = { lo: seed.a, hi: seed.a };
+      for (const dir of [-1, 1]) {
+        let prev = seed;
+        for (let k = 1; prev; k++) {
+          const a = seed.a + dir * 0.1 * k;
+          if (Math.abs(a) > AIM_MAX + 1e-9) break;
+          const run = runAt(a, seedsAt(prev), prev);
+          if (run) { runs.push(run); if (dir < 0) span.lo = run.a; else span.hi = run.a; if (wider(run)) top = run; }
+          prev = run;
+        }
       }
+      spans.push(span);
+    };
+    const first = runAt(best.a, k1s);
+    if (first) widen(first);
+    // and from the coarse scan's aim that holed the most launches (ties to the straighter), when the widening above
+    // did not reach it: holing aims need not be one stretch
+    const ac = [...coarse.entries()].sort((x, y) => y[1].size - x[1].size || Math.abs(x[0]) - Math.abs(y[0]))[0];
+    if (ac && !spans.some((s) => ac[0] >= s.lo - 0.1 && ac[0] <= s.hi + 0.1)) {
+      const ps = [...ac[1]].sort((x, y) => x - y), ks = [ps[ps.length >> 1], ...ps].map((p) => pctOf(Math.min(powerMax, puttPowerOfV0(p * vD))));
+      const run = runAt(ac[0], ks);
+      if (run) widen(run);
     }
-    // then 0.025° round the widest
     if (top) {
+      // of the aims (0.1° apart) that hole as many percents as the widest, side by side with it, the middle one: the
+      // strength forgives as much there and the aim the most
+      const plateau = runs.filter((r) => r.n === top.n).sort((x, y) => x.a - y.a);
+      let i0 = plateau.indexOf(top), i1 = i0;
+      while (i0 > 0 && plateau[i0].a - plateau[i0 - 1].a < 0.1 + 1e-6) i0--;
+      while (i1 < plateau.length - 1 && plateau[i1 + 1].a - plateau[i1].a < 0.1 + 1e-6) i1++;
+      top = plateau[(i0 + i1) >> 1];
       const a2 = top.a;
+      // the stretch of holing aims (0.1° apart) the read lies in
+      const sp = spans.find((s) => a2 >= s.lo - 1e-9 && a2 <= s.hi + 1e-9) ?? { lo: a2, hi: a2 };
+      const aimsOf = (a) => ({ lo: Math.min(sp.lo, a), hi: Math.max(sp.hi, a) });
+      // then 0.025° round it, for a wider run between the tenths
       for (let k = -3; k <= 3; k++) {
         if (k === 0) continue;
         const run = runAt(a2 + 0.025 * k, seedsAt(top), top);
-        if (run && run.w > top.w) top = run;
+        if (run && run.n > top.n) top = run;
       }
       const pw = pwOf(top.mid);
       best = { c: best.c, a: top.a, p: pw, r: null, range: { lo: pwOf(top.lo), hi: pwOf(top.hi) }, power: { lo: top.lo, hi: top.hi, mid: top.mid },
         // the range's ends as flat rolls, which gaugeBars turns into bars at the Switch's greenSpeed
-        Dflat: { lo: flatStop(puttV0(top.lo)), hi: flatStop(puttV0(top.hi)) } };
+        Dflat: { lo: flatStop(puttV0(top.lo)), hi: flatStop(puttV0(top.hi)) }, aims: aimsOf(top.a) };
     }
   }
+  // a lag line (or a holing launch no whole percent repeats): the percent nearest the scan's launch
+  if (!best.power && vD > 0) best = { ...best, p: puttV0(Math.min(powerMax, puttPowerOfV0(best.p * vD))) / vD };
   best.r = simPutt(field, ball, cup, best.a, best.p);
   return best;
 }
@@ -504,32 +565,34 @@ export function solvePutt(field, ball, cup) {
 // ---- the gauge ----
 // NSS's putter: power -> roll on a flat green (src/nsssim.js at each whole
 // percent of GolfShotVelTable's PT row, tools/build-nss-shape.mjs
-// PUTT_ROLL_YD; the table's design rule is pct / 100 x 20 yd), linear between
-// the rows, to PowerOverMaxPT 1.5.
+// PUTT_ROLL_YD; the table's design rule is pct / 100 x 20 yd), to
+// PowerOverMaxPT 1.5. The game flies the percent (int)(100 power), so T is a
+// step: puttRoll(p) is the roll of p's percent, puttPower(d) the percent whose
+// roll is nearest d, at the middle of its window (powerOfPct: 1.0 at a full
+// gauge).
 export const PUTT_POWER_TABLE = [[0, 0], ...PUTT_ROLL_YD.map((yd, k) => [(k + 1) / 100, yd])];
 // The Switch number: the flat roll of a full-gauge (4-bar) putt, yd. NSS's own
 // at power 1.0 until logged flat putts fit it.
 export const GREEN_SPEED = PUTT_ROLL_YD[99];
 const T1 = GREEN_SPEED;
 export function puttRoll(p) {
-  const tb = PUTT_POWER_TABLE, q = Math.max(0, p);
-  for (let k = 1; k < tb.length; k++) if (q <= tb[k][0] || k === tb.length - 1) {
-    const [p0, d0] = tb[k - 1], [p1, d1] = tb[k];
-    return d0 + ((d1 - d0) * (q - p0)) / (p1 - p0);
-  }
-  return 0;
+  if (!(p > 0)) return 0;
+  return PUTT_ROLL_YD[Math.min(PUTT_ROLL_YD.length, pctOf(p)) - 1];
 }
 export function puttPower(d) {
-  const tb = PUTT_POWER_TABLE, q = Math.max(0, d);
-  for (let k = 1; k < tb.length; k++) if (q <= tb[k][1] || k === tb.length - 1) {
-    const [p0, d0] = tb[k - 1], [p1, d1] = tb[k];
-    return p0 + ((p1 - p0) * (q - d0)) / (d1 - d0);
-  }
-  return 0;
+  if (!(d > 0)) return 0;
+  const tb = PUTT_ROLL_YD, n = tb.length;
+  let k = 1;
+  while (k < n && tb[k] <= d) k++;
+  if (k < n && Math.abs(tb[k] - d) < Math.abs(tb[k - 1] - d)) k++;
+  return powerOfPct(k);
 }
 // the bars a putt of flat roll Dflat needs: 4·T⁻¹(Dflat / greenSpeed · T(1))
-// (over 4 = past a full gauge: NSS's putter reads its table to power 1.5)
+// (over 4 = past a full gauge: without Shot Assist NSS's putter reads its table
+// to power 1.5)
 export const gaugeBars = (Dflat, greenSpeed = GREEN_SPEED) => 4 * puttPower((Dflat / greenSpeed) * T1);
+// a putter power as gauge bars at greenSpeed (its percent's flat roll, through gaugeBars)
+export const powerBars = (p, greenSpeed = GREEN_SPEED) => gaugeBars(puttRoll(p), greenSpeed);
 // greenSpeed from logged putts ({ bars, rolled, flat }): the median of
 // rolled / (T(bars / 4) / T(1)) over the flat rows; under 2 of them, NSS's
 export function fitGreenSpeed(putts) {
@@ -538,4 +601,83 @@ export function fitGreenSpeed(putts) {
   if (est.length < 2) return { greenSpeed: GREEN_SPEED, n: est.length };
   const m = est.length >> 1;
   return { greenSpeed: est.length % 2 ? est[m] : (est[m - 1] + est[m]) / 2, n: est.length };
+}
+
+// ---- the putter assist ----
+// NSS pulls a putt toward a holing power of its own (swing-power.md section 6,
+// decoded from NSS 1.5.0's code: 0xdffaec / 0xe00b88 / 0xe03ed4, and checked
+// in Eden's RAM: the live search struct and a launch at exactly its target).
+// While the player addresses the ball on the green (not the fringe: no search
+// from there) and holds the aim still, the game runs ghost putts with its own
+// ball on the real green along that aim and keeps holeLo / holeHi, the lowest
+// and highest holing trial on the hundredth grid, and the target T1 =
+// round((holeLo + holeHi) / 2, 0.01) (float32, half away from zero); within
+// the close distance also T2 = min(round(holeLo + 0.02, 0.01), T1), the
+// softest holing power plus 0.02. At the stroke a power P within `snap` of the
+// target launches at exactly the target (y = 1 on the mode's curve), further
+// out it is pulled part way, from `zero` not at all; within the close
+// distance below T2 or nearer it P launches at T2, above T1 at T1 and between
+// the two nearer T1 at 2P - T1, all inside the holing range. With Shot Assist
+// a P over 1.0 is first cut to 1.0 (without it a P over 1.0 gets no pull);
+// the launch is then clamped to the putter's PowerMin, 0.04 (a 0.28 m putt in
+// Eden's round 3: holeLo 0.01, T2 0.03, launched at 0.04).
+// The mode: HandeHigh with Shot Assist or a hole handicap of 4 or more
+// (strokes so far - par + 1, less 3 / 2 / 1 for the leader after a hole: a
+// player well over par on the hole), HandeLow from 2, else normal. Distances
+// are the ball-to-cup horizontal distance in metres (EnableDist / CloseDist).
+// The curves' points are GolfPlayerSwingParam's PutterAssist* (Hermit2DSmooth,
+// read by the decoder from the RomFS).
+export const PUTT_ASSIST = Object.freeze({
+  normal: { enableM: 25, closeM: 3, snap: 0.03, zero: 0.5, snapClose: 0.2, zeroClose: 0.35 },
+  handeLow: { enableM: 30, closeM: 4, snap: 0.05, zero: 0.6, snapClose: 0.2, zeroClose: 0.35 },
+  handeHigh: { enableM: 30, closeM: 7, snap: 0.15, zero: 0.5, snapClose: 0.25, zeroClose: 0.5 },
+});
+const f32 = Math.fround;
+const PT_MIN = PHYSICS.clubs.PT.powerMin;
+// round(x, 0.01) as the game does it: (int)(x * 100 + 0.5) / 100 in float32 (x > 0)
+const round01 = (x) => Math.trunc(f32(f32(f32(x) * 100) + 0.5)) / 100;
+export function puttAssistMode({ shotAssist = true, handicap = null } = {}) {
+  if (shotAssist || handicap >= 4) return "handeHigh";
+  return handicap >= 2 ? "handeLow" : "normal";
+}
+// The assist on a putt whose holing range is `power` ({ lo, hi } in putter
+// power, solvePutt's at the read's aim: the game's own search on that aim
+// finds the same whole percents) from distM metres. The search tries the
+// hundredths 0.01 .. 1.00 only (its first trial at most 1.0, a rescale past
+// 1.0 turned to 0.5, missHi from 1.0: swing-power.md 6.2), each flying its
+// own percent ((int)(100 h) in float32: 0.53 flies 52 %, 0.59 58 %), so its
+// holeLo / holeHi are the lowest and highest hundredth up to 1.00 whose
+// percent holes, and a range that starts past 1.0 (a putt longer than a full
+// gauge rolls, Shot Assist off) has no holing trial: the game pulls toward
+// its closest miss, if anywhere, and a stroke over 1.0 without Shot Assist
+// gets no pull (6.1). null when the game gives none (no holing range, none up
+// to 1.0, the fringe, beyond EnableDist), else { mode, close,
+// enableM, closeM, holeLo, holeHi, target (T1), low (T2 within the close
+// distance, else null), snap: { lo, hi } (the stroke powers that launch at
+// exactly a holing power: hi Infinity when every harder stroke is cut to 1.0
+// inside it), launch: { lo, hi } (where those strokes launch, PowerMin at
+// least) and pct: { lo, hi } (the percents those launches fly: (int)(100 p) in
+// float32, which reads the hundredths 0.53, 0.59, 1.05, 1.06, 1.17 and 1.18 a
+// percent low), clipped (the model's range runs past 1.0, where the search
+// stops) }.
+export function puttAssist(power, distM, { shotAssist = true, handicap = null, fringe = false } = {}) {
+  if (!power || fringe || !(distM >= 0)) return null;
+  const mode = puttAssistMode({ shotAssist, handicap }), m = PUTT_ASSIST[mode];
+  if (distM > m.enableM) return null;
+  const kLo = Math.min(PT_N, pctOf(power.lo)), kHi = Math.min(PT_N, pctOf(power.hi));
+  let hLo = null, hHi = null;
+  for (let h = 1; h <= 100; h++) { const k = pctOf(h / 100); if (k >= kLo && k <= kHi) { hLo ??= h; hHi = h; } }
+  if (hLo == null) return null;
+  const holeLo = hLo / 100, holeHi = hHi / 100;
+  const target = round01(f32(f32(f32(holeLo) + f32(holeHi)) / 2));
+  const close = distM <= m.closeM;
+  const low = close ? Math.min(round01(holeLo + 0.02), target) : null;
+  const reach = close ? m.snapClose : m.snap;
+  const lo = Math.max(0, (close ? low : target) - reach);
+  let hi = target + reach;
+  if (shotAssist && hi >= 1) hi = Infinity;
+  else hi = Math.min(hi, 1);
+  if (lo > hi) return null;
+  const launch = { lo: Math.max(PT_MIN, close ? low : target), hi: Math.max(PT_MIN, target) };
+  return { mode, close, enableM: m.enableM, closeM: m.closeM, holeLo, holeHi, clipped: kHi > pctOf(1), target, low, snap: { lo, hi }, launch, pct: { lo: pctOfPutt(launch.lo), hi: pctOfPutt(launch.hi) } };
 }
