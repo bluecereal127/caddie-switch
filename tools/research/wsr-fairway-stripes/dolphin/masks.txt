@@ -1,0 +1,19 @@
+## screen band masks (mask.py): N normal, W line texture all white (0xFF), B all black (0x00); minimap: W = MapLine1 all 0xFF, B = all 0x44
+# 3D, hole 1 address
+  live px 2148146 W 1057462 B 750691 neither 339993
+  W-B luminance over live px: p5 -5.4 p50 2.9 p95 8.4; share W lighter 0.798
+# 3D, hole 6 tee
+  live px 1738025 W 714896 B 633424 neither 389705
+  W-B luminance over live px: p5 -13.1 p50 -3.7 p95 8.6; share W lighter 0.195
+# minimap, hole 1 address (whole frame, so these counts include the animated 3D background and HUD; the registration below is cropped to the panel)
+  live px 478714 W 109827 B 95176 neither 273711
+  W-B luminance over live px: p5 -23.1 p50 5.8 p95 26.1; share W lighter 0.646
+# minimap, hole 6 tee (whole frame, so these counts include the animated 3D background and HUD; the registration below is cropped to the panel)
+  live px 714541 W 304377 B 42716 neither 367448
+  W-B luminance over live px: p5 -42.7 p50 5.9 p95 154.4; share W lighter 0.616
+
+## minimap registration (reg.py; screen = k * map px + offset; W/B classes from the map model's uv1)
+# hole 1 address (zoomed)
+  k 5.640 screen px per map px, offset (1358.5, 280.0); agreement rot180 0.994, rot0 0.006; mask px on the predicted fairway 0.934; n bright 52930 dim 55933
+# hole 6 tee (overview)
+  k 2.498 screen px per map px, offset (1744.5, 512.0); agreement rot180 0.952, rot0 0.048; mask px on the predicted fairway 0.970; n bright 9886 dim 9277

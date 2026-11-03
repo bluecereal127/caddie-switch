@@ -1,0 +1,6 @@
+holes 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21
+  course {"layers":["glf_fairway1:b40585 s1,1 r0 t0,0","glf_fairway_line1:1abf77 s1,1 r0 t0,0","glf_JimenGara2:9959af s0.03,0.03 r-43 t2.1,-0.2","projection_1:ea8bce s1,1 r0 t0,0","projection_2:ea8bce s1,1 r0 t0,0"],"tev":{"c0":[160,160,160,0],"c1":[10,40,50,0],"c2":[0,0,0,0]},"konst":{"k0":[0,0,0,0],"k1":[0,0,0,0],"k2":[0,0,0,0],"k3":[0,0,0,0]},"stages":["m1c1:zero+lerp(c0,rasc;texc)x1","m0c0:zero+lerp(c1,texc;cprev)x1","m2c2:zero+lerp(zero,texc;cprev)x2","m3c3:zero+lerp(cprev,konst;texc)x1 k=k3","m4c4:zero+lerp(cprev,konst;texc)x1 k=k3"]}
+
+holes 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21
+  map {"layers":["glfM_MapFairway1:76ca67 s1,1 r0 t0,0","glfM_MapLine1:5ccf26 s1,1 r180 t0,0"],"tev":{"c0":[20,20,20,0],"c1":[0,0,0,0],"c2":[0,0,0,0]},"konst":{"k0":[0,0,0,0],"k1":[0,0,0,0],"k2":[0,0,0,0],"k3":[0,0,0,0]},"stages":["m0c0:zero+lerp(texc,zero;zero)x1","m1c1:cprev+lerp(zero,c0;texc)x1"]}
+

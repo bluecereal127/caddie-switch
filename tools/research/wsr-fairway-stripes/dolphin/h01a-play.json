@@ -1,0 +1,46 @@
+{
+ "name": "h01a",
+ "hole": 1,
+ "pin": [
+  240.3000030517578,
+  -58.20000076293945,
+  -1555.5
+ ],
+ "from": [
+  -493.20001220703125,
+  150.9499969482422,
+  1986
+ ],
+ "lie": 15,
+ "target": [
+  41.75400751952537,
+  -58.20000076293945,
+  -55.84121906277801
+ ],
+ "plan": {
+  "club": "driver",
+  "power": 0.67,
+  "heading": 2.8853559887988496,
+  "err": 0.49687429433603825,
+  "stop": 230.3382211397257,
+  "drift": 0,
+  "why": "approach 231 yd, port stop 230.3, aim off 0.0 yd"
+ },
+ "flightDump": {
+  "course": "0x92be2f20",
+  "map": "0x92cf80a0"
+ },
+ "rest": [
+  40.481746673583984,
+  -23.527477264404297,
+  20.70233917236328
+ ],
+ "restAttr": 1,
+ "hazard": 0,
+ "restDump": {
+  "course": "0x92be2f20",
+  "map": "0x92cf80a0"
+ },
+ "snapRest": "C:\\Users\\Stephen\\AppData\\Local\\Temp\\claude\\c--Users-Stephen-Desktop-caddie-switch-web-caddie-web\\02770d4d-3231-4333-ac41-2b45ba7b703d\\scratchpad\\fw\\V\\shots\\h01a-rest.png",
+ "toPinYd": 173.75519814909657
+}

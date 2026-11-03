@@ -1,0 +1,53 @@
+[('0x80004000', '0x26e0'), ('0x800071c0', '0x64cde0'), ('0x800066e0', '0x460'), ('0x80006b40', '0x680'), ('0x80653fa0', '0x5a0'), ('0x80654540', '0x20'), ('0x80654560', '0x1120'), ('0x80655680', '0x372c0'), ('0x8068c940', '0x637e0'), ('0x806f0120', '0x3ce0'), ('0x806f6080', '0xf380')]
+0x806640af WS2_dgl_fairway_bound_%s
+0x80664910 M_Green
+0x8066e34c WS2_common_move_liner_revolve1
+0x8066e36b Liner/G3D/WS2_common_move_liner.brres
+0x8066e391 WS2_common_move_liner
+0x8066e3a7 WS2_common_move_liner_light
+0x8066e3c3 Liner/G3D/WS2_common_move_liner_ef.brres
+0x8066e3ec WS2_common_move_liner_ef
+0x80673241 N_line_point_%02d
+0x8067756f jsk_col_move_liner
+0x80677582 Collision/WS2_common_move_liner_jsk.kcl
+0x80678484 pln_col_move_liner
+0x80678497 WS2_common_move_liner.kcl
+0x8067b648 M_Green
+0x8067bc1d WS2_glf_fairway_shot
+0x8067bced IR/SW (Fairway)
+0x8067c0d9 WS2_glf_fairway_bound
+0x8067d216 pln_col_move_liner
+0x806802f8 WS2_can_water_line_ship
+0x80680533 WS2_can_goal_line
+0x8068090b WS2_can_water_line_duck
+0x80680d85 WS2_can_water_line_fish
+0x80686d92 jsk_col_move_liner
+0x80688a6b WS2_fld_target_line
+table 0x806f1920:
+-4 0x8067b4d3 glf_pin1
+-3 0x8067b4dc glf_pin1b
+-2 0x8067b520 G3D/glf_matoPIN.brres
+-1 0x8067b536 glf_matoPIN
+0 0x8067b648 M_Green
+1 0x8067b650 Environment/scene_Light.plight
+2 0x8067b66f Environment/scene_Lm.plmap
+3 0x8067b68a Environment/scene_Bloom.pblm
+4 0x8067b880 G3D/glf_cup.brres
+5 0x8067b892 glf_cup
+6 0x8067b89a glf_cup_side
+7 0x0
+8 0x8067bbd4 G3D/glf_club.brres
+9 0x0
+10 0x8067bf98 G3D/glf_fukidasi.brres
+11 0x0
+pointers to the strings:
+   0x80676a14 -> 0x8067756f jsk_col_move_liner
+   0x80676a18 -> 0x80677582 Collision/WS2_common_move_liner_jsk.kcl
+   0x80676edc -> 0x80678484 pln_col_move_liner
+   0x80676ee0 -> 0x80678497 WS2_common_move_liner.kcl
+   0x8067d114 -> 0x8067d216 pln_col_move_liner
+   0x80686cbc -> 0x80686d92 jsk_col_move_liner
+   0x806f0b40 -> 0x80664910 M_Green
+   0x806f0f80 -> 0x8066e34c WS2_common_move_liner_revolve1
+   0x806f0f84 -> 0x8066e34c WS2_common_move_liner_revolve1
+   0x806f1920 -> 0x8067b648 M_Green

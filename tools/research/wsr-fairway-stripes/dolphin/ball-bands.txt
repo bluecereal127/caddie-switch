@@ -1,0 +1,4 @@
+## the ball at rest after h01a (address), and the tee balls of holes 1 and 6
+40.48,20.70 {"course":{"s":2.9728,"frac":0.973,"band":"W","y":-24.03,"edgeDist":{"+x":3.25,"-x":55.75,"+z":30.5,"-z":300}},"map":{"s":2.9728,"frac":0.973,"band":"W","y":-24.03,"edgeDist":{"+x":3.25,"-x":55.75,"+z":30.5,"-z":300}}}
+-493.2,1986 {"course":{"s":-2.7511,"frac":0.249,"band":"B","y":150,"edgeDist":{"+x":14,"-x":14,"+z":52.75,"-z":null}},"map":{"s":-2.7235,"frac":0.277,"band":"B","y":150,"edgeDist":{"+x":18,"-x":22.5,"+z":73.25,"-z":null}}}
+-46.7,2039.5 {"course":{"s":1.2522,"frac":0.252,"band":"B","y":45,"edgeDist":{"+x":13.25,"-x":13.5,"+z":null,"-z":null}},"map":{"s":1.2522,"frac":0.252,"band":"B","y":45,"edgeDist":{"+x":13.25,"-x":13.5,"+z":null,"-z":null}}}

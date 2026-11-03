@@ -1,0 +1,14 @@
+mdl0 version 11
+M_Fairway lightChans 1 lightSet 0 fogSet 0
+ chan0 flags 0x3f mat 255,255,255,255 amb 0,0,0,255 color {"raw":"0x703","matSrc":"vertex","lighting":true,"lights":0,"ambSrc":"register","diffFn":2,"atten":true} alpha {"raw":"0x701","matSrc":"vertex","lighting":false,"lights":0,"ambSrc":"register","diffFn":2,"atten":true}
+ chan1 flags 0xf mat 0,0,0,255 amb 0,0,0,0 color {"raw":"0x0","matSrc":"register","lighting":false,"lights":0,"ambSrc":"register","diffFn":0,"atten":false} alpha {"raw":"0x0","matSrc":"register","lighting":false,"lights":0,"ambSrc":"register","diffFn":0,"atten":false}
+M_Green lightChans 1 lightSet 0 fogSet 0
+ chan0 flags 0x3f mat 255,255,255,255 amb 127,127,127,255 color {"raw":"0x703","matSrc":"vertex","lighting":true,"lights":0,"ambSrc":"register","diffFn":2,"atten":true} alpha {"raw":"0x701","matSrc":"vertex","lighting":false,"lights":0,"ambSrc":"register","diffFn":2,"atten":true}
+ chan1 flags 0xf mat 0,0,0,255 amb 0,0,0,0 color {"raw":"0x0","matSrc":"register","lighting":false,"lights":0,"ambSrc":"register","diffFn":0,"atten":false} alpha {"raw":"0x0","matSrc":"register","lighting":false,"lights":0,"ambSrc":"register","diffFn":0,"atten":false}
+M_Rough lightChans 1 lightSet 0 fogSet 0
+ chan0 flags 0x3f mat 255,255,255,255 amb 38,38,38,255 color {"raw":"0x703","matSrc":"vertex","lighting":true,"lights":0,"ambSrc":"register","diffFn":2,"atten":true} alpha {"raw":"0x701","matSrc":"vertex","lighting":false,"lights":0,"ambSrc":"register","diffFn":2,"atten":true}
+ chan1 flags 0xf mat 0,0,0,255 amb 0,0,0,0 color {"raw":"0x0","matSrc":"register","lighting":false,"lights":0,"ambSrc":"register","diffFn":0,"atten":false} alpha {"raw":"0x0","matSrc":"register","lighting":false,"lights":0,"ambSrc":"register","diffFn":0,"atten":false}
+mdl0 version 11
+M_Fairway lightChans 1 lightSet -1 fogSet 0
+ chan0 flags 0x3f mat 255,255,255,255 amb 0,0,0,255 color {"raw":"0x701","matSrc":"vertex","lighting":false,"lights":0,"ambSrc":"register","diffFn":2,"atten":true} alpha {"raw":"0x701","matSrc":"vertex","lighting":false,"lights":0,"ambSrc":"register","diffFn":2,"atten":true}
+ chan1 flags 0xf mat 0,0,0,255 amb 0,0,0,0 color {"raw":"0x0","matSrc":"register","lighting":false,"lights":0,"ambSrc":"register","diffFn":0,"atten":false} alpha {"raw":"0x0","matSrc":"register","lighting":false,"lights":0,"ambSrc":"register","diffFn":0,"atten":false}

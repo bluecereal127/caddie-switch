@@ -1,0 +1,623 @@
+{
+ "name": "M_Fairway",
+ "index": 2,
+ "xlu": false,
+ "texgens": 5,
+ "lightChannels": 1,
+ "stages": 5,
+ "indirect": 0,
+ "cull": 2,
+ "alphaFunc": 1,
+ "layers": [
+  {
+   "texture": "glf_fairway1",
+   "palette": null,
+   "wrapS": 1,
+   "wrapT": 1,
+   "minFilter": 5,
+   "magFilter": 1,
+   "lodBias": -3.5
+  },
+  {
+   "texture": "glf_fairway_line1",
+   "palette": null,
+   "wrapS": 1,
+   "wrapT": 1,
+   "minFilter": 1,
+   "magFilter": 1,
+   "lodBias": 0
+  },
+  {
+   "texture": "glf_JimenGara2",
+   "palette": null,
+   "wrapS": 1,
+   "wrapT": 1,
+   "minFilter": 1,
+   "magFilter": 1,
+   "lodBias": 0
+  },
+  {
+   "texture": "projection_1",
+   "palette": null,
+   "wrapS": 0,
+   "wrapT": 0,
+   "minFilter": 1,
+   "magFilter": 1,
+   "lodBias": 0
+  },
+  {
+   "texture": "projection_2",
+   "palette": null,
+   "wrapS": 0,
+   "wrapT": 0,
+   "minFilter": 1,
+   "magFilter": 1,
+   "lodBias": 0
+  }
+ ],
+ "srt": [
+  {
+   "scale": [
+    1,
+    1
+   ],
+   "rot": 0,
+   "trans": [
+    0,
+    0
+   ]
+  },
+  {
+   "scale": [
+    1,
+    1
+   ],
+   "rot": 0,
+   "trans": [
+    0,
+    0
+   ]
+  },
+  {
+   "scale": [
+    0.029999999329447746,
+    0.029999999329447746
+   ],
+   "rot": -43,
+   "trans": [
+    2.0999999046325684,
+    -0.20000000298023224
+   ]
+  },
+  {
+   "scale": [
+    1,
+    1
+   ],
+   "rot": 0,
+   "trans": [
+    0,
+    0
+   ]
+  },
+  {
+   "scale": [
+    1,
+    1
+   ],
+   "rot": 0,
+   "trans": [
+    0,
+    0
+   ]
+  }
+ ],
+ "texgen": [
+  {
+   "source": 5,
+   "projection": false,
+   "inputForm": false,
+   "type": 0
+  },
+  {
+   "source": 6,
+   "projection": false,
+   "inputForm": false,
+   "type": 0
+  },
+  {
+   "source": 5,
+   "projection": false,
+   "inputForm": false,
+   "type": 0
+  },
+  {
+   "source": 0,
+   "projection": true,
+   "inputForm": true,
+   "type": 0
+  },
+  {
+   "source": 0,
+   "projection": true,
+   "inputForm": true,
+   "type": 0
+  }
+ ],
+ "tev": {
+  "c0": [
+   160,
+   160,
+   160,
+   0
+  ],
+  "c1": [
+   10,
+   40,
+   50,
+   0
+  ],
+  "c2": [
+   0,
+   0,
+   0,
+   0
+  ]
+ },
+ "konst": {
+  "k0": [
+   0,
+   0,
+   0,
+   0
+  ],
+  "k1": [
+   0,
+   0,
+   0,
+   0
+  ],
+  "k2": [
+   0,
+   0,
+   0,
+   0
+  ],
+  "k3": [
+   0,
+   0,
+   0,
+   0
+  ]
+ },
+ "blend": {
+  "enable": false,
+  "src": 4,
+  "dst": 5,
+  "subtract": false
+ },
+ "zmode": {
+  "test": true,
+  "func": 3,
+  "write": true
+ },
+ "alphaCompare": {
+  "ref0": 0,
+  "ref1": 0,
+  "comp0": 7,
+  "comp1": 7,
+  "logic": 0
+ },
+ "srtFlags": "ff1ff",
+ "effect": [
+  {
+   "cam": -1,
+   "light": -1,
+   "mapMode": 0,
+   "flags": 1,
+   "mtx": "1 0 0 0 0 1 0 0 0 0 1 0"
+  },
+  {
+   "cam": -1,
+   "light": -1,
+   "mapMode": 0,
+   "flags": 1,
+   "mtx": "1 0 0 0 0 1 0 0 0 0 1 0"
+  },
+  {
+   "cam": -1,
+   "light": -1,
+   "mapMode": 0,
+   "flags": 1,
+   "mtx": "1 0 0 0 0 1 0 0 0 0 1 0"
+  },
+  {
+   "cam": 0,
+   "light": -1,
+   "mapMode": 2,
+   "flags": 1,
+   "mtx": "1 0 0 0 0 1 0 0 0 0 1 0"
+  },
+  {
+   "cam": 0,
+   "light": -1,
+   "mapMode": 2,
+   "flags": 1,
+   "mtx": "1 0 0 0 0 1 0 0 0 0 1 0"
+  }
+ ],
+ "shader": {
+  "off": 32032,
+  "index": 2,
+  "stages": [
+   {
+    "texMap": 1,
+    "texCoord": 1,
+    "texEnable": true,
+    "colorChan": 0,
+    "color": {
+     "a": "c0",
+     "b": "rasc",
+     "c": "texc",
+     "d": "zero",
+     "bias": 0,
+     "sub": false,
+     "clamp": true,
+     "scale": 1,
+     "dest": 0
+    },
+    "alpha": {
+     "a": "zero",
+     "b": "texa",
+     "c": "rasa",
+     "d": "zero",
+     "bias": 0,
+     "sub": false,
+     "clamp": true,
+     "scale": 1,
+     "dest": 0
+    },
+    "kc": 0.125,
+    "ka": "ak0"
+   },
+   {
+    "texMap": 0,
+    "texCoord": 0,
+    "texEnable": true,
+    "colorChan": 0,
+    "color": {
+     "a": "c1",
+     "b": "texc",
+     "c": "cprev",
+     "d": "zero",
+     "bias": 0,
+     "sub": false,
+     "clamp": true,
+     "scale": 1,
+     "dest": 0
+    },
+    "alpha": {
+     "a": "zero",
+     "b": "zero",
+     "c": "zero",
+     "d": "aprev",
+     "bias": 0,
+     "sub": false,
+     "clamp": true,
+     "scale": 1,
+     "dest": 0
+    },
+    "kc": "k0",
+    "ka": "ak3"
+   },
+   {
+    "texMap": 2,
+    "texCoord": 2,
+    "texEnable": true,
+    "colorChan": 0,
+    "color": {
+     "a": "zero",
+     "b": "texc",
+     "c": "cprev",
+     "d": "zero",
+     "bias": 0,
+     "sub": false,
+     "clamp": true,
+     "scale": 2,
+     "dest": 0
+    },
+    "alpha": {
+     "a": "zero",
+     "b": "zero",
+     "c": "zero",
+     "d": "aprev",
+     "bias": 0,
+     "sub": false,
+     "clamp": true,
+     "scale": 1,
+     "dest": 0
+    },
+    "kc": "k0",
+    "ka": "ak0"
+   },
+   {
+    "texMap": 3,
+    "texCoord": 3,
+    "texEnable": true,
+    "colorChan": 0,
+    "color": {
+     "a": "cprev",
+     "b": "konst",
+     "c": "texc",
+     "d": "zero",
+     "bias": 0,
+     "sub": false,
+     "clamp": true,
+     "scale": 1,
+     "dest": 0
+    },
+    "alpha": {
+     "a": "aprev",
+     "b": "zero",
+     "c": "zero",
+     "d": "zero",
+     "bias": 0,
+     "sub": false,
+     "clamp": true,
+     "scale": 1,
+     "dest": 0
+    },
+    "kc": "k3",
+    "ka": "ak0"
+   },
+   {
+    "texMap": 4,
+    "texCoord": 4,
+    "texEnable": true,
+    "colorChan": 0,
+    "color": {
+     "a": "cprev",
+     "b": "konst",
+     "c": "texc",
+     "d": "zero",
+     "bias": 0,
+     "sub": false,
+     "clamp": true,
+     "scale": 1,
+     "dest": 0
+    },
+    "alpha": {
+     "a": "aprev",
+     "b": "zero",
+     "c": "zero",
+     "d": "zero",
+     "bias": 0,
+     "sub": false,
+     "clamp": true,
+     "scale": 0.5,
+     "dest": 0
+    },
+    "kc": "k3",
+    "ka": "ak0"
+   }
+  ]
+ }
+}
+draws: polygon6(opa,prio 3) attrs pos,nrm,col0,uv0,uv1 uv 5,6,-1,-1,-1,-1,-1,-1
+{
+ "name": "M_Fairway",
+ "index": 2,
+ "xlu": false,
+ "texgens": 2,
+ "lightChannels": 1,
+ "stages": 2,
+ "indirect": 0,
+ "cull": 2,
+ "alphaFunc": 1,
+ "layers": [
+  {
+   "texture": "glfM_MapFairway1",
+   "palette": null,
+   "wrapS": 1,
+   "wrapT": 1,
+   "minFilter": 5,
+   "magFilter": 1,
+   "lodBias": -1.5
+  },
+  {
+   "texture": "glfM_MapLine1",
+   "palette": null,
+   "wrapS": 1,
+   "wrapT": 1,
+   "minFilter": 1,
+   "magFilter": 1,
+   "lodBias": 0
+  }
+ ],
+ "srt": [
+  {
+   "scale": [
+    1,
+    1
+   ],
+   "rot": 0,
+   "trans": [
+    0,
+    0
+   ]
+  },
+  {
+   "scale": [
+    1,
+    1
+   ],
+   "rot": 180,
+   "trans": [
+    0,
+    0
+   ]
+  }
+ ],
+ "texgen": [
+  {
+   "source": 5,
+   "projection": false,
+   "inputForm": false,
+   "type": 0
+  },
+  {
+   "source": 6,
+   "projection": false,
+   "inputForm": false,
+   "type": 0
+  }
+ ],
+ "tev": {
+  "c0": [
+   20,
+   20,
+   20,
+   0
+  ],
+  "c1": [
+   0,
+   0,
+   0,
+   0
+  ],
+  "c2": [
+   0,
+   0,
+   0,
+   0
+  ]
+ },
+ "konst": {
+  "k0": [
+   0,
+   0,
+   0,
+   0
+  ],
+  "k1": [
+   0,
+   0,
+   0,
+   0
+  ],
+  "k2": [
+   0,
+   0,
+   0,
+   0
+  ],
+  "k3": [
+   0,
+   0,
+   0,
+   0
+  ]
+ },
+ "blend": {
+  "enable": false,
+  "src": 4,
+  "dst": 5,
+  "subtract": false
+ },
+ "zmode": {
+  "test": true,
+  "func": 3,
+  "write": true
+ },
+ "alphaCompare": {
+  "ref0": 0,
+  "ref1": 0,
+  "comp0": 7,
+  "comp1": 7,
+  "logic": 0
+ },
+ "srtFlags": "bf",
+ "effect": [
+  {
+   "cam": -1,
+   "light": -1,
+   "mapMode": 0,
+   "flags": 1,
+   "mtx": "1 0 0 0 0 1 0 0 0 0 1 0"
+  },
+  {
+   "cam": -1,
+   "light": -1,
+   "mapMode": 0,
+   "flags": 1,
+   "mtx": "1 0 0 0 0 1 0 0 0 0 1 0"
+  }
+ ],
+ "shader": {
+  "off": 15072,
+  "index": 2,
+  "stages": [
+   {
+    "texMap": 0,
+    "texCoord": 0,
+    "texEnable": true,
+    "colorChan": 0,
+    "color": {
+     "a": "texc",
+     "b": "zero",
+     "c": "zero",
+     "d": "zero",
+     "bias": 0,
+     "sub": false,
+     "clamp": true,
+     "scale": 1,
+     "dest": 0
+    },
+    "alpha": {
+     "a": "texa",
+     "b": "zero",
+     "c": "zero",
+     "d": "zero",
+     "bias": 0,
+     "sub": false,
+     "clamp": true,
+     "scale": 1,
+     "dest": 0
+    },
+    "kc": 0.125,
+    "ka": "ak0"
+   },
+   {
+    "texMap": 1,
+    "texCoord": 1,
+    "texEnable": true,
+    "colorChan": 0,
+    "color": {
+     "a": "zero",
+     "b": "c0",
+     "c": "texc",
+     "d": "cprev",
+     "bias": 0,
+     "sub": false,
+     "clamp": true,
+     "scale": 1,
+     "dest": 0
+    },
+    "alpha": {
+     "a": "aprev",
+     "b": "zero",
+     "c": "zero",
+     "d": "zero",
+     "bias": 0,
+     "sub": false,
+     "clamp": true,
+     "scale": 1,
+     "dest": 0
+    },
+    "kc": "k0",
+    "ka": "ak3"
+   }
+  ]
+ }
+}
+draws: polygon2(opa,prio 0) attrs pos,nrm,col0,uv0,uv1 uv 2,3,-1,-1,-1,-1,-1,-1
