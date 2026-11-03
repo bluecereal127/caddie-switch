@@ -1,0 +1,83 @@
+80401d6c: stwu     r1, -0x50(r1)
+80401d70: mflr     r0
+80401d74: stw      r0, 0x54(r1)
+80401d78: stw      r31, 0x4c(r1)
+80401d7c: mr       r31, r3
+80401d80: bl       0x80406b58
+80401d84: cmpwi    r3, 0
+80401d88: beq      0x80401ea4
+80401d8c: lbz      r0, 0x8c(r31)
+80401d90: cmpwi    r0, 0
+80401d94: beq      0x80401dc0
+80401d98: lfs      f1, 0x90(r31)
+80401d9c: lfs      f0, -0x698(r2)
+80401da0: lfs      f2, -0x6e0(r2)
+80401da4: fadds    f0, f1, f0
+80401da8: .byte    0xfc, 0x00, 0x10, 0x40
+80401dac: ble      0x80401db4
+80401db0: b        0x80401db8
+80401db4: fmr      f2, f0
+80401db8: stfs     f2, 0x90(r31)
+80401dbc: b        0x80401de4
+80401dc0: lfs      f1, 0x90(r31)
+80401dc4: lfs      f0, -0x698(r2)
+80401dc8: lfs      f2, -0x6e8(r2)
+80401dcc: fsubs    f0, f1, f0
+80401dd0: .byte    0xfc, 0x00, 0x10, 0x40
+80401dd4: bge      0x80401ddc
+80401dd8: b        0x80401de0
+80401ddc: fmr      f2, f0
+80401de0: stfs     f2, 0x90(r31)
+80401de4: lbz      r5, -0x70c(r2)
+80401de8: lis      r7, 0x4330
+80401dec: addi     r3, r2, -0x70c
+80401df0: stw      r5, 0x14(r1)
+80401df4: lbz      r6, 1(r3)
+80401df8: li       r0, 0xff
+80401dfc: stw      r7, 0x10(r1)
+80401e00: addi     r5, r1, 8
+80401e04: lbz      r4, 2(r3)
+80401e08: mr       r3, r31
+80401e0c: lfd      f4, -0x690(r2)
+80401e10: lfd      f0, 0x10(r1)
+80401e14: stw      r6, 0x24(r1)
+80401e18: fsubs    f1, f0, f4
+80401e1c: lfs      f3, -0x694(r2)
+80401e20: stw      r7, 0x20(r1)
+80401e24: lfs      f5, 0x90(r31)
+80401e28: lfd      f0, 0x20(r1)
+80401e2c: fsubs    f1, f1, f3
+80401e30: stw      r4, 0x34(r1)
+80401e34: fsubs    f2, f0, f4
+80401e38: stw      r7, 0x30(r1)
+80401e3c: fmadds   f6, f5, f1, f3
+80401e40: fsubs    f1, f2, f3
+80401e44: lfd      f0, 0x30(r1)
+80401e48: fctiwz   f2, f6
+80401e4c: stb      r0, 0xb(r1)
+80401e50: fsubs    f0, f0, f4
+80401e54: fmadds   f1, f5, f1, f3
+80401e58: stfd     f2, 0x18(r1)
+80401e5c: fsubs    f0, f0, f3
+80401e60: fctiwz   f1, f1
+80401e64: lwz      r0, 0x1c(r1)
+80401e68: stb      r0, 8(r1)
+80401e6c: fmadds   f0, f5, f0, f3
+80401e70: stfd     f1, 0x28(r1)
+80401e74: fctiwz   f0, f0
+80401e78: lwz      r0, 0x2c(r1)
+80401e7c: stb      r0, 9(r1)
+80401e80: stfd     f0, 0x38(r1)
+80401e84: lwz      r0, 0x3c(r1)
+80401e88: stb      r0, 0xa(r1)
+80401e8c: lwz      r4, 0x80(r31)
+80401e90: bl       0x80401d0c
+80401e94: lwz      r4, 0x84(r31)
+80401e98: mr       r3, r31
+80401e9c: addi     r5, r1, 8
+80401ea0: bl       0x80401d0c
+80401ea4: lwz      r0, 0x54(r1)
+80401ea8: lwz      r31, 0x4c(r1)
+80401eac: mtlr     r0
+80401eb0: addi     r1, r1, 0x50
+80401eb4: blr      
