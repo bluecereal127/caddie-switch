@@ -5,13 +5,18 @@ The NSS counterpart of `wsr-green-plaid.md`, following its last section. Nintend
 (`tools/harness/state/eden/nss-romfs/`). NSS units: metres, the hole frame (+x east, +y up, -z toward the minimap's
 north); map bearings are north-up and clockwise (hole 13's map is turned 0.1256 deg from the NSS world).
 
-**Status (handoff version):**
+**Status (final):**
 - The black-box test is done and verified.
-- The asset decode is done. It has not been reviewed yet.
-- Still pending, and to be added to this file:
-  - The code decode: which function writes the matrices, and when it runs.
-  - A review.
-- Not needed (the user, 2026-11-03):
+- The asset decode is done and reviewed. Its key claims were re-read from the files with no errors found:
+  - the identity `tex_mtx0` bytes;
+  - ElsaUberPatch's three attributes;
+  - the vertex shader's world X, Z → tex_mtx0 texcoord;
+  - the two textures' phases;
+  - the per-hole minimap scales;
+  - the minimap shader's plaid fetch.
+- Not done, by the user's decision (2026-11-03):
+  - The code decode (which function in main writes the matrices). It was stopped: the behaviour is known, and the
+    leads are kept below.
   - Exact constants: the tile is 2 m by definition.
   - A live RAM check.
 
@@ -103,7 +108,7 @@ The game auto-aims every address at the cup (RAM's aim equals the line to 1e-4 d
   130 deg line too (0.04 deg), and the 3D stripes on the green run toward the flag. The setup re-aims it for every
   stroke.
 
-## The assets (the dump's RomFS; decoded by a Sonnet agent, not yet reviewed)
+## The assets (the dump's RomFS; decoded by a Sonnet agent, spot-checked)
 
 ### 3D green: material `Glf_Green_M`
 
@@ -164,10 +169,10 @@ rotate 0, scale 1 in the file.
   seen in Eden must therefore be written at runtime, most likely into texture SRT 1 (rotating the pane would turn the
   capture's mask with it).
 
-## The code (main NSO): in progress
+## The code (main NSO): not decoded
 
-A Sonnet agent is decoding it: which function writes the plaid's matrices, and when it runs. Constants are not
-sought (the tile is 2 m by definition). Leads:
+The decode was stopped by the user's decision. The behaviour is known from the black-box test, and the function that
+writes the matrices is not needed. Leads, for anyone who wants it:
 
 - **Minimap.**
   - `L_MiniMap/P_MapGreenGrid` (0x2e089fe) is used at 0x1c1bba4 and 0x1c1c338. At 0x1c1c334..0x1c1c360 the minimap
