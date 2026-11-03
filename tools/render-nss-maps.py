@@ -24,18 +24,15 @@
 #    in linear light, written to an sRGB target, so on the course (A = 0) the display is sRGB(1.2^2.2 * texel); the
 #    verifier's colour check puts it at a mean of 4.0-5.7 levels from the Switch capture stacks (the next best display
 #    transform 10.1-14.1).
-#  * The plaid (verifier, verify/maps/plaid-zoom.json): the Switch's zoomed green frames registered on MiniMap measure
-#    a tile of 1.98-2.00 m on H1, H3 (GreenAreaSize 50), H9 (40), H12 (35), H17 (45) and H18 (30), not the layout's
-#    25 tiles across GreenAreaSize (1.2-2.0 m): the game sets the plaid's scale at runtime to GreenAreaSize / 2 tiles,
-#    which is 25 on the CommonBase's 50 m. Its phase is not fixed in the world: fitted (period 2 m, the frames
-#    registered as the verifier did) on 25 zoomed frames of 14 holes, the phase at the green area's centre differs
-#    between frames of one hole (H10: 0.05-0.58 of a tile over six frames with SNR 40-68; two frames of one view agree
-#    to 0.03). On H10 a tile centre (the texture's dark square) sits on the cup in play to 0.18 of a tile in x and 0.07
-#    in z across four cups, but on the other holes neither the cup, the green area's centre or corner, the map area's
-#    corner, the world origin nor the view centre holds it, so the frames do not give the game's anchor. The overview's
-#    plaid therefore puts a tile centre on the green area's centre (--plaid-origin centre, the default) or on NSS cup k
-#    (--plaid-origin cup0 .. cup5): the period and orientation are the game's, the phase a choice. At 2x a tile is
-#    1.0-2.3 px, at 4x 2.0-4.6 px. The green crop's Terrain view covers the plaid with P_MapGreen's bands.
+#  * The plaid: a 2 m tile on every hole by definition. The layout animation LGlfMiniMap_TypeHoleNum sets texture
+#    SRT 1's scale to GreenAreaSize / 2 tiles a hole (25 on the CommonBase's 50 m); the minimap verifier's 1.98-2.00 m
+#    on six holes (verify/maps/plaid-zoom.json) is that tile. The game lays it per stroke (tools/research/
+#    nss-green-plaid.md, measured in Eden): at each stroke's setup, from the player's own ball, the darkest square
+#    centred on the cup in play and one stripe set turned onto the ball->cup line. That is why the verifier found no
+#    world-fixed phase (H10: 0.05-0.58 of a tile between frames of one hole). A static overview has no ball, so the
+#    render picks a phase: a tile centre (the texture's darkest square) on the green area's centre, north-up
+#    (--plaid-origin centre, the default), or on NSS cup k (--plaid-origin cup0 .. cup5). At 2x a tile is 1.0-2.3 px,
+#    at 4x 2.0-4.6 px. The green crop's Terrain view covers the plaid with P_MapGreen's bands.
 #  * Off the course the pane is translucent (alpha 0.088 at A 240, 0.153 at A 229, 0.848 at A 51, 0 at A 255) over
 #    the dimmed live 3D view, which no file holds. --backdrop world (the default) stands in flat colours for it, one
 #    for OB ground (green-tinted texels), one for sea (blue-tinted: B > 0.8 G), one where nothing was captured
@@ -86,7 +83,7 @@ MAP_W, MAP_H = 250, 304
 GREEN_MARGIN = 0.12  # build-derived's GT_MARGIN / render-maps.mjs GREEN_MARGIN
 GREEN_SCALE, GREEN_MIN = 4, 256  # render-maps.mjs --green-scale / --green-min defaults
 MAP_VEC3, GREEN_VEC3 = (1.0, 1.0, 1.2), (1.0, 1.0, 1.25)  # P_Map / P_MapGreen __CUS_Vec3_0
-PLAID_TILE_M = 2.0  # the plaid's period in the world (verifier: 1.98-2.00 m measured on six holes)
+PLAID_TILE_M = 2.0  # the plaid's period in the world: 2 m by definition (GreenAreaSize / 2 tiles a hole)
 HOLES = list(range(1, 22))
 
 # ---------------------------------------------------------------- containers: zstd, BYML, SARC, BFRES -> BNTX

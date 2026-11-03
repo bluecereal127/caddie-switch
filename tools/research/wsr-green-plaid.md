@@ -177,7 +177,10 @@ The method, as it went here:
    - Check the minimap the same way, with one ball→cup line diagonal to north,
      since an axis-aligned line cannot show the turn on a square plaid.
 
-Leads for Nintendo Switch Sports (NSS 1.5.0):
+Leads for Nintendo Switch Sports (NSS 1.5.0). Answered 2026-11-03 in
+`nss-green-plaid.md`: the same construction, re-laid at each stroke's setup from
+the player's own ball, with a 2 m tile by definition (1 m stripes) and the cup
+on the darkest square. The leads as they stood:
 
 - **Where the minimap plaid lives:** layout `LGlfMiniMap.bflyt`, pane
   `P_MapGreenGrid`, texture `Glf_MiniMapGreen^o` (128², repeat), tex SRT scale

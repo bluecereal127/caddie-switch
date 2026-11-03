@@ -8,11 +8,12 @@ north); map bearings are north-up and clockwise (hole 13's map is turned 0.1256 
 **Status (handoff version):**
 - The black-box test is done and verified.
 - The asset decode is done. It has not been reviewed yet.
-- Still pending:
-  - The code decode: which function writes the matrices, its constants and callers, and where it lives in RAM.
-  - A live RAM check of the matrices at a rest and at the next address.
-  - An Opus review.
-- They will be added to this file.
+- Still pending, and to be added to this file:
+  - The code decode: which function writes the matrices, and when it runs.
+  - A review.
+- Not needed (the user, 2026-11-03):
+  - Exact constants: the tile is 2 m by definition.
+  - A live RAM check.
 
 Files beside this note in `nss-green-plaid/`:
 - `img/` holds the Eden frames as JPEG.
@@ -36,8 +37,11 @@ play and turned so one set of stripes runs along the ball→cup line**, on the 3
 rebuilt at each stroke's setup (between the rest and the next address, for a chip as for a putt), not while the ball
 rests and not while aiming. Two things differ from WSR:
 
-- **A stripe is 1 m** (a tile, one light and one dark stripe, is 2.0 m). WSR's is 1 yd.
+- **The tile is 2 m, by definition**: two 1 m stripes, one light and one dark. WSR's tile is 2 yd (1-yd stripes).
 - **The cup sits at the centre of the darkest square.** WSR's sits on the lightest.
+
+The plaid always follows the player's own ball. In the player's view, online included, it is laid from their ball to
+the cup in play (the user, 2026-11-03).
 
 At the address the ball sits mid-stripe in the stripe that runs to the cup, so counting stripes from the ball to the
 cup reads the distance in metres. Along the line the ball sits wherever its distance puts it.
@@ -83,7 +87,7 @@ The game auto-aims every address at the cup (RAM's aim equals the line to 1e-4 d
   | 5 (11 m, chip, mid zoom) | 130.04 | 130.000 | 29.28 px | ~14.7 | ~2.0 m | | |
 
   - The plaid is turned onto the line, within 0.04-0.12 deg.
-  - The tile is 2.0 m.
+  - The tile is 2 m: the screen fits measure 1.990-1.998 m, which is the 2 m tile within the measurement.
   - The cup sits at the darkest square's centre, within 0.01 of a period.
   - The ball is centred across, within 0.03 of a period.
   - At 2.5 tiles the ball is on a light stripe's centre along the line (0.988). So the plaid is anchored on the cup,
@@ -92,8 +96,9 @@ The game auto-aims every address at the cup (RAM's aim equals the line to 1e-4 d
 - **The 3D period** (`eden/persp3d.py`). On the address frames the camera sits on the line. The band edges on the
   screen column through the ball and the cup were fitted with y = yh + K / (s + D), for cup-centred stripes of width w,
   with the cup at s = d and the ball's ground contact at s = 0.
-  - The fits give w = 1.008 m (5.000 m, rms 0.73 px), 1.008 m (3.950 m, 0.67 px) and 1.016 m (5.987 m, 1.64 px).
-  - The cup's band is dark on every frame. So the 3D plaid is the minimap's: 1 m stripes, the cup on the darkest square.
+  - The fits give w = 1.008 m (5.000 m, rms 0.73 px), 1.008 m (3.950 m, 0.67 px) and 1.016 m (5.987 m, 1.64 px):
+    the 1 m stripe within the fit.
+  - The cup's band is dark on every frame. So the 3D plaid is the minimap's: the 2 m tile, the cup on the darkest square.
 - **The chip** (`img/h13-s5-chip-address.jpg`). At the fairway address the minimap's green plaid is turned onto the
   130 deg line too (0.04 deg), and the 3D stripes on the green run toward the flag. The setup re-aims it for every
   stroke.
@@ -154,24 +159,23 @@ rotate 0, scale 1 in the file.
   - In the file: translate (0, 0), rotate 0, scale (25, 25).
   - `anim/LGlfMiniMap_TypeHoleNum.bflan` animates its scale per hole (frame = hole - 1) to GreenAreaSize / 2 (25,
     22.5, … 15). The pane spans the green capture, so a tile is GreenAreaSize / (GreenAreaSize / 2) = **2 m on every
-    hole**, the 1.98-2.00 m the minimap verifier measured.
+    hole, by definition**. The minimap verifier's 1.98-2.00 m is that tile.
 - **What the runtime sets.** Nothing in the layout rotates or translates the plaid. The turn and the cup-centred phase
   seen in Eden must therefore be written at runtime, most likely into texture SRT 1 (rotating the pane would turn the
   capture's mask with it).
 
 ## The code (main NSO): in progress
 
-A Sonnet agent is decoding it, and the live RAM check follows its report. Leads:
+A Sonnet agent is decoding it: which function writes the plaid's matrices, and when it runs. Constants are not
+sought (the tile is 2 m by definition). Leads:
 
 - **Minimap.**
   - `L_MiniMap/P_MapGreenGrid` (0x2e089fe) is used at 0x1c1bba4 and 0x1c1c338. At 0x1c1c334..0x1c1c360 the minimap
     layout's init looks the pane up (vtable +0x3a0), passes it to `bl 0x185d840` and keeps the result at
     [this+0x440]: probably the handle the plaid's SRT is written through.
   - Also `N_MapGreenRT` (0x1c1c314), `P_MapGreen` (0x1c1b114), `N_MapGreenS` (0x1c1c2f0).
-- **3D.** Look for the writer of `tex_mtx0` (6 floats at Mat+0x20) on the seven green FMATs.
-  - Expected for a 2 m tile: rows of length 0.25, one along the ball→cup direction, with the cup mapped to 0 mod 0.5.
-  - The material's GPU uniform block (gsys_material, 0x290 bytes) is in guest memory, so the written matrix can be
-    read from Eden.
+- **3D.** Look for the writer of `tex_mtx0` (6 floats at Mat+0x20) on the seven green FMATs. For the 2 m tile, its
+  rows are of length 0.25, one along the ball→cup direction, with the cup mapped to 0 mod 0.5.
 - **Not the writer.** The `Proc*` names (ProcTextureTileChecker, ProcTurfRenderer, ProcTurfPreview, ProcComposeGreen
   at 0xece488..0xece5e0) and the turf renderer (0x1e4e000-0x1e50000) are leads already looked at; the turf is off on
   the green.
@@ -189,11 +193,10 @@ The minimap's plaid is the same pattern. So a render that wants the game's look 
 that ball's line and puts the darkest square on the cup. A static overview has no ball: the tee's line (GlfTeeOBJ →
 cup) is what the game shows at the tee address.
 
-## Checking it further
+## Settled without further checks
 
-- **The live RAM check.** Read the 3D green's `tex_mtx0` (each of the 7 FMATs' uniform blocks) and the minimap
-  plaid's SRT. Do it at a rest (the old line) and at the next address (the new one), and against the expected rows
-  0.25 · (direction along / across the line) with the cup → 0 (mod 0.5). This confirms the period, the phase and
-  when the write happens.
-- **A second hole and cup.** Hole 13's cup 0 only, so far.
-- **Online.** Not looked at: whether the platform's tee shot or a multi-player green shows the same thing.
+- **The tile.** It is 2 m by definition. The measurements above agree with it, and no exact constants are sought.
+- **Whose ball.** The plaid follows the player's own ball, online included: whatever the player's view shows is laid
+  from their ball (the user).
+- **No live RAM check** of the matrices is planned. The behaviour is measured on screen, and the code decode says
+  where it comes from.
