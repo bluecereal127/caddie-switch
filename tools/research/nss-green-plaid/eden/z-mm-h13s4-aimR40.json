@@ -1,0 +1,67 @@
+{
+ "frame": "h13s4-aimR40.png",
+ "cup_px": [
+  1183.29,
+  342.68
+ ],
+ "cup_r_px": 7.46,
+ "ball_px": [
+  1093.91,
+  429.32
+ ],
+ "pointer_px": [
+  1093.31,
+  429.46
+ ],
+ "lines": [
+  {
+   "f": "h13s4-aimR40.png",
+   "n": 424,
+   "dir_deg": 84.95
+  },
+  {
+   "f": "h13s4-aim0.png",
+   "n": 606,
+   "dir_deg": 45.84
+  },
+  {
+   "f": "h13s4-aimL40.png",
+   "n": 506,
+   "dir_deg": 5.15
+  },
+  {
+   "f": "h13s4-aimR40.png",
+   "n": 424,
+   "dir_deg": 84.95
+  },
+  {
+   "f": "h13s4-aimback.png",
+   "n": 610,
+   "dir_deg": 45.83
+  }
+ ],
+ "ball_cup_px": 124.48,
+ "px_per_m": 24.896,
+ "line_on_panel_deg": 45.89,
+ "line_ram_deg": 45.0,
+ "period_m": 1.998,
+ "period_px": 49.74,
+ "r2": 0.7501,
+ "amp_along": 12.45,
+ "amp_across": 12.95,
+ "u_light_from_cup_m": 1.0179,
+ "v_light_from_cup_m": 0.9768,
+ "cup_phase": {
+  "along": 0.4906,
+  "across": 0.5111
+ },
+ "ball_uv_m": [
+  -4.9994,
+  -0.0777
+ ],
+ "ball_phase": {
+  "along": 0.9884,
+  "across": 0.4722
+ },
+ "n_px": 66872
+}
