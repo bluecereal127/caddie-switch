@@ -1,0 +1,45 @@
+glf_tokosenFix [7eb7d81c] 8x256 fmt 8 mips 1 lod 0-0 palette fmt 1 (0 IA8, 1 RGB565, 2 RGB5A3) n 16 cols-equal true
+  used by course:H1 map:H1 course:H2 map:H2 map:H3 course:H4 map:H4 course:H7 map:H7 course:H10 map:H10 course:H11 map:H11 course:H12 map:H12 course:H14 map:H14 course:H17 map:H17 course:H18 map:H18 course:H20 map:H20
+  palette 0a84 0bab 1202 1307 19a1 1c4c 2d0c 35ab 468b 6eec 970e af73 ffff ffff ffff ffff
+  rows   0- 21 (22) v 0.0000-0.0859 idx 11 rgba 173,239,156,255 luma 209.8
+  rows  22- 43 (22) v 0.0859-0.1719 idx 10 rgba 148,227,115,255 luma 190.6
+  rows  44- 64 (21) v 0.1719-0.2539 idx 9 rgba 107,223,99,255 luma 174.2
+  rows  65- 85 (21) v 0.2539-0.3359 idx 8 rgba 66,210,90,255 luma 153.3
+  rows  86-106 (21) v 0.3359-0.4180 idx 7 rgba 49,182,90,255 luma 131.7
+  rows 107-127 (21) v 0.4180-0.5000 idx 6 rgba 41,162,99,255 luma 118.6
+  rows 128-148 (21) v 0.5000-0.5820 idx 5 rgba 25,138,99,255 luma 99.8
+  rows 149-169 (21) v 0.5820-0.6641 idx 1 rgba 8,117,90,255 luma 81.3
+  rows 170-190 (21) v 0.6641-0.7461 idx 3 rgba 16,97,58,255 luma 68.3
+  rows 191-211 (21) v 0.7461-0.8281 idx 0 rgba 8,81,33,255 luma 53.7
+  rows 212-233 (22) v 0.8281-0.9141 idx 2 rgba 16,65,16,255 luma 44.8
+  rows 234-255 (22) v 0.9141-1.0000 idx 4 rgba 25,53,8,255 luma 39.5
+glf_tokosenFix2 [048d6f87] 8x256 fmt 14 mips 1 lod 0-0 palette fmt null (0 IA8, 1 RGB565, 2 RGB5A3) n 0 cols-equal true
+  used by course:H3 course:H5 map:H5 course:H6 map:H6 course:H8 map:H8 course:H9 map:H9 course:H13 map:H13 course:H15 map:H15 course:H16 map:H16 course:H19 map:H19 course:H21 map:H21
+  palette 
+  rows   0- 15 (16) v 0.0000-0.0625 idx 0 rgba 210,245,202,255 luma 229.6
+  rows  16- 17 ( 2) v 0.0625-0.0703 idx 0 rgba 211,246,200,255 luma 230.3
+  rows  18- 19 ( 2) v 0.0703-0.0781 idx 0 rgba 175,240,154,255 luma 210.8
+  rows  20- 35 (16) v 0.0781-0.1406 idx 0 rgba 178,240,154,255 luma 211.7
+  rows  36- 36 ( 1) v 0.1406-0.1445 idx 0 rgba 177,241,156,255 luma 212.2
+  rows  37- 39 ( 3) v 0.1445-0.1563 idx 0 rgba 148,231,115,255 luma 193
+  rows  40- 55 (16) v 0.1563-0.2188 idx 0 rgba 148,229,115,255 luma 191.8
+  rows  56- 71 (16) v 0.2188-0.2813 idx 0 rgba 111,221,103,255 luma 174.7
+  rows  72- 73 ( 2) v 0.2813-0.2891 idx 0 rgba 110,221,104,255 luma 174.5
+  rows  74- 75 ( 2) v 0.2891-0.2969 idx 0 rgba 71,208,93,255 luma 153.9
+  rows  76- 91 (16) v 0.2969-0.3594 idx 0 rgba 71,208,90,255 luma 153.6
+  rows  92-107 (16) v 0.3594-0.4219 idx 0 rgba 55,183,93,255 luma 134.5
+  rows 108-109 ( 2) v 0.4219-0.4297 idx 0 rgba 55,182,93,255 luma 133.9
+  rows 110-111 ( 2) v 0.4297-0.4375 idx 0 rgba 44,162,96,255 luma 119.2
+  rows 112-127 (16) v 0.4375-0.5000 idx 0 rgba 41,162,99,255 luma 118.6
+  rows 128-143 (16) v 0.5000-0.5625 idx 0 rgba 25,136,101,255 luma 98.8
+  rows 144-145 ( 2) v 0.5625-0.5703 idx 0 rgba 25,138,99,255 luma 99.8
+  rows 146-163 (18) v 0.5703-0.6406 idx 0 rgba 14,116,93,255 luma 82.9
+  rows 164-179 (16) v 0.6406-0.7031 idx 0 rgba 16,98,63,255 luma 69.5
+  rows 180-181 ( 2) v 0.7031-0.7109 idx 0 rgba 16,97,66,255 luma 69.2
+  rows 182-199 (18) v 0.7109-0.7813 idx 0 rgba 12,81,33,255 luma 54.9
+  rows 200-218 (19) v 0.7813-0.8555 idx 0 rgba 22,67,16,255 luma 47.7
+  rows 219-219 ( 1) v 0.8555-0.8594 idx 0 rgba 25,53,16,255 luma 40.4
+  rows 220-235 (16) v 0.8594-0.9219 idx 0 rgba 25,54,14,255 luma 40.8
+  rows 236-237 ( 2) v 0.9219-0.9297 idx 0 rgba 25,53,14,255 luma 40.2
+  rows 238-239 ( 2) v 0.9297-0.9375 idx 0 rgba 16,36,11,255 luma 27.2
+  rows 240-255 (16) v 0.9375-1.0000 idx 0 rgba 16,36,8,255 luma 26.8

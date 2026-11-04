@@ -1,0 +1,8 @@
+main.dol (RZTE01 Rev 1) constants read by the Terrain-view fade 0x80401d6c (r2 = 0x806fe080):
+  r2-0x698 = 0x806fd9e8 step  0.07999999821186066
+  r2-0x6e0 = 0x806fd9a0 max   1.0
+  r2-0x6e8 = 0x806fd998 min   0.0
+  r2-0x694 = 0x806fd9ec K     255.0 (white)
+  r2-0x70c = 0x806fd974 bytes [30, 60, 90] (the Terrain-view k2: R, G, B; alpha written as 0xff)
+  r2-0x690 = 0x806fd9f0 4330000000000000 (the u32 -> double conversion constant)
+r13-0x6800 -> 0x8067b648 -> 'M_Green' (the material name every M_Green lookup passes)

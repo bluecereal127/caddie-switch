@@ -1,0 +1,29 @@
+803fac30: cmpwi    r0, 0
+803fac34: bne      0x803fadd8
+803fac38: bl       0x803fcb48
+803fac3c: cmpwi    r3, 0
+803fac40: beq      0x803fadc4
+803fac44: lwz      r3, 0x664(r28)
+803fac48: mr       r4, r27
+803fac4c: lfs      f1, -0x90c(r2)
+803fac50: mr       r5, r26
+803fac54: bl       0x803fcf28
+803fac58: lbz      r0, 0x8a8(r28)
+803fac5c: cmpwi    r0, 0
+803fac60: bne      0x803fadc4
+803fac64: lwz      r0, 0x1c(r31)
+803fac68: rlwinm.  r0, r0, 0, 0x16, 0x16
+803fac6c: beq      0x803faca0
+803fac70: bl       0x803fa8d4
+803fac74: lwz      r3, 4(r3)
+803fac78: li       r0, 1
+803fac7c: cmpwi    r3, 5
+803fac80: beq      0x803fac90
+803fac84: cmpwi    r3, 8
+803fac88: beq      0x803fac90
+803fac8c: li       r0, 0
+803fac90: cmpwi    r0, 0
+803fac94: bne      0x803faca0
+803fac98: lwz      r3, -0x2ca0(r13)
+803fac9c: bl       0x80401ed0
+803faca0: lwz      r3, 0x664(r28)

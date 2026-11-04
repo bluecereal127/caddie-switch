@@ -1,0 +1,11 @@
+M_Green in the RAM dumps of 2026-11-03 (Dolphin, the fairway session: tools/research/wsr-fairway-stripes) against the archive files
+fcJP11 course tee0: layer-1 SRT = file; layer-1 effect matrix = file; layer-1 effect header file ffff0001 ram ffff0000; glf_tokosenFix texels = file; glf_tokosenFix palette = file; k2 R 255 G 255 B 255 (file 30/60/90)
+fcJP11 course h01a-flight: layer-1 SRT = file; layer-1 effect matrix = file; layer-1 effect header file ffff0001 ram ffff0000; glf_tokosenFix texels = file; glf_tokosenFix palette = file; k2 R 255 G 255 B 255 (file 30/60/90)
+fcJP11 course h01a-rest: layer-1 SRT = file; layer-1 effect matrix = file; layer-1 effect header file ffff0001 ram ffff0000; glf_tokosenFix texels = file; glf_tokosenFix palette = file; k2 R 255 G 255 B 255 (file 30/60/90)
+fcJP11 course h01a-address: layer-1 SRT = file; layer-1 effect matrix = file; layer-1 effect header file ffff0001 ram ffff0000; glf_tokosenFix texels = file; glf_tokosenFix palette = file; k2 R 255 G 255 B 255 (file 30/60/90)
+fcJP11 map tee0: layer-1 SRT = file; layer-1 effect matrix = file; layer-1 effect header file ffff0001 ram ffff0000; glf_tokosenFix texels = file; glf_tokosenFix palette = file; k2 R 255 G 255 B 255 (file 30/60/90)
+fcJP11 map h01a-flight: layer-1 SRT = file; layer-1 effect matrix = file; layer-1 effect header file ffff0001 ram ffff0000; glf_tokosenFix texels = file; glf_tokosenFix palette = file; k2 R 255 G 255 B 255 (file 30/60/90)
+fcJP11 map h01a-rest: layer-1 SRT = file; layer-1 effect matrix = file; layer-1 effect header file ffff0001 ram ffff0000; glf_tokosenFix texels = file; glf_tokosenFix palette = file; k2 R 255 G 255 B 255 (file 30/60/90)
+fcJP11 map h01a-address: layer-1 SRT = file; layer-1 effect matrix = file; layer-1 effect header file ffff0001 ram ffff0000; glf_tokosenFix texels = file; glf_tokosenFix palette = file; k2 R 255 G 255 B 255 (file 30/60/90)
+fcJP10 course h06-tee: layer-1 SRT = file; layer-1 effect matrix = file; layer-1 effect header file ffff0001 ram ffff0000; glf_tokosenFix2 texels = file; k2 R 255 G 255 B 255 (file 30/60/90)
+fcJP10 map h06-tee: layer-1 SRT = file; layer-1 effect matrix = file; layer-1 effect header file ffff0001 ram ffff0000; glf_tokosenFix2 texels = file; k2 R 255 G 255 B 255 (file 30/60/90)

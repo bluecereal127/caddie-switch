@@ -1,0 +1,59 @@
+=== fcJP11 course M_Green (index 3) texgens 6 chans 1 stages 7 indirect 0 xlu false cull 2 lightSet 0 fogSet 0
+ indirect methods 0,0,0,0 normalMapRefs -1,-1,-1,-1
+ texSrt flags 0xfffdff mode 0 (0 Maya, 1 XSI, 2 3dsMax)
+ L0 glf_green1 wrap 1,1 min 5 mag 1 lodBias -3 | srt s(1,1) r0 t(0,0) | effect cam 0 light -1 mapMode 2 flags 1 mtx [1 0 0 0 0 1 0 0 0 0 1 0]
+ L1 glf_tokosenFix +pal glf_tokosenFix wrap 1,0 min 1 mag 1 lodBias 0 | srt s(1,1) r0 t(0,0) | effect cam -1 light -1 mapMode 0 flags 1 mtx [1 0 0 0 0 1 0 0 0 0 1 0]
+ L2 glf_hole1 wrap 0,0 min 1 mag 1 lodBias 0 | srt s(10,10) r0 t(0,0) | effect cam 0 light -1 mapMode 2 flags 1 mtx [1 0 0 0 0 1 0 0 0 0 1 0]
+ L3 WS2_dgl_goal2 wrap 0,0 min 5 mag 1 lodBias -1 | srt s(1,1) r0 t(0,0) | effect cam 0 light -1 mapMode 2 flags 1 mtx [1 0 0 0 0 1 0 0 0 0 1 0]
+ L4 projection_1 wrap 0,0 min 1 mag 1 lodBias 0 | srt s(1,1) r0 t(0,0) | effect cam 0 light -1 mapMode 2 flags 1 mtx [1 0 0 0 0 1 0 0 0 0 1 0]
+ L5 projection_3 wrap 0,0 min 1 mag 1 lodBias 0 | srt s(1,1) r0 t(0,0) | effect cam 0 light -1 mapMode 2 flags 1 mtx [1 0 0 0 0 1 0 0 0 0 1 0]
+ regs (R,G,B,A): {"k0":[0,0,0,0],"c0":[10,0,10,0],"k1":[0,0,0,0],"c1":[0,0,0,0],"k2":[30,60,90,255],"c2":[0,0,0,0],"k3":[0,0,0,0]}
+ alphaCompare ref0 64 ref1 255 comp0 6 comp1 3 op 0 | blend en 0 src 4 dst 5 sub 0 | z test 1 func 3 write 1
+ texgen0: STQ in ABC1 type 0 srcRow 0 (0 pos, 5+ uv0..) | dualTex row 0 normalize 0
+ texgen1: ST in AB11 type 0 srcRow 6 (0 pos, 5+ uv0..) | dualTex row 3 normalize 0
+ texgen2: STQ in ABC1 type 0 srcRow 0 (0 pos, 5+ uv0..) | dualTex row 6 normalize 0
+ texgen3: STQ in ABC1 type 0 srcRow 0 (0 pos, 5+ uv0..) | dualTex row 9 normalize 0
+ texgen4: STQ in ABC1 type 0 srcRow 0 (0 pos, 5+ uv0..) | dualTex row 12 normalize 0
+ texgen5: STQ in ABC1 type 0 srcRow 0 (0 pos, 5+ uv0..) | dualTex row 15 normalize 0
+ chan0 flags 0x3f mat 255,255,255,255 amb 127,127,127,255 color[vtx lit lights 0x0 amb reg diff2 atten1] alpha[vtx unlit]
+ shader @0x7f20 stages 7 texRefs 0,1,2,3,4,5,-,-
+ swap tables: rgba rrra ggga bbba
+ stage0: map 0 coord 0 ras color0a0
+    C: prev = (zero + lerp(c0, texc; rasc)) *2
+    A: prev = (zero + lerp(zero, texa; rasa))  (swap ras 0 tex 0)
+ stage1: map 1 coord 1 ras color0a0
+    C: prev = (zero + lerp(texc, cprev; konst[k2.rgb]))
+    A: prev = (aprev + lerp(zero, zero; zero))  (swap ras 0 tex 0)
+ stage2: map 2 coord 2 ras color0a0
+    C: prev = (cprev + lerp(zero, zero; zero))
+    A: prev = (zero + lerp(zero, texa; aprev))  (swap ras 0 tex 0)
+ stage3: map 3 coord 3 ras color0a0
+    C: r2 = (zero + lerp(cprev, texc; texa))
+    A: prev = (aprev + lerp(zero, zero; zero))  (swap ras 0 tex 0)
+ stage4: map - coord 7 ras color0a0
+    C: prev = (zero + lerp(cprev, c2; konst[k1.rgb]))
+    A: prev = (aprev + lerp(zero, zero; zero))  (swap ras 0 tex 0)
+ stage5: map 4 coord 4 ras color0a0
+    C: prev = (zero + lerp(cprev, konst[k3.rgb]; texc))
+    A: prev = (zero + lerp(aprev, zero; zero))  (swap ras 0 tex 0)
+ stage6: map 5 coord 5 ras color0a0
+    C: prev = (zero + lerp(cprev, konst[k3.rgb]; texc))
+    A: prev = (zero + lerp(aprev, zero; zero)) *0.5  (swap ras 0 tex 0)
+=== fcJP11 map M_Green (index 3) texgens 2 chans 1 stages 2 indirect 0 xlu false cull 2 lightSet -1 fogSet 0
+ indirect methods 0,0,0,0 normalMapRefs -1,-1,-1,-1
+ texSrt flags 0xff mode 0 (0 Maya, 1 XSI, 2 3dsMax)
+ L0 glfM_MapGreen1 wrap 1,1 min 5 mag 1 lodBias -2 | srt s(1,1) r0 t(0,0) | effect cam 0 light -1 mapMode 2 flags 1 mtx [1 0 0 0 0 1 0 0 0 0 1 0]
+ L1 glf_tokosenFix +pal glf_tokosenFix wrap 1,0 min 1 mag 1 lodBias 0 | srt s(1,1) r0 t(0,0) | effect cam -1 light -1 mapMode 0 flags 1 mtx [1 0 0 0 0 1 0 0 0 0 1 0]
+ regs (R,G,B,A): {"k0":[0,0,0,0],"c0":[10,0,10,0],"k1":[0,0,0,0],"c1":[0,0,0,0],"k2":[30,60,90,255],"c2":[0,0,0,0],"k3":[0,0,0,0]}
+ alphaCompare ref0 64 ref1 255 comp0 6 comp1 3 op 0 | blend en 0 src 4 dst 5 sub 0 | z test 1 func 3 write 1
+ texgen0: STQ in ABC1 type 0 srcRow 0 (0 pos, 5+ uv0..) | dualTex row 0 normalize 0
+ texgen1: ST in AB11 type 0 srcRow 6 (0 pos, 5+ uv0..) | dualTex row 3 normalize 0
+ chan0 flags 0x3f mat 255,255,255,255 amb 127,127,127,255 color[vtx unlit] alpha[vtx unlit]
+ shader @0x3ce0 stages 2 texRefs 0,1,-,-,-,-,-,-
+ swap tables: rgba rrra ggga bbba
+ stage0: map 0 coord 0 ras color0a0
+    C: prev = (zero + lerp(texc, zero; zero))
+    A: prev = (zero + lerp(texa, zero; zero))  (swap ras 0 tex 0)
+ stage1: map 1 coord 1 ras color0a0
+    C: prev = (zero + lerp(texc, cprev; konst[k2.rgb]))
+    A: prev = (aprev + lerp(zero, zero; zero))  (swap ras 0 tex 0)

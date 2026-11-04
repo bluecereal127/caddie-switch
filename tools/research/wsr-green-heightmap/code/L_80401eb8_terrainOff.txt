@@ -1,0 +1,6 @@
+80401eb8: li       r0, 0
+80401ebc: stb      r0, 0x8c(r3)
+80401ec0: lwz      r3, -0x2c10(r13)
+80401ec4: lwz      r3, 0xc(r3)
+80401ec8: stb      r0, 0x105(r3)
+80401ecc: blr      
