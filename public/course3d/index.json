@@ -1,6 +1,7 @@
 {
  "version": 2,
  "src": "nss",
+ "game": "Switch Sports Resort 1.0.0",
  "_note": "NSS's collision meshes for the live solver (tools/build-course3d.mjs; src/live3d-core.js buildCourse reads them through tools/lib/nss3d.mjs, NSS's ball src/nsssim.js flies over them): per hole hNN.bin (V/T/A the ground pack, TV/TT/TA the tree pack, KV/KT/KA the actor trees' kind meshes; vertices in NSS metres, mesh = unitsPerM * nss + O) and hNN.json (meta.trees: each actor tree's kind and placement)",
  "unitsPerM": 10,
  "thick": 5,
@@ -46,477 +47,583 @@
   "1": {
    "bin": "h01.bin",
    "json": "h01.json",
-   "bytes": 595131,
-   "sha1": "2fd96c0eb90270f87c7f07805a6154055cdf423a",
-   "tris": 16090,
-   "treeTris": 23567,
-   "verts": 9571,
-   "treeVerts": 12706,
-   "actorTrees": 10,
-   "actorKinds": 4,
-   "actorTris": 6957
+   "bytes": 446431,
+   "sha1": "943e4206e339e44e1324a97cb29adfaac5ab6e27",
+   "tris": 16597,
+   "treeTris": 13169,
+   "verts": 9822,
+   "treeVerts": 6751,
+   "actorTrees": 76,
+   "actorKinds": 7,
+   "actorTris": 19727
   },
   "2": {
    "bin": "h02.bin",
    "json": "h02.json",
-   "bytes": 347963,
-   "sha1": "da40dff2d23238075ebff6213eaacd56deb04d62",
-   "tris": 13219,
-   "treeTris": 8728,
-   "verts": 8227,
-   "treeVerts": 4697,
-   "actorTrees": 14,
-   "actorKinds": 4,
-   "actorTris": 7875
+   "bytes": 354089,
+   "sha1": "36d542e33d1d44fc844d54aaad558016f03b6b4c",
+   "tris": 16258,
+   "treeTris": 5220,
+   "verts": 10218,
+   "treeVerts": 2709,
+   "actorTrees": 62,
+   "actorKinds": 8,
+   "actorTris": 17681
   },
   "3": {
    "bin": "h03.bin",
    "json": "h03.json",
-   "bytes": 471411,
-   "sha1": "f04b90a0f7132fecbb7b46e4b6bdb422b3d9dd9a",
-   "tris": 16507,
-   "treeTris": 14588,
-   "verts": 9389,
-   "treeVerts": 8486,
-   "actorTrees": 22,
-   "actorKinds": 4,
-   "actorTris": 10936
+   "bytes": 471445,
+   "sha1": "f35a6d2b2e556d4ec1d54d6ff07b9a3579a61cac",
+   "tris": 22613,
+   "treeTris": 7370,
+   "verts": 13272,
+   "treeVerts": 4473,
+   "actorTrees": 103,
+   "actorKinds": 8,
+   "actorTris": 27034
   },
   "4": {
    "bin": "h04.bin",
    "json": "h04.json",
-   "bytes": 436235,
-   "sha1": "04a53d0ba8cda98e12eb2d4199ddd61a8823d705",
-   "tris": 12188,
-   "treeTris": 17050,
-   "verts": 7176,
-   "treeVerts": 8851,
-   "actorTrees": 12,
-   "actorKinds": 4,
-   "actorTris": 7874
+   "bytes": 459833,
+   "sha1": "9fd901b6f7709f741901686bafca02f3a2f6b353",
+   "tris": 17717,
+   "treeTris": 12246,
+   "verts": 10513,
+   "treeVerts": 6276,
+   "actorTrees": 40,
+   "actorKinds": 8,
+   "actorTris": 12916
   },
   "5": {
    "bin": "h05.bin",
    "json": "h05.json",
-   "bytes": 711822,
-   "sha1": "25945897bda19e2465c7be25e6356ca79036a07d",
-   "tris": 19776,
-   "treeTris": 28636,
-   "verts": 11084,
-   "treeVerts": 15924,
-   "actorTrees": 24,
-   "actorKinds": 5,
-   "actorTris": 13493
+   "bytes": 629617,
+   "sha1": "40ce86395210539711defab42e0910788668aedd",
+   "tris": 22528,
+   "treeTris": 20198,
+   "verts": 12532,
+   "treeVerts": 10961,
+   "actorTrees": 81,
+   "actorKinds": 8,
+   "actorTris": 23508
   },
   "6": {
    "bin": "h06.bin",
    "json": "h06.json",
-   "bytes": 693467,
-   "sha1": "74bdf782335539dac9fcbc6d7a04b03b9b10ff6d",
-   "tris": 9276,
-   "treeTris": 39982,
-   "verts": 4790,
-   "treeVerts": 21404,
-   "actorTrees": 32,
-   "actorKinds": 4,
-   "actorTris": 11918
+   "bytes": 568227,
+   "sha1": "79316d772111839a1fdd567aef71326c5c3c15e3",
+   "tris": 10179,
+   "treeTris": 30004,
+   "verts": 5247,
+   "treeVerts": 15581,
+   "actorTrees": 92,
+   "actorKinds": 6,
+   "actorTris": 23535
   },
   "7": {
    "bin": "h07.bin",
    "json": "h07.json",
-   "bytes": 1078356,
-   "sha1": "e336f4dc4f2f01f900cf834e4f8cc9464fe77822",
-   "tris": 35664,
-   "treeTris": 36886,
-   "verts": 21597,
-   "treeVerts": 19262,
-   "actorTrees": 29,
-   "actorKinds": 6,
-   "actorTris": 18713
+   "bytes": 958857,
+   "sha1": "a2fd3279d1906ec4cbf9702f4f0385bc98392cd5",
+   "tris": 37322,
+   "treeTris": 28944,
+   "verts": 22447,
+   "treeVerts": 14751,
+   "actorTrees": 69,
+   "actorKinds": 8,
+   "actorTris": 26006
   },
   "8": {
    "bin": "h08.bin",
    "json": "h08.json",
-   "bytes": 614565,
-   "sha1": "91a671e8addfd35e8907c35901a50f5ed7973f94",
-   "tris": 17178,
-   "treeTris": 27628,
-   "verts": 9791,
-   "treeVerts": 13715,
-   "actorTrees": 18,
-   "actorKinds": 3,
-   "actorTris": 9812
+   "bytes": 524503,
+   "sha1": "5d6960b4ce77f505f2f6a4ac9571d405d465c09e",
+   "tris": 25381,
+   "treeTris": 11010,
+   "verts": 14832,
+   "treeVerts": 5296,
+   "actorTrees": 66,
+   "actorKinds": 7,
+   "actorTris": 17605
   },
   "9": {
    "bin": "h09.bin",
    "json": "h09.json",
-   "bytes": 627430,
-   "sha1": "7fc2d84f5b15044b577b2a8d939982c021d60df1",
-   "tris": 31890,
-   "treeTris": 10610,
-   "verts": 18626,
-   "treeVerts": 6370,
-   "actorTrees": 31,
-   "actorKinds": 3,
-   "actorTris": 11483
+   "bytes": 573815,
+   "sha1": "f511063648aa55ccba3f4df7b8d39272044579c5",
+   "tris": 33609,
+   "treeTris": 4552,
+   "verts": 19575,
+   "treeVerts": 2898,
+   "actorTrees": 78,
+   "actorKinds": 6,
+   "actorTris": 20700
   },
   "10": {
    "bin": "h10.bin",
    "json": "h10.json",
-   "bytes": 715323,
-   "sha1": "ee89d6e6db422f58d28782d6ff2a3c3a32e05888",
-   "tris": 10130,
-   "treeTris": 39199,
-   "verts": 5362,
-   "treeVerts": 21289,
-   "actorTrees": 32,
-   "actorKinds": 4,
-   "actorTris": 31112
+   "bytes": 495931,
+   "sha1": "0c3e252cf59f52c119364c3aa2f01e705646369f",
+   "tris": 11222,
+   "treeTris": 23330,
+   "verts": 5970,
+   "treeVerts": 12118,
+   "actorTrees": 107,
+   "actorKinds": 6,
+   "actorTris": 51063
   },
   "11": {
    "bin": "h11.bin",
    "json": "h11.json",
-   "bytes": 804351,
-   "sha1": "5cd276dc7b80b3033780042b234db6ddfe596e7a",
-   "tris": 9674,
-   "treeTris": 49396,
-   "verts": 5637,
-   "treeVerts": 26150,
-   "actorTrees": 22,
-   "actorKinds": 2,
-   "actorTris": 7645
+   "bytes": 647113,
+   "sha1": "8f02d25d5b5dcd7e1c2bc28eb29da8c51958808f",
+   "tris": 10593,
+   "treeTris": 36742,
+   "verts": 6131,
+   "treeVerts": 18798,
+   "actorTrees": 94,
+   "actorKinds": 5,
+   "actorTris": 21605
   },
   "12": {
    "bin": "h12.bin",
    "json": "h12.json",
-   "bytes": 1116781,
-   "sha1": "0bce87c98fb6095ff7f7f30d167f011afc077bd7",
-   "tris": 15106,
-   "treeTris": 66252,
-   "verts": 8420,
-   "treeVerts": 34702,
-   "actorTrees": 9,
-   "actorKinds": 3,
-   "actorTris": 3998
+   "bytes": 1005359,
+   "sha1": "036ca69d7e39f2756b8130a974e73dbf734c2afc",
+   "tris": 16635,
+   "treeTris": 56434,
+   "verts": 9127,
+   "treeVerts": 28945,
+   "actorTrees": 87,
+   "actorKinds": 6,
+   "actorTris": 18661
   },
   "13": {
    "bin": "h13.bin",
    "json": "h13.json",
-   "bytes": 696127,
-   "sha1": "a5ab88d9499c71a73c0f19b5d4752a9be558b771",
-   "tris": 5631,
-   "treeTris": 45958,
-   "verts": 3310,
-   "treeVerts": 23822,
-   "actorTrees": 17,
-   "actorKinds": 2,
-   "actorTris": 5819
+   "bytes": 638037,
+   "sha1": "9be69ac044bc0d15fd9b08b1abf19e26e0ce41cc",
+   "tris": 6135,
+   "treeTris": 40888,
+   "verts": 3523,
+   "treeVerts": 20832,
+   "actorTrees": 86,
+   "actorKinds": 5,
+   "actorTris": 19667
   },
   "14": {
    "bin": "h14.bin",
    "json": "h14.json",
-   "bytes": 484907,
-   "sha1": "0325c535624fe9b4b72a4ed7b3ac189b26648048",
-   "tris": 19267,
-   "treeTris": 11748,
-   "verts": 11316,
-   "treeVerts": 6817,
-   "actorTrees": 37,
-   "actorKinds": 4,
-   "actorTris": 18892
+   "bytes": 523347,
+   "sha1": "0b7e77d27c341d98e6a0cd8feaa976c402fc1397",
+   "tris": 20236,
+   "treeTris": 16104,
+   "verts": 11811,
+   "treeVerts": 7519,
+   "actorTrees": 81,
+   "actorKinds": 6,
+   "actorTris": 27204
   },
   "15": {
    "bin": "h15.bin",
    "json": "h15.json",
-   "bytes": 915105,
-   "sha1": "c5849fd169962b23352d1fc7e7aaf28a73afb3eb",
-   "tris": 27601,
-   "treeTris": 34598,
-   "verts": 16841,
-   "treeVerts": 18574,
-   "actorTrees": 27,
-   "actorKinds": 5,
-   "actorTris": 22429
+   "bytes": 703011,
+   "sha1": "beb68ed060c45dabaf1cbcc44ffc8dfde87ce962",
+   "tris": 25206,
+   "treeTris": 23430,
+   "verts": 14887,
+   "treeVerts": 12242,
+   "actorTrees": 95,
+   "actorKinds": 6,
+   "actorTris": 37675
   },
   "16": {
    "bin": "h16.bin",
    "json": "h16.json",
-   "bytes": 1411545,
-   "sha1": "4b55a46e3cee9035f72671500b491e1be13421a3",
-   "tris": 6924,
-   "treeTris": 99122,
-   "verts": 3635,
-   "treeVerts": 50972,
-   "actorTrees": 32,
+   "bytes": 1367097,
+   "sha1": "73e75de35161e9a0cc51e5b2fc947d152d506f8d",
+   "tris": 7506,
+   "treeTris": 96396,
+   "verts": 3920,
+   "treeVerts": 48645,
+   "actorTrees": 100,
    "actorKinds": 3,
-   "actorTris": 10824
+   "actorTris": 21802
   },
   "17": {
    "bin": "h17.bin",
    "json": "h17.json",
-   "bytes": 630467,
-   "sha1": "78ab6bd12e5f1b34b6db7719efe542a68dd11a76",
-   "tris": 29148,
-   "treeTris": 14969,
-   "verts": 17986,
-   "treeVerts": 8033,
-   "actorTrees": 15,
-   "actorKinds": 2,
-   "actorTris": 5242
+   "bytes": 677685,
+   "sha1": "c87148ba0b63beea9c19628d9deb8dbd8d31c6e4",
+   "tris": 35841,
+   "treeTris": 11614,
+   "verts": 21996,
+   "treeVerts": 6045,
+   "actorTrees": 68,
+   "actorKinds": 3,
+   "actorTris": 13559
   },
   "18": {
    "bin": "h18.bin",
    "json": "h18.json",
-   "bytes": 1025479,
-   "sha1": "e74f77de600cbde7bef4c5a1f12336f2bd3b866a",
-   "tris": 36032,
-   "treeTris": 37096,
-   "verts": 22349,
-   "treeVerts": 19665,
-   "actorTrees": 19,
-   "actorKinds": 2,
-   "actorTris": 6514
+   "bytes": 1003109,
+   "sha1": "70b763d8626a95eb3190afb910e0b7042ff34930",
+   "tris": 38756,
+   "treeTris": 33090,
+   "verts": 23826,
+   "treeVerts": 17106,
+   "actorTrees": 59,
+   "actorKinds": 3,
+   "actorTris": 12978
   },
   "19": {
    "bin": "h19.bin",
    "json": "h19.json",
-   "bytes": 837685,
-   "sha1": "47551a1097710ab5dc613070ec8b1ad00282420f",
-   "tris": 19279,
-   "treeTris": 37850,
-   "verts": 11769,
-   "treeVerts": 20152,
-   "actorTrees": 17,
-   "actorKinds": 5,
-   "actorTris": 10217
+   "bytes": 380587,
+   "sha1": "3db8f8d805cbf4b3159c15c7fba2851728b464c3",
+   "tris": 12767,
+   "treeTris": 13378,
+   "verts": 6816,
+   "treeVerts": 6564,
+   "actorTrees": 134,
+   "actorKinds": 6,
+   "actorTris": 37044
   },
   "20": {
    "bin": "h20.bin",
    "json": "h20.json",
-   "bytes": 457181,
-   "sha1": "28fe712077c3086c6af47db47e489ad06416091c",
-   "tris": 22497,
-   "treeTris": 6086,
-   "verts": 13389,
-   "treeVerts": 3475,
-   "actorTrees": 18,
-   "actorKinds": 5,
-   "actorTris": 13181
+   "bytes": 422563,
+   "sha1": "bc1ef2c1be9dcf7da431fbd581f12dd3427bcc10",
+   "tris": 16431,
+   "treeTris": 11732,
+   "verts": 9616,
+   "treeVerts": 6085,
+   "actorTrees": 103,
+   "actorKinds": 6,
+   "actorTris": 30012
   },
   "21": {
    "bin": "h21.bin",
    "json": "h21.json",
-   "bytes": 575831,
-   "sha1": "573b77fdb22915be278cd50c9c02f36aef850cf2",
-   "tris": 14899,
-   "treeTris": 27790,
-   "verts": 8407,
-   "treeVerts": 12729,
-   "actorTrees": 7,
+   "bytes": 642850,
+   "sha1": "e0de2fb578e1aac1e839612f38e771e66f281ad2",
+   "tris": 41096,
+   "treeTris": 2896,
+   "verts": 23944,
+   "treeVerts": 1631,
+   "actorTrees": 125,
+   "actorKinds": 3,
+   "actorTris": 44150
+  },
+  "22": {
+   "bin": "h22.bin",
+   "json": "h22.json",
+   "bytes": 442485,
+   "sha1": "e70dbceee6a1201b32c338f9a253c3533a55615c",
+   "tris": 20071,
+   "treeTris": 9730,
+   "verts": 11732,
+   "treeVerts": 5033,
+   "actorTrees": 71,
+   "actorKinds": 5,
+   "actorTris": 25111
+  },
+  "23": {
+   "bin": "h23.bin",
+   "json": "h23.json",
+   "bytes": 651411,
+   "sha1": "591b4f9ad6798eb656a8727813122ab04b792a92",
+   "tris": 25788,
+   "treeTris": 16446,
+   "verts": 15219,
+   "treeVerts": 11979,
+   "actorTrees": 24,
    "actorKinds": 4,
-   "actorTris": 3585
+   "actorTris": 14171
+  },
+  "24": {
+   "bin": "h24.bin",
+   "json": "h24.json",
+   "bytes": 703527,
+   "sha1": "645a576c9882bb0fad38ef9dedbe280c1dc570b7",
+   "tris": 20807,
+   "treeTris": 27650,
+   "verts": 12675,
+   "treeVerts": 14420,
+   "actorTrees": 82,
+   "actorKinds": 7,
+   "actorTris": 22713
+  },
+  "25": {
+   "bin": "h25.bin",
+   "json": "h25.json",
+   "bytes": 516635,
+   "sha1": "a5c4fa4a015b650c60315fc01169a88b836f4b79",
+   "tris": 19640,
+   "treeTris": 15868,
+   "verts": 11230,
+   "treeVerts": 8758,
+   "actorTrees": 46,
+   "actorKinds": 7,
+   "actorTris": 10837
+  },
+  "26": {
+   "bin": "h26.bin",
+   "json": "h26.json",
+   "bytes": 442379,
+   "sha1": "cd8f36acc21776190302e3e72f255a8597514a50",
+   "tris": 21147,
+   "treeTris": 8652,
+   "verts": 11829,
+   "treeVerts": 4569,
+   "actorTrees": 144,
+   "actorKinds": 6,
+   "actorTris": 42842
+  },
+  "27": {
+   "bin": "h27.bin",
+   "json": "h27.json",
+   "bytes": 511485,
+   "sha1": "851e80ca6241a346a3f7d9fc47373068ded6d5b1",
+   "tris": 30570,
+   "treeTris": 4066,
+   "verts": 17298,
+   "treeVerts": 1983,
+   "actorTrees": 81,
+   "actorKinds": 8,
+   "actorTris": 44902
   }
  },
  "source": {
   "1": {
-   "field": "04c6f095233660beafc82f74435a81b41c84233b",
-   "covers": "96de466efe7120528cb057baadc350ea25b6f9ec",
-   "leaf": "1b3492e74305c76961df74e086e10e8c852c36c3",
-   "actors": "f7c9e86a17b4a89eada7be17e94e8ccfe161e49e"
+   "field": "437980bfe85a5438321dfdfe5141783df326bd81",
+   "covers": "df48d83ad6ff4949548fc9892abf7b6ccc72af91",
+   "leaf": "e023329e77df4d30162a85f497b438a66c8d0342",
+   "actors": "1e033b5a55bee5f88ce945ca2a16a17f388c82b1"
   },
   "2": {
-   "field": "e290fb1a99303f2cdb08c0ac2d364174be1658c3",
-   "covers": "3f1bc53845b8eafafdf5b3fc5b4380da0eb82140",
-   "leaf": "15481a8103a905ac043bfc8caa0cb16848811e34",
-   "actors": "4378d79e20884452fec8233b86cf154836752e33"
+   "field": "46a8596ec6653039688451fd1c8473e63a16851e",
+   "covers": "0e5f1fd5e5914ee4ab5990acc282c711fe356c1a",
+   "leaf": "cb2861671880e2db62e0ef66f3970dc63cad6276",
+   "actors": "dc5c12b650e2fbd06b2185f0b25ae87c141536c3"
   },
   "3": {
-   "field": "8269d83ea0bbe09f9cd3e438437a5a42802398a5",
-   "covers": "8e2c889d250d2cf97d4c7b06846f0cc64704d567",
-   "leaf": "0b6ba056f124bfa841f5283d572723bba4f54699",
-   "water": "a5c55ff4452dea6bdd0725c0ee0ccd4d7b512472",
-   "actors": "a8c00e61e4af953e161579af44219166c6ac1889"
+   "field": "f4d247ed16fa58b8d236130bf94cf380ab62c540",
+   "covers": "60f709c1f596a0726ddc142153bbad084e75914b",
+   "leaf": "3e5cf1f97f54f0bc56913c8aaed77afe3e99643d",
+   "actors": "521fedbc9c71a6cfa5e979f5e53a4d100b7455e2"
   },
   "4": {
-   "field": "d87b70472e0dd55bfcfc6fececc24214addf0fdb",
-   "covers": "1bd972999fe65bbc2df605b51575ec4a7d80fd39",
-   "leaf": "c6d63966b8bbd4d77e7d32d7ca75907e3d94a5de",
-   "actors": "0efc7c698235f738c9286b74d3494c23683bff52"
+   "field": "04b4a0e3f90f0b33be1daf51671e048fee176451",
+   "covers": "9e3ce6c2000aa89e0b342783f72dbbac0a6d9f59",
+   "leaf": "2d9ad4c55d500a2df4dfa7180a5486566a13905d",
+   "actors": "0173229deb5889c56d478c1909af81e715f1380a"
   },
   "5": {
-   "field": "e78244d13489ca35d985ea9b8ea128762a187fff",
-   "covers": "0534f3433417a94c852b6d7e8e27666e80ec4ae1",
-   "leaf": "2beed087b9dece2623cbbfb231dc3a1aa944181e",
-   "actors": "0d8d4d7552a5ef74b7c9c43a253a318f5c4c8fdf"
+   "field": "a1784c18cb2753f9b9df9f24c7e4b2b62d761c79",
+   "covers": "33294ceca08a8ee5e8310fc4ad76b666c6ee9324",
+   "leaf": "663222f46301e45c1bd8ef08805a1e54a86f9ddf",
+   "actors": "3c9c337d1d026e6c35387b37ca192e53ec194726"
   },
   "6": {
-   "field": "f5586ff04f8b8da5ce352600a9d578d69d23b40a",
-   "covers": "729c5e61f2bbe9fd01eee2ea811f902d23763b05",
-   "leaf": "13339b2c33ab08bce1452a8f4bbf755dcef7858e",
-   "actors": "0b722d597324d742e6754316103641072fe9ffa5"
+   "field": "663b9093edbd42965559847b05afc60ab4f3e8c9",
+   "covers": "779c3958589ddf8ac5e55ba893377b740470de80",
+   "leaf": "2da40c3f7875da80698f6383be2a6cb62f944277",
+   "actors": "10689b61d0a4d81725e14a9d3d3937e339e3dca8"
   },
   "7": {
-   "field": "286fbe26f494f5e6af44b6a9aec599766805803c",
-   "covers": "c029a5946fd4a7127844056cac1bfb181f8ab54c",
-   "leaf": "17c6d82b069396ef277abc21a0c50380fe84a2d8",
-   "actors": "fd5f531d195c0ae24fa81450201e863dd2aad1f3"
+   "field": "a347091f44833256ee31533c1e4fa30d2ace3da8",
+   "covers": "6aa4991bf236ef4f410ea089031594269f2b3330",
+   "leaf": "186bef34c3eb1c6f371c82616349f954cca2283f",
+   "actors": "096cd8064ff0f9646751d819e71fd924c541a907"
   },
   "8": {
-   "field": "b6b86cb839b131353b8f9ab220c40dc55bffac91",
-   "covers": "685fb839e8ecf83a81f003f6d50407c828fd00eb",
-   "leaf": "9d76e521d1a08dd2419eac245237dcf8f0c6b584",
-   "actors": "2050d342fb13366f608aab4e080fe0115c0a2f5e"
+   "field": "fa0b83bff2dc5f431a04e93aa172bc107d217642",
+   "covers": "d817b9b81719533170c5b257b55ac963fdc8377c",
+   "leaf": "2d9af6b814605f7cf11b9b37de71590cfab0d2d5",
+   "actors": "7f99e889a266e7689c8e25e436fee343e0fd91ca"
   },
   "9": {
-   "field": "255f0caf642f83e5535b003a5186d8977f74044e",
-   "covers": "5b02b285a806e257f14dbbec3b4e4cd2611862ea",
-   "leaf": "3543c8ccca1444eaad1d33d789fe88d990c61922",
-   "actors": "ad9563028671c4300c783510320a99f0594991c2"
+   "field": "fad16343b210ca755411f06699dae48ce6b8a125",
+   "covers": "bb67f109d7d1f3c1c334d9446275ec8cbb07d897",
+   "leaf": "f459ba32349fbda91c5679c4aeccb8865f31a8b4",
+   "actors": "0be14cd2ec96f7b385adc01ca45258ad2a84f64c"
   },
   "10": {
-   "field": "485c1b4814a30f273a71f6dda389e5ade7f9d69b",
-   "covers": "983cddecb260219bf0f9bdac8d8027295258a456",
-   "leaf": "e0578f871bf9fd8703cdc3e681e69a9164399091",
-   "actors": "ddd4a61da108ff68db8c9fd7c7987c72395057d5"
+   "field": "6d301a82f1aafed68e42cb97f3c6eaebc1baee38",
+   "covers": "46fc57fe9f8cc32f61cfea6a39aebc58b247e959",
+   "leaf": "afe4e8012bd3825cf1f02fbbad412042171c57dd",
+   "actors": "0e472f307a94e3e778b94102d7c2bea9b5bba5b5"
   },
   "11": {
-   "field": "42d304c96035e3e677852596cea4ccc77b213434",
-   "covers": "35e6b19a6c71ae0b7ee0047941c72769af684e61",
-   "leaf": "2618cbb7b952325ce414aabfda492f32b06cb87c",
-   "actors": "e0f7c54d06992328d5b5064c78ee2d17ea7606ec"
+   "field": "724c6976c5c399d9fd86e1291ac669afeff3e142",
+   "covers": "a77b760a0bb3a063b471e471d61df67b83c8ef03",
+   "leaf": "edf55225f3fd38c3857410360e80abd6ff16fd06",
+   "actors": "f647e03d8679a97319349d9b5d056e2e083f789d"
   },
   "12": {
-   "field": "4319516492849fdee2aa43f97082c1b0914449c0",
-   "covers": "3aa8018b4bd34b6011a9493c704b7280350a71bc",
-   "leaf": "dd37e039cd7c662c73916d12ac3e55eb9c3840c4",
-   "actors": "256d24d0dba32b57be6d71b9dcf88b5dfef3a4c7"
+   "field": "038baaddb57feedbdd20c55b222c447fa83a0398",
+   "covers": "69e87cf8630488f069ac216c0bb72bfa7c1e4e6c",
+   "leaf": "aa10b007b3acbade1a6122ab44426fa1e9ce1762",
+   "actors": "4afd46e5c0281bb06747fa1b7a6bfcfea5405be9"
   },
   "13": {
-   "field": "94067b15d562b34b2c25facf9aa1209f29925f74",
-   "covers": "99150fd24d82e6c91a4c01adfa3751eecaa4ff26",
-   "leaf": "40a9617261f94e288e2f6eccaa7451128619449e",
-   "actors": "3ef2e1d7b78438b5c47855e1b52b330ecdaf9699"
+   "field": "f857fda6a3ab4d1740ebbf2249b467659a5c86f9",
+   "covers": "f76dc6ef57f2ab7094a9344332d473da70bf8098",
+   "leaf": "9f5d81302c467fa7c73d7d9b9cd7abe7c2b67201",
+   "actors": "32c19bd4f980d8446cf0ba9b9a68a57b1dcb4a82"
   },
   "14": {
-   "field": "c20c0a68505f6057b2a5f0abd5072e652336d4a3",
-   "covers": "998f7e4dceeaa769d4860dee798dd0f4e802ae77",
-   "leaf": "9375cc93a03bc79a156c1185212f2f8e09ed2d9a",
-   "actors": "b33c7e8d191bc0afd0afa57bdc0cbec5bd8ae58c"
+   "field": "30363282b17ac2a2e6a8d915854b33bc2ca02917",
+   "covers": "e2e1a9305b0bfded9031adcd93784fbbc19260a3",
+   "leaf": "9900d41c0b24cda38bba81b1feb58e979dd04193",
+   "actors": "198e20ea93ff6869cc965f40d6aa75031d4c5169"
   },
   "15": {
-   "field": "a22adcbfb81fac6e82215266dc764a9109a5dd5b",
-   "covers": "c75beabb111a5278094d9b3cb59cddcf014a42ad",
-   "leaf": "9f987e227268b3fcc5c2c88aa773ab9e02e4fc3d",
-   "actors": "b215bc17d9dce85c24520cf9d2e83b2eb00ecdfd"
+   "field": "9414387822459aa3827ced9cd823e6722a3e694a",
+   "covers": "d421660bc466b94b80e5623015bb672a12744199",
+   "leaf": "c5f4c76825b8f61c88043692f08ae92ad2b4b8a8",
+   "actors": "30d4490bb38021fb88f71614bc48baea58b7bd0a"
   },
   "16": {
-   "field": "331d3400f37a3d00bbdb1f235785e6ee75d5f612",
-   "covers": "8379916f73faa7cf813e7b514959a144a870c756",
-   "leaf": "b74fbfc59f463ba2051ce86e76d31b72c6fdf3c6",
-   "actors": "9581961ffe0abdfe4acf94e791cd3520fa77ccb0"
+   "field": "3ab4e1cdfb6babe169430fdc8c38c7a7c40a37c2",
+   "covers": "baa34455e8e83df829c86aa931ba79f84a51c3b3",
+   "leaf": "5b09f622243e9ee7b9b1e53cc748b5ba295c3c0d",
+   "actors": "4a1dfee4bff740f8881ee2a5abe42120e4d39567"
   },
   "17": {
-   "field": "eb1ee9100e65e04e9d898006b77fa1d7d34e7be2",
-   "covers": "1f3d1b334382df0bb63c27da9922fb4bcdf268a2",
-   "leaf": "454979276075f3391eaf49a6ee9525511d49cc37",
-   "actors": "246313862ff2df8118c2e7f4435867531d9db980"
+   "field": "06edbbac09dcb5d5a1a34c4164f26d521fe85c57",
+   "covers": "7b0a7d1774bbf8041a3a3e2770994b7f278836c3",
+   "leaf": "535254215946e888468a3fabe183fb80dea865b8",
+   "actors": "cce898ecd0d123a5cfc34b97171b7de5b1bef132"
   },
   "18": {
-   "field": "318730c9e57ca125aad56dc7919e98a26f6bb799",
-   "covers": "b6690244845c052883f5806a639ed221e8f4d05a",
-   "leaf": "d49b30068212c4a626ca746da35c0596461f72f1",
-   "actors": "4fdbbdb914bba52cb9acab0fc86ef485cbf58a94"
+   "field": "883d932c5a26efdcdb98efcb8bce176291afaf47",
+   "covers": "e7c4dcdb328c5fda6f86ee512d9c4f0d40eda5cb",
+   "leaf": "18f0b4d112f94048e5771aedb6fc24c6e0b9f6a5",
+   "actors": "d84810604833ef7aa52a6878a649a56da97c65d2"
   },
   "19": {
-   "field": "c6eee0aea2a56cc0622503e953d54d67cd256f78",
-   "covers": "2868a62c51692260dd40e38f877e05bacd56918b",
-   "leaf": "487c375fc0972e8ca4b4c3b9f5bbc3565de3b0ba",
-   "actors": "07a616ce1c5f0f88c4cc796e66e72ae6f7af0215"
+   "field": "518ff93d56aeb84631f4e4127704f5bea009b1b3",
+   "covers": "159d9f296e533e3e564c38883f87374157e88e81",
+   "leaf": "0b575808c8b641a9cba41cdeae017c95abb3ef00",
+   "actors": "e7320585994101e539773a2c222ebeba1ed4ce6f"
   },
   "20": {
-   "field": "ee5409475ea95da3bd987fcf968f3936c5088bde",
-   "covers": "1fc9f7f871cca3a4ba4c48b3cadbd568055500bf",
-   "leaf": "c35493e9bac6e8d79512143fd321796b104ff84e",
-   "actors": "b22116dc8f4142c5669f8149d14bb4a6fe3eb66a"
+   "field": "e60ce6164c0cd24366a590ab3fece0eada929611",
+   "covers": "d945930f3844369dd75ed68814c8f8cbe46aaa3c",
+   "leaf": "37daede6f4f9d9b2b7752a53d598c04c2f936632",
+   "actors": "c424a88ca704f6f6401bb189f935eb1118eda68b"
   },
   "21": {
-   "field": "36d2ddc684a3bb63965917e05f0552ac1c674249",
-   "covers": "7abea5cc6750aed91e0a06f893600fc5a90d0eae",
-   "leaf": "01533dff2a2efce909fad80c9f934293397cbfb4",
-   "actors": "b6e48b19a2b5eb978a1205289194f66f4f84a123"
+   "field": "a6dcc5fc24f2bfb885847840d2e7f3e0420845d9",
+   "covers": "33a2f178eeaf0f7189898afaf20e08a682fb6ee9",
+   "leaf": "3673ab6338a4f614fb50b0df682ac6aaed8aea11",
+   "actors": "834c2ab99c2e7ae5d6fc6434b2275bfa789a5448"
   },
-  "trees": "de3ca134829919dc4701f661e6ce5e8c3ac8dabe"
+  "22": {
+   "field": "1763a8dcd7afb034a39f5ab190cf29e3e96b0e12",
+   "covers": "5e0214f9a0c4ddd780b1128a092dc9de64242c29",
+   "leaf": "8da0ecef76ba5a8a5972fc156a79884bc2ad1a8b",
+   "actors": "299b4fad6e9d54b675ba716bbf6f8a8cdd5de23f"
+  },
+  "23": {
+   "field": "b6793d85217df3a99afe541c1808d3c70d5f556a",
+   "covers": "49624ad21edc8758a46bb3c470e199e23d7c00ac",
+   "leaf": "10673d08b4042b17c3143f983b48e87c936dbc27",
+   "actors": "2772d22ba29ac6843795ef13969be2e413d82fcd"
+  },
+  "24": {
+   "field": "0490fabffe9a941737f6a642d77e13ad8bcd62b9",
+   "covers": "3a190b44cc4109c733fab9589319f052aa8e9ecb",
+   "leaf": "921a5d6de2c8165b01ee2ec2803fdbcdcf0d36f4",
+   "actors": "1449d5f921257e30d5e22f59aded87fb10ae7f9b"
+  },
+  "25": {
+   "field": "a5672cfe8d88b8da3b65d585d3f9a4438a3dcd5a",
+   "covers": "0fa720aba86eb351554d5e70b96614f5ac84d5c0",
+   "leaf": "eb447d3fc2f766ec66fb12eb34c6cb55aa43c2b0",
+   "actors": "a9795d7712a93ed3efe68efb410888cc8ab2de63"
+  },
+  "26": {
+   "field": "dec67e0dae313a140e2c1bd2023c44dea05c2412",
+   "covers": "69f58677d6e2429813e5d85339f9644c30302eb7",
+   "leaf": "866a31b986f4062ca81cfd551860aca33cff64ae",
+   "actors": "271ad28a4057150edd4893a5d7cf28da1b67dac6"
+  },
+  "27": {
+   "field": "010224ee84482117ebf7dfaa6bad3284e86b6620",
+   "covers": "56b14b9294fc025f40c0fdde499efa046fd3f6a2",
+   "leaf": "f7f4996fcec137f6c1b67f52c35b7caccc565674",
+   "actors": "bbc9a1534d5964acb2e5781bb9ca2e79ec9eb04d"
+  },
+  "trees": "35dd5e2234bc938e2965e278672e1bd28cc2f597"
  },
  "kinds": {
   "ConiferTreeA": {
-   "shape": "Glf_ConiferTreeAMesh_Col",
+   "shape": "Shape_Obj_Glf_ConiferTreeA_Mesh_Col",
    "nv": 989,
    "nt": 1218,
-   "sha1": "d6c97127569f2e0be4a8c2224330d7a9d66566af",
-   "packSha1": "ffc50c240ba547ba5f6c44d8340a0d754c6cb311"
+   "sha1": "987bf1b22cebd781cb86f4f9ddca5817fac15a41",
+   "packSha1": "6d93f0eb4cc82bfc86bc1b13e64968c268f8a495"
   },
-  "ConiferTreeB": {
-   "shape": "Glf_ConiferTreeBMesh_Col",
-   "nv": 989,
-   "nt": 1218,
-   "sha1": "d6c97127569f2e0be4a8c2224330d7a9d66566af",
-   "packSha1": "3a9c67eb572c6a3d2a8ce624e070c1fbf459223e"
+  "ConiferTreeA_OB": {
+   "shape": "Shape_BGOBJ_Glf_ConiferTreeA_OB_Col",
+   "nv": 155,
+   "nt": 278,
+   "sha1": "5589b2eb233d0ddaec4103389c80ec1a71a47645",
+   "packSha1": "252fbe9ed7593963b94ae7a2a51c1faac5c771cc"
   },
-  "ConiferTreeC": {
-   "shape": "Glf_ConiferTreeCMesh_Col",
-   "nv": 993,
-   "nt": 1235,
-   "sha1": "b43fd1ae0d3f2b4480df2fa01ac5fa9604a17cf1",
-   "packSha1": "424084672ead421501a6c7155a7694aca3f0086d"
-  },
-  "ConiferTreeD": {
-   "shape": "Glf_ConiferTreeDMesh_Col",
-   "nv": 993,
-   "nt": 1235,
-   "sha1": "b43fd1ae0d3f2b4480df2fa01ac5fa9604a17cf1",
-   "packSha1": "ea64abdd24ce426d6f9b03829af5c52ff18112f3"
+  "ConiferTreeB_OB": {
+   "shape": "Shape_BGOBJ_Glf_ConiferTreeB_OB_Col",
+   "nv": 155,
+   "nt": 278,
+   "sha1": "ad6cfe3587d25c06b10c1dc076fc442b5841d5ca",
+   "packSha1": "66724bd2b3d59f863246825c4f8bdaf70c613634"
   },
   "HardWoodA": {
-   "shape": "Glf_Mesh_HardWoodA_Col",
+   "shape": "Shape_Obj_Glf_HardWoodA_Mesh_Col",
    "nv": 174,
    "nt": 318,
-   "sha1": "8975002dbe4aa1285e3bdaa7c3709896c6d7ee34",
-   "packSha1": "a47826681d8b7cba0ba9338e65b423be56ca7f30"
+   "sha1": "37360ce2f0f5050c2449d606050908043078d1e2",
+   "packSha1": "5c721a811e87a9f370e406b554f278f18400c82a"
   },
-  "HardWoodB": {
-   "shape": "Glf_Mesh_HardWoodB_Col",
-   "nv": 205,
-   "nt": 377,
-   "sha1": "2cafcc14e527288495e5c305987565dd1453b179",
-   "packSha1": "1598801102ce587c160ec7f7a0dc194184a2f532"
+  "HardWoodA_OB": {
+   "shape": "Shape_BGOBJ_Glf_HardWoodA_OB_Col",
+   "nv": 82,
+   "nt": 138,
+   "sha1": "42929aeb0994140fa889413ddc694bdc51ab8c7f",
+   "packSha1": "fcf31512f4cee90d06ad70963a318b7ade4a9b4f"
   },
-  "HardWoodC": {
-   "shape": "Glf_Mesh_HardWoodC_Col",
-   "nv": 182,
-   "nt": 334,
-   "sha1": "d68c8fc9c6dc9b41088d60b761a4ac6bdd6775e5",
-   "packSha1": "c153267971e89bd03d537bfcf155700398722cf7"
-  },
-  "HardWoodD": {
-   "shape": "Glf_Mesh_HardWoodD_Col",
-   "nv": 182,
-   "nt": 334,
-   "sha1": "e9e4f4bf5c24f304036a8a0664af7f25820e6f72",
-   "packSha1": "5a63af89feb28ac8d192e20c0e3389cc08b8a24a"
+  "HardWoodB_OB": {
+   "shape": "Shape_BGOBJ_Glf_HardWoodB_OB_Col",
+   "nv": 113,
+   "nt": 197,
+   "sha1": "9e1619eadb3d304861fa4dffef05f61fd0327880",
+   "packSha1": "742649b49f615b4461c67fb452d64390fb8f2c5c"
   },
   "PalmTreeA": {
-   "shape": "Glf_Mesh_PalmTreeA_Col",
+   "shape": "Shape_Obj_Glf_PalmTreeA_Mesh_Col",
    "nv": 351,
    "nt": 746,
-   "sha1": "98111754b3e01e98a51a14a5fca6183c9c12f0d1",
-   "packSha1": "76b3ed791cdc9a21564d8d49e0a1361b9bc540a2"
+   "sha1": "6a2f252558afdb113809881a747ab2751336c9f2",
+   "packSha1": "5035b8e449d87e4dcb01ce1f2b7e4d67c7ef6151"
+  },
+  "PalmTreeA_OB": {
+   "shape": "Shape_BGOBJ_Glf_PalmTreeA_OB_Col",
+   "nv": 88,
+   "nt": 160,
+   "sha1": "774ebac13f0e005749bbaf61c784234d3d02f936",
+   "packSha1": "737f489fa819dc5954890cf9163b3fd8a27dfaae"
   },
   "PalmTreeB": {
-   "shape": "Glf_Mesh_PalmTreeB_Col",
+   "shape": "Shape_Obj_Glf_PalmTreeB_Mesh_Col",
    "nv": 351,
    "nt": 746,
-   "sha1": "a56edc27752ecfe90a0b463f95f175449a89f731",
-   "packSha1": "af60730bb929bedcd0cfe6cb912b2fe3c7a03e61"
+   "sha1": "f1ae39131d1c22198b8eee1c2eca1472f335cc5c",
+   "packSha1": "f72471317c9f2df9794b57b41e5834f96eeae41f"
   }
  }
 }

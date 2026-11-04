@@ -1,7 +1,7 @@
 // The NSS (Nintendo Switch Sports) course data the app and its generators use,
 // exported from the git-ignored eden dump into three small committed files:
 //
-//   node tools/nss-export.mjs [--src tools/harness/state/eden/nss-golf-x] [--out-dir tools]
+//   node tools/nss-export.mjs [--src tools/harness/state/eden/nss-golf-x] [--out-dir tools] [--game "NSS 1.5.0"]
 //
 //   tools/nss-registration.json  per hole the NSS world -> map similarity (px = a*x - b*z + tx,
 //                                py = b*x + a*z + ty; pins.json's tree fit, copied at full
@@ -47,6 +47,22 @@
 // 0.40-0.77 px off on 13 holes); a standing x or ball the platform's collision mat does not
 // cover; slots.json's ball offset not one magnitude to either side, or its mats or bones not
 // the platform's; a WSR spot match the decoder did not make; H3 without its sea.
+//
+// The same schema serves Switch Sports Resort (SR: holes numbered 1-27, NSS's physics). Point --src at the SR dump (the assembler's
+// sr-golf-x: the NSS dump's layout plus a registration.json) and give --game a label for the three files' `source.game`.
+//  - The hole list is the dump's pins.json holes, 1..N in a row.
+//  - With a registration.json beside pins.json (the SR dump) a hole's frame is that file's entry, copied at full precision and checked
+//    against pins.json's transform and mesh origin: NSS's tree fit where SR shares NSS's capture area, the exact layout frame where it
+//    does not (17, 23, the new holes: residuals and fit fields null, points 0).
+//  - wsr-pins.json is read through the dump's `nssHole` (SR 23 = NSS 20, 24 = 19, 25 = 21; the hole's own number in the NSS dump). A
+//    hole without one (SR 19, 20, 21, 22, 26, 27) has no WSR start or spots: tees.wsrStart null, wsr and nearestWsr null,
+//    ydFromWsrStart = ydFromTeeObj. A WSR start's map x / y are wsr-pins.json's where the hole's map frame is WSR's / NSS's (and must
+//    agree with the registration to 0.1 px), and go through the registration where SR's frame is its own (17, 23).
+//  - The SR dump's ydFromWsrStart is the GlfTeeOBJ distance (its ydFromWsrStartNote) and it carries no decoder WSR-spot match: those two
+//    cross-checks run on the NSS dump only. Its platform.json map.slots go through the same registration (0.00 px against the 0.8 px
+//    check), so only the 1e-4 m world check of the slots is independent there.
+//  - A cover is a 20-triangle fan about the cup's hub, or the two-ring disc of SR 27's cup 0 (60 triangles, the same fan inside).
+//  - H3's sea is its own actor in the NSS dump (h03-water) and part of the field mesh in SR's, which is checked to hold water instead.
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -55,11 +71,12 @@ import { nssToMap, nssToPx, mapToNss, meshToNss, nssToMesh, bearingOf, platformT
 import { loadCollision, loadObject, gridIndex, topGround, GROUND_CODES, NSS_CODES } from "./lib/nsscol.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
-const opt = { src: join(ROOT, "tools/harness/state/eden/nss-golf-x"), outDir: join(ROOT, "tools") };
+const opt = { src: join(ROOT, "tools/harness/state/eden/sr-golf-x"), outDir: join(ROOT, "tools"), game: "Switch Sports Resort 1.0.0" };   // the SR dump since 2026-11-04 (NSS: --src tools/harness/state/eden/nss-golf-x --game "NSS 1.5.0")
 const argv = process.argv.slice(2);
 for (let i = 0; i < argv.length; i++) {
   if (argv[i] === "--src") opt.src = resolve(argv[++i]);
   else if (argv[i] === "--out-dir") opt.outDir = resolve(argv[++i]);
+  else if (argv[i] === "--game") opt.game = argv[++i];
   else { console.error(`unknown argument ${argv[i]}`); process.exit(1); }
 }
 const COL = join(opt.src, "collision");
@@ -80,6 +97,9 @@ const PLAT = readJson(join(opt.src, "platform.json"));
 const SLOTS = readJson(join(opt.src, "slots.json"));
 const WSRP = readJson(join(ROOT, "tools/wsr-pins.json"));
 const P = PINS.json, PL = PLAT.json, SL = SLOTS.json, W = WSRP.json;
+// the SR dump's map frames (registration.json); the NSS dump has none: its frames are pins.json's tree fits
+const REGSRC = existsSync(join(opt.src, "registration.json")) ? readJson(join(opt.src, "registration.json")) : null;
+const RG = REGSRC?.json, SR = RG != null;
 
 // ---- the platform's own frame (the same on every hole) ---------------------
 const TIERS = ["low", "high"];
@@ -136,13 +156,28 @@ const WSR_MATCH_YD = 0.3, COVER_MM = 4, SLOT_MAP_PX = 0.8;
 const FRAME_MARGIN_M = 25;   // the ground index reaches this far past the map frame
 let surfUp = [Infinity, -Infinity];
 const slotSummary = [], ties = [];
-for (let n = 1; n <= 21; n++) {
-  const key = pad2(n), h = P.holes[key], ph = PL.perHole[key], wh = W.holes[String(n)];
-  if (!h || !ph || !wh) { refuse(`H${n}: missing in pins.json, platform.json or wsr-pins.json`); continue; }
+const HOLES = Object.keys(P.holes).map(Number).sort((p, q) => p - q);
+if (HOLES.some((n, i) => n !== i + 1)) refuse(`pins.json holes ${HOLES}: not 1..${HOLES.length} in a row`);
+for (const n of HOLES) {
+  const key = pad2(n), h = P.holes[key], ph = PL.perHole[key];
+  // the WSR hole this one is (wsr-pins.json: its start and spots): the same number in the NSS dump; in the SR dump `nssHole`
+  // (SR 23 = 20, 24 = 19, 25 = 21), null on a hole new in SR
+  const wsrN = h && "nssHole" in h ? h.nssHole : n, wh = wsrN == null ? null : W.holes[String(wsrN)];
+  if (!h || !ph || (wsrN != null && !wh)) { refuse(`H${n}: missing in pins.json, platform.json or wsr-pins.json`); continue; }
   const t = h.transform, m = t.toWsrMesh;
   if (t.flip !== false) refuse(`H${n}: transform flipped`);
   if (h.par !== h.parApp) refuse(`H${n}: par ${h.par} against the app's ${h.parApp}`);
-  const reg = {
+  // the SR dump's frame: registration.json's entry as it is, which must agree with the transform pins.json carries
+  const rr = RG?.holes?.[String(n)];
+  if (SR && !rr) { refuse(`H${n}: no registration.json entry`); continue; }
+  if (rr && (["a", "b", "tx", "ty"].some((k) => !(Math.abs(rr[k] - t[k]) <= 1e-9)) || rr.unitsPerM !== 10 || rr.nssHole !== h.nssHole ||
+    rr.originMesh[0] !== m.originMesh[0] || rr.originMesh[1] !== m.originMesh[1] || rr.originMeshY !== m.originMeshY)) refuse(`H${n}: registration.json disagrees with pins.json's transform, mesh origin or nssHole`);
+  const reg = rr ? {
+    a: rr.a, b: rr.b, tx: rr.tx, ty: rr.ty,
+    residualPx: rr.residualPx, residualYd: rr.residualYd, maxPx: rr.maxPx, points: rr.points, pointsKind: rr.pointsKind,
+    ydPerPxFit: rr.ydPerPxFit, unitsPerM: 10, unitsPerMFit: rr.unitsPerMFit, rotDegFit: rr.rotDegFit,
+    originMesh: [rr.originMesh[0], rr.originMesh[1]], originMeshY: rr.originMeshY,
+  } : {
     a: t.a, b: t.b, tx: t.tx, ty: t.ty,
     residualPx: t.residualPx, residualYd: t.residualYd, maxPx: t.maxPx, points: t.points, pointsKind: t.pointsKind,
     ydPerPxFit: t.ydPerPxFit, unitsPerM: 10, unitsPerMFit: m.unitsPerM, rotDegFit: m.rotDeg,
@@ -153,7 +188,8 @@ for (let n = 1; n <= 21; n++) {
   // collision: field + covers + the sea where it is its own actor (H3), a ground
   // index over the map frame (the sea plane runs ~16 km out)
   const col = loadCollision(COL, n, { covers: true, extras: ["water"] });
-  if (n === 3 && col.missing.length) refuse(`H3: no collision/h03-water.json + .bin (H3's sea, Object_BGOBJ_GolfCourse03Water)`);
+  if (n === 3 && !SR && col.missing.length) refuse(`H3: no collision/h03-water.json + .bin (H3's sea, Object_BGOBJ_GolfCourse03Water)`);
+  if (n === 3 && SR && !col.surface.some((c) => c === 8)) refuse(`H3: no GolfWaterhazard triangle in the field mesh (SR's sea is part of it)`);
   COLSHA[n] = col.sha1;
   const corners = [[0, 0], [1, 0], [0, 1], [1, 1]].map(([fx, fy]) => mapToNss(reg, fx, fy));
   const frame = [Math.min(...corners.map((c) => c[0])) - FRAME_MARGIN_M, Math.min(...corners.map((c) => c[1])) - FRAME_MARGIN_M,
@@ -167,46 +203,52 @@ for (let n = 1; n <= 21; n++) {
   if (!rot || !tee) { refuse(`H${n}: no Glf_RotateOBJ / GlfTeeOBJ bone`); continue; }
   for (const b of [rot, tee]) if (b.rot[0] !== 0 || b.rot[2] !== 0) refuse(`H${n}: ${b.actor} rotation ${b.rot} is not a pure yaw`);
   const yawDegOf = (b) => (b.rot[1] * 180) / Math.PI;
-  const s0 = wh.starts?.[0];
-  if (!s0) { refuse(`H${n}: wsr-pins.json has no start`); continue; }
-  const wsrWorld = meshToNss(reg, s0.mesh);
+  const s0 = wh ? wh.starts?.[0] : null;
+  if (wh && !s0) { refuse(`H${n}: wsr-pins.json has no start`); continue; }
+  const wsrWorld = s0 ? meshToNss(reg, s0.mesh) : null;
+  // its map x / y: wsr-pins.json's where the hole's map frame is WSR's / NSS's (they must agree with the registration to 0.1 px, which
+  // also ties the WSR hole to this one), through the registration in SR's own frame (SR 17, 23)
+  const wsrMap = s0 ? nssToMap(reg, wsrWorld[0], wsrWorld[2]) : null, ownFrame = rr != null && rr.sameCaptureAreaAsNss !== true;
+  if (s0 && !ownFrame) { const d = Math.sqrt(((wsrMap.x - s0.x) * 250) ** 2 + ((wsrMap.y - s0.y) * 304) ** 2); if (d > 0.1) refuse(`H${n}: wsr-pins.json start ${s0.x},${s0.y} is ${d.toFixed(2)} px from the registration's ${wsrMap.x.toFixed(5)},${wsrMap.y.toFixed(5)}`); }
   const teeEntry = (b) => { const p = nssToMap(reg, b.world[0], b.world[2]); return { world: b.world.map(f4), yawDeg: f4(yawDegOf(b)), x: f5(p.x), y: f5(p.y) }; };
   const tees = {
     rotateObj: teeEntry(rot),
     teeObj: teeEntry(tee),
-    wsrStart: { world: wsrWorld.map(f4), mesh: s0.mesh, x: s0.x, y: s0.y },
+    wsrStart: s0 ? { world: wsrWorld.map(f4), mesh: s0.mesh, x: ownFrame ? f5(wsrMap.x) : s0.x, y: ownFrame ? f5(wsrMap.y) : s0.y } : null,
   };
 
   // cups
   const cups = h.cups.slice().sort((p, q) => p.k - q.k);
   if (cups.length !== 6 || cups.some((c, i) => c.k !== i)) { refuse(`H${n}: ${cups.length} cups (k ${cups.map((c) => c.k)}), not six k = 0..5`); continue; }
-  const spots = (wh.spots || []).map((s) => ({ id: `s${s.slots[0]}`, label: s.label, w: meshToNss(reg, s.mesh) }));
+  const spots = (wh?.spots || []).map((s) => ({ id: `s${s.slots[0]}`, label: s.label, w: meshToNss(reg, s.mesh) }));
   const cupOut = [];
   for (const c of cups) {
     const [bx, by, bz] = c.world;
     const cv = col.covers.find((q) => q.k === c.k);
     if (!cv) { refuse(`H${n} c${c.k}: no cover`); continue; }
-    // the hub of the cover's fan: the vertex all 20 of its triangles share
+    // the hub of the cover's fan: the vertex all 20 of a plain cover's triangles share; SR 27's cup 0 is a two-ring disc (60 triangles),
+    // its hub the vertex of the inner 20-triangle fan
     const cnt = new Map();
     for (let tr = cv.tri0; tr < cv.tri1; tr++) for (let e = 0; e < 3; e++) { const v = col.tris[tr * 3 + e]; cnt.set(v, (cnt.get(v) || 0) + 1); }
     const [hub, hubN] = [...cnt.entries()].sort((p, q) => q[1] - p[1] || p[0] - q[0])[0];
     const hx = col.verts[hub * 3], hy = col.verts[hub * 3 + 1], hz = col.verts[hub * 3 + 2];
     const dMm = dist2(hx, hz, bx, bz) * 1000;
-    if (hubN !== cv.tri1 - cv.tri0 || dMm > COVER_MM) refuse(`H${n} c${c.k}: cover hub ${dMm.toFixed(2)} mm from the bone (${hubN} of ${cv.tri1 - cv.tri0} triangles)`);
+    if (hubN !== 20 || (cv.tri1 - cv.tri0 !== 20 && cv.tri1 - cv.tri0 !== 60) || dMm > COVER_MM) refuse(`H${n} c${c.k}: cover hub ${dMm.toFixed(2)} mm from the bone (${hubN} of ${cv.tri1 - cv.tri0} triangles)`);
     const top = groundAt(bx, bz);
     if (!top || top.tri < cv.tri0 || top.tri >= cv.tri1) { refuse(`H${n} c${c.k}: the top ground over the bone is not its cover (${top ? `${NSS_CODES[top.code]} tri ${top.tri}` : "none"})`); continue; }
     const surfaceY = top.y;
     surfUp = [Math.min(surfUp[0], surfaceY - by), Math.max(surfUp[1], surfaceY - by)];
     const mp = nssToMap(reg, bx, bz);
     if (Math.abs(mp.x - c.map[0]) > 1.5e-5 || Math.abs(mp.y - c.map[1]) > 1.5e-5) refuse(`H${n} c${c.k}: map ${mp.x},${mp.y} against pins.json's ${c.map}`);
-    const ydWsr = dist2(bx, bz, wsrWorld[0], wsrWorld[2]) / M_PER_YD;
     const ydTee = dist2(bx, bz, tee.world[0], tee.world[2]) / M_PER_YD;
-    if (Math.abs(ydWsr - c.ydFromWsrStart) > 0.06 || Math.abs(ydTee - c.ydFromGlfTeeOBJ) > 0.06) refuse(`H${n} c${c.k}: ${ydWsr} / ${ydTee} yd against pins.json's ${c.ydFromWsrStart} / ${c.ydFromGlfTeeOBJ}`);
+    // no WSR start (a hole new in SR): the GlfTeeOBJ distance stands in; the SR dump's own ydFromWsrStart is that distance too
+    const ydWsr = wsrWorld ? dist2(bx, bz, wsrWorld[0], wsrWorld[2]) / M_PER_YD : ydTee;
+    if (Math.abs((c.ydFromWsrStartNote ? ydTee : ydWsr) - c.ydFromWsrStart) > 0.06 || Math.abs(ydTee - c.ydFromGlfTeeOBJ) > 0.06) refuse(`H${n} c${c.k}: ${ydWsr} / ${ydTee} yd against pins.json's ${c.ydFromWsrStart} / ${c.ydFromGlfTeeOBJ}`);
     let near = null;
     for (const s of spots) { const d = dist2(bx, bz, s.w[0], s.w[2]) / M_PER_YD; if (!near || d < near.yd) near = { id: s.id, label: s.label, yd: d }; }
     const wsr = near && near.yd <= WSR_MATCH_YD ? near.id : null;
     const decoderWsr = c.nearestWsrSpot && c.nearestWsrSpot.distYd <= WSR_MATCH_YD ? c.nearestWsrSpot.id : null;
-    if (wsr !== decoderWsr) refuse(`H${n} c${c.k}: WSR spot ${wsr} against the decoder's ${decoderWsr}`);
+    if (!SR && wsr !== decoderWsr) refuse(`H${n} c${c.k}: WSR spot ${wsr} against the decoder's ${decoderWsr}`);
     cupOut.push({
       k: c.k, x: f5(mp.x), y: f5(mp.y), difficult: c.difficult === true,
       world: c.world.map(f4),
@@ -300,20 +342,25 @@ function fmt(v, ind = "") {
   if (Array.isArray(v)) return `[\n${v.map((e) => next + fmt(e, next)).join(",\n")}\n${ind}]`;
   return `{\n${Object.entries(v).map(([k, e]) => `${next}${JSON.stringify(k)}: ${fmt(e, next)}`).join(",\n")}\n${ind}}`;
 }
-const GAME = "NSS 1.5.0";
+const GAME = opt.game;
+const SR_NOTES = !SR ? {} : {
+  reg: " Switch Sports Resort dump (holes are SR's 1-27): each entry is the dump's registration.json entry at full precision. Where SR shares NSS's minimap capture area (SR 1-16, 18, 24 = NSS 19, 25 = NSS 21: 19 holes) it is NSS's own tree fit (pointsKind trees); on SR 17, SR 23 (= NSS 20, with a new tee) and the new holes (SR 19, 20, 21, 22, 26, 27) the capture area is SR's own and the frame is the exact layout frame (pointsKind exact-layout, points 0: no tree fit, so residualPx, residualYd, maxPx, unitsPerMFit and rotDegFit are null). originMesh / originMeshY are NSS's (= WSR's KCL frame) on SR 1-18, 23, 24 and 25 and the placeholder [0, 0] / 0 on the new holes, which have no WSR mesh: `mesh` there is 10 x NSS metres.",
+  pins: " Switch Sports Resort dump (holes are SR's 1-27; difficult = AnnaGolfFieldParam OfficialScene HoleParams[n - 1].CupDifficulties[k]): SR 23 (cup bones GolfCourse20holeK), 24 and 25 are NSS 20, 19 and 21, taking the WSR start and spots of WSR holes 20, 19 and 21 (SR 23's tee is far behind WSR 20's start, so its ydFromWsrStart is the old hole's distance: the app reads ydFromTeeObj); the new holes (SR 19, 20, 21, 22, 26, 27) have no WSR data: tees.wsrStart null, wsr and nearestWsr null, ydFromWsrStart = ydFromTeeObj. SR 27's cup 0 cover is a two-ring disc (60 triangles), its hub the vertex of the inner 20-triangle fan. x / y are in SR's own map frame on SR 17, 23 and the new holes (nss-registration.json).",
+  plat: " Switch Sports Resort dump (holes are SR's 1-27): the platform's rule (tiers incl. mats and rim heights, standingX, slotsLocal, slotRule, tierOffset, ballOffsetM) equals NSS's file's, SR's deck collision files being re-exported (other SHA-1s) with the same mats (checked here at every standing x and ball); per hole the origin and yaw are SR's Glf_RotateOBJ bone, so SR 23's platform stands at its new tee; map x / y are in SR's own frame on SR 17, 23 and the new holes (nss-registration.json); decoderMapSlots / decoderMaxPx are the dump assembler's own points through that same registration (about 0 px), not an independent decode.",
+};
 const outReg = {
-  _note: "NSS world -> the app's map frame per hole, and NSS -> WSR KCL mesh units. NSS world: metres, y up, -z toward the green, one frame per hole, y 0 = the WSR player start's height (public/terrain's datum). Map: the 250x304 minimap, px = a*x - b*z + tx, py = b*x + a*z + ty (fractions = px/250, py/304; no flip). a, b, tx, ty: the tree fit of pins.json (NSS tree bones on WSR's PMP trees), copied at full precision; residualPx/residualYd/maxPx over its `points` matched trees; ydPerPxFit = 1 / (sqrt(a^2+b^2) * 0.9144). Mesh: [X, Y, Z] = unitsPerM * [x, y, z] + [originMesh[0], originMeshY, originMesh[1]], unitsPerM 10 (the fit's own unitsPerMFit 9.9979-10.0002 and rotDegFit are kept for audit). One transform for the cups, the platform, the tees and course3d (INTEGRATION.md D1). Read with tools/lib/nssreg.mjs. Generated by tools/nss-export.mjs.",
-  source: { game: GAME, pinsJsonSha1: PINS.sha1 },
+  _note: "NSS world -> the app's map frame per hole, and NSS -> WSR KCL mesh units. NSS world: metres, y up, -z toward the green, one frame per hole, y 0 = the WSR player start's height (public/terrain's datum). Map: the 250x304 minimap, px = a*x - b*z + tx, py = b*x + a*z + ty (fractions = px/250, py/304; no flip). a, b, tx, ty: the tree fit of pins.json (NSS tree bones on WSR's PMP trees), copied at full precision; residualPx/residualYd/maxPx over its `points` matched trees; ydPerPxFit = 1 / (sqrt(a^2+b^2) * 0.9144). Mesh: [X, Y, Z] = unitsPerM * [x, y, z] + [originMesh[0], originMeshY, originMesh[1]], unitsPerM 10 (the fit's own unitsPerMFit 9.9979-10.0002 and rotDegFit are kept for audit). One transform for the cups, the platform, the tees and course3d (INTEGRATION.md D1). Read with tools/lib/nssreg.mjs. Generated by tools/nss-export.mjs." + (SR_NOTES.reg ?? ""),
+  source: { game: GAME, pinsJsonSha1: PINS.sha1, ...(SR ? { registrationJsonSha1: REGSRC.sha1 } : {}) },
   holes: REG,
 };
 const outPins = {
-  _note: `NSS's six cups per hole (bones GolfCourseNNholeK of the course model Fld_GolfCourseNN, k = 0..5: the cup bottoms), from the eden dump through tools/nss-registration.json. x, y = map fractions; world = the bone, NSS metres; surfaceY = the green surface over the cup (the top of HoleCover k, the plug that closes cup k while another is in play; ${surfUp[0].toFixed(3)}-${surfUp[1].toFixed(3)} m above the bone; the game sets the flag pin at bone + 0.30), surfaceYd = it in yd above the datum (NSS y 0 = the WSR start's height); mesh = WSR KCL units at the surface; difficult = GolfFieldMgrParam HoleParams[hole-1].CupDifficulties[k] (the game leaves those out of some draws); ydFromWsrStart / ydFromTeeObj = the flat distance from the WSR start / the GlfTeeOBJ bone; nearestWsr = the nearest WSR pin spot (tools/wsr-pins.json, id s<slot>) and wsr = its id when it is within 0.3 yd (the same spot). cover.hub = the centre vertex of the cover's 20-triangle fan, dxzMm its offset from the bone (the collision's vertices sit on a 1/512 m grid). tees: Glf_RotateOBJ (where the online platform stands), GlfTeeOBJ (the local tee bone) and the WSR start (the app's tee for now). Generated by tools/nss-export.mjs.`,
-  source: { game: GAME, pinsJsonSha1: PINS.sha1, wsrPinsSha1: WSRP.sha1, collisionSha1: COLSHA },
+  _note: `NSS's six cups per hole (bones GolfCourseNNholeK of the course model Fld_GolfCourseNN, k = 0..5: the cup bottoms), from the eden dump through tools/nss-registration.json. x, y = map fractions; world = the bone, NSS metres; surfaceY = the green surface over the cup (the top of HoleCover k, the plug that closes cup k while another is in play; ${surfUp[0].toFixed(3)}-${surfUp[1].toFixed(3)} m above the bone; the game sets the flag pin at bone + 0.30), surfaceYd = it in yd above the datum (NSS y 0 = the WSR start's height); mesh = WSR KCL units at the surface; difficult = GolfFieldMgrParam HoleParams[hole-1].CupDifficulties[k] (the game leaves those out of some draws); ydFromWsrStart / ydFromTeeObj = the flat distance from the WSR start / the GlfTeeOBJ bone; nearestWsr = the nearest WSR pin spot (tools/wsr-pins.json, id s<slot>) and wsr = its id when it is within 0.3 yd (the same spot). cover.hub = the centre vertex of the cover's 20-triangle fan, dxzMm its offset from the bone (the collision's vertices sit on a 1/512 m grid). tees: Glf_RotateOBJ (where the online platform stands), GlfTeeOBJ (the local tee bone) and the WSR start (the app's tee for now). Generated by tools/nss-export.mjs.` + (SR_NOTES.pins ?? ""),
+  source: { game: GAME, pinsJsonSha1: PINS.sha1, wsrPinsSha1: WSRP.sha1, collisionSha1: COLSHA, ...(SR ? { registrationJsonSha1: REGSRC.sha1 } : {}) },
   holes: PINOUT,
 };
 const outPlat = {
-  _note: "The online tee platform (Survival Golf), decoded from NSS: the actors Object_BGOBJ_GlfStartObj (low tier) and ...High (high tier) posed at the course bone Glf_RotateOBJ, world = origin + Ry(yawDeg) * local with Ry = [[cos,0,sin],[0,1,0],[-sin,0,cos]] and yawDeg the bone's own Euler Y. Platform-local: +z forward (toward the green), +y up, +x the player's LEFT. Slot bones GlfTeeOBJ_1..4 (low, local z +2.0) and _5..8 (high, z -1.5) at x -3.45, -1.15, +1.15, +3.45 m = sides R2, R1, L1, L2; with an odd number of players on a tier a player stands midway between two adjacent bones (x -2.3, 0, +2.3), so standingX lists every x the game uses, from the player's left to the right (which x a player takes for each player count: the eden dump's slots.json, not shipped here). holes[n].tiers.low/high: those 7 positions in that order (fromLeft 0..6). Each position is a STANCE, where the golfer stands (slots.json `stand`): its bone(s), world (NSS metres, y = the mat), x/y map fractions (tools/nss-registration.json), z = the mat in yd above the datum (NSS y 0 = the WSR start's height = public/terrain's datum; the mats are 0.0996 / 1.668 m up, the deck's 0.117 / 1.686 m faces are only its bevelled rim), and groundZ / groundCode / ground = the NSS field collision's top ground under the stance (yd above the datum; null where none). Its `ball` is the tee spot, the ball's start: rightHanded / leftHanded = the stance moved along platform-local x by ballOffsetM (applied before the platform transform: a right-hander's ball 0.9 m to his right, a left-hander's 0.9 m to his left; main 0x2ef29f0 / 0x2ef29fc, slots.md section 5; that this point is the GolfBall's start is inferred there, not yet seen in RAM), each with its localX, world, x/y, z (the mat under the ball, the contact height) and the ground under the ball, which can differ from the stance's (H1: the stance at -2.3 is over fairway, its right-handed ball over GolfOB). facingDeg = the map bearing (north-up, clockwise) of the platform's local +z, the row's orientation (it orders L2 .. R2 and puts the high tier behind the low), not the start aim; forward = local +z as a world (x, z) direction. startFacingDeg = the map bearing of GlfTeeOBJ's local +z (its yaw startYawDeg): the golfer's start rotation in platform mode is the course GlfTeeOBJ's, not the platform's (eden verify/slots-verdicts.json), up to 10 deg off facingDeg. slots = the 8 bones in bone order (i 0-7) with their sides (stances); centre = local x 0 per tier (stance); localTee = GlfTeeOBJ. decoderMapSlots = platform.json's own map points (its tree-ICP + mesh-registration path, decoderMaxPx from these). Generated by tools/nss-export.mjs.",
-  source: { game: GAME, platformJsonSha1: PLAT.sha1, slotsJsonSha1: SLOTS.sha1, pinsJsonSha1: PINS.sha1, objectsSha1: OBJ_SHA, collisionSha1: COLSHA },
+  _note: "The online tee platform (Survival Golf), decoded from NSS: the actors Object_BGOBJ_GlfStartObj (low tier) and ...High (high tier) posed at the course bone Glf_RotateOBJ, world = origin + Ry(yawDeg) * local with Ry = [[cos,0,sin],[0,1,0],[-sin,0,cos]] and yawDeg the bone's own Euler Y. Platform-local: +z forward (toward the green), +y up, +x the player's LEFT. Slot bones GlfTeeOBJ_1..4 (low, local z +2.0) and _5..8 (high, z -1.5) at x -3.45, -1.15, +1.15, +3.45 m = sides R2, R1, L1, L2; with an odd number of players on a tier a player stands midway between two adjacent bones (x -2.3, 0, +2.3), so standingX lists every x the game uses, from the player's left to the right (which x a player takes for each player count: the eden dump's slots.json, not shipped here). holes[n].tiers.low/high: those 7 positions in that order (fromLeft 0..6). Each position is a STANCE, where the golfer stands (slots.json `stand`): its bone(s), world (NSS metres, y = the mat), x/y map fractions (tools/nss-registration.json), z = the mat in yd above the datum (NSS y 0 = the WSR start's height = public/terrain's datum; the mats are 0.0996 / 1.668 m up, the deck's 0.117 / 1.686 m faces are only its bevelled rim), and groundZ / groundCode / ground = the NSS field collision's top ground under the stance (yd above the datum; null where none). Its `ball` is the tee spot, the ball's start: rightHanded / leftHanded = the stance moved along platform-local x by ballOffsetM (applied before the platform transform: a right-hander's ball 0.9 m to his right, a left-hander's 0.9 m to his left; main 0x2ef29f0 / 0x2ef29fc, slots.md section 5; that this point is the GolfBall's start is inferred there, not yet seen in RAM), each with its localX, world, x/y, z (the mat under the ball, the contact height) and the ground under the ball, which can differ from the stance's (H1: the stance at -2.3 is over fairway, its right-handed ball over GolfOB). facingDeg = the map bearing (north-up, clockwise) of the platform's local +z, the row's orientation (it orders L2 .. R2 and puts the high tier behind the low), not the start aim; forward = local +z as a world (x, z) direction. startFacingDeg = the map bearing of GlfTeeOBJ's local +z (its yaw startYawDeg): the golfer's start rotation in platform mode is the course GlfTeeOBJ's, not the platform's (eden verify/slots-verdicts.json), up to 10 deg off facingDeg. slots = the 8 bones in bone order (i 0-7) with their sides (stances); centre = local x 0 per tier (stance); localTee = GlfTeeOBJ. decoderMapSlots = platform.json's own map points (its tree-ICP + mesh-registration path, decoderMaxPx from these). Generated by tools/nss-export.mjs." + (SR_NOTES.plat ?? ""),
+  source: { game: GAME, platformJsonSha1: PLAT.sha1, slotsJsonSha1: SLOTS.sha1, pinsJsonSha1: PINS.sha1, objectsSha1: OBJ_SHA, collisionSha1: COLSHA, ...(SR ? { registrationJsonSha1: REGSRC.sha1 } : {}) },
   standingX: STANDING_X,
   ballOffsetM: { rightHanded: BALL_OFFSET.rightHanded, leftHanded: BALL_OFFSET.leftHanded },
   tiers: Object.fromEntries(TIERS.map((t) => [t, { actor: TIER_ACTOR[t], localZ: TIER_Z[t], boneY: TIER_BONE_Y[t], matY: MAT_Y[t], rimY: PL.tierOffset.deckTopsY[t], bones: SLOTS_LOCAL.filter((s) => s.tier === t).map((s) => s.bone) }])),

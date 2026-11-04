@@ -1,6 +1,7 @@
 {
  "_note": "Course terrain for the app, written by tools/build-terrain.mjs from NSS's own collision (the Switch game's Fld_GolfCourseNN field meshes with the six HoleCovers closing the cups, and on H3 the separate sea actor Object_BGOBJ_GolfCourse03Water) by vertical ray casts through tools/nss-registration.json; read by src/terrain.js. hNN.bin: the ground height and surface class on a w x h grid over the 250x304 map frame (sample (i, j) = the map px square [2i, 2i+2) x [2j, 2j+2), its centre at ((i+0.5)/w, (j+0.5)/h)): the height the ray at the centre lands on, in ydPerUnit above the hole's datum (NSS y 0 = the WSR player start's height; datumY = it in WSR's KCL units, 0.1 m, datumYd in yd), nodata where no ground lies under it; the class the majority of 4x4 rays over the cell (classNames: the KCL vocabulary plus 17, sand OB; codeToClass maps the NSS surface codes). gNN.bin: heights over nss-truth.json's green box + margin at stepYd, in unitYd above z0Yd (the green's mean height above the datum), with a mask of the nodes whose ray lands on the green. Byte layouts in the tool's header; both files repeat their own sizes, datum, box and units in a header. classes: per-hole sample counts by class; noHeight: samples with no ground; collisionSha1: the dump files read; datumWsrMeshY: the WSR start's height in KCL units (tools/nss-pins.json), against datumY; missing (only on a build run with --allow-missing): the separate collision actors the hole was built without.",
  "source": "nss",
+ "game": "Switch Sports Resort 1.0.0",
  "version": 1,
  "w": 125,
  "h": 152,
@@ -41,15 +42,15 @@
  "holes": {
   "1": {
    "file": "h01.bin",
-   "meshId": "Fld_GolfCourse01",
+   "meshId": "Shape_Fld_Glf_Course01_Col",
    "datumY": 150,
    "datumYd": 16.4042,
    "datumWsrMeshY": 150,
    "bytes": 57020,
-   "sha1": "9b820fcab95883c0e41c86bb30183256a8e4a384",
+   "sha1": "b25f21b804ba41cdcfc4aabde5abfde5fec703d7",
    "collisionSha1": {
-    "field": "04c6f095233660beafc82f74435a81b41c84233b",
-    "covers": "96de466efe7120528cb057baadc350ea25b6f9ec"
+    "field": "437980bfe85a5438321dfdfe5141783df326bd81",
+    "covers": "df48d83ad6ff4949548fc9892abf7b6ccc72af91"
    },
    "classes": {
     "0": 1149,
@@ -87,26 +88,26 @@
   },
   "2": {
    "file": "h02.bin",
-   "meshId": "Fld_GolfCourse02",
+   "meshId": "Shape_Fld_Glf_Course02_Col",
    "datumY": -4.4,
    "datumYd": -0.4812,
    "datumWsrMeshY": -4.4,
    "bytes": 57020,
-   "sha1": "0f0baefaa1d9a1d4caceb4bdf05238722f7b841b",
+   "sha1": "b1b6d2bfe0e6580ea8605130d4b375c4efaeceab",
    "collisionSha1": {
-    "field": "e290fb1a99303f2cdb08c0ac2d364174be1658c3",
-    "covers": "3f1bc53845b8eafafdf5b3fc5b4380da0eb82140"
+    "field": "46a8596ec6653039688451fd1c8473e63a16851e",
+    "covers": "0e5f1fd5e5914ee4ab5990acc282c711fe356c1a"
    },
    "classes": {
-    "1": 1043,
-    "2": 4540,
+    "1": 1039,
+    "2": 4535,
     "3": 75,
     "4": 8122,
     "6": 189,
-    "7": 2087,
-    "9": 57,
-    "12": 756,
-    "17": 2131
+    "7": 2085,
+    "9": 66,
+    "12": 798,
+    "17": 2091
    },
    "noHeight": 0,
    "green": {
@@ -114,9 +115,9 @@
     "w": 87,
     "h": 73,
     "box": {
-     "x0": 0.407884,
+     "x0": 0.407834,
      "y0": 0.247929,
-     "x1": 0.586016,
+     "x1": 0.585966,
      "y1": 0.370571
     },
     "stepYd": 0.5,
@@ -125,34 +126,33 @@
     "inside": 2864,
     "rangeYd": [
      -1.273,
-     1.279
+     1.28
     ],
     "bytes": 19093,
-    "sha1": "360d2ff751966bcb9fe4c150756004c6e6a53bd9"
+    "sha1": "27779dff21edf8ca9b3153f1aca0807fc15e9648"
    }
   },
   "3": {
    "file": "h03.bin",
-   "meshId": "Fld_GolfCourse03",
+   "meshId": "Shape_Fld_Glf_Course03_Col",
    "datumY": -338,
    "datumYd": -36.9641,
    "datumWsrMeshY": -338,
    "bytes": 57020,
-   "sha1": "a7c4f09e088797a3c29bf645ea8680ac579fe56a",
+   "sha1": "085708557e92fec9ecec569e3169f231d40349b5",
    "collisionSha1": {
-    "field": "8269d83ea0bbe09f9cd3e438437a5a42802398a5",
-    "covers": "8e2c889d250d2cf97d4c7b06846f0cc64704d567",
-    "water": "a5c55ff4452dea6bdd0725c0ee0ccd4d7b512472"
+    "field": "f4d247ed16fa58b8d236130bf94cf380ab62c540",
+    "covers": "60f709c1f596a0726ddc142153bbad084e75914b"
    },
    "classes": {
     "1": 1085,
     "2": 2606,
-    "3": 544,
-    "4": 8818,
+    "3": 545,
+    "4": 8327,
     "6": 37,
-    "7": 5727,
+    "7": 5669,
     "9": 10,
-    "12": 173
+    "12": 721
    },
    "noHeight": 0,
    "green": {
@@ -179,26 +179,26 @@
   },
   "4": {
    "file": "h04.bin",
-   "meshId": "Fld_GolfCourse04",
+   "meshId": "Shape_Fld_Glf_Course04_Col",
    "datumY": 0,
    "datumYd": 0,
    "datumWsrMeshY": 0,
    "bytes": 57020,
-   "sha1": "d7c524535b00a53896c9b2fadaafb9e6a7450b80",
+   "sha1": "142e3e2078c715252290cf46280d041373c2f22c",
    "collisionSha1": {
-    "field": "d87b70472e0dd55bfcfc6fececc24214addf0fdb",
-    "covers": "1bd972999fe65bbc2df605b51575ec4a7d80fd39"
+    "field": "04b4a0e3f90f0b33be1daf51671e048fee176451",
+    "covers": "9e3ce6c2000aa89e0b342783f72dbbac0a6d9f59"
    },
    "classes": {
-    "1": 1195,
+    "1": 1193,
     "2": 5668,
     "3": 151,
-    "4": 4591,
+    "4": 4555,
     "6": 142,
-    "7": 5137,
-    "9": 48,
-    "12": 721,
-    "17": 1347
+    "7": 4897,
+    "9": 50,
+    "12": 764,
+    "17": 1580
    },
    "noHeight": 0,
    "green": {
@@ -207,43 +207,43 @@
     "h": 75,
     "box": {
      "x0": 0.3132,
-     "y0": 0.283632,
+     "y0": 0.283682,
      "x1": 0.4758,
-     "y1": 0.397368
+     "y1": 0.397418
     },
     "stepYd": 0.5,
-    "z0Yd": -4.9162,
+    "z0Yd": -4.9165,
     "unitYd": 0.001,
-    "inside": 2635,
+    "inside": 2638,
     "rangeYd": [
-     -2.36,
-     1.675
+     -2.361,
+     1.672
     ],
     "bytes": 19840,
-    "sha1": "2afe2d5670e2e439b8817569bc4ddac3ee4e0775"
+    "sha1": "bcc0217de78e8888971eb065b02d4239509690c2"
    }
   },
   "5": {
    "file": "h05.bin",
-   "meshId": "Fld_GolfCourse05",
+   "meshId": "Shape_Fld_Glf_Course05_Col",
    "datumY": 230,
    "datumYd": 25.1531,
    "datumWsrMeshY": 230,
    "bytes": 57020,
-   "sha1": "f5857bc066e4ba5a281245331c00959601353cd3",
+   "sha1": "bc5a2f555b59bbd30a4945cec30469ba9426c67a",
    "collisionSha1": {
-    "field": "e78244d13489ca35d985ea9b8ea128762a187fff",
-    "covers": "0534f3433417a94c852b6d7e8e27666e80ec4ae1"
+    "field": "a1784c18cb2753f9b9df9f24c7e4b2b62d761c79",
+    "covers": "33294ceca08a8ee5e8310fc4ad76b666c6ee9324"
    },
    "classes": {
     "1": 990,
     "2": 2570,
     "3": 143,
-    "4": 8991,
+    "4": 8894,
     "6": 33,
     "7": 5307,
     "9": 7,
-    "12": 358,
+    "12": 455,
     "17": 601
    },
    "noHeight": 0,
@@ -266,20 +266,20 @@
      1.936
     ],
     "bytes": 20065,
-    "sha1": "e5d158ff69bc711d67bc85569064336061d146ea"
+    "sha1": "6281418bc26889245238774991486ecd5e9aed9e"
    }
   },
   "6": {
    "file": "h06.bin",
-   "meshId": "Fld_GolfCourse06",
+   "meshId": "Shape_Fld_Glf_Course06_Col",
    "datumY": 45,
    "datumYd": 4.9213,
    "datumWsrMeshY": 45,
    "bytes": 57020,
    "sha1": "814bdf38d5ec5e633156b80799f9ffab546d47fa",
    "collisionSha1": {
-    "field": "f5586ff04f8b8da5ce352600a9d578d69d23b40a",
-    "covers": "729c5e61f2bbe9fd01eee2ea811f902d23763b05"
+    "field": "663b9093edbd42965559847b05afc60ab4f3e8c9",
+    "covers": "779c3958589ddf8ac5e55ba893377b740470de80"
    },
    "classes": {
     "0": 1088,
@@ -310,76 +310,76 @@
      2.091
     ],
     "bytes": 23197,
-    "sha1": "9f5680be66f7b872bca819d9542f632a6bea8375"
+    "sha1": "afdf79ff15efbe012d85951ac2cdae3ca64164eb"
    }
   },
   "7": {
    "file": "h07.bin",
-   "meshId": "Fld_GolfCourse07",
+   "meshId": "Shape_Fld_Glf_Course07_Col",
    "datumY": 190.69,
    "datumYd": 20.8541,
    "datumWsrMeshY": 190.6,
    "bytes": 57020,
-   "sha1": "a7ec10e737e9ab1c526f62c933cad9fcc2ee50f5",
+   "sha1": "a1d1bfcf379d7759edd403f3dfe96e75bd8314f7",
    "collisionSha1": {
-    "field": "286fbe26f494f5e6af44b6a9aec599766805803c",
-    "covers": "c029a5946fd4a7127844056cac1bfb181f8ab54c"
+    "field": "a347091f44833256ee31533c1e4fa30d2ace3da8",
+    "covers": "6aa4991bf236ef4f410ea089031594269f2b3330"
    },
    "classes": {
-    "1": 994,
+    "1": 993,
     "2": 2718,
     "3": 74,
-    "4": 6093,
-    "6": 44,
+    "4": 6021,
+    "6": 43,
     "7": 6153,
-    "9": 10,
-    "12": 497,
+    "9": 12,
+    "12": 569,
     "17": 2417
    },
    "noHeight": 0,
    "green": {
     "file": "g07.bin",
-    "w": 90,
-    "h": 78,
+    "w": 89,
+    "h": 77,
     "box": {
-     "x0": 0.422169,
-     "y0": 0.213601,
-     "x1": 0.505231,
-     "y1": 0.272699
+     "x0": 0.422636,
+     "y0": 0.214035,
+     "x1": 0.504764,
+     "y1": 0.272365
     },
     "stepYd": 0.5,
-    "z0Yd": -29.464,
+    "z0Yd": -29.4647,
     "unitYd": 0.001,
-    "inside": 3116,
+    "inside": 3041,
     "rangeYd": [
-     -2.326,
-     0.443
+     -2.325,
+     0.44
     ],
-    "bytes": 21100,
-    "sha1": "7772fba768c7d999fdf0a3b2de07dbd50812cb62"
+    "bytes": 20599,
+    "sha1": "b352aa5102db52a7cac2f39e130662bdb819827c"
    }
   },
   "8": {
    "file": "h08.bin",
-   "meshId": "Fld_GolfCourse08",
+   "meshId": "Shape_Fld_Glf_Course08_Col",
    "datumY": 37.5,
    "datumYd": 4.101,
    "datumWsrMeshY": 37.5,
    "bytes": 57020,
-   "sha1": "141170375f21a3188d6b1bf758b020f888a9a4b9",
+   "sha1": "deadfe1797cb086f5e38fcb7a3d4abadd61a63fd",
    "collisionSha1": {
-    "field": "b6b86cb839b131353b8f9ab220c40dc55bffac91",
-    "covers": "685fb839e8ecf83a81f003f6d50407c828fd00eb"
+    "field": "fa0b83bff2dc5f431a04e93aa172bc107d217642",
+    "covers": "d817b9b81719533170c5b257b55ac963fdc8377c"
    },
    "classes": {
-    "1": 285,
+    "1": 284,
     "2": 3239,
-    "4": 3199,
+    "4": 3118,
     "6": 69,
-    "7": 6781,
-    "9": 21,
-    "12": 1893,
-    "17": 3513
+    "7": 6772,
+    "9": 22,
+    "12": 1998,
+    "17": 3498
    },
    "noHeight": 0,
    "green": {
@@ -388,44 +388,44 @@
     "h": 80,
     "box": {
      "x0": 0.468455,
-     "y0": 0.338546,
+     "y0": 0.338496,
      "x1": 0.572445,
-     "y1": 0.414454
+     "y1": 0.414404
     },
     "stepYd": 0.5,
-    "z0Yd": -15.729,
+    "z0Yd": -15.7295,
     "unitYd": 0.001,
-    "inside": 3241,
+    "inside": 3228,
     "rangeYd": [
-     -8.495,
-     0.866
+     -8.494,
+     0.867
     ],
     "bytes": 21640,
-    "sha1": "6c6da13edbfdd115ed5bc227718d66a7ebdeb401"
+    "sha1": "31d5780fff53fa2bc9560dce84348b72076d3c7c"
    }
   },
   "9": {
    "file": "h09.bin",
-   "meshId": "Fld_GolfCourse09",
+   "meshId": "Shape_Fld_Glf_Course09_Col",
    "datumY": 130,
    "datumYd": 14.217,
    "datumWsrMeshY": 130,
    "bytes": 57020,
-   "sha1": "f24034062b4d8e7ca57b49ad3b30fa62cf2c1cc0",
+   "sha1": "3bc42d1c4aa29481a4acc507171320c21f812d25",
    "collisionSha1": {
-    "field": "255f0caf642f83e5535b003a5186d8977f74044e",
-    "covers": "5b02b285a806e257f14dbbec3b4e4cd2611862ea"
+    "field": "fad16343b210ca755411f06699dae48ce6b8a125",
+    "covers": "bb67f109d7d1f3c1c334d9446275ec8cbb07d897"
    },
    "classes": {
     "0": 723,
     "1": 669,
     "2": 3518,
     "3": 116,
-    "4": 13185,
+    "4": 13154,
     "6": 37,
     "7": 707,
     "9": 4,
-    "12": 41
+    "12": 72
    },
    "noHeight": 793,
    "green": {
@@ -433,358 +433,360 @@
     "w": 86,
     "h": 88,
     "box": {
-     "x0": 0.506148,
+     "x0": 0.506098,
      "y0": 0.105514,
-     "x1": 0.573952,
+     "x1": 0.573902,
      "y1": 0.162586
     },
     "stepYd": 0.5,
-    "z0Yd": -21.8359,
+    "z0Yd": -21.8358,
     "unitYd": 0.001,
-    "inside": 3443,
+    "inside": 3448,
     "rangeYd": [
      -2.678,
-     1.95
+     1.952
     ],
     "bytes": 22744,
-    "sha1": "519214b8fd0aac6283c7e8ef680adbc1d12e320b"
+    "sha1": "4e88efc2ca2a841e21a0992b410636efdbc0a28d"
    }
   },
   "10": {
    "file": "h10.bin",
-   "meshId": "Fld_GolfCourse10",
+   "meshId": "Shape_Fld_Glf_Course10_Col",
    "datumY": 194,
    "datumYd": 21.2161,
    "datumWsrMeshY": 194,
    "bytes": 57020,
-   "sha1": "4c2271a755e7dd4d91d1d6b4b00cf12b39fcd2cd",
+   "sha1": "09a8789cb1025fbe2ca96fcdbee07cf870883e28",
    "collisionSha1": {
-    "field": "485c1b4814a30f273a71f6dda389e5ade7f9d69b",
-    "covers": "983cddecb260219bf0f9bdac8d8027295258a456"
+    "field": "6d301a82f1aafed68e42cb97f3c6eaebc1baee38",
+    "covers": "46fc57fe9f8cc32f61cfea6a39aebc58b247e959"
    },
    "classes": {
     "0": 760,
-    "1": 1392,
+    "1": 1387,
     "2": 3324,
     "3": 154,
-    "4": 13281,
-    "6": 79,
-    "9": 10
+    "4": 13273,
+    "6": 72,
+    "9": 22,
+    "12": 8
    },
    "noHeight": 760,
    "green": {
     "file": "g10.bin",
-    "w": 93,
-    "h": 88,
+    "w": 91,
+    "h": 86,
     "box": {
-     "x0": 0.441464,
-     "y0": 0.128283,
-     "x1": 0.544636,
-     "y1": 0.208517
+     "x0": 0.442586,
+     "y0": 0.129205,
+     "x1": 0.543514,
+     "y1": 0.207595
     },
     "stepYd": 0.5,
-    "z0Yd": -6.1753,
+    "z0Yd": -6.1751,
     "unitYd": 0.001,
-    "inside": 3941,
+    "inside": 3748,
     "rangeYd": [
-     -1.596,
-     1.588
+     -1.457,
+     1.535
     ],
-    "bytes": 24592,
-    "sha1": "32ba9560e9bf14d5dec6a6f337010823108e4c07"
+    "bytes": 23518,
+    "sha1": "b3afeb70d350d682fc781b712422758ac4c67552"
    }
   },
   "11": {
    "file": "h11.bin",
-   "meshId": "Fld_GolfCourse11",
+   "meshId": "Shape_Fld_Glf_Course11_Col",
    "datumY": 36,
    "datumYd": 3.937,
    "datumWsrMeshY": 36,
    "bytes": 57020,
-   "sha1": "beef2a30ca6832d1f3f0020072648e2362f70ef9",
+   "sha1": "c95b34f5ec93abbf72aa836ea65dcf4c645e17ca",
    "collisionSha1": {
-    "field": "42d304c96035e3e677852596cea4ccc77b213434",
-    "covers": "35e6b19a6c71ae0b7ee0047941c72769af684e61"
+    "field": "724c6976c5c399d9fd86e1291ac669afeff3e142",
+    "covers": "a77b760a0bb3a063b471e471d61df67b83c8ef03"
    },
    "classes": {
-    "1": 892,
-    "2": 4980,
+    "1": 880,
+    "2": 4977,
     "3": 147,
-    "4": 10136,
-    "6": 193,
+    "4": 10086,
+    "6": 176,
     "7": 2279,
-    "9": 29,
-    "12": 344
+    "9": 61,
+    "12": 394
    },
    "noHeight": 0,
    "green": {
     "file": "g11.bin",
-    "w": 78,
-    "h": 72,
+    "w": 75,
+    "h": 69,
     "box": {
-     "x0": 0.448042,
-     "y0": 0.267466,
-     "x1": 0.620758,
-     "y1": 0.398434
+     "x0": 0.451407,
+     "y0": 0.270233,
+     "x1": 0.617393,
+     "y1": 0.395667
     },
     "stepYd": 0.5,
-    "z0Yd": -4.3755,
+    "z0Yd": -4.3792,
     "unitYd": 0.001,
-    "inside": 2436,
+    "inside": 2248,
     "rangeYd": [
-     -1.05,
-     1.159
+     -0.951,
+     1.103
     ],
-    "bytes": 16888,
-    "sha1": "e47d487ee1fd2847fbd6a9f85d5f6fcd5650f11e"
+    "bytes": 15565,
+    "sha1": "6f25565d7d51bbeb33740054566ec3c97377037f"
    }
   },
   "12": {
    "file": "h12.bin",
-   "meshId": "Fld_GolfCourse12",
+   "meshId": "Shape_Fld_Glf_Course12_Col",
    "datumY": 17.75,
    "datumYd": 1.9412,
    "datumWsrMeshY": 17.7,
    "bytes": 57020,
-   "sha1": "da9aa0dbc45ecd0d97ba558e3f045de710148073",
+   "sha1": "0aab0f53c8c3ef84ac9ab8549b292902a6b8fb06",
    "collisionSha1": {
-    "field": "4319516492849fdee2aa43f97082c1b0914449c0",
-    "covers": "3aa8018b4bd34b6011a9493c704b7280350a71bc"
+    "field": "038baaddb57feedbdd20c55b222c447fa83a0398",
+    "covers": "69e87cf8630488f069ac216c0bb72bfa7c1e4e6c"
    },
    "classes": {
-    "1": 1080,
+    "1": 1076,
     "2": 2170,
     "3": 36,
-    "4": 15099,
-    "6": 31,
+    "4": 15050,
+    "6": 29,
     "7": 324,
-    "9": 1,
-    "12": 259
+    "9": 7,
+    "12": 308
    },
    "noHeight": 0,
    "green": {
     "file": "g12.bin",
-    "w": 63,
-    "h": 68,
+    "w": 60,
+    "h": 65,
     "box": {
-     "x0": 0.393319,
-     "y0": 0.133695,
-     "x1": 0.451281,
-     "y1": 0.185205
+     "x0": 0.394772,
+     "y0": 0.134798,
+     "x1": 0.449928,
+     "y1": 0.184002
     },
     "stepYd": 0.5,
-    "z0Yd": -6.9439,
+    "z0Yd": -6.9394,
     "unitYd": 0.001,
-    "inside": 2142,
+    "inside": 1967,
     "rangeYd": [
-     -1.54,
-     0.876
+     -1.37,
+     0.824
     ],
-    "bytes": 12892,
-    "sha1": "b94b84b5a10be7fb94768f45d89e7132b375b7d6"
+    "bytes": 11740,
+    "sha1": "2aeb78028a17c6ab0394ff490d4c495d5b2a1500"
    }
   },
   "13": {
    "file": "h13.bin",
-   "meshId": "Fld_GolfCourse13",
+   "meshId": "Shape_Fld_Glf_Course13_Col",
    "datumY": 50,
    "datumYd": 5.4681,
    "datumWsrMeshY": 50,
    "bytes": 57020,
-   "sha1": "cc44442daa1045e76e63658799a926fa6a36cbaf",
+   "sha1": "6ccb88ff8e92c2e2f62bf77f7a32aeb91a8da13b",
    "collisionSha1": {
-    "field": "94067b15d562b34b2c25facf9aa1209f29925f74",
-    "covers": "99150fd24d82e6c91a4c01adfa3751eecaa4ff26"
+    "field": "f857fda6a3ab4d1740ebbf2249b467659a5c86f9",
+    "covers": "f76dc6ef57f2ab7094a9344332d473da70bf8098"
    },
    "classes": {
-    "1": 520,
+    "1": 502,
     "2": 2820,
     "3": 159,
     "4": 5896,
-    "6": 208,
+    "6": 193,
     "7": 8799,
-    "9": 32,
+    "9": 65,
     "12": 566
    },
    "noHeight": 0,
    "green": {
     "file": "g13.bin",
-    "w": 80,
-    "h": 75,
+    "w": 77,
+    "h": 72,
     "box": {
-     "x0": 0.365974,
-     "y0": 0.233976,
-     "x1": 0.542326,
-     "y1": 0.369824
+     "x0": 0.369323,
+     "y0": 0.23668,
+     "x1": 0.538977,
+     "y1": 0.36702
     },
     "stepYd": 0.5,
-    "z0Yd": -5.4992,
+    "z0Yd": -5.4921,
     "unitYd": 0.001,
-    "inside": 2665,
+    "inside": 2459,
     "rangeYd": [
-     -1.674,
-     0.613
+     -1.496,
+     0.605
     ],
-    "bytes": 18040,
-    "sha1": "2d5842c32a1dae31e69d6605e71428be12ad3dcd"
+    "bytes": 16672,
+    "sha1": "969d80cd06fce252292c9fd2095a94144303d952"
    }
   },
   "14": {
    "file": "h14.bin",
-   "meshId": "Fld_GolfCourse14",
+   "meshId": "Shape_Fld_Glf_Course14_Col",
    "datumY": -31.77,
    "datumYd": -3.4744,
    "datumWsrMeshY": -31.7,
    "bytes": 57020,
-   "sha1": "625123090040f1775822fea349b4dcb62109f287",
+   "sha1": "9023ed8820b48014ea0e3a4cf154ed82def6de32",
    "collisionSha1": {
-    "field": "c20c0a68505f6057b2a5f0abd5072e652336d4a3",
-    "covers": "998f7e4dceeaa769d4860dee798dd0f4e802ae77"
+    "field": "30363282b17ac2a2e6a8d915854b33bc2ca02917",
+    "covers": "e2e1a9305b0bfded9031adcd93784fbbc19260a3"
    },
    "classes": {
-    "1": 2012,
+    "1": 2003,
     "2": 4101,
     "3": 155,
     "4": 6276,
-    "6": 54,
-    "7": 4300,
-    "9": 4,
+    "6": 48,
+    "7": 4301,
+    "9": 19,
     "12": 334,
-    "17": 1764
+    "17": 1763
    },
    "noHeight": 0,
    "green": {
     "file": "g14.bin",
-    "w": 80,
-    "h": 67,
+    "w": 77,
+    "h": 64,
     "box": {
-     "x0": 0.601558,
-     "y0": 0.105265,
-     "x1": 0.700342,
-     "y1": 0.173135
+     "x0": 0.603433,
+     "y0": 0.106808,
+     "x1": 0.698467,
+     "y1": 0.171592
     },
     "stepYd": 0.5,
-    "z0Yd": 3.6755,
+    "z0Yd": 3.6666,
     "unitYd": 0.001,
-    "inside": 2149,
+    "inside": 1952,
     "rangeYd": [
-     -1.288,
-     0.816
+     -0.948,
+     0.825
     ],
-    "bytes": 16120,
-    "sha1": "d7beeb36dbe77edb9e2705c4a74a05da49b4b6b6"
+    "bytes": 14824,
+    "sha1": "475a80e88a2f900419470c35b57ec312b3d4dce9"
    }
   },
   "15": {
    "file": "h15.bin",
-   "meshId": "Fld_GolfCourse15",
+   "meshId": "Shape_Fld_Glf_Course15_Col",
    "datumY": 10,
    "datumYd": 1.0936,
    "datumWsrMeshY": 10,
    "bytes": 57020,
-   "sha1": "94f085c8f48cbb1b56a3c5a38952a0afaf7d01fc",
+   "sha1": "50c31c6fbad04489ceac1621bb1b9b44829ae246",
    "collisionSha1": {
-    "field": "a22adcbfb81fac6e82215266dc764a9109a5dd5b",
-    "covers": "c75beabb111a5278094d9b3cb59cddcf014a42ad"
+    "field": "9414387822459aa3827ced9cd823e6722a3e694a",
+    "covers": "d421660bc466b94b80e5623015bb672a12744199"
    },
    "classes": {
-    "1": 907,
+    "1": 897,
     "2": 4235,
     "3": 180,
-    "4": 9565,
-    "6": 59,
+    "4": 9523,
+    "6": 53,
     "7": 2570,
-    "9": 2,
-    "12": 1482
+    "9": 18,
+    "12": 1524
    },
    "noHeight": 0,
    "green": {
     "file": "g15.bin",
-    "w": 85,
-    "h": 76,
+    "w": 82,
+    "h": 73,
     "box": {
-     "x0": 0.513991,
-     "y0": 0.175096,
-     "x1": 0.608109,
-     "y1": 0.244204
+     "x0": 0.515621,
+     "y0": 0.176478,
+     "x1": 0.606379,
+     "y1": 0.242822
     },
     "stepYd": 0.5,
-    "z0Yd": 11.1176,
+    "z0Yd": 11.1214,
     "unitYd": 0.001,
-    "inside": 2896,
+    "inside": 2667,
     "rangeYd": [
-     -2.2,
-     1.364
+     -2.13,
+     1.236
     ],
-    "bytes": 19420,
-    "sha1": "69e848ca0079607e0d27db34a3b6de6db5935488"
+    "bytes": 17998,
+    "sha1": "634e34a1706657b0b685a2bb80bad623a6d73ef8"
    }
   },
   "16": {
    "file": "h16.bin",
-   "meshId": "Fld_GolfCourse16",
+   "meshId": "Shape_Fld_Glf_Course16_Col",
    "datumY": 0,
    "datumYd": 0,
    "datumWsrMeshY": 0,
    "bytes": 57020,
-   "sha1": "0e3fadf78bd2cd0ca0272c743118610c1a760146",
+   "sha1": "0356ce89d86d7dccc991d60b7a85b5c19eda9983",
    "collisionSha1": {
-    "field": "331d3400f37a3d00bbdb1f235785e6ee75d5f612",
-    "covers": "8379916f73faa7cf813e7b514959a144a870c756"
+    "field": "3ab4e1cdfb6babe169430fdc8c38c7a7c40a37c2",
+    "covers": "baa34455e8e83df829c86aa931ba79f84a51c3b3"
    },
    "classes": {
     "0": 214,
-    "1": 1426,
+    "1": 1418,
     "2": 3696,
     "3": 193,
-    "4": 13381,
-    "6": 84,
-    "9": 6
+    "4": 13362,
+    "6": 72,
+    "9": 26,
+    "12": 19
    },
    "noHeight": 247,
    "green": {
     "file": "g16.bin",
-    "w": 91,
-    "h": 66,
+    "w": 88,
+    "h": 63,
     "box": {
-     "x0": 0.647798,
-     "y0": 0.294744,
-     "x1": 0.768202,
-     "y1": 0.366256
+     "x0": 0.649755,
+     "y0": 0.296394,
+     "x1": 0.766145,
+     "y1": 0.364606
     },
     "stepYd": 0.5,
-    "z0Yd": 11.2309,
+    "z0Yd": 11.2318,
     "unitYd": 0.001,
-    "inside": 2826,
+    "inside": 2613,
     "rangeYd": [
-     -1.762,
-     1.255
+     -1.697,
+     1.149
     ],
-    "bytes": 18058,
-    "sha1": "41013f0d543086322d5d07a0c062a0a0912b7b1b"
+    "bytes": 16672,
+    "sha1": "2110a80d40e919c4ba8eaa0afd0b3a4138e7bcfa"
    }
   },
   "17": {
    "file": "h17.bin",
-   "meshId": "Fld_GolfCourse17",
+   "meshId": "Shape_Fld_Glf_Course17_Col",
    "datumY": 0.12,
    "datumYd": 0.0131,
    "datumWsrMeshY": 0,
    "bytes": 57020,
-   "sha1": "a5d2c50c44a1009cf0e818f3d32d00a520a060c8",
+   "sha1": "e2478dff759475b433c81fd6d11f2a7094214622",
    "collisionSha1": {
-    "field": "eb1ee9100e65e04e9d898006b77fa1d7d34e7be2",
-    "covers": "1f3d1b334382df0bb63c27da9922fb4bcdf268a2"
+    "field": "06edbbac09dcb5d5a1a34c4164f26d521fe85c57",
+    "covers": "7b0a7d1774bbf8041a3a3e2770994b7f278836c3"
    },
    "classes": {
-    "1": 809,
-    "2": 2985,
-    "3": 126,
-    "4": 3063,
-    "6": 164,
-    "7": 9344,
-    "9": 22,
-    "12": 2487
+    "1": 711,
+    "2": 2918,
+    "3": 117,
+    "4": 3285,
+    "6": 145,
+    "7": 9531,
+    "9": 20,
+    "12": 2273
    },
    "noHeight": 0,
    "green": {
@@ -792,34 +794,34 @@
     "w": 95,
     "h": 90,
     "box": {
-     "x0": 0.468501,
-     "y0": 0.181664,
-     "x1": 0.633499,
-     "y1": 0.310136
+     "x0": 0.471073,
+     "y0": 0.117736,
+     "x1": 0.626127,
+     "y1": 0.238464
     },
     "stepYd": 0.5,
-    "z0Yd": 21.6982,
+    "z0Yd": 21.6981,
     "unitYd": 0.001,
-    "inside": 3415,
+    "inside": 3417,
     "rangeYd": [
-     -3.437,
-     1.218
+     -3.439,
+     1.219
     ],
     "bytes": 25690,
-    "sha1": "d00ef574b80aa16afa61a798f05089deeece1a94"
+    "sha1": "e474beb58901a30332c0157fd07b497fb352cd44"
    }
   },
   "18": {
    "file": "h18.bin",
-   "meshId": "Fld_GolfCourse18",
+   "meshId": "Shape_Fld_Glf_Course18_Col",
    "datumY": -70,
    "datumYd": -7.6553,
    "datumWsrMeshY": -70,
    "bytes": 57020,
-   "sha1": "9a20d277851674e19d600101739c19c4b1d3057a",
+   "sha1": "36367457077a8bd4fc96accf5c57b52f33be7cee",
    "collisionSha1": {
-    "field": "318730c9e57ca125aad56dc7919e98a26f6bb799",
-    "covers": "b6690244845c052883f5806a639ed221e8f4d05a"
+    "field": "883d932c5a26efdcdb98efcb8bce176291afaf47",
+    "covers": "e7c4dcdb328c5fda6f86ee512d9c4f0d40eda5cb"
    },
    "classes": {
     "1": 1028,
@@ -842,151 +844,424 @@
      "y1": 0.184712
     },
     "stepYd": 0.5,
-    "z0Yd": 0.4137,
+    "z0Yd": 0.4135,
     "unitYd": 0.001,
-    "inside": 1844,
+    "inside": 1843,
     "rangeYd": [
      -0.396,
      1.403
     ],
     "bytes": 12712,
-    "sha1": "a79bebbb32ad0334f3945155225e257aa0ca80f4"
+    "sha1": "47d5aecc2594ecfe8d028121085300167e3f2f6c"
    }
   },
   "19": {
    "file": "h19.bin",
-   "meshId": "Fld_GolfCourse19",
-   "datumY": 260,
-   "datumYd": 28.4339,
-   "datumWsrMeshY": 260,
+   "meshId": "Shape_Fld_Glf_Course19_Col",
+   "datumY": 0,
+   "datumYd": 0,
+   "datumWsrMeshY": null,
    "bytes": 57020,
-   "sha1": "268d609c889fd48f5088f33a68dec07c4e301fa9",
+   "sha1": "db1b6926f5e558505d0e94a772b2ec12d3e4e77d",
    "collisionSha1": {
-    "field": "c6eee0aea2a56cc0622503e953d54d67cd256f78",
-    "covers": "2868a62c51692260dd40e38f877e05bacd56918b"
+    "field": "518ff93d56aeb84631f4e4127704f5bea009b1b3",
+    "covers": "159d9f296e533e3e564c38883f87374157e88e81"
    },
    "classes": {
-    "0": 203,
-    "1": 2018,
-    "2": 4810,
-    "3": 138,
-    "4": 8546,
-    "6": 95,
-    "7": 2759,
-    "9": 11,
-    "12": 420
+    "0": 40,
+    "1": 1770,
+    "2": 2674,
+    "3": 144,
+    "4": 14170,
+    "6": 58,
+    "9": 19,
+    "12": 125
    },
-   "noHeight": 217,
+   "noHeight": 52,
    "green": {
     "file": "g19.bin",
-    "w": 102,
-    "h": 87,
+    "w": 93,
+    "h": 84,
     "box": {
-     "x0": 0.300822,
-     "y0": 0.09068,
-     "x1": 0.426978,
-     "y1": 0.17902
+     "x0": 0.482444,
+     "y0": 0.15595,
+     "x1": 0.576256,
+     "y1": 0.22555
     },
     "stepYd": 0.5,
-    "z0Yd": -4.0177,
+    "z0Yd": -10.7775,
     "unitYd": 0.001,
-    "inside": 3730,
+    "inside": 3692,
     "rangeYd": [
-     -1.967,
-     1.684
+     -1.261,
+     1.583
     ],
-    "bytes": 26662,
-    "sha1": "68ae0ee422d8d19dd2e39a18aeb49c725fcd2ac9"
+    "bytes": 23476,
+    "sha1": "d03b211e81fdb43300bc29455eca580045ff98d8"
    }
   },
   "20": {
    "file": "h20.bin",
-   "meshId": "Fld_GolfCourse20",
+   "meshId": "Shape_Fld_Glf_Course20_Col",
    "datumY": 0,
    "datumYd": 0,
-   "datumWsrMeshY": 0,
+   "datumWsrMeshY": null,
    "bytes": 57020,
-   "sha1": "ca246aa60c7d5f888288a76aaaeefc7fe8698d38",
+   "sha1": "7ab9978c1232aa15433a04339f301132ef665330",
    "collisionSha1": {
-    "field": "ee5409475ea95da3bd987fcf968f3936c5088bde",
-    "covers": "1fc9f7f871cca3a4ba4c48b3cadbd568055500bf"
+    "field": "e60ce6164c0cd24366a590ab3fece0eada929611",
+    "covers": "d945930f3844369dd75ed68814c8f8cbe46aaa3c"
    },
    "classes": {
-    "1": 1746,
-    "2": 3435,
-    "3": 204,
-    "4": 12109,
-    "6": 69,
-    "9": 25,
-    "12": 1412
+    "1": 1230,
+    "2": 5830,
+    "3": 267,
+    "4": 10722,
+    "6": 126,
+    "7": 571,
+    "9": 46,
+    "12": 208
    },
-   "noHeight": 2,
+   "noHeight": 0,
    "green": {
     "file": "g20.bin",
-    "w": 80,
-    "h": 72,
+    "w": 77,
+    "h": 68,
     "box": {
-     "x0": 0.578186,
-     "y0": 0.129653,
-     "x1": 0.683714,
-     "y1": 0.207647
+     "x0": 0.546911,
+     "y0": 0.275248,
+     "x1": 0.688989,
+     "y1": 0.378252
     },
     "stepYd": 0.5,
-    "z0Yd": 15.3788,
+    "z0Yd": -10.2852,
     "unitYd": 0.001,
-    "inside": 2525,
+    "inside": 2350,
     "rangeYd": [
-     -2.417,
-     3.16
+     -1.761,
+     0.614
     ],
-    "bytes": 17320,
-    "sha1": "019cfc2d6f6fd2a93f6639075d816bcb795d749e"
+    "bytes": 15748,
+    "sha1": "09ac49791fa933590255f5d1a44600002b036359"
    }
   },
   "21": {
    "file": "h21.bin",
-   "meshId": "Fld_GolfCourse21",
-   "datumY": 200,
-   "datumYd": 21.8723,
-   "datumWsrMeshY": 200,
+   "meshId": "Shape_Fld_Glf_Course21_Col",
+   "datumY": 0,
+   "datumYd": 0,
+   "datumWsrMeshY": null,
    "bytes": 57020,
-   "sha1": "148c2145289840581b8ba20a2af05066090240dc",
+   "sha1": "07c07581eb3fe58f589a31a690a3edefa548c729",
    "collisionSha1": {
-    "field": "36d2ddc684a3bb63965917e05f0552ac1c674249",
-    "covers": "7abea5cc6750aed91e0a06f893600fc5a90d0eae"
+    "field": "a6dcc5fc24f2bfb885847840d2e7f3e0420845d9",
+    "covers": "33a2f178eeaf0f7189898afaf20e08a682fb6ee9"
    },
    "classes": {
-    "1": 397,
-    "2": 2076,
-    "3": 214,
-    "4": 8943,
-    "6": 44,
-    "7": 6273,
+    "1": 1475,
+    "2": 2889,
+    "3": 54,
+    "4": 10617,
+    "6": 40,
+    "7": 1845,
     "9": 15,
-    "12": 118,
-    "17": 920
+    "12": 2065
    },
    "noHeight": 0,
    "green": {
     "file": "g21.bin",
+    "w": 90,
+    "h": 69,
+    "box": {
+     "x0": 0.556905,
+     "y0": 0.120915,
+     "x1": 0.640095,
+     "y1": 0.173185
+    },
+    "stepYd": 0.5,
+    "z0Yd": -16.8355,
+    "unitYd": 0.001,
+    "inside": 2982,
+    "rangeYd": [
+     -1.294,
+     1.108
+    ],
+    "bytes": 18670,
+    "sha1": "b34baa0fbc42ff142aa11922669ed3e44a3a2918"
+   }
+  },
+  "22": {
+   "file": "h22.bin",
+   "meshId": "Shape_Fld_Glf_Course22_Col",
+   "datumY": 0,
+   "datumYd": 0,
+   "datumWsrMeshY": null,
+   "bytes": 57020,
+   "sha1": "4e94b98b628ebffd970ae94c77091f26a2c6def5",
+   "collisionSha1": {
+    "field": "1763a8dcd7afb034a39f5ab190cf29e3e96b0e12",
+    "covers": "5e0214f9a0c4ddd780b1128a092dc9de64242c29"
+   },
+   "classes": {
+    "0": 4,
+    "1": 1010,
+    "2": 6293,
+    "3": 273,
+    "4": 10269,
+    "6": 199,
+    "7": 391,
+    "9": 65,
+    "12": 496
+   },
+   "noHeight": 14,
+   "green": {
+    "file": "g22.bin",
+    "w": 88,
+    "h": 67,
+    "box": {
+     "x0": 0.571637,
+     "y0": 0.147955,
+     "x1": 0.749063,
+     "y1": 0.258645
+    },
+    "stepYd": 0.5,
+    "z0Yd": -15.7529,
+    "unitYd": 0.001,
+    "inside": 3109,
+    "rangeYd": [
+     -0.899,
+     1.022
+    ],
+    "bytes": 17728,
+    "sha1": "04c3369f0f4521346076a11b1da6b2e6bdeb1ae6"
+   }
+  },
+  "23": {
+   "file": "h23.bin",
+   "meshId": "Shape_Fld_Glf_Course23_Col",
+   "datumY": 0,
+   "datumYd": 0,
+   "datumWsrMeshY": 0,
+   "bytes": 57020,
+   "sha1": "d0b970fa088bf3f8a6bc9a4804e0c9cfc73618a7",
+   "collisionSha1": {
+    "field": "b6793d85217df3a99afe541c1808d3c70d5f556a",
+    "covers": "49624ad21edc8758a46bb3c470e199e23d7c00ac"
+   },
+   "classes": {
+    "1": 851,
+    "2": 1891,
+    "3": 106,
+    "4": 14503,
+    "6": 37,
+    "7": 463,
+    "9": 9,
+    "12": 1140
+   },
+   "noHeight": 0,
+   "green": {
+    "file": "g23.bin",
+    "w": 81,
+    "h": 72,
+    "box": {
+     "x0": 0.554811,
+     "y0": 0.081012,
+     "x1": 0.629589,
+     "y1": 0.135588
+    },
+    "stepYd": 0.5,
+    "z0Yd": 15.3775,
+    "unitYd": 0.001,
+    "inside": 2517,
+    "rangeYd": [
+     -2.421,
+     3.188
+    ],
+    "bytes": 17536,
+    "sha1": "a4e2d7884ee323dcb15f4afc04738aded0d728a9"
+   }
+  },
+  "24": {
+   "file": "h24.bin",
+   "meshId": "Shape_Fld_Glf_Course24_Col",
+   "datumY": 260,
+   "datumYd": 28.4339,
+   "datumWsrMeshY": 260,
+   "bytes": 57020,
+   "sha1": "ed98f6e9c2c4a1885bacc45b02994f51227acb1f",
+   "collisionSha1": {
+    "field": "0490fabffe9a941737f6a642d77e13ad8bcd62b9",
+    "covers": "3a190b44cc4109c733fab9589319f052aa8e9ecb"
+   },
+   "classes": {
+    "0": 203,
+    "1": 2018,
+    "2": 4805,
+    "3": 138,
+    "4": 8547,
+    "6": 89,
+    "7": 2736,
+    "9": 21,
+    "12": 443
+   },
+   "noHeight": 217,
+   "green": {
+    "file": "g24.bin",
+    "w": 101,
+    "h": 86,
+    "box": {
+     "x0": 0.301446,
+     "y0": 0.091244,
+     "x1": 0.426354,
+     "y1": 0.178556
+    },
+    "stepYd": 0.5,
+    "z0Yd": -4.0137,
+    "unitYd": 0.001,
+    "inside": 3650,
+    "rangeYd": [
+     -1.952,
+     1.673
+    ],
+    "bytes": 26098,
+    "sha1": "d2b9d71ed81e16109794c223cd967031cf7505a7"
+   }
+  },
+  "25": {
+   "file": "h25.bin",
+   "meshId": "Shape_Fld_Glf_Course25_Col",
+   "datumY": 200,
+   "datumYd": 21.8723,
+   "datumWsrMeshY": 200,
+   "bytes": 57020,
+   "sha1": "76682b4405fd6bb6efa6ee1b630c429971136a2b",
+   "collisionSha1": {
+    "field": "a5672cfe8d88b8da3b65d585d3f9a4438a3dcd5a",
+    "covers": "0fa720aba86eb351554d5e70b96614f5ac84d5c0"
+   },
+   "classes": {
+    "1": 395,
+    "2": 2073,
+    "3": 214,
+    "4": 14360,
+    "6": 43,
+    "7": 1053,
+    "9": 19,
+    "12": 170,
+    "17": 673
+   },
+   "noHeight": 0,
+   "green": {
+    "file": "g25.bin",
     "w": 86,
     "h": 85,
     "box": {
      "x0": 0.400618,
-     "y0": 0.131025,
+     "y0": 0.131075,
      "x1": 0.487182,
-     "y1": 0.201375
+     "y1": 0.201425
     },
     "stepYd": 0.5,
-    "z0Yd": -55.8752,
+    "z0Yd": -55.8801,
     "unitYd": 0.001,
-    "inside": 2645,
+    "inside": 2606,
     "rangeYd": [
-     -1.329,
-     1.328
+     -1.321,
+     1.316
     ],
     "bytes": 21970,
-    "sha1": "f629b037a82dfe079881689123a4b8f78e54f9cc"
+    "sha1": "c4a5a3a2f12d26c1a92c939d4208add1f698e920"
+   }
+  },
+  "26": {
+   "file": "h26.bin",
+   "meshId": "Shape_Fld_Glf_Course26_Col",
+   "datumY": 0,
+   "datumYd": 0,
+   "datumWsrMeshY": null,
+   "bytes": 57020,
+   "sha1": "ee2e2cafebbbe6607d811250bf284e2a5ffc3b1f",
+   "collisionSha1": {
+    "field": "dec67e0dae313a140e2c1bd2023c44dea05c2412",
+    "covers": "69f58677d6e2429813e5d85339f9644c30302eb7"
+   },
+   "classes": {
+    "1": 1655,
+    "2": 2741,
+    "4": 10708,
+    "6": 81,
+    "7": 3417,
+    "9": 25,
+    "12": 373
+   },
+   "noHeight": 0,
+   "green": {
+    "file": "g26.bin",
+    "w": 84,
+    "h": 84,
+    "box": {
+     "x0": 0.480653,
+     "y0": 0.349399,
+     "x1": 0.586447,
+     "y1": 0.436401
+    },
+    "stepYd": 0.5,
+    "z0Yd": 10.1051,
+    "unitYd": 0.001,
+    "inside": 3144,
+    "rangeYd": [
+     -4.038,
+     1.558
+    ],
+    "bytes": 21208,
+    "sha1": "380bf839df2a653fc246411e9635c447f2dc6008"
+   }
+  },
+  "27": {
+   "file": "h27.bin",
+   "meshId": "Shape_Fld_Glf_Course27_Col",
+   "datumY": 0,
+   "datumYd": 0,
+   "datumWsrMeshY": null,
+   "bytes": 57020,
+   "sha1": "6689dd4b9c3c331ec1fe10faeea845766f0dd454",
+   "collisionSha1": {
+    "field": "010224ee84482117ebf7dfaa6bad3284e86b6620",
+    "covers": "56b14b9294fc025f40c0fdde499efa046fd3f6a2"
+   },
+   "classes": {
+    "0": 10,
+    "1": 912,
+    "2": 1265,
+    "3": 90,
+    "4": 1084,
+    "6": 41,
+    "7": 14701,
+    "9": 9,
+    "12": 507,
+    "17": 381
+   },
+   "noHeight": 14,
+   "green": {
+    "file": "g27.bin",
+    "w": 88,
+    "h": 88,
+    "box": {
+     "x0": 0.427143,
+     "y0": 0.105024,
+     "x1": 0.497857,
+     "y1": 0.163176
+    },
+    "stepYd": 0.5,
+    "z0Yd": -33.7566,
+    "unitYd": 0.001,
+    "inside": 3840,
+    "rangeYd": [
+     -3.771,
+     1.842
+    ],
+    "bytes": 23272,
+    "sha1": "0e9141dbbcda90df49476aa1ac217de299f4e24c"
    }
   }
  }

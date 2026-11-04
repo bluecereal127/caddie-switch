@@ -68,22 +68,30 @@ import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
-import { loadCollision, loadObject, readMeshBin } from "./lib/nsscol.mjs";
+import { loadCollision, loadObject, readMeshBin, TIE_ORDER } from "./lib/nsscol.mjs";
 import { regOf, mapToNss, nssToMesh, platformToWorld, MAP_W, MAP_H } from "./lib/nssreg.mjs";
 import { eulerR, placeActorTree } from "./lib/nss3d.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, "..");
 const arg = (n, d) => { const i = process.argv.indexOf(n); return i >= 0 ? process.argv[i + 1] : d; };
-const DUMP = path.join(HERE, "harness", "state", "eden", "nss-golf-x");
+const DUMP = path.join(HERE, "harness", "state", "eden", "sr-golf-x");   // the SR dump since 2026-11-04
 const COLL = path.resolve(arg("--collision", path.join(DUMP, "collision")));
 const TREES_FILE = path.resolve(arg("--trees", path.join(DUMP, "trees.json")));
 const OUT = path.resolve(arg("--out", path.join(ROOT, "public", "course3d")));
 const ALLOW_MISSING = process.argv.includes("--allow-missing");
 const readJson = (f) => JSON.parse(fs.readFileSync(f, "utf8"));
-const REG = readJson(path.join(HERE, "nss-registration.json"));
-const PINS = readJson(path.join(HERE, "nss-pins.json"));
-const PLAT = readJson(path.join(HERE, "nss-platform.json"));
+const REG = readJson(path.resolve(arg("--registration", path.join(HERE, "nss-registration.json"))));
+const PINS = readJson(path.resolve(arg("--pins", path.join(HERE, "nss-pins.json"))));
+const PLAT = readJson(path.resolve(arg("--platform", path.join(HERE, "nss-platform.json"))));
+const NO_WATER = !process.argv.includes("--nss-water");   // SR: the water is in the field mesh (--nss-water: NSS's H3 sea actor)   // SR: the water is in the field mesh, H3's sea included
+const GAME = arg("--game", "Switch Sports Resort 1.0.0");
+// the holes are the pins file's (NSS 1-21, SR 1-27)
+const HOLES = Object.keys(PINS.holes).map(Number).filter(Number.isInteger).sort((a, b) => a - b);
+// stacked triangles with two codes (SR 27: fairway under fringe; SR 23 / NSS 20: OB under object): the copy whose
+// code ranks first in the terrain's TIE_ORDER wins, so course3d and public/terrain read the same surface
+const RANK = new Map(TIE_ORDER.map((c, i) => [c, i]));
+const rankOf = (c) => RANK.get(c) ?? TIE_ORDER.length;
 const fail = (m) => { console.error(`REFUSED: ${m}`); process.exit(1); };
 // a missing input the course needs: refused, or with --allow-missing logged
 const missingNotes = [];
@@ -95,7 +103,7 @@ const TREES_TEXT = fs.existsSync(TREES_FILE) ? fs.readFileSync(TREES_FILE, "utf8
 if (!TREES_TEXT) missing(`no ${path.relative(ROOT, TREES_FILE).replace(/\\/g, "/")}: the actor trees would have no collision`);
 const TREES = TREES_TEXT ? JSON.parse(TREES_TEXT.replace(/([:\[,]\s*)-?(?:NaN|Infinity)(?=\s*[,\]}])/g, "$1null")) : null;
 // the extras each hole must have: TreeLeaf canopies everywhere, H3's sea
-const EXPECT = (hole) => (hole === 3 ? ["leaf", "water"] : ["leaf"]);
+const EXPECT = (hole) => (hole === 3 && !NO_WATER ? ["leaf", "water"] : ["leaf"]);
 // trees.json's family as WSR's tree kind (the naming the app's tree markers use)
 const KIND = { broadleaf: 2, conifer: 3, palm: 6 };
 
@@ -183,14 +191,14 @@ function dumpActors(hh) {
 
 fs.mkdirSync(OUT, { recursive: true });
 const index = {
-  version: 2, src: "nss",
+  version: 2, src: "nss", ...(GAME ? { game: GAME } : {}),
   _note: "NSS's collision meshes for the live solver (tools/build-course3d.mjs; src/live3d-core.js buildCourse reads them through tools/lib/nss3d.mjs, NSS's ball src/nsssim.js flies over them): per hole hNN.bin (V/T/A the ground pack, TV/TT/TA the tree pack, KV/KT/KA the actor trees' kind meshes; vertices in NSS metres, mesh = unitsPerM * nss + O) and hNN.json (meta.trees: each actor tree's kind and placement)",
   unitsPerM: 10, thick: THICK, cropM: CROP_M, attrMap: ATTR_MAP, attrs: ATTR_LABEL, holes: {}, source: {},
 };
 if (TREES_TEXT) index.source.trees = sha1(TREES_TEXT);
 let total = 0, actorAll = 0, actorTris = 0;
 const kindsUsed = new Map();
-for (let hole = 1; hole <= 21; hole++) {
+for (const hole of HOLES) {
   const hh = pad2(hole), reg = regOf(REG, hole), O = [reg.originMesh[0], reg.originMeshY, reg.originMesh[1]], U = reg.unitsPerM;
   const m = loadCollision(COLL, hole, { covers: true, extras: ["leaf", "water"] });
   for (const x of EXPECT(hole)) if (!m.sha1[x]) missing(`H${hole}: no collision/h${hh}-${x}.* (${x === "leaf" ? "its TreeLeaf canopies" : "its sea"})`);
@@ -248,7 +256,14 @@ for (let hole = 1; hole <= 21; hole++) {
     const k = (tree ? "T" : "G") + [pkey(Tr[3 * t]), pkey(Tr[3 * t + 1]), pkey(Tr[3 * t + 2])].sort().join("|");
     const g = groups.get(k);
     if (g == null) { groups.set(k, t); continue; }
-    if (attr[g] !== attr[t]) { const mk = `${code[g]}+${code[t]}`; mixed[mk] = (mixed[mk] ?? 0) + 1; }
+    if (attr[g] !== attr[t]) {
+      const mk = `${code[g]}+${code[t]}`; mixed[mk] = (mixed[mk] ?? 0) + 1;
+      if (!tree) {   // two ground codes on one triangle: TIE_ORDER decides, as in public/terrain
+        const rg = rankOf(code[g]), rt = rankOf(code[t]);
+        if (rt < rg) { keep[g] = 0; groups.set(k, t); drop.dup++; continue; }
+        if (rg < rt) { keep[t] = 0; drop.dup++; continue; }
+      }
+    }
     if (tree) { treeDup++; continue; }
     if (ny[t] > ny[g]) { keep[g] = 0; groups.set(k, t); } else keep[t] = 0;
     drop.dup++;
@@ -357,7 +372,7 @@ for (let hole = 1; hole <= 21; hole++) {
   }
   // ---- tees (audit: the local tee stays the WSR start, INTEGRATION.md D3) ----
   const T0 = PINS.holes[hole].tees, tm = (w) => nssToMesh(reg, w).map(r4);
-  const tee = { wsrStart: tm(T0.wsrStart.world), teeObj: tm(T0.teeObj.world), rotateObj: tm(T0.rotateObj.world) };
+  const tee = { wsrStart: T0.wsrStart?.world ? tm(T0.wsrStart.world) : null, teeObj: tm(T0.teeObj.world), rotateObj: tm(T0.rotateObj.world) };
   // ---- the platform: the seven standing spots per tier, on the mat ----
   const ph = PLAT.holes[hole];
   const tiers = {};
@@ -394,4 +409,4 @@ index.kinds = Object.fromEntries([...kindsUsed.entries()].sort());
 for (const f of fs.readdirSync(OUT)) if (f === "palm.bin") fs.unlinkSync(path.join(OUT, f));
 if (missingNotes.length) index.missing = missingNotes;
 fs.writeFileSync(path.join(OUT, "index.json"), JSON.stringify(index, null, 1));
-console.log(`21 holes, ${(total / 1024 / 1024).toFixed(2)} MB (${total} bytes); ${actorAll} actor trees, ${actorTris} triangles placed from ${kindsUsed.size} kind meshes${missingNotes.length ? `; built WITHOUT (--allow-missing): ${missingNotes.join("; ")}` : ""}`);
+console.log(`${HOLES.length} holes, ${(total / 1024 / 1024).toFixed(2)} MB (${total} bytes); ${actorAll} actor trees, ${actorTris} triangles placed from ${kindsUsed.size} kind meshes${missingNotes.length ? `; built WITHOUT (--allow-missing): ${missingNotes.join("; ")}` : ""}`);

@@ -128,7 +128,8 @@ for (const c of GROUND_CODES) if (CLASS_OF[c] == null) throw new Error(`NSS grou
 const CUP_CODES = new Set([30, 31]);
 const RAY_CODES = new Set([...GROUND_CODES, ...CUP_CODES]);
 // separate collision actors a hole's ground includes (loadCollision extras)
-const EXTRAS = { 3: ["water"] };
+// SR (--no-extras): the water is in the field mesh, H3's sea included; no separate actor exists
+const EXTRAS = process.argv.includes("--nss-extras") ? { 3: ["water"] } : {};   // SR: no separate water actor (--nss-extras: NSS's H3 sea)
 const EXTRA_ACTOR = { water: "Object_BGOBJ_GolfCourse03Water, H3's sea: without it the field mesh's sea floor, sand OB, stands where the water is" };
 
 // A cell's class from its rays' votes: votes[c] = the rays that landed on
@@ -176,7 +177,7 @@ function crop(mesh, x0, z0, x1, z1) {
 function buildHole(n) {
   const reg = regOf(REGJ, n), t = TRUTH[n], tees = PINS[n]?.tees;
   if (!t?.greenBox || !t.scale) throw new Error(`H${n}: no green box or scale in tools/nss-truth.json`);
-  if (!tees?.wsrStart?.mesh) throw new Error(`H${n}: no WSR start in tools/nss-pins.json`);
+  if (!tees?.wsrStart?.mesh && !tees?.teeObj?.world) throw new Error(`H${n}: no WSR start or GlfTeeOBJ in tools/nss-pins.json`);
   const extras = EXTRAS[n] ?? [];
   const full = loadCollision(opt.collision, n, { covers: true, extras });
   const files = (list) => list.map((m) => `h${String(n).padStart(2, "0")}-${m}.json / .bin (${EXTRA_ACTOR[m] ?? m})`).join(", ");
@@ -271,7 +272,7 @@ function buildHole(n) {
   const noHeight = heights.reduce((s, v) => s + (v === NODATA), 0);
   const entry = {
     file: `h${nn}.bin`, meshId: full.meta.shape, datumY: +datumY.toFixed(2), datumYd: +(datumY / KCL_UNITS_PER_M / M_PER_YD).toFixed(4),
-    datumWsrMeshY: tees.wsrStart.mesh[1], bytes: tb.length, sha1: sha1(tb),
+    datumWsrMeshY: tees.wsrStart?.mesh?.[1] ?? null, bytes: tb.length, sha1: sha1(tb),
     collisionSha1: full.sha1, ...(full.missing.length ? { missing: full.missing } : {}),
     classes: tally, noHeight,
     green: { file: `g${nn}.bin`, w: gw, h: gh, box: { x0: +gx0.toFixed(6), y0: +gy0.toFixed(6), x1: +gx1.toFixed(6), y1: +gy1.toFixed(6) }, stepYd: GREEN_STEP_YD, z0Yd, unitYd: GREEN_UNIT_YD, inside, rangeYd: [+lo.toFixed(3), +hi.toFixed(3)], bytes: gb.length, sha1: sha1(gb) },
@@ -285,12 +286,13 @@ function buildHole(n) {
 function main() {
   const args = process.argv.slice(2);
   opt = {
-    collision: join(ROOT, "tools/harness/state/eden/nss-golf-x/collision"),
+    collision: join(ROOT, "tools/harness/state/eden/sr-golf-x/collision"),   // the SR dump since 2026-11-04
     truth: join(ROOT, "tools/nss-truth.json"),
     registration: join(ROOT, "tools/nss-registration.json"),
     pins: join(ROOT, "tools/nss-pins.json"),
     out: join(ROOT, "public/terrain"),
     holes: null,
+    game: "Switch Sports Resort 1.0.0",
     allowMissing: new Set(),
   };
   const USAGE = "usage: node tools/build-terrain.mjs [--collision dir] [--truth tools/nss-truth.json] [--registration tools/nss-registration.json] [--pins tools/nss-pins.json] [--out public/terrain] [--holes 7,16] [--allow-missing water]";
@@ -303,17 +305,21 @@ function main() {
     else if (a === "--pins") opt.pins = resolve(args[++i]);
     else if (a === "--out") opt.out = resolve(args[++i]);
     else if (a === "--holes") opt.holes = args[++i].split(",").map(Number);
+    else if (a === "--no-extras" || a === "--nss-extras") {}
+    else if (a === "--game") opt.game = args[++i];
     else if (a === "--allow-missing") for (const m of (args[++i] ?? "").split(",")) {
       if (!extraNames.has(m)) { console.error(`--allow-missing: one of ${[...extraNames].join(", ")}, not "${m}"\n${USAGE}`); process.exit(1); }
       opt.allowMissing.add(m);
     }
     else { console.error(`unknown argument ${a}\n${USAGE}`); process.exit(1); }
   }
-  const HOLES = opt.holes ?? Array.from({ length: 21 }, (_, i) => i + 1);
-  if (HOLES.some((n) => !(Number.isInteger(n) && n >= 1 && n <= 21))) { console.error(`--holes: 1-21 only\n${USAGE}`); process.exit(1); }
   const OUT = opt.out;
   const readJson = (q) => JSON.parse(readFileSync(q, "utf8"));
   TRUTH = readJson(opt.truth).holes; REGJ = readJson(opt.registration); PINS = readJson(opt.pins).holes;
+  // the holes are the pins file's (NSS 1-21, SR 1-27)
+  const ALL = Object.keys(PINS).map(Number).filter(Number.isInteger).sort((a, b) => a - b);
+  const HOLES = opt.holes ?? ALL;
+  if (HOLES.some((n) => !ALL.includes(n))) { console.error(`--holes: one of ${ALL.join(",")} only\n${USAGE}`); process.exit(1); }
 
   // every file is written only after every hole has built
   let built;
@@ -333,6 +339,7 @@ function main() {
   const index = {
     _note: "Course terrain for the app, written by tools/build-terrain.mjs from NSS's own collision (the Switch game's Fld_GolfCourseNN field meshes with the six HoleCovers closing the cups, and on H3 the separate sea actor Object_BGOBJ_GolfCourse03Water) by vertical ray casts through tools/nss-registration.json; read by src/terrain.js. hNN.bin: the ground height and surface class on a w x h grid over the 250x304 map frame (sample (i, j) = the map px square [2i, 2i+2) x [2j, 2j+2), its centre at ((i+0.5)/w, (j+0.5)/h)): the height the ray at the centre lands on, in ydPerUnit above the hole's datum (NSS y 0 = the WSR player start's height; datumY = it in WSR's KCL units, 0.1 m, datumYd in yd), nodata where no ground lies under it; the class the majority of 4x4 rays over the cell (classNames: the KCL vocabulary plus 17, sand OB; codeToClass maps the NSS surface codes). gNN.bin: heights over nss-truth.json's green box + margin at stepYd, in unitYd above z0Yd (the green's mean height above the datum), with a mask of the nodes whose ray lands on the green. Byte layouts in the tool's header; both files repeat their own sizes, datum, box and units in a header. classes: per-hole sample counts by class; noHeight: samples with no ground; collisionSha1: the dump files read; datumWsrMeshY: the WSR start's height in KCL units (tools/nss-pins.json), against datumY; missing (only on a build run with --allow-missing): the separate collision actors the hole was built without.",
     source: "nss",
+    ...(opt.game ? { game: opt.game } : {}),
     version: LAYOUT, w: GW, h: GH, mapPxPerSample: GRID_PX, classRaysPerSample: SUB * SUB, ydPerUnit: Z_UNIT_YD, nodata: NODATA, headerBytes: HEADER,
     classNames: CLASS_NAMES, codeToClass: CLASS_OF,
     green: { stepYd: GREEN_STEP_YD, margin: GREEN_MARGIN, unitYd: GREEN_UNIT_YD, headerBytes: GREEN_HEADER },
