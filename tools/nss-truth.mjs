@@ -14,8 +14,8 @@
 //
 // The holes are the registration's (1..27 for Switch Sports Resort, the default since 2026-11-04; 1..21 for NSS: point
 // --collision at tools/harness/state/eden/nss-golf-x/collision and --registration at the nss-registration.json
-// tools/nss-export.mjs wrote from that dump, with --game "" to leave the label out, which gives the NSS file of before byte for
-// byte). `meshId` is the field shape (Shape_Fld_Glf_CourseNN_Col; NSS's Fld_GolfCourseNN). --game "<label>" records the game in
+// tools/nss-export.mjs wrote from that dump, with --game "" to leave the label out and --out <file> beside the committed one,
+// which gives the NSS file of before byte for byte). `meshId` is the field shape (Shape_Fld_Glf_CourseNN_Col; NSS's Fld_GolfCourseNN). --game "<label>" records the game in
 // `source.game` and in the note.
 //
 // The collision dump is git-ignored (on the dump machine only), so the output

@@ -241,5 +241,19 @@ ok(eq(JSON.parse(JSON.stringify(out)), out), "the migrated store survives JSON")
   ok(M.srRow(s5, true) === s5 && M.srRow(s0, true) === s0 && M.srRow(sn, true) === sn && M.srRow(null, true) === null, "srRow: an unmoved row is the same object");
   console.log("6. srNeedsMove and srRow");
 }
+// ---- 7. srBackupOnce against src/storage.js's semantics (get throws on a missing key) and against a get that gives null ----
+{
+  const shim = (throwing) => { const m = new Map(); return { m, async get(k) { if (!m.has(k)) { if (throwing) throw new Error("key not found: " + k); return null; } return { key: k, value: m.get(k) }; }, async set(k, v) { m.set(k, v); return { key: k, value: v }; } }; };
+  for (const throwing of [true, false]) {
+    const st = shim(throwing), tag = throwing ? "a get that throws on a missing key" : "a get that gives null";
+    ok(await M.srBackupOnce(st, "k", "{\"old\":1}") === true && st.m.get("k.pre-sr") === "{\"old\":1}", `srBackupOnce writes the copy (${tag})`);
+    ok(await M.srBackupOnce(st, "k", "{\"newer\":2}") === false && st.m.get("k.pre-sr") === "{\"old\":1}", `srBackupOnce never writes over an earlier copy (${tag})`);
+    ok(await M.srBackupOnce(st, "other", 42) === false && !st.m.has("other.pre-sr"), `srBackupOnce takes only a string (${tag})`);
+  }
+  const full = { async get() { throw new Error("key not found"); }, async set() { throw new Error("QuotaExceededError"); } };
+  ok(await M.srBackupOnce(full, "k", "{}") === false, "srBackupOnce: a quota failure is swallowed");
+  ok(await M.srBackupOnce(null, "k", "{}") === false, "srBackupOnce: no storage, no write");
+  console.log("7. srBackupOnce written once, never over an earlier copy");
+}
 console.log(fails ? `${fails} of ${checks} checks FAILED` : `all ${checks} checks passed`);
 process.exit(fails ? 1 : 0);

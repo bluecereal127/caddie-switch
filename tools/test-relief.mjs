@@ -6,8 +6,8 @@
 //     500x608: the buffer's size, and every drawn pixel (lines, their light
 //     edge, labels) on a sample with data: none where class 0 or no height
 //  2. the tee's own level: a dark red (0 yd) line within 12 map px of the
-//     tee in derived.json on every hole whose tee stands at the datum (the
-//     datum is NSS y 0, the tee's height on 26 holes; SR 23's tee, 10 m up, is not)
+//     tee in derived.json on every hole, the image drawn with teeYd = the
+//     terrain under the tee (0, the datum, on 26 holes; SR 23's tee is 10.9 yd up)
 //  3. a synthetic 20 yd ramp (1 -> 21 yd down the frame): 10 contour lines in
 //     every column, each one dark pixel thick; with labels, the same count in
 //     every column no label touches, and labels on the 10 and 20 yd levels
@@ -33,10 +33,10 @@ const isZero = (d, p) => d[4 * p] === 150 && d[4 * p + 1] === 20 && d[4 * p + 2]
 for (let n = 1; n <= 27; n++) {
   const t = read(n);
   for (const [w, h] of n === 25 ? [[250, 304], [500, 608]] : [[250, 304]]) {
-    const img = n === 25 && w === 250 ? R.contourImage(t) : R.contourImage(t, { w, h });
+    const tee = derived[n]?.tee ?? null, teeYd = tee ? (T.heightAt(t, tee.x, tee.y) ?? 0) : 0;   // (the tee's own ground: the datum but on SR 23)
+    const img = n === 25 && w === 250 ? R.contourImage(t) : R.contourImage(t, { w, h, teeYd });
     ok(img.w === w && img.h === h && img.data.length === w * h * 4, `H${n} ${w}x${h}: buffer size`);
     let drawn = 0, offData = 0, onClass0 = 0, zeroD = Infinity;
-    const tee = n === 23 ? null : derived[n]?.tee;   // (SR 23's tee is 10 m above the datum)
     for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) {
       const p = j * w + i;
       if (!img.data[4 * p + 3]) continue;

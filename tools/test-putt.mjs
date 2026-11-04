@@ -339,7 +339,7 @@ const greenOf = (n, cupId = null) => {
     let m = 0;
     for (let i = 0; i < 60; i++) for (let j = 0; j < 60; j++) { field.grad((i / 59) * W, (j / 59) * H, o); m = Math.max(m, Math.hypot(o[0], o[1])); }
     steep.push(m);
-    ok(m < 0.42, `H${n}'s green reads a ${(100 * m).toFixed(1)} % slope`);
+    ok(m < (n === 24 || n === 27 ? 0.42 : 0.35), `H${n}'s green reads a ${(100 * m).toFixed(1)} % slope (at most ${n === 24 || n === 27 ? 42 : 35})`);   // (SR 24 35.4 %, SR 27 38.8 %; every other hole 31.1 or less)
   }
   console.log(`g. steepest gradient per green box: ${steep.map((m, k) => `H${k + 1} ${(100 * m).toFixed(1)}`).join(" ")} %`);
 }

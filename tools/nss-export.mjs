@@ -2,7 +2,7 @@
 // exported from the git-ignored dump into three small committed files:
 //
 //   node tools/nss-export.mjs [--src tools/harness/state/eden/sr-golf-x] [--out-dir tools] [--game "Switch Sports Resort 1.0.0"]
-//   (the NSS files of before, byte for byte: --src tools/harness/state/eden/nss-golf-x --game "NSS 1.5.0")
+//   (the NSS files of before, byte for byte: --src tools/harness/state/eden/nss-golf-x --game "NSS 1.5.0" --out-dir <dir>)
 //
 //   tools/nss-registration.json  per hole the NSS world -> map similarity (px = a*x - b*z + tx,
 //                                py = b*x + a*z + ty; pins.json's tree fit, copied at full

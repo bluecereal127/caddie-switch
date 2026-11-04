@@ -263,7 +263,7 @@ for (const hole of HOLES) {
         mixedKept[mk] = rt < rg ? code[t] : code[g];
         if (rt < rg) { keep[g] = 0; groups.set(k, t); drop.dup++; continue; }
         if (rg < rt) { keep[t] = 0; drop.dup++; continue; }
-      }
+      } else mixedKept[mk] = "both (tree pack)";
     }
     if (tree) { treeDup++; continue; }
     if (ny[t] > ny[g]) { keep[g] = 0; groups.set(k, t); } else keep[t] = 0;

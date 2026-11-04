@@ -13,7 +13,7 @@ import { MAP_SCALES, mapScaleOf, mapFileUrl, loadMapIndex, preloadImage } from "
 import { scrollFor } from "./mapView.js";
 import { liveSolve } from "./live3d.js";
 import { onlineOf, checkOnline, fixOnline, pairWith, ballOf, startOf, onPlatform, slotLift, TIERS, HANDS, HIGH_COUNTS, LOW_COUNTS } from "./platform.js";
-import { SR_HOLES, SR_PARS, srMigrate, srNeedsMove, srRow, srFrameFix } from "./srMigrate.js";
+import { SR_HOLES, SR_PARS, srMigrate, srNeedsMove, srRow, srBackupOnce, srFrameFix } from "./srMigrate.js";
 
 
 /* ============================================================
@@ -1150,8 +1150,9 @@ export default function App() {
       const srOld = srNeedsMove(d);
       if (srOld) {
         // the state as it was, kept beside the store under its own key, written once (never over an earlier copy; a quota
-        // failure is ignored), so the one-way move below can be undone by hand from it
-        try { const prev = await window.storage.get(STORE_KEY + ".pre-sr"); if (!prev?.value) await window.storage.set(STORE_KEY + ".pre-sr", raw); } catch {}
+        // failure is ignored; src/srMigrate.js srBackupOnce, which reads the key with a try of its own since the shim's get
+        // throws on a missing key), so the one-way move below can be undone by hand from it
+        await srBackupOnce(window.storage, STORE_KEY, raw);
         d = srMigrate(d, { notes: NOTES });
       }
       if (d) {
@@ -2560,11 +2561,14 @@ export default function App() {
                           // from the putt rows, so it travels for reference only)
                           const got = JSON.parse(ioText);
                           if (!got || typeof got !== "object") return;
-                          // an export from before the 27-hole numbering (the object form without srHolesV1) carries NSS's hole
-                          // numbers: its rows move 19 -> 24, 20 -> 23, 21 -> 25 (a hole 17 / 20 row's pos through the frame change)
-                          // as the store's did; a bare array is rows typed now, under SR's numbers
+                          // an export from before the 27-hole numbering carries NSS's hole numbers: the object form without
+                          // srHolesV1, and a bare array of exported rows (wAlong set: the export was a bare array whenever no putt
+                          // was logged, and every build that wrote one was NSS-numbered); such rows move 19 -> 24, 20 -> 23,
+                          // 21 -> 25 (a hole 17 / 20 row's pos through the frame change) as the store's did. Rows typed by hand
+                          // (no wAlong) are rows typed now, under SR's numbers
                           const nssNumbered = !Array.isArray(got) && got.srHolesV1 !== true;
-                          const arr = (Array.isArray(got) ? got : Array.isArray(got.shots) ? got.shots : []).map((r) => (nssNumbered ? srRow(r, true) : r));
+                          const oldRow = (r) => nssNumbered || (Array.isArray(got) && r && typeof r === "object" && r.wAlong != null);
+                          const arr = (Array.isArray(got) ? got : Array.isArray(got.shots) ? got.shots : []).map((r) => (oldRow(r) ? srRow(r, true) : r));
                           const inPutts = Array.isArray(got) ? [] : puttRows(Array.isArray(got.putts) ? got.putts.map((r) => (nssNumbered ? srRow(r, false) : r)) : got.putts);
                           const conv = arr.map((r, i) => {
                             if (r.wAlong != null) return r;
@@ -2585,7 +2589,7 @@ export default function App() {
                         } catch {}
                       }} className="flex-1 py-1 rounded-lg border-2 font-bold" style={chip(false)}>Import (replace box first)</button>
                   </div>
-                  <div className="opacity-60 text-[10px]">Copy the box to back up. To import, paste a JSON array — either exported shots, or simple rows like {"{"}"club":"driver","power":4,"lie":"tee","windSpeed":9,"windDeg":180,"ended":242,"hole":10,"stroke":1{"}"} (side optional; "landed":"green" etc. says where it finished, fairway when left out). I can generate these from your screenshots in chat. The box holds {"{"}"shots":[…],"putts":[…],"greenSpeed":…,"srHolesV1":true{"}"} (an export from before the 27-hole numbering, without srHolesV1, is renumbered on import: 19 → 24, 20 → 23, 21 → 25); putt rows are {"{"}"bars":2,"rolled":10.1,"flat":true,"hole":4{"}"}, and greenSpeed is refitted from them.</div>
+                  <div className="opacity-60 text-[10px]">Copy the box to back up. To import, paste a JSON array — either exported shots, or simple rows like {"{"}"club":"driver","power":4,"lie":"tee","windSpeed":9,"windDeg":180,"ended":242,"hole":10,"stroke":1{"}"} (side optional; "landed":"green" etc. says where it finished, fairway when left out). I can generate these from your screenshots in chat. The box holds {"{"}"shots":[…],"putts":[…],"greenSpeed":…,"srHolesV1":true{"}"} (an export from before the 27-hole numbering, without srHolesV1, and a pasted array of exported rows are renumbered on import: 19 → 24, 20 → 23, 21 → 25; rows typed by hand keep their numbers, SR's); putt rows are {"{"}"bars":2,"rolled":10.1,"flat":true,"hole":4{"}"}, and greenSpeed is refitted from them.</div>
                 </div>
               )}
             </section>

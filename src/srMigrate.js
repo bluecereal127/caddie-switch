@@ -96,6 +96,18 @@ export function srRow(r, posToo) {
   return o;
 }
 
+// The state as it was, kept beside the store under `${key}.pre-sr` before the one-way move, written once: never over an
+// earlier copy (the shim's get throws on a missing key, src/storage.js, so that read has a try of its own); a quota
+// failure or a storage without set is ignored. Resolves true when the copy was written. App.jsx runs it only when
+// srNeedsMove(d).
+export async function srBackupOnce(storage, key, raw) {
+  if (!storage || typeof raw !== "string") return false;
+  let prev = null;
+  try { prev = await storage.get(key + ".pre-sr"); } catch {}
+  if (prev && prev.value) return false;
+  try { await storage.set(key + ".pre-sr", raw); return true; } catch { return false; }
+}
+
 // The stored state (the parsed JSON of caddie:sss-golf-solver-v2) onto SR's numbering, once: holesMeta re-keyed
 // (and each moved hole as rekeyHole says), shots' and putts' hole, the rounds' and the active round's scores keys;
 // a row's pos (a map fraction of the address frame's minimap) of SR 17 or of NSS 20 (SR 23) goes through the frame

@@ -31,7 +31,7 @@
 // trunk is an actor tree (the kinds include the _OB variants); water, H3's sea included, is in the field mesh (no separate actor); the six
 // covers are 20 triangles each except H27's cup 0, a two-ring disc of 60 (160 cover triangles on that hole), which tools/lib/nss3d.mjs
 // has to remove by its triangle range for that cup to open fully (a change awaiting the user's approval: until it does the outer
-// annulus stays and plugs the bevel; a ball dropped on the centre still holes, one dropped 0.10 m off it rests on the annulus,
+// annulus stays and plugs the bevel; a ball dropped on the centre still holes, one dropped 0.12 m off it rests on the annulus,
 // which the drop checks below state).
 //   node tools/test-course3d.mjs
 import fs from "node:fs";
@@ -193,12 +193,13 @@ for (let hole = 1; hole <= HOLES; hole++) {
     const drop = (key) => S.run({ club: "PT", start: [q.x, q.top + 0.02 + S.BALL_R, q.z], v0: [0, -3, 0], ground: N.ground({ cupKey: key }), cup: key ? { x: N.cups[key].x, y: N.cups[key].y, z: N.cups[key].z } : null });
     const inn = drop(`c${c.k}`), shut = drop(other);
     if (inn.holed) cupsOpen++;
-    // off the centre (0.10 m, inside the rim): holes in every direction on every cup but H27 c0, whose two-ring cover
+    // off the centre (0.12 m, inside the rim; every other cup holes out to 0.14 m, H27 c0 catches from 0.10 m): holes in every
+    // direction on every cup but H27 c0, whose two-ring cover
     // tools/lib/nss3d.mjs opens only at its inner fan (the annulus, r 0.15-0.19 m, stays: pending the user's approval of the
     // cover-range opening, lab/r6work/sr/wire/LEAD-NOTES.md item 2)
-    const offs = [[0.1, 0], [-0.1, 0], [0, 0.1], [0, -0.1]].map(([dx, dz]) => S.run({ club: "PT", start: [q.x + dx, q.top + 0.02 + S.BALL_R, q.z + dz], v0: [0, -3, 0], ground: N.ground({ cupKey: `c${c.k}` }), cup: { x: q.x, y: q.y, z: q.z } }).holed);
+    const offs = [[0.12, 0], [-0.12, 0], [0, 0.12], [0, -0.12]].map(([dx, dz]) => S.run({ club: "PT", start: [q.x + dx, q.top + 0.02 + S.BALL_R, q.z + dz], v0: [0, -3, 0], ground: N.ground({ cupKey: `c${c.k}` }), cup: { x: q.x, y: q.y, z: q.z } }).holed);
     const plugged = hole === 27 && c.k === 0, nIn = offs.filter(Boolean).length;
-    ok(plugged ? nIn < 4 : nIn === 4, `H${hole} c${c.k}: balls dropped 0.10 m off the centre hole in ${nIn} of 4 directions${plugged ? " (the annulus of its two-ring cover stays in the course: pending approval)" : ""}`);
+    ok(plugged ? nIn < 4 : nIn === 4, `H${hole} c${c.k}: balls dropped 0.12 m off the centre hole in ${nIn} of 4 directions${plugged ? " (the annulus of its two-ring cover stays in the course: pending approval)" : ""}`);
     if (!shut.holed && shut.outcome === "rest" && shut.restAttr === S.ATTR.green && Math.abs(shut.rest[1] - q.top - S.BALL_R) < 0.02) coversShut++;
     ok(inn.holed && !shut.holed && shut.restAttr === S.ATTR.green, `H${hole} c${c.k}: in play a ball dropped into it is ${inn.outcome}; with ${other} in play it rests on the cover (${shut.outcome} on ${S.ATTR_NAME[shut.restAttr]}, ${(shut.rest[1] - q.top).toFixed(3)} m up)`);
   }

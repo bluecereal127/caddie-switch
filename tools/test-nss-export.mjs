@@ -12,7 +12,7 @@
 //     derived.json's greenPoly; mesh = the surface point through the mesh
 //     offset, and through tools/mesh-registration.json's meshToMapFrac (an
 //     independent path, 100-560 yd from the origin) within 0.1 px of x/y; the
-//     surface 0.245-0.345 m over the bone (NSS 0.29-0.345, SR 26's cups 0.25-0.285); the cover hub within 4 mm; the
+//     surface 0.29-0.345 m over the bone (0.245-0.29 on SR 26, whose cups are 0.251-0.285); the cover hub within 4 mm; the
 //     yardages from the WSR start (the GlfTeeOBJ's on SR's six new holes, which
 //     have none) and GlfTeeOBJ; the WSR start (from
 //     tools/wsr-pins.json: NSS's hole of the same SR number or, SR 24 / 23 / 25, NSS 19 / 20 / 21) within 0.2 px of its own map point (in SR's
@@ -24,7 +24,7 @@
 //     3.5 m behind the low along facingDeg; z = the mats (0.0996 / 1.668 m, not
 //     the 0.117 / 1.686 rim): 0.1089 / 1.8241 yd, + the origin's height (0.1094 on H3, 10.94 on SR 23); left-to-right
 //     order on every map (slot 0 = R2 the rightmost, slot 3 = L2 the leftmost);
-//     the 8 bones within 0.8 px of the decoder's own map points; ground under
+//     the 8 bones within 0.8 px of the decoder's own map points (vacuous on the SR dump, whose points are the assembler's through the same registration); ground under
 //     every position; every stance (10 * world + O) through mesh-registration.json
 //     within 0.02 px; per stance its two balls (ballOffsetM -0.9 / +0.9 m along
 //     local x): placed by the same pose, 0.9 m to the right (right-handed) or
@@ -42,8 +42,8 @@
 //  5. with the dump present: a fresh export is identical to the committed
 //     files (line ends aside: core.autocrlf may check them out CRLF; an export
 //     that fails is a FAIL line), their source SHA-1s are the dump's;
-//     slots.json's 513 stands are the stances (1e-4 px) and its 1026 balls the
-//     balls (0.002 px, heights 1e-4 yd); and on every hole (H3's sea is in its
+//     slots.json's stands are the stances (1e-4 px; 361 compared, on the 19 holes it has, SR 17's through the frame change
+//     within 0.004) and its balls the balls (0.002 px, SR 17 0.006, heights 1e-4 yd; 722); and on every hole (H3's sea is in its
 //     field mesh: no water extra), the
 //     ground at the WSR start, Glf_RotateOBJ and GlfTeeOBJ is 0.000 m fairway (the tee's own height, 10 m, on SR 23),
 //     each cup's top ground is its own cover at the shipped surface, and the

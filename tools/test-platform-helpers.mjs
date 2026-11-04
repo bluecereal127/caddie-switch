@@ -212,7 +212,7 @@ for (let n = 1; n <= HOLES; n++) {
       const e0 = sh[v.tier][`${v.place}-of-${b.count}`]?.[v.hand === "right" ? "rightHanded" : "leftHanded"];
       ok(e0 && near(sh[v.tier][`${v.place}-of-${b.count}`].slotX, b.standX, 1e-9), `${tag} ${key}: slots.json has no entry`);
       if (e0) {
-        const [ex, ey] = SRM.toSrFrame(n, e0.x, e0.y), e = { ...e0, x: ex, y: ey }, tolX = PX_TOL;   // (NSS's frame into SR's: SR 17's worst is 0.0019 px)
+        const [ex, ey] = SRM.toSrFrame(n, e0.x, e0.y), e = { ...e0, x: ex, y: ey }, tolX = PX_TOL;   // (NSS's frame into SR's: SR 17's worst is 0.0017 px; every hole 0.0014-0.0019 from 5-decimal rounding)
         const d = pxOff(b, e), ds = pxOff(bs, e);
         stats.slots = Math.max(stats.slots, d); stats.shipped = Math.max(stats.shipped, ds); stats.height = Math.max(stats.height, Math.abs(b.zYd - e.heightYd)); stats.nSlots++;
         ok(d <= tolX, `${tag} ${key}: ${d.toFixed(4)} px from slots.json's ball`);
