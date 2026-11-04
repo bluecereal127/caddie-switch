@@ -1,20 +1,20 @@
 {
- "_note": "The flat stand-ins tools/render-nss-maps.py --backdrop world composites the off-course minimap pane over (linear RGB, after P_bg's dimming): NSS draws the pane translucent over the live 3D view, which no file holds. Derived by `python -P tools/render-nss-maps.py --derive-backdrop` from the capture stacks captures/derived/maps/hNN.png (median Switch tee frames): per off-course px (pane alpha < 0.99, outside the HUD and the window's border), est = (stack - alpha * pane) / (1 - alpha) in linear light, sorted into ob / sea (filtered texel B > 0.8 G) / void (texel A >= 254); each kind's value is the weighted median of est, weights 1 - alpha, pooled over the holes with at least 200 px of it (perHole lists every hole's own), which minimises the summed |stack - composite| over those px. A kind no hole has enough of falls back to ob.",
+ "_note": "The flat stand-ins tools/render-nss-maps.py --backdrop world composites the off-course minimap pane over (linear RGB, after P_bg's dimming): NSS draws the pane translucent over the live 3D view, which no file holds. Derived by `python -P tools/render-nss-maps.py --derive-backdrop` from the capture stacks captures/derived/maps/hNN.png (median Switch tee frames): per off-course px (pane alpha < 0.99, outside the HUD and the window's border), est = (stack - alpha * pane) / (1 - alpha) in linear light, sorted into ob / sea (filtered texel B > 0.8 G) / void (texel A >= 254); each kind's value is the weighted median of est, weights 1 - alpha, pooled over the holes with at least 200 px of it (perHole lists every hole's own), which minimises the summed |stack - composite| over those px. A kind no hole has enough of falls back to ob. For SR (--game sr) the stacks are SR's own screen: each hNN.png in the app frame is the median of the live advisor's tee-overview frames of the hole (720p captures of the game, address frames with the minimap at overview), their minimap pane warped into the frame through a fitted pane model (the capture square's centre and side in screen px, per hole), so the stand-ins rest on the holes that have frames.",
  "world": {
   "ob": [
-   0.0083,
-   0.0595,
-   0.0056
+   0.0136,
+   0.1116,
+   0.0037
   ],
   "sea": [
-   0.0101,
-   0.0718,
-   0.0874
+   0.0123,
+   0.0819,
+   0.0661
   ],
   "void": [
-   0.003,
-   0.013,
-   0.0056
+   0.0103,
+   0.0423,
+   0.011
   ]
  },
  "used": {
@@ -40,9 +40,15 @@
     18,
     19,
     20,
-    21
+    21,
+    22,
+    23,
+    24,
+    25,
+    26,
+    27
    ],
-   "px": 685933
+   "px": 606328
   },
   "sea": {
    "holes": [
@@ -57,400 +63,505 @@
     15,
     17,
     18,
-    19,
-    21
+    21,
+    24,
+    25,
+    27
    ],
-   "px": 260973
+   "px": 218866
   },
   "void": {
    "holes": [
-    21
+    1,
+    22
    ],
-   "px": 763
+   "px": 55308
   }
  },
  "perHole": {
   "1": {
    "ob": {
-    "px": 51020,
-    "weight": 46142.0,
+    "px": 2727,
+    "weight": 392.1,
     "wmedian": [
-     0.0071,
-     0.0424,
-     0.0107
+     0.058,
+     0.2151,
+     0.0254
+    ]
+   },
+   "void": {
+    "px": 33012,
+    "weight": 33012.0,
+    "wmedian": [
+     0.0097,
+     0.0395,
+     0.0152
     ]
    }
   },
   "2": {
    "ob": {
-    "px": 24238,
-    "weight": 21590.2,
+    "px": 22637,
+    "weight": 17588.1,
     "wmedian": [
-     0.0113,
-     0.0504,
-     0.0088
+     0.0245,
+     0.1368,
+     0.0908
     ]
    },
    "sea": {
-    "px": 15914,
-    "weight": 13359.0,
+    "px": 8256,
+    "weight": 7368.1,
     "wmedian": [
-     0.0137,
-     0.0809,
-     0.0874
+     0.0256,
+     0.1489,
+     0.145
     ]
    }
   },
   "3": {
    "ob": {
-    "px": 34009,
-    "weight": 28294.0,
+    "px": 24509,
+    "weight": 19921.5,
     "wmedian": [
-     0.0048,
-     0.0556,
-     0.004
+     0.0101,
+     0.0916,
+     0.0072
     ]
    },
    "sea": {
-    "px": 15170,
-    "weight": 12693.9,
+    "px": 9537,
+    "weight": 8863.6,
     "wmedian": [
-     0.0089,
-     0.0674,
-     0.0849
+     0.0138,
+     0.1042,
+     0.0738
     ]
    }
   },
   "4": {
    "ob": {
-    "px": 16731,
-    "weight": 13785.2,
+    "px": 14966,
+    "weight": 9422.0,
     "wmedian": [
-     0.0115,
-     0.0676,
-     0.0095
+     0.0143,
+     0.109,
+     0.0053
     ]
    },
    "sea": {
-    "px": 18762,
-    "weight": 15732.7,
+    "px": 12439,
+    "weight": 11585.0,
     "wmedian": [
-     0.0137,
-     0.0809,
-     0.0899
-    ]
-   },
-   "void": {
-    "px": 61,
-    "weight": 61.0,
-    "wmedian": [
-     0.007,
-     0.0194,
-     0.0137
+     0.017,
+     0.0907,
+     0.0534
     ]
    }
   },
   "5": {
    "ob": {
-    "px": 35369,
-    "weight": 29441.8,
+    "px": 18761,
+    "weight": 15350.4,
     "wmedian": [
-     0.004,
-     0.0556,
-     0.0029
+     0.0151,
+     0.1142,
+     0.0017
     ]
    },
    "sea": {
-    "px": 15217,
-    "weight": 12691.2,
+    "px": 15158,
+    "weight": 14079.7,
     "wmedian": [
-     0.004,
-     0.0612,
-     0.0899
+     0.0064,
+     0.055,
+     0.068
     ]
    }
   },
   "6": {
    "ob": {
-    "px": 42547,
-    "weight": 35614.5,
+    "px": 33646,
+    "weight": 25824.1,
     "wmedian": [
-     0.0108,
-     0.0697,
-     0.0077
+     0.0114,
+     0.1013,
+     0.0013
     ]
    }
   },
   "7": {
    "ob": {
-    "px": 24067,
-    "weight": 19855.9,
+    "px": 21875,
+    "weight": 17791.4,
     "wmedian": [
-     0.0122,
-     0.0763,
-     0.0129
+     0.0136,
+     0.128,
+     0.1407
     ]
    },
    "sea": {
-    "px": 26786,
-    "weight": 22465.4,
+    "px": 11105,
+    "weight": 10279.9,
     "wmedian": [
-     0.0162,
-     0.0856,
-     0.0874
+     0.0123,
+     0.093,
+     0.0605
     ]
    }
   },
   "8": {
    "ob": {
-    "px": 11724,
-    "weight": 9264.9,
+    "px": 13712,
+    "weight": 10088.0,
     "wmedian": [
-     0.024,
-     0.0879,
-     0.05
+     0.0339,
+     0.094,
+     0.0245
     ]
    },
    "sea": {
-    "px": 32775,
-    "weight": 27210.6,
+    "px": 16672,
+    "weight": 15247.1,
     "wmedian": [
-     0.0115,
-     0.074,
-     0.0899
+     0.0528,
+     0.1286,
+     0.1414
     ]
    }
   },
   "9": {
    "ob": {
-    "px": 46467,
-    "weight": 38965.3,
+    "px": 34129,
+    "weight": 26878.6,
     "wmedian": [
-     0.0083,
-     0.0655,
-     0.004
+     0.0089,
+     0.0964,
+     0.0007
     ]
    }
   },
   "10": {
    "ob": {
-    "px": 47729,
-    "weight": 40076.3,
+    "px": 35480,
+    "weight": 30582.8,
     "wmedian": [
-     0.0066,
-     0.0635,
-     0.0048
+     0.0143,
+     0.1142,
+     0.0023
     ]
    }
   },
   "11": {
    "ob": {
-    "px": 31493,
-    "weight": 26262.0,
+    "px": 40011,
+    "weight": 28781.7,
     "wmedian": [
-     0.0166,
-     0.0572,
-     0.0043
+     0.0177,
+     0.1197,
+     0.0136
     ]
    }
   },
   "12": {
    "ob": {
-    "px": 52735,
-    "weight": 7906.3,
+    "px": 37456,
+    "weight": 32767.3,
     "wmedian": [
-     0.0233,
-     0.1251,
-     0.0504
+     0.0121,
+     0.0964,
+     0.002
     ]
    }
   },
   "13": {
    "ob": {
-    "px": 16774,
-    "weight": 2496.3,
+    "px": 3284,
+    "weight": 306.2,
     "wmedian": [
-     0.0117,
-     0.1176,
-     0.0267
+     0.0198,
+     0.2235,
+     0.0695
     ]
    },
    "sea": {
-    "px": 34842,
-    "weight": 29366.1,
+    "px": 36824,
+    "weight": 34059.1,
     "wmedian": [
-     0.0021,
-     0.0592,
-     0.0849
+     0.0043,
+     0.0516,
+     0.0642
     ]
    }
   },
   "14": {
    "ob": {
-    "px": 19168,
-    "weight": 15734.9,
+    "px": 14757,
+    "weight": 10938.8,
     "wmedian": [
-     0.0122,
-     0.074,
-     0.0083
+     0.0151,
+     0.1224,
+     0.0388
     ]
    },
    "sea": {
-    "px": 21904,
-    "weight": 18419.9,
+    "px": 15870,
+    "weight": 14836.3,
     "wmedian": [
-     0.0129,
-     0.0809,
-     0.0899
+     0.0162,
+     0.0885,
+     0.0587
     ]
    }
   },
   "15": {
    "ob": {
-    "px": 36590,
-    "weight": 30406.4,
+    "px": 27652,
+    "weight": 21348.7,
     "wmedian": [
-     0.0077,
-     0.0614,
-     0.0048
+     0.0114,
+     0.1013,
+     0.001
     ]
    },
    "sea": {
-    "px": 7600,
-    "weight": 6239.8,
+    "px": 3254,
+    "weight": 2999.7,
     "wmedian": [
-     0.0108,
-     0.074,
-     0.0874
+     0.0123,
+     0.0777,
+     0.0518
     ]
    },
    "void": {
-    "px": 60,
-    "weight": 60.0,
+    "px": 1,
+    "weight": 1.0,
     "wmedian": [
-     0.003,
-     0.0091,
-     0.0137
+     0.0109,
+     0.0345,
+     0.0064
     ]
    }
   },
   "16": {
    "ob": {
-    "px": 45003,
-    "weight": 37640.8,
+    "px": 29486,
+    "weight": 23223.5,
     "wmedian": [
-     0.0071,
-     0.0454,
-     0.004
+     0.0136,
+     0.109,
+     0.0013
     ]
    }
   },
   "17": {
    "ob": {
-    "px": 12125,
-    "weight": 1777.5,
+    "px": 10642,
+    "weight": 7497.1,
     "wmedian": [
-     0.0235,
-     0.1292,
-     0.0328
+     0.0159,
+     0.109,
+     0.0072
     ]
    },
    "sea": {
-    "px": 26835,
-    "weight": 22403.3,
+    "px": 16000,
+    "weight": 14830.3,
     "wmedian": [
-     0.0145,
-     0.0809,
-     0.0899
+     0.0153,
+     0.0819,
+     0.0534
     ]
    }
   },
   "18": {
    "ob": {
-    "px": 12634,
-    "weight": 1869.8,
+    "px": 8218,
+    "weight": 6283.7,
     "wmedian": [
-     0.0288,
-     0.1274,
-     0.0516
+     0.0121,
+     0.1183,
+     0.0346
     ]
    },
    "sea": {
-    "px": 35144,
-    "weight": 29217.0,
+    "px": 23452,
+    "weight": 21740.9,
     "wmedian": [
-     0.0052,
-     0.0632,
-     0.0874
+     0.0036,
+     0.0453,
+     0.0623
     ]
    }
   },
   "19": {
    "ob": {
-    "px": 31576,
-    "weight": 25989.7,
+    "px": 33129,
+    "weight": 28952.6,
     "wmedian": [
-     0.0101,
-     0.0676,
-     0.0101
-    ]
-   },
-   "sea": {
-    "px": 4320,
-    "weight": 3516.9,
-    "wmedian": [
-     0.0129,
-     0.0763,
-     0.0874
-    ]
-   },
-   "void": {
-    "px": 9,
-    "weight": 9.0,
-    "wmedian": [
-     0.0161,
-     0.0296,
-     0.032
+     0.0136,
+     0.1116,
+     0.002
     ]
    }
   },
   "20": {
    "ob": {
-    "px": 44931,
-    "weight": 37529.9,
+    "px": 28677,
+    "weight": 22037.3,
     "wmedian": [
-     0.0043,
-     0.0556,
-     0.0036
+     0.0089,
+     0.0869,
+     0.0062
+    ]
+   },
+   "sea": {
+    "px": 18,
+    "weight": 1.4,
+    "wmedian": [
+     0.0429,
+     1.1023,
+     0.8719
     ]
    }
   },
   "21": {
    "ob": {
-    "px": 49003,
-    "weight": 41033.4,
+    "px": 36457,
+    "weight": 31969.4,
     "wmedian": [
-     0.0066,
-     0.0614,
-     0.0061
+     0.0159,
+     0.1142,
+     0.0159
     ]
    },
    "sea": {
-    "px": 5704,
-    "weight": 4743.6,
+    "px": 4096,
+    "weight": 3754.5,
     "wmedian": [
-     0.0021,
-     0.0515,
-     0.0824
+     0.0187,
+     0.0907,
+     0.068
+    ]
+   }
+  },
+  "22": {
+   "ob": {
+    "px": 1869,
+    "weight": 483.8,
+    "wmedian": [
+     0.0525,
+     0.1951,
+     0.0092
     ]
    },
    "void": {
-    "px": 763,
-    "weight": 763.0,
+    "px": 22296,
+    "weight": 22295.9,
     "wmedian": [
-     0.003,
-     0.013,
-     0.0056
+     0.0137,
+     0.0545,
+     0.003
+    ]
+   }
+  },
+  "23": {
+   "ob": {
+    "px": 34080,
+    "weight": 28003.8,
+    "wmedian": [
+     0.0159,
+     0.1116,
+     0.0037
+    ]
+   }
+  },
+  "24": {
+   "ob": {
+    "px": 25473,
+    "weight": 19368.5,
+    "wmedian": [
+     0.0159,
+     0.1169,
+     0.0089
+    ]
+   },
+   "sea": {
+    "px": 2618,
+    "weight": 2437.3,
+    "wmedian": [
+     0.0216,
+     0.1001,
+     0.0517
+    ]
+   },
+   "void": {
+    "px": 12,
+    "weight": 12.0,
+    "wmedian": [
+     0.0997,
+     0.1715,
+     0.0382
+    ]
+   }
+  },
+  "25": {
+   "ob": {
+    "px": 27384,
+    "weight": 23855.6,
+    "wmedian": [
+     0.0044,
+     0.0759,
+     0.0089
+    ]
+   },
+   "sea": {
+    "px": 5722,
+    "weight": 5296.0,
+    "wmedian": [
+     0.0091,
+     0.0585,
+     0.0623
+    ]
+   }
+  },
+  "26": {
+   "ob": {
+    "px": 22518,
+    "weight": 17975.7,
+    "wmedian": [
+     0.0314,
+     0.1295,
+     0.0155
+    ]
+   },
+   "sea": {
+    "px": 16,
+    "weight": 1.1,
+    "wmedian": [
+     0.0256,
+     0.6657,
+     -0.1612
+    ]
+   }
+  },
+  "27": {
+   "ob": {
+    "px": 2793,
+    "weight": 456.1,
+    "wmedian": [
+     0.051,
+     0.2899,
+     0.0931
+    ]
+   },
+   "sea": {
+    "px": 37863,
+    "weight": 35423.3,
+    "wmedian": [
+     0.0097,
+     0.0841,
+     0.074
     ]
    }
   }

@@ -1,15 +1,20 @@
 // Acceptance for derived.json's pins and tees (tools/build-derived.mjs, the Pins
 // block), on the committed files:
-//   1. every hole has exactly NSS's six cups, c0..c5, labelled 1..6, src "nss",
-//      at tools/nss-pins.json's map points, `difficult` on exactly the 16 cups
-//      the game's CupDifficulties lists, `wsr` on exactly the 7 that coincide
+//   1. every hole (Switch Sports Resort's 27, 1-18 NSS's under the same numbers,
+//      SR 23 = NSS 20 lengthened, 24 = NSS 19, 25 = NSS 21, six new) has exactly
+//      six cups, c0..c5, labelled 1..6, src "nss",
+//      at tools/nss-pins.json's map points, `difficult` on exactly the 20 cups
+//      the game's CupDifficulties lists (NSS's 16 and SR 26's and 27's four), `wsr`
+//      on exactly the 7 that coincide
 //      with a WSR spot (each within 0.3 yd of it), yd = the floor of the flat
 //      yards from the tee (GlfTeeOBJ) to the cup, and no Switch-only pin,
 //      pinCandidates, pinZones or teeOnline left;
 //   2. every cup inside the hole's green outline and, over public/terrain, on
 //      the green (class 6);
-//   3. the tee is NSS's GlfTeeOBJ, where local play tees off (hole 1 too), and
-//      teeNss NSS's two tee bones (GlfTeeOBJ = the tee, and Glf_RotateOBJ);
+//   3. the tee is the course's GlfTeeOBJ, where local play tees off (hole 1 too), and
+//      teeNss its two tee bones (GlfTeeOBJ = the tee, and Glf_RotateOBJ); where a WSR
+//      start exists (tees.wsrStart, null on SR's six new holes) the tee's map distance
+//      from it is its distance in metres;
 //   4. with the captures (captures/derived/pin-observations.json), each cup's
 //      `seen` is the number of rounds credited to it, every credited
 //      observation within 2.5 px of its cup, an ambiguous one a near tie, an
@@ -28,13 +33,14 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const J = (...p) => JSON.parse(readFileSync(join(ROOT, ...p), "utf8"));
 const derived = J("public", "derived.json"), D = derived.holes;
 const NP = J("tools", "nss-pins.json").holes, WP = J("tools", "wsr-pins.json").holes;
+const HOLES = 27;   // Switch Sports Resort's (src/srMigrate.js SR_HOLES); WP is WSR's: its holes are NSS's numbers, and the ON_WSR cups below are on holes 1-18, which SR numbers alike
 const W = derived.mapW, H = derived.mapH, YD = 0.9144;
 let fails = 0, checks = 0;
 const ok = (c, m) => { checks++; if (!c) { fails++; console.log(`FAIL ${m}`); } };
 
 // the game's CupDifficulties (GolfFieldMgrParam HoleParams[hole-1]) and the
 // cups that coincide with a WSR spot, from the decode (INTEGRATION.md 1.2)
-const DIFFICULT = { 5: [4], 6: [5], 7: [4], 8: [3], 9: [2], 14: [5], 16: [0, 4], 17: [0], 18: [3], 19: [1, 5], 20: [2, 4], 21: [0, 5] };
+const DIFFICULT = { 5: [4], 6: [5], 7: [4], 8: [3], 9: [2], 14: [5], 16: [0, 4], 17: [0], 18: [3], 23: [2, 4], 24: [1, 5], 25: [0, 5], 26: [3, 4], 27: [1, 2] };   // (SR 23-25 are NSS 20, 19, 21)
 const ON_WSR = { 3: { 1: "s1" }, 7: { 2: "s3" }, 9: { 0: "s1" }, 11: { 0: "s0" }, 13: { 0: "s0" }, 16: { 3: "s2" }, 18: { 0: "s0" } };
 const CUP_MATCH_PX = 2.5, AMBIG_PX = 1;
 const flatYd = (a, b) => Math.sqrt((a[0] - b[0]) ** 2 + (a[2] - b[2]) ** 2) / YD;
@@ -50,7 +56,7 @@ const inPoly = (x, y, poly) => {
 
 // 1. the cups
 let nDiff = 0, nWsr = 0, ydGap = 0, wsrGap = 0;
-for (let n = 1; n <= 21; n++) {
+for (let n = 1; n <= HOLES; n++) {
   const d = D[n], np = NP[n];
   ok(d && Array.isArray(d.pins), `H${n}: no pins in derived.json`);
   if (!d?.pins) continue;
@@ -86,15 +92,15 @@ for (let n = 1; n <= 21; n++) {
     ok(Number.isInteger(p.seen) && p.seen >= 0, `${tag}: seen ${p.seen}`);
   });
   // the cups stand apart (no two one spot)
-  for (let a = 0; a < 6; a++) for (let b = a + 1; b < 6; b++) ok(pxTo(d.pins[a], d.pins[b]) >= 2, `H${n}: c${a} and c${b} ${pxTo(d.pins[a], d.pins[b]).toFixed(2)} px apart`);
+  for (let a = 0; a < 6; a++) for (let b = a + 1; b < 6; b++) ok(pxTo(d.pins[a], d.pins[b]) >= 1.5, `H${n}: c${a} and c${b} ${pxTo(d.pins[a], d.pins[b]).toFixed(2)} px apart`);   // (NSS's closest pair 2.06 px, H9; SR 27's c1 / c2 1.76 px = 4.3 yd)
 }
-ok(nDiff === 16, `${nDiff} difficult cups, not 16`);
+ok(nDiff === 20, `${nDiff} difficult cups, not 20`);
 ok(nWsr === 7, `${nWsr} cups on a WSR spot, not 7`);
-console.log(`1. 21 holes x 6 NSS cups c0..c5 (labels 1-6, src nss) at nss-pins.json's points; difficult ${nDiff}, on a WSR spot ${nWsr} (<= ${wsrGap.toFixed(2)} yd from it); yd = floor(GlfTeeOBJ -> cup) in NSS metres, the map frame within ${ydGap.toFixed(2)} yd of it; no pinCandidates, pinZones, teeOnline or Switch-only pin`);
+console.log(`1. ${HOLES} holes x 6 cups c0..c5 (labels 1-6, src nss) at nss-pins.json's points; difficult ${nDiff}, on a WSR spot ${nWsr} (<= ${wsrGap.toFixed(2)} yd from it); yd = floor(GlfTeeOBJ -> cup) in NSS metres, the map frame within ${ydGap.toFixed(2)} yd of it; no pinCandidates, pinZones, teeOnline or Switch-only pin`);
 
 // 2. on the green
 let onGreen = 0, inOutline = 0, terrains = 0;
-for (let n = 1; n <= 21; n++) {
+for (let n = 1; n <= HOLES; n++) {
   const d = D[n];
   for (const p of d.pins) { const i = inPoly(p.x, p.y, d.greenPoly); inOutline += i ? 1 : 0; ok(i, `H${n} ${p.id}: outside the green outline`); }
   const f = join(ROOT, "public", "terrain", `h${String(n).padStart(2, "0")}.bin`);
@@ -103,22 +109,23 @@ for (let n = 1; n <= 21; n++) {
   terrains++;
   for (const p of d.pins) { const c = classAt(t, p.x, p.y); onGreen += c === 6 ? 1 : 0; ok(c === 6, `H${n} ${p.id}: terrain class ${c} under the cup, not 6 (green)`); }
 }
-console.log(`2. cups inside the green outline: ${inOutline} of 126; on terrain class 6 (green): ${onGreen} of ${terrains * 6} (${terrains} terrain files)`);
+console.log(`2. cups inside the green outline: ${inOutline} of ${6 * HOLES}; on terrain class 6 (green): ${onGreen} of ${terrains * 6} (${terrains} terrain files)`);
 
 // 3. the tee (GlfTeeOBJ) and NSS's tee bones
 let teeGapYd = [], teeMapYd = 0;
-for (let n = 1; n <= 21; n++) {
-  const d = D[n], st = WP[n].starts[0], t = NP[n].tees;
+for (let n = 1; n <= HOLES; n++) {
+  const d = D[n], t = NP[n].tees, st = t.wsrStart;
   ok(d.tee && Object.keys(d.tee).length === 2 && d.tee.x === t.teeObj.x && d.tee.y === t.teeObj.y, `H${n}: tee ${JSON.stringify(d.tee)}, GlfTeeOBJ is ${t.teeObj.x}, ${t.teeObj.y}`);
   ok(d.teeNss && d.teeNss.rotateObj.x === t.rotateObj.x && d.teeNss.rotateObj.y === t.rotateObj.y && d.teeNss.teeObj.x === t.teeObj.x && d.teeNss.teeObj.y === t.teeObj.y,
     `H${n}: teeNss ${JSON.stringify(d.teeNss)} is not nss-pins.json's rotateObj / teeObj`);
   // the map point and the bone agree: the WSR start (tools/wsr-pins.json, on
   // the map and in NSS metres) to the tee, both ways, at the hole's scale
-  const gap = flatYd(t.wsrStart.world, t.teeObj.world), viaMap = pxTo(st, d.tee) * d.scale;
+  if (!st) { ok(n === 19 || n === 20 || n === 21 || n === 22 || n === 26 || n === 27, `H${n}: no WSR start, and the hole is not one of SR's six new ones`); continue; }
+  const gap = flatYd(st.world, t.teeObj.world), viaMap = pxTo(st, d.tee) * d.scale;
   teeGapYd.push(gap); teeMapYd = Math.max(teeMapYd, Math.abs(viaMap - gap));
   ok(Math.abs(viaMap - gap) < 0.05, `H${n}: the tee ${viaMap.toFixed(3)} yd from the WSR start on the map, ${gap.toFixed(3)} in NSS metres`);
 }
-console.log(`3. tee = GlfTeeOBJ on all 21 holes, ${Math.min(...teeGapYd).toFixed(2)}-${Math.max(...teeGapYd).toFixed(2)} yd from the WSR start (the map frame within ${teeMapYd.toFixed(3)} yd of NSS metres); teeNss = Glf_RotateOBJ and GlfTeeOBJ`);
+console.log(`3. tee = GlfTeeOBJ on all ${HOLES} holes, ${Math.min(...teeGapYd).toFixed(2)}-${Math.max(...teeGapYd).toFixed(2)} yd from the WSR start (${teeGapYd.length} holes with one; SR 23's tee is 79 yd from NSS 20's) (the map frame within ${teeMapYd.toFixed(3)} yd of NSS metres); teeNss = Glf_RotateOBJ and GlfTeeOBJ`);
 
 // 4. the crediting, against the captures
 const OBS = join(ROOT, "captures", "derived", "pin-observations.json");
@@ -127,7 +134,7 @@ else {
   const PO = JSON.parse(readFileSync(OBS, "utf8"));
   const tally = { credited: 0, ambiguous: 0, unmatched: 0 }, mostSeen = [], h1 = [];
   let maxPx = 0, local = 0, fitTee = 0, fitStart = 0, tieBroken = 0;
-  for (let n = 1; n <= 21; n++) {
+  for (let n = 1; n <= HOLES; n++) {
     const d = D[n], obs = PO[n] ?? [], np = NP[n];
     const at = (o) => ({ x: o.at[0] / W, y: o.at[1] / H });
     for (const p of d.pins) {
@@ -150,7 +157,7 @@ else {
           const c = np.cups[cup.k];
           for (const b of o.badges ?? []) {
             const m = (P) => b - flatYd(P, c.world);
-            local++; const mt = m(np.tees.teeObj.world), ms = m(np.tees.wsrStart.world);
+            local++; const mt = m(np.tees.teeObj.world), ms = np.tees.wsrStart ? m(np.tees.wsrStart.world) : NaN;
             fitTee += mt > -1.1 && mt <= 0.1 ? 1 : 0; fitStart += ms > -1.1 && ms <= 0.1 ? 1 : 0;
             if (n === 1) {
               // the H1 decision: the badge fits from GlfTeeOBJ, not from Glf_RotateOBJ

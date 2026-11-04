@@ -1,7 +1,29 @@
-# Render NSS's own hole minimaps into the app's 250x304 map frame: the NSS counterpart of tools/render-maps.mjs
+# Render the game's own hole minimaps into the app's 250x304 map frame: the NSS counterpart of tools/render-maps.mjs
 # (which renders WSR's minimap model), committed from the minimap agent's decode (2026-10-24) with the minimap
 # verifier's corrections (2026-10-25): the green plaid's tile is 2 m on every hole, and the off-course backdrop
 # constants are derived by this script (--derive-backdrop) into tools/nss-map-backdrop.json instead of hard-coded.
+#
+# --game sr (the default since 2026-11-04, the changeover to Switch Sports Resort's 27-hole numbering) renders SR's
+# own minimap (Switch 2, "Anna" 1.0.0 RomFS, --romfs default C:/Users/Stephen/Desktop/Switch Sports Resort/romfs);
+# --game nss still renders NSS's (21 holes, the NSS RomFS) as before, byte for byte. What SR changes (everything
+# else below, written for NSS, holds as it stands):
+#  * the textures are standalone BNTX files, Tex/AnnaGolfMiniMapCapture__GolfCourseNN_{MiniMap,Green,Water}_Msk.bntx.zs
+#    (platform tag 'Ounc', BC7; the plaid is ASTC 6x6 sRGB), the parameters Parameter/AnnaGolfMiniMapCaptureParam/
+#    GolfCourseNN overlaid on AnnaGolfMiniMapCaptureBaseParam (CameraAt / TargetWidth / ImageResolution =
+#    AreaCenter / AreaSize / PixelPerMeter, GreenCameraAt / GreenTargetWidth / GreenImageResolution), the plaid
+#    Glf_MiniMapGreen^_A in Layout/LGlfMiniMap.Nin_Ounce_NVN2.blarc.zs.
+#  * the textures are tiled with the Turing / Ampere GOB layout (address bits y0 y1 x4 y2 x5, Tegra X1's is y0 x4 y1
+#    y2 x5): decoded with X1's, a BC7 or ASTC texture comes out with 4x4-block scrambles at every high-contrast
+#    edge (ragged course and green outlines, a plaid with misplaced blocks). The platform tag picks the layout.
+#  * the alpha is the coverage itself (255 on the course, a per-hole constant off it: 16 the OB tint, 10 the sea's,
+#    28 on H26, 0 where nothing was captured) and the colour is straight; NSS's is premultiplied with A = 1 - coverage.
+#    The loader hands the shader NSS's convention for A (255 - A), shade(conv = "sr") takes the colour as it is (no
+#    Min(rgb, 1 - A) guard). SR's shader is a compiled binary (NSS's archive carries the GLSL): its Vec3 is fitted to
+#    SR's own screen (see VEC3).
+#  * the plaid's tile is GreenAreaSize / the scale LGlfMiniMap_TypeHoleNum.bflan sets for the hole (frame = hole - 1):
+#    2.000 m on SR 1-20, 23, 25, 1.969 / 1.990 / 1.976 / 1.978 / 1.997 on 21, 22, 24, 26, 27. The render keeps 2 m on every
+#    hole (--plaid-tile 2, the default, so plaid.tileM is 2 as every consumer checks); the layout's own value is recorded
+#    per hole as plaid.layoutTileM, and --plaid-tile layout draws (and records as tileM) that instead.
 #
 # What NSS draws (NSS 1.5.0 RomFS):
 #  * Model/MiniMap_Field_Fld_GolfCourseNN.bfres.zs holds no model, only an external textures.bntx with three
@@ -47,11 +69,12 @@
 #    of k x k bilinear samples of the raw texels (k = ceil(texels per output px) + 1), shaded after filtering as the
 #    GPU does (the filtered fetch, then the fragment shader), composited in linear light, sRGB encoded.
 #
-# Inputs: the NSS RomFS (git-ignored; --romfs, default tools/harness/state/eden/nss-romfs/romfs), and the committed
-# tools/nss-registration.json (the transform), tools/nss-truth.json (the green box, the NSS collision's GolfGreen
-# triangles), tools/nss-map-backdrop.json (the world backdrop) and tools/nss-pins.json (the cups, the tee).
-# --compare (default on) and --derive-backdrop also read the capture stacks captures/derived/maps/hNN.png
-# (git-ignored); --compare is skipped for a hole without one.
+# Inputs: the game's RomFS (git-ignored; --romfs, default tools/harness/state/eden/nss-romfs/romfs for NSS, the SR
+# folder above for SR), and the committed tools/nss-registration.json (the transform), tools/nss-truth.json (the green
+# box, the collision's GolfGreen triangles), tools/nss-map-backdrop.json (the world backdrop) and tools/nss-pins.json
+# (the cups, the tee) (--data <dir> reads them from another folder). --compare (default on) and
+# --derive-backdrop also read the capture stacks captures/derived/maps/hNN.png (git-ignored; --stacks <dir>);
+# --compare is skipped for a hole without one (SR has none by default: a stack of SR's screen is made from frames).
 #
 # Outputs (never the WSR renders' folders): <out>/hNN.png (2x, 500x608), hNN-3x.png (750x912), hNN-4x.png
 # (1000x1216), hNN-green.png (the green box + 0.12 of it on every side, render-maps.mjs's sizing: max(4,
@@ -60,10 +83,11 @@
 # holes[n].green). A --holes batch keeps the other holes' entries. Deterministic: no timestamps; the same RomFS,
 # committed inputs and options give the same PNG bytes (the comparison block also depends on the stacks).
 #
-#   python -P tools/render-nss-maps.py [--holes 1,7] [--scales 2,3,4] [--out captures/derived/render-nss]
-#        [--romfs <dir>] [--backdrop world|pane|black] [--green-view height|grid] [--plaid-origin centre|cupK]
-#        [--no-grid] [--no-green] [--no-compare] [--ss K] [--jobs N]
-#   python -P tools/render-nss-maps.py --derive-backdrop [--holes ...]    (writes tools/nss-map-backdrop.json)
+#   python -P tools/render-nss-maps.py [--game sr|nss] [--holes 1,7] [--scales 2,3,4] [--out captures/derived/render-nss]
+#        [--romfs <dir>] [--data <dir>] [--stacks <dir>] [--backdrop world|pane|black] [--green-view height|grid]
+#        [--plaid-origin centre|cupK] [--plaid-tile 2|layout] [--no-grid] [--no-green] [--no-compare] [--ss K] [--jobs N]
+#   python -P tools/render-nss-maps.py --derive-backdrop [--holes ...]    (writes nss-map-backdrop.json into --data, default tools/)
+#   SR: python -P tools/render-nss-maps.py --game sr --stacks <dir of hNN.png> --derive-backdrop
 #
 # Needs numpy, Pillow, zstandard and texture2ddecoder; scipy for --compare and --derive-backdrop. About 40 s a hole
 # for the three scales, the green and the comparison; --jobs N renders N holes at once (each worker holds one
@@ -74,17 +98,20 @@ from PIL import Image
 
 TOOLS = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(TOOLS)
-DEFAULT_ROMFS = os.path.join(REPO, "tools", "harness", "state", "eden", "nss-romfs", "romfs")
+DEFAULT_ROMFS = {"nss": os.path.join(REPO, "tools", "harness", "state", "eden", "nss-romfs", "romfs"),
+                 "sr": "C:/Users/Stephen/Desktop/Switch Sports Resort/romfs"}
+GAME_HOLES = {"nss": 21, "sr": 27}
 CAPS = os.path.join(REPO, "captures", "derived", "maps")
 DEFAULT_OUT = os.path.join(REPO, "captures", "derived", "render-nss")
-BACKDROP_JSON = os.path.join(TOOLS, "nss-map-backdrop.json")
+BACKDROP_NAME = "nss-map-backdrop.json"  # in the data folder (default tools/)
 FORBIDDEN_OUT = [os.path.join(REPO, "captures", "derived", d) for d in ("render", "render-3x", "render-4x", "maps")] + [os.path.join(REPO, "public"), os.path.join(REPO, "src")]
 MAP_W, MAP_H = 250, 304
 GREEN_MARGIN = 0.12  # build-derived's GT_MARGIN / render-maps.mjs GREEN_MARGIN
 GREEN_SCALE, GREEN_MIN = 4, 256  # render-maps.mjs --green-scale / --green-min defaults
-MAP_VEC3, GREEN_VEC3 = (1.0, 1.0, 1.2), (1.0, 1.0, 1.25)  # P_Map / P_MapGreen __CUS_Vec3_0
+VEC3 = {"nss": ((1.0, 1.0, 1.2), (1.0, 1.0, 1.25)),  # P_Map / P_MapGreen __CUS_Vec3_0 (NSS's, from its GLSL)
+        "sr": ((1.0, 1.186, 1.264), (1.0, 1.165, 1.287))}  # SR's: fitted to its screen (no GLSL), see the header
 PLAID_TILE_M = 2.0  # the plaid's period in the world: 2 m by definition (GreenAreaSize / 2 tiles a hole)
-HOLES = list(range(1, 22))
+HOLES = list(range(1, 28))
 
 # ---------------------------------------------------------------- containers: zstd, BYML, SARC, BFRES -> BNTX
 def unzs(d):
@@ -151,6 +178,7 @@ BNTX_FORMATS = {  # BNTX format (u32 at BRTI+0x1C) -> (kind, block bytes, block 
     0x1A01: ("bc1", 8, 4, 4), 0x1A06: ("bc1", 8, 4, 4), 0x1C01: ("bc3", 16, 4, 4), 0x1C06: ("bc3", 16, 4, 4),
     0x1D01: ("bc4", 8, 4, 4), 0x1D02: ("bc4", 8, 4, 4), 0x1E01: ("bc5", 16, 4, 4), 0x1E02: ("bc5", 16, 4, 4),
     0x2001: ("bc7", 16, 4, 4), 0x2006: ("bc7", 16, 4, 4),
+    0x3101: ("astc", 16, 6, 6), 0x3106: ("astc", 16, 6, 6),  # ASTC 6x6 (SR's plaid)
 }
 
 def bntx_of(data):
@@ -165,7 +193,7 @@ def bntx_of(data):
     raise ValueError("no BNTX external file")
 
 def bntx_textures(b):
-    assert b[:4] == b"BNTX" and b[0x20:0x24] == b"NX  "
+    assert b[:4] == b"BNTX" and b[0x20:0x24] in (b"NX  ", b"Ounc"), b[0x20:0x24]  # Ounc: Switch 2 (SR)
     n = struct.unpack_from("<I", b, 0x24)[0]; arr = struct.unpack_from("<Q", b, 0x28)[0]
     out = []
     for i in range(n):
@@ -175,15 +203,18 @@ def bntx_textures(b):
         w, h, _, _, bh = struct.unpack_from("<IIIII", b, o + 0x24)
         no = struct.unpack_from("<Q", b, o + 0x60)[0]; ln = struct.unpack_from("<H", b, no)[0]
         mo = list(struct.unpack_from("<%dQ" % mips, b, struct.unpack_from("<Q", b, o + 0x70)[0]))
-        out.append({"name": b[no + 2:no + 2 + ln].decode("utf8"), "fmt": fmt, "w": w, "h": h, "mips": mips, "bhLog2": bh, "mipOffsets": mo})
+        out.append({"name": b[no + 2:no + 2 + ln].decode("utf8"), "fmt": fmt, "w": w, "h": h, "mips": mips, "bhLog2": bh, "mipOffsets": mo,
+                    "ampere": b[0x20:0x24] == b"Ounc"})
     return out
 
-def _deswizzle(raw, wb, hb, bpp, bh_gobs):
-    """Tegra X1 block linear -> linear, in elements (BCn blocks or pixels) of bpp bytes."""
+def _deswizzle(raw, wb, hb, bpp, bh_gobs, ampere=False):
+    """Block linear -> linear, in elements (BCn blocks or pixels) of bpp bytes. Tegra X1 (NSS): the GOB's address
+    bits are x5 y2 y1 x4 y0 x3..0; Turing / Ampere (SR, platform tag Ounc): x5 y2 x4 y1 y0 x3..0 (x in bytes)."""
     gobs_w = (wb * bpp + 63) // 64
     y = np.arange(hb, dtype=np.int64)[:, None]; x = np.arange(wb, dtype=np.int64)[None, :] * bpp
     gob = ((y // (8 * bh_gobs)) * 512 * bh_gobs * gobs_w + (x // 64) * 512 * bh_gobs + ((y % (8 * bh_gobs)) // 8) * 512)
-    addr = gob + ((x % 64) // 32) * 256 + ((y % 8) // 2) * 64 + ((x % 32) // 16) * 32 + (y % 2) * 16 + (x % 16)
+    if ampere: addr = gob + ((x % 64) // 32) * 256 + ((y % 8) // 4) * 128 + ((x % 32) // 16) * 64 + ((y % 4) // 2) * 32 + (y % 2) * 16 + (x % 16)
+    else: addr = gob + ((x % 64) // 32) * 256 + ((y % 8) // 2) * 64 + ((x % 32) // 16) * 32 + (y % 2) * 16 + (x % 16)
     src = np.frombuffer(raw, dtype=np.uint8)
     need = int(addr.max()) + bpp
     if need > src.size: src = np.concatenate([src, np.zeros(need - src.size, np.uint8)])
@@ -195,18 +226,35 @@ def bntx_decode(b, t):
     wb, hb = (t["w"] + bw - 1) // bw, (t["h"] + bhp - 1) // bhp
     bh_gobs = 1 << t["bhLog2"]
     gobs_w = (wb * bpp + 63) // 64; rows = 8 * bh_gobs; hpad = (hb + rows - 1) // rows * rows
-    lin = _deswizzle(b[t["mipOffsets"][0]: t["mipOffsets"][0] + gobs_w * 64 * hpad], wb, hb, bpp, bh_gobs)
+    lin = _deswizzle(b[t["mipOffsets"][0]: t["mipOffsets"][0] + gobs_w * 64 * hpad], wb, hb, bpp, bh_gobs, t.get("ampere", False))
     if kind in ("rgba8", "bgra8"):
         a = np.frombuffer(lin, np.uint8).reshape(t["h"], t["w"], 4).copy()
         return a[:, :, [2, 1, 0, 3]] if kind == "bgra8" else a
     import texture2ddecoder as td
+    if kind == "astc":
+        bgra = np.frombuffer(td.decode_astc(lin, wb * bw, hb * bhp, bw, bhp), np.uint8).reshape(hb * bhp, wb * bw, 4)
+        return bgra[:t["h"], :t["w"], [2, 1, 0, 3]].copy()
     f = {"bc1": td.decode_bc1, "bc3": td.decode_bc3, "bc4": td.decode_bc4, "bc5": td.decode_bc5, "bc7": td.decode_bc7}[kind]
     bgra = np.frombuffer(f(lin, wb * 4, hb * 4), np.uint8).reshape(hb * 4, wb * 4, 4)
     return bgra[:t["h"], :t["w"], [2, 1, 0, 3]].copy()
 
-# ---------------------------------------------------------------- NSS inputs
-def capture_params(romfs, hole):
-    """GolfMiniMapCaptureParam for a hole: CommonBase overlaid with Field_Fld_GolfCourseNN (its $parent)."""
+# ---------------------------------------------------------------- the game's inputs (NSS, SR)
+def capture_params(romfs, hole, game="nss"):
+    """The capture parameters for a hole, in NSS's key names. NSS: GolfMiniMapCaptureParam, CommonBase overlaid with
+    Field_Fld_GolfCourseNN (its $parent). SR: AnnaGolfMiniMapCaptureParam, AnnaGolfMiniMapCaptureBaseParam overlaid with
+    GolfCourseNN: CameraAt / TargetWidth / TargetHeight / ImageResolution = AreaCenter / AreaSize / PixelPerMeter,
+    GreenCameraAt / GreenTargetWidth / GreenTargetHeight / GreenImageResolution = GreenAreaCenter / GreenAreaSize /
+    GreenPixelPerMeter (a missing centre is 0, the game's default, as in NSS)."""
+    if game == "sr":
+        d = os.path.join(romfs, "Parameter", "AnnaGolfMiniMapCaptureParam")
+        base = byml_load(open(os.path.join(d, "AnnaGolfMiniMapCaptureBaseParam.anna__AnnaGolfMiniMapCaptureParam.bgyml"), "rb").read())
+        own = byml_load(open(os.path.join(d, "GolfCourse%02d.anna__AnnaGolfMiniMapCaptureParam.bgyml" % hole), "rb").read())
+        q = dict(base); q.update({k: v for k, v in own.items() if k != "$parent"})
+        ca, ga = q.get("CameraAt", {}), q.get("GreenCameraAt", {})
+        return {"AreaCenterX": ca.get("X", 0.0), "AreaCenterZ": ca.get("Z", 0.0), "AreaSizeX": q["TargetWidth"], "AreaSizeZ": q["TargetHeight"],
+                "PixelPerMeter": q["ImageResolution"], "GreenAreaCenterX": ga.get("X", 0.0), "GreenAreaCenterZ": ga.get("Z", 0.0),
+                "GreenAreaSizeX": q["GreenTargetWidth"], "GreenAreaSizeZ": q["GreenTargetHeight"], "GreenPixelPerMeter": q["GreenImageResolution"],
+                "GreenContourBottom": q.get("GreenContourBottom"), "GreenContourHeight": q.get("GreenContourHeight")}
     d = os.path.join(romfs, "Parameter", "GolfMiniMapCaptureParam")
     base = byml_load(open(os.path.join(d, "CommonBase.elsa__scene__GolfMiniMapCaptureParam.bgyml"), "rb").read())
     own = byml_load(open(os.path.join(d, "Field_Fld_GolfCourse%02d.elsa__scene__GolfMiniMapCaptureParam.bgyml" % hole), "rb").read())
@@ -214,20 +262,67 @@ def capture_params(romfs, hole):
     for k in ("AreaCenterX", "AreaCenterZ", "GreenAreaCenterX", "GreenAreaCenterY", "GreenAreaCenterZ"): p.setdefault(k, 0.0)
     return p
 
-def minimap_file(romfs, hole):
+def minimap_file(romfs, hole, game="nss", name="MiniMap"):
+    """NSS: Model/MiniMap_Field_Fld_GolfCourseNN.bfres.zs (the three textures in its external BNTX). SR: one BNTX each,
+    Tex/AnnaGolfMiniMapCapture__GolfCourseNN_<MiniMap | Green | Water>_Msk.bntx.zs."""
+    if game == "sr": return os.path.join(romfs, "Tex", "AnnaGolfMiniMapCapture__GolfCourse%02d_%s_Msk.bntx.zs" % (hole, name))
     return os.path.join(romfs, "Model", "MiniMap_Field_Fld_GolfCourse%02d.bfres.zs" % hole)
 
-def load_textures(romfs, hole):
-    """{name: (info, RGBA uint8 HxWx4)} of the hole's minimap BNTX."""
+def load_textures(romfs, hole, game="nss"):
+    """{name: (info, RGBA uint8 HxWx4)} of the hole's capture textures (NSS names: MiniMap, Green, WaterMap). SR's MiniMap and
+    Green are put into NSS's convention for A: 255 - coverage (the colour stays straight, see shade)."""
+    if game == "sr":
+        out = {}
+        for nm, key in (("MiniMap", "MiniMap"), ("Green", "Green"), ("Water", "WaterMap")):
+            b = bntx_of(open(minimap_file(romfs, hole, game, nm), "rb").read())
+            for t in bntx_textures(b):
+                a = bntx_decode(b, t)
+                if key != "WaterMap": a[..., 3] = 255 - a[..., 3]
+                out[key] = (t, a)
+        return out
     b = bntx_of(open(minimap_file(romfs, hole), "rb").read())
     return {t["name"]: (t, bntx_decode(b, t)) for t in bntx_textures(b)}
 
-def load_plaid(romfs):
-    """Glf_MiniMapGreen^o (BC1 sRGB, 128 x 128) from the layout archive, as float RGBA 0..255 (sRGB)."""
-    files = sarc_files(open(os.path.join(romfs, "Layout", "LGlfMiniMap.Nin_NX_NVN.blarc.zs"), "rb").read())
+def load_plaid(romfs, game="nss"):
+    """Glf_MiniMapGreen^o (BC1 sRGB; SR: Glf_MiniMapGreen^_A, ASTC 6x6 sRGB; 128 x 128) from the layout archive, as float
+    RGBA 0..255 (sRGB)."""
+    nm, arc = ("Glf_MiniMapGreen^_A", "LGlfMiniMap.Nin_Ounce_NVN2.blarc.zs") if game == "sr" else ("Glf_MiniMapGreen^o", "LGlfMiniMap.Nin_NX_NVN.blarc.zs")
+    files = sarc_files(open(os.path.join(romfs, "Layout", arc), "rb").read())
     b = files["timg/__Combined.bntx"]
-    t = [t for t in bntx_textures(b) if t["name"] == "Glf_MiniMapGreen^o"][0]
+    t = [t for t in bntx_textures(b) if t["name"] == nm][0]
     return bntx_decode(b, t).astype(np.float64)
+
+def flan_scales(data):
+    """{frame: scale} of LGlfMiniMap_TypeHoleNum.bflan's P_MapGreenGrid texture-SRT scale curve (the plaid repeats `scale`
+    times across the Green capture square on the hole whose number - 1 is the frame; step or hermite keys, the last key
+    of a frame wins)."""
+    assert data[:4] == b"FLAN"
+    E = "<" if data[4:6] == b"\xff\xfe" else ">"
+    pos, nblk = struct.unpack_from(E + "H", data, 6)[0], struct.unpack_from(E + "H", data, 0x10)[0]
+    for _ in range(nblk):
+        size = struct.unpack_from(E + "I", data, pos + 4)[0]
+        if data[pos:pos + 4] == b"pai1":
+            blk = data[pos:pos + size]
+            nent, entoff = struct.unpack_from(E + "H", blk, 0x0E)[0], struct.unpack_from(E + "I", blk, 0x10)[0]
+            for eo in struct.unpack_from(E + "%dI" % nent, blk, entoff):
+                name = blk[eo:eo + 28].split(b"\0")[0].decode()
+                tags = struct.unpack_from(E + "%dI" % blk[eo + 28], blk, eo + 32)
+                for to in tags:
+                    if name != "P_MapGreenGrid" or blk[eo + to:eo + to + 4] != b"FLTS": continue
+                    for co in struct.unpack_from(E + "%dI" % blk[eo + to + 4], blk, eo + to + 8):
+                        b0 = eo + to + co
+                        if blk[b0 + 1] != 3: continue  # target 3 = scale S
+                        n, ko = struct.unpack_from(E + "H", blk, b0 + 4)[0], struct.unpack_from(E + "I", blk, b0 + 8)[0]
+                        w = 8 if blk[b0 + 2] == 1 else 12
+                        keys = [struct.unpack_from(E + ("fHH" if blk[b0 + 2] == 1 else "fff"), blk, b0 + ko + i * w) for i in range(n)]
+                        return {int(round(k[0])): float(k[1]) for k in keys}
+        pos += size
+    raise ValueError("no P_MapGreenGrid scale curve")
+
+def plaid_scales(romfs, game):
+    """{frame: scale} of the layout's plaid animation; the tile on hole h is GreenAreaSize / scales[h - 1]."""
+    arc = "LGlfMiniMap.Nin_Ounce_NVN2.blarc.zs" if game == "sr" else "LGlfMiniMap.Nin_NX_NVN.blarc.zs"
+    return flan_scales(sarc_files(open(os.path.join(romfs, "Layout", arc), "rb").read())["anim/LGlfMiniMap_TypeHoleNum.bflan"])
 
 def read_json(path):
     with open(path, encoding="utf8") as f: return json.load(f)
@@ -311,12 +406,14 @@ def hsb_to_rgb(c):
     rgb = np.clip(np.abs(np.mod(h * 6.0 + np.array([0.0, 4.0, 2.0]), 6.0) - 3.0) - 1.0, 0.0, 1.0)
     return v * (1.0 + (rgb - 1.0) * s)
 
-def shade(tex255, vec3=MAP_VEC3):
+def shade(tex255, vec3=VEC3["nss"][0], conv="nss"):
     """The P_Map / P_MapGreen fragment: filtered texel (0..255 RGBA) -> (linear rgb, alpha), before the black/white
-    mix (black (0,0,0,0), white (1,1,1,1): the identity) and the framebuffer blend."""
+    mix (black (0,0,0,0), white (1,1,1,1): the identity) and the framebuffer blend. conv "nss": the texel is premultiplied
+    and A = 1 - coverage; "sr": A has been put into that convention by the loader but the colour is straight, so the
+    Min(rgb, inv) guard of a premultiplied colour is not applied."""
     t = np.clip(tex255.astype(np.float64) / 255.0, 0.0, 1.0)
     inv = 1.0 - t[..., 3]                                       # SubtractFrom1(tex.a)
-    m = np.minimum(t[..., :3], inv[..., None])                  # Min(tex.rgb, inv)
+    m = np.minimum(t[..., :3], inv[..., None]) if conv == "nss" else t[..., :3]  # Min(tex.rgb, inv)
     k = np.clip(inv - 0.2 - inv * -0.2, 0.0, 1.0)[..., None]    # Clamp01((inv + -0.2) - inv * -0.2)
     c1 = m * 1.6 + (m - m * 1.6) * k                            # Mix(m * 1.6, m, k)
     c2 = np.power(np.maximum(hsb_to_rgb(rgb_to_hsb(np.power(m, 1.0 / 2.2)) * np.array(vec3)), 0.0), 2.2)
@@ -350,17 +447,17 @@ def backdrop(raw, mode, world):
     B = np.where(sea[..., None], np.array(world["sea"]), np.array(world["ob"]))
     return np.where(void[..., None], np.array(world["void"]), B)
 
-def compose(raw, mode, world, vec3=MAP_VEC3):
+def compose(raw, mode, world, vec3=VEC3["nss"][0], conv="nss"):
     """P_Map over the backdrop: linear RGB (H, W, 3) and the pane's alpha."""
-    rgb, al = shade(raw, vec3)
+    rgb, al = shade(raw, vec3, conv)
     if mode == "pane": return np.clip(rgb, 0, 1), al
     a = al[..., None]
     return np.clip(a * rgb + (1 - a) * backdrop(raw, mode, world), 0, 1), al
 
-def grid_layer(plaid_lin, gt, ga, origin, frame, box, W, H, k, rows=32):
+def grid_layer(plaid_lin, gt, ga, origin, frame, box, W, H, k, rows=32, tile=PLAID_TILE_M):
     """P_MapGreenGrid as src-alpha blending lays it down. Per k x k sample: inv = 1 - Green.a (the Green capture
     sampled through its own area; 0 outside it), rgb = plaid * inv, alpha = inv (HSB x (1, 1, 1) is the identity;
-    the shader's pow(1/2.2) / pow(2.2) cancel); the plaid repeats every PLAID_TILE_M metres, world-locked, with a
+    the shader's pow(1/2.2) / pow(2.2) cancel); the plaid repeats every `tile` metres, world-locked, with a
     tile centre (texture coordinate 0.5) at origin = (x, z). Returns the pixel means of alpha * rgb (H, W, 3) and
     of alpha (H, W); only pixels over the Green area are evaluated."""
     n = plaid_lin.shape[0]
@@ -378,7 +475,7 @@ def grid_layer(plaid_lin, gt, ga, origin, frame, box, W, H, k, rows=32):
         inv = 1.0 - np.clip(bilinear(gt[..., 3:4], tu, tv)[..., 0] / 255.0, 0, 1)
         inv = np.where((x < ga.x0) | (x > ga.x0 + ga.sx) | (z < ga.z0) | (z > ga.z0 + ga.sz), 0.0, inv)
         # texture coordinate in tiles: 0.5 at the origin; texel centres at (i + 0.5) / n
-        g = bilinear_wrap(plaid_lin, (0.5 + (x - origin[0]) / PLAID_TILE_M) * n - 0.5, (0.5 + (z - origin[1]) / PLAID_TILE_M) * n - 0.5)
+        g = bilinear_wrap(plaid_lin, (0.5 + (x - origin[0]) / tile) * n - 0.5, (0.5 + (z - origin[1]) / tile) * n - 0.5)
         a = inv[..., None]
         pre[r0:r1, u0:u1] = (a * a * g).reshape(r1 - r0, k, u1 - u0, k, 3).mean(axis=(1, 3))
         alp[r0:r1, u0:u1] = inv.reshape(r1 - r0, k, u1 - u0, k).mean(axis=(1, 3))
@@ -486,32 +583,42 @@ def render_hole(job):
     h, o = job["hole"], job["opt"]
     t0 = time.time()
     nn = "%02d" % h
-    romfs, out = o["romfs"], o["out"]
-    reg = read_json(os.path.join(TOOLS, "nss-registration.json"))["holes"][str(h)]
-    truth = read_json(os.path.join(TOOLS, "nss-truth.json"))["holes"][str(h)]
-    pins = read_json(os.path.join(TOOLS, "nss-pins.json"))["holes"][str(h)]
-    world = read_json(BACKDROP_JSON)["world"] if o["backdrop"] == "world" else None
-    p = capture_params(romfs, h)
-    texs = load_textures(romfs, h)
+    romfs, out, g, data, stacks = o["romfs"], o["out"], o["game"], o["data"], o["stacks"]
+    map_vec3, green_vec3 = VEC3[g]
+    reg = read_json(os.path.join(data, "nss-registration.json"))["holes"][str(h)]
+    truth = read_json(os.path.join(data, "nss-truth.json"))["holes"][str(h)]
+    pins = read_json(os.path.join(data, "nss-pins.json"))["holes"][str(h)]
+    world = read_json(os.path.join(data, BACKDROP_NAME))["world"] if o["backdrop"] == "world" else None
+    p = capture_params(romfs, h, g)
+    texs = load_textures(romfs, h, g)
     mm = texs["MiniMap"][1]; area = map_area(p, mm)
     gt = texs["Green"][1]; ga = green_area(p, gt)
     frame = Frame(reg)
-    plaid_lin = srgb_decode(load_plaid(romfs)[..., :3] / 255.0)  # the sRGB fetch decodes before filtering
+    plaid_lin = srgb_decode(load_plaid(romfs, g)[..., :3] / 255.0)  # the sRGB fetch decodes before filtering
+    layout_scale = o["plaid_scales"].get(h - 1) if o["plaid_scales"] else None
+    # the plaid's tile: 2 m (NSS, or --plaid-tile 2), else what the layout's animation sets for the hole
+    tile = round(p["GreenAreaSizeX"] / layout_scale, 4) if g == "sr" and o["plaid_tile"] == "layout" and layout_scale else PLAID_TILE_M
     origin, origin_what = plaid_origin(o["plaid_origin"], p, pins["cups"])
     gbox = truth["greenBox"]
-    entry = {"art": "nss", "backdrop": o["backdrop"], "overviewGrid": not o["no_grid"],
-             "plaid": {"tileM": PLAID_TILE_M, "origin": [round(origin[0], 4), round(origin[1], 4)], "originIs": origin_what},
-             "source": {"file": "Model/MiniMap_Field_Fld_GolfCourse%s.bfres.zs" % nn, "sha1": sha1(minimap_file(romfs, h)),
+    entry = {"art": g, "backdrop": o["backdrop"], "overviewGrid": not o["no_grid"],
+             "plaid": {"tileM": tile, "origin": [round(origin[0], 4), round(origin[1], 4)], "originIs": origin_what},
+             "source": {"file": "Model/MiniMap_Field_Fld_GolfCourse%s.bfres.zs" % nn, "sha1": sha1(minimap_file(romfs, h, g)),
                         "textures": {kk: {"w": v[0]["w"], "h": v[0]["h"], "fmt": "%#06x" % v[0]["fmt"]} for kk, v in sorted(texs.items())}},
              "area": {"center": [p["AreaCenterX"], p["AreaCenterZ"]], "size": [p["AreaSizeX"], p["AreaSizeZ"]], "pixelPerMeter": round(p["PixelPerMeter"], 4),
                       "green": {"center": [p["GreenAreaCenterX"], p["GreenAreaCenterZ"]], "size": [p["GreenAreaSizeX"], p["GreenAreaSizeZ"]], "pixelPerMeter": round(p["GreenPixelPerMeter"], 4)}},
              "transform": {kk: reg[kk] for kk in ("a", "b", "tx", "ty")}}
+    if g == "sr":  # SR: three texture files, the layout's own plaid scale for the hole
+        rel = lambda f: os.path.relpath(f, romfs).replace(os.sep, "/")
+        entry["source"] = {"file": rel(minimap_file(romfs, h, g)), "sha1": sha1(minimap_file(romfs, h, g)),
+                           "files": {nm: {"file": rel(minimap_file(romfs, h, g, nm)), "sha1": sha1(minimap_file(romfs, h, g, nm))} for nm in ("MiniMap", "Green", "Water")},
+                           "textures": {kk: {"w": v[0]["w"], "h": v[0]["h"], "fmt": "%#06x" % v[0]["fmt"]} for kk, v in sorted(texs.items())}}
+        entry["plaid"].update({"layoutScale": round(layout_scale, 4) if layout_scale else None, "layoutTileM": round(p["GreenAreaSizeX"] / layout_scale, 4) if layout_scale else None})
     cap = None
-    if not o["no_compare"] and os.path.exists(os.path.join(CAPS, "h%s.png" % nn)):
-        cap = np.array(Image.open(os.path.join(CAPS, "h%s.png" % nn)).convert("RGB"))
+    if not o["no_compare"] and stacks and os.path.exists(os.path.join(stacks, "h%s.png" % nn)):
+        cap = np.array(Image.open(os.path.join(stacks, "h%s.png" % nn)).convert("RGB"))
     al1 = hud = None
     if cap is not None:
-        _, al1 = shade(resample(mm, area, frame, (0, 0, MAP_W, MAP_H), MAP_W, MAP_H, supersample(area, frame, 1)))
+        _, al1 = shade(resample(mm, area, frame, (0, 0, MAP_W, MAP_H), MAP_W, MAP_H, supersample(area, frame, 1)), map_vec3, g)
         hud = hud_mask(cap)
     tee = pins.get("tees", {}).get("teeObj")
     tee_px = (tee["x"] * MAP_W, tee["y"] * MAP_H) if tee else None
@@ -520,9 +627,9 @@ def render_hole(job):
         k = o["ss"] or supersample(area, frame, s)
         fn = "h%s.png" % nn if s == 2 else "h%s-%dx.png" % (nn, s)
         box = (0, 0, MAP_W, MAP_H)
-        lin, _ = compose(resample(mm, area, frame, box, MAP_W * s, MAP_H * s, k), o["backdrop"], world)
+        lin, _ = compose(resample(mm, area, frame, box, MAP_W * s, MAP_H * s, k), o["backdrop"], world, map_vec3, g)
         if not o["no_grid"]:  # the overview shows P_MapGreenGrid's plaid on the green (the capture stacks have it)
-            lin = over(lin, *grid_layer(plaid_lin, gt, ga, origin, frame, box, MAP_W * s, MAP_H * s, k))
+            lin = over(lin, *grid_layer(plaid_lin, gt, ga, origin, frame, box, MAP_W * s, MAP_H * s, k, tile=tile))
         img = to8(lin)
         Image.fromarray(img, "RGB").save(os.path.join(out, fn), optimize=True)
         maps[str(s)] = {"file": fn, "width": MAP_W * s, "height": MAP_H * s, "scale": s, "ss": k}
@@ -542,17 +649,17 @@ def render_hole(job):
         box = (fb[0] * MAP_W, fb[1] * MAP_H, fb[2] * MAP_W, fb[3] * MAP_H)
         sx = W / (box[2] - box[0])  # output px per map px
         # the zoomed green as the layout stacks it: P_Map, P_MapGreenGrid, then (Terrain view) P_MapGreen's bands
-        lin, _ = compose(resample(mm, area, frame, box, W, H, supersample(area, frame, sx)), o["backdrop"], world)
+        lin, _ = compose(resample(mm, area, frame, box, W, H, supersample(area, frame, sx)), o["backdrop"], world, map_vec3, g)
         kg = supersample(ga, frame, sx)
-        lin = over(lin, *grid_layer(plaid_lin, gt, ga, origin, frame, box, W, H, kg))
+        lin = over(lin, *grid_layer(plaid_lin, gt, ga, origin, frame, box, W, H, kg, tile=tile))
         if o["green_view"] == "height":
-            grgb, gal = shade(resample(gt, ga, frame, box, W, H, kg), GREEN_VEC3)
+            grgb, gal = shade(resample(gt, ga, frame, box, W, H, kg), green_vec3, g)
             a = np.clip(gal, 0, 1)[..., None]
             lin = np.clip(a * np.clip(grgb, 0, 1) + (1 - a) * lin, 0, 1)
         fn = "h%s-green.png" % nn
         Image.fromarray(to8(lin), "RGB").save(os.path.join(out, fn), optimize=True)
         entry["green"] = {"file": fn, "width": W, "height": H, "aspect": round(bw / bh, 4), "margin": GREEN_MARGIN, "pxPerMapPx": gs,
-                          "box": {kk: b[kk] for kk in ("x0", "y0", "x1", "y1")}, "boxSource": "tools/nss-truth.json greenBox (NSS collision GolfGreen)",
+                          "box": {kk: b[kk] for kk in ("x0", "y0", "x1", "y1")}, "boxSource": "tools/nss-truth.json greenBox (%s collision GolfGreen)" % g.upper(),
                           "view": o["green_view"], "frame": {"x0": round(fb[0], 4), "y0": round(fb[1], 4), "x1": round(fb[2], 4), "y1": round(fb[3], 4)}}
     msg = "H%d: %s in %.1f s" % (h, ", ".join("%s %dx%d (ss %d)" % (m["file"], m["width"], m["height"], m["ss"]) for m in maps.values()), time.time() - t0)
     if "2" in fid:
@@ -564,15 +671,15 @@ def derive_hole(job):
     """Per pixel of the hole's off-course pane (alpha < 0.99), outside the HUD, the inversion of the composite
     est = (capture - alpha * pane) / (1 - alpha) (linear light), its weight 1 - alpha (the backdrop's share of the
     pixel), and its kind."""
-    h, romfs = job["hole"], job["opt"]["romfs"]
+    h, romfs, g = job["hole"], job["opt"]["romfs"], job["opt"]["game"]
     nn = "%02d" % h
-    path = os.path.join(CAPS, "h%s.png" % nn)
+    path = os.path.join(job["opt"]["stacks"], "h%s.png" % nn)
     if not os.path.exists(path): return h, None
-    reg = read_json(os.path.join(TOOLS, "nss-registration.json"))["holes"][str(h)]
-    p = capture_params(romfs, h); texs = load_textures(romfs, h)
+    reg = read_json(os.path.join(job["opt"]["data"], "nss-registration.json"))["holes"][str(h)]
+    p = capture_params(romfs, h, g); texs = load_textures(romfs, h, g)
     mm = texs["MiniMap"][1]; area = map_area(p, mm); frame = Frame(reg)
     raw = resample(mm, area, frame, (0, 0, MAP_W, MAP_H), MAP_W, MAP_H, supersample(area, frame, 1)).astype(np.float64)
-    rgb, al = shade(raw); rgb = np.clip(rgb, 0, 1)
+    rgb, al = shade(raw, VEC3[g][0], g); rgb = np.clip(rgb, 0, 1)
     cap8 = np.array(Image.open(path).convert("RGB")); cl = srgb_decode(cap8 / 255.0)
     off = (al < 0.99) & ~hud_mask(cap8)
     off[:, :1] = off[:, -1:] = False; off[-1:, :] = False  # the window's border px
@@ -638,12 +745,32 @@ INDEX_NOTE = ("Written by tools/render-nss-maps.py: NSS's own minimap, the baked
     "course), madOff elsewhere, both without the HUD (wind dial, top strip); differs = regions over `thr` outside the "
     "HUD; registration4x = the shift (map px, + right / down) that best fits the 4x render to the stack.")
 
+INDEX_NOTE_SR = ("Written by tools/render-nss-maps.py --game sr: Switch Sports Resort's own minimap, the baked capture textures "
+    "Tex/AnnaGolfMiniMapCapture__GolfCourseNN_{MiniMap,Green}_Msk.bntx.zs (SR 1.0.0 RomFS; BC7, Turing / Ampere tiling, "
+    "alpha = coverage, straight colour: put into NSS's convention for A on load) drawn with LGlfMiniMap.bflyt's P_Map / "
+    "P_MapGreen shader (NSS's Glf_MiniMap.glsl structure; SR's own is a compiled binary, so its Vec3 is fitted to SR's "
+    "screen: shader.map / shader.green), P_MapGreenGrid's plaid on the green (Glf_MiniMapGreen^_A, ASTC 6x6; a tile of "
+    "2 m (plaid.tileM; the layout's own tile, GreenAreaSize / its LGlfMiniMap_TypeHoleNum scale, is plaid.layoutTileM: 2 m "
+    "except SR 21, 22, 24, 26, 27) with a tile centre on `plaid.origin`, the game centring one on the cup in play), placed by tools/nss-registration.json. "
+    "holes[n] (SR's numbers 1-27): art 'sr'; maps[s] = { file, width, height, scale, ss }, the 250x304 map frame at s px per "
+    "map px (s 2, 3, 4, 8: hNN.png, hNN-3x.png, hNN-4x.png, hNN-8x.png), ss the supersamples per axis; map = maps['2']; green = "
+    "{ file, width, height, aspect, margin, pxPerMapPx, box, frame, view }: the crop of tools/nss-truth.json's greenBox (box, "
+    "map fractions, exactly the truth's) plus margin of it on every side at the box's aspect (width / height in map px), "
+    "bbox-local (u, v) at ((u + margin) / (1 + 2 margin)) of the image; view height = the Terrain view (map, plaid, height "
+    "bands), grid = the plain plaid view. backdrop: what stands in for the live 3D view under the translucent off-course "
+    "pane (world = tools/nss-map-backdrop.json's flat stand-ins, derived from SR's screen by --derive-backdrop). fidelity "
+    "(when --stacks has hNN.png): each render box-filtered to 250x304 against it, mean |diff| per channel (0..255), as for NSS.")
+
 def main():
-    ap = argparse.ArgumentParser(description="Render NSS's own hole minimaps into the 250x304 map frame.")
-    ap.add_argument("--holes", default=",".join(str(i) for i in HOLES))
+    ap = argparse.ArgumentParser(description="Render the game's own hole minimaps (SR, or NSS with --game nss) into the 250x304 map frame.")
+    ap.add_argument("--game", default="sr", choices=["sr", "nss"], help="whose minimap: Switch Sports Resort (27 holes, default) or NSS (21)")
+    ap.add_argument("--data", default=TOOLS, help="the folder with nss-registration.json, nss-truth.json, nss-pins.json, nss-map-backdrop.json")
+    ap.add_argument("--stacks", default=None, help="the capture stacks hNN.png to compare with (default for NSS: captures/derived/maps; none for SR)")
+    ap.add_argument("--plaid-tile", default="2", choices=["2", "layout"], help="SR: the plaid's tile 2 m (default) or the layout animation's own (GreenAreaSize / scale)")
+    ap.add_argument("--holes", default=None)
     ap.add_argument("--scales", default="2,3,4")
     ap.add_argument("--out", default=DEFAULT_OUT)
-    ap.add_argument("--romfs", default=DEFAULT_ROMFS)
+    ap.add_argument("--romfs", default=None)
     ap.add_argument("--backdrop", default="world", choices=["world", "pane", "black"])
     ap.add_argument("--green-view", default="height", choices=["height", "grid"])
     ap.add_argument("--plaid-origin", default="centre", choices=["centre"] + ["cup%d" % k for k in range(6)])
@@ -654,13 +781,22 @@ def main():
     ap.add_argument("--jobs", type=int, default=1, help="holes rendered at once")
     ap.add_argument("--derive-backdrop", action="store_true", help="derive the world backdrop from the capture stacks into tools/nss-map-backdrop.json, then stop")
     o = ap.parse_args()
+    nholes = GAME_HOLES[o.game]
+    if o.holes is None: o.holes = ",".join(str(i) for i in range(1, nholes + 1))
+    if o.romfs is None: o.romfs = DEFAULT_ROMFS[o.game]
+    o.data = os.path.abspath(o.data)
+    BACKDROP_JSON = os.path.join(o.data, BACKDROP_NAME)
+    stacks = os.path.abspath(o.stacks) if o.stacks else (CAPS if o.game == "nss" else None)
     holes = sorted({int(x) for x in o.holes.split(",") if x})
-    if not holes or any(h not in HOLES for h in holes): sys.exit("--holes: 1..21")
-    if not os.path.isdir(o.romfs): sys.exit("no NSS RomFS at %s (--romfs <dir>: the dump's romfs, with Model/ Parameter/ Layout/)" % o.romfs)
+    if not holes or any(h not in range(1, nholes + 1) for h in holes): sys.exit("--holes: 1..%d" % nholes)
+    if not os.path.isdir(o.romfs): sys.exit("no %s RomFS at %s (--romfs <dir>: the dump's romfs, with Parameter/ Layout/ and Model/ or Tex/)" % (o.game.upper(), o.romfs))
     opt = {"romfs": os.path.abspath(o.romfs), "backdrop": o.backdrop, "green_view": o.green_view, "plaid_origin": o.plaid_origin,
-           "no_green": o.no_green, "no_grid": o.no_grid, "no_compare": o.no_compare, "ss": o.ss}
+           "no_green": o.no_green, "no_grid": o.no_grid, "no_compare": o.no_compare, "ss": o.ss,
+           "game": o.game, "data": o.data, "stacks": stacks, "plaid_tile": o.plaid_tile,
+           "plaid_scales": plaid_scales(os.path.abspath(o.romfs), o.game) if o.game == "sr" else None}
 
     if o.derive_backdrop:
+        if not stacks: sys.exit("--derive-backdrop reads the capture stacks: --stacks <dir with hNN.png>")
         t0 = time.time()
         res = dict(run_jobs(derive_hole, [{"hole": h, "opt": opt} for h in holes], o.jobs))
         missing = [h for h, r in res.items() if r is None]
@@ -673,7 +809,11 @@ def main():
                         "linear light, sorted into ob / sea (filtered texel B > 0.8 G) / void (texel A >= 254); each "
                         "kind's value is the weighted median of est, weights 1 - alpha, pooled over the holes with at "
                         "least 200 px of it (perHole lists every hole's own), which minimises the summed |stack - "
-                        "composite| over those px. A kind no hole has enough of falls back to ob.",
+                        "composite| over those px. A kind no hole has enough of falls back to ob." + (
+                        " For SR (--game sr) the stacks are SR's own screen: each hNN.png in the app frame is the median of the live "
+                        "advisor's tee-overview frames of the hole (720p captures of the game, address frames with the minimap at "
+                        "overview), their minimap pane warped into the frame through a fitted pane model (the capture square's centre "
+                        "and side in screen px, per hole), so the stand-ins rest on the holes that have frames." if o.game == "sr" else ""),
                "world": world, "used": used, "perHole": per, "holesWithoutStack": missing}
         with open(BACKDROP_JSON, "w", encoding="utf8", newline="\n") as f: f.write(json.dumps(doc, indent=1) + "\n")
         print("wrote %s in %.1f s: %s%s" % (os.path.relpath(BACKDROP_JSON, REPO).replace(os.sep, "/"), time.time() - t0,
@@ -695,9 +835,10 @@ def main():
     try: prev = read_json(idx_path).get("holes", {})
     except Exception: prev = {}
     if not isinstance(prev, dict): prev = {}
-    index = {"_note": INDEX_NOTE, "art": "nss", "renderer": "tools/render-nss-maps.py", "backdrop": o.backdrop, "greenView": o.green_view,
+    vm, vg = VEC3[o.game]
+    index = {"_note": INDEX_NOTE if o.game == "nss" else INDEX_NOTE_SR, "art": o.game, "renderer": "tools/render-nss-maps.py", "backdrop": o.backdrop, "greenView": o.green_view,
              "overviewGrid": not o.no_grid, "plaidTileM": PLAID_TILE_M, "plaidOrigin": o.plaid_origin, "scales": scales,
-             "shader": {"map": "Glf_MiniMap Vec3 (1, 1, 1.2)", "green": "Glf_MiniMap Vec3 (1, 1, 1.25)" if o.green_view == "height" else "Glf_MiniMapGreen plaid"},
+             "shader": {"map": "Glf_MiniMap Vec3 (%g, %g, %g)" % vm, "green": "Glf_MiniMap Vec3 (%g, %g, %g)" % vg if o.green_view == "height" else "Glf_MiniMapGreen plaid"},
              "world": read_json(BACKDROP_JSON)["world"] if o.backdrop == "world" else None,
              "holes": {}}
     done = dict(prev)

@@ -22,16 +22,27 @@
 // cups, every check runs on it too. The WSR-era pins are rebuilt from
 // tools/wsr-pins.json and the four Switch-only spots below (the last
 // WSR-era derived.json's), so the test does not need that derived.json.
+// Hole numbers are Switch Sports Resort's (src/srMigrate.js): the WSR-era store is NSS's hole n
+// under SR's number (NSS 19, 20, 21 are SR 24, 23, 25: the pins' ids d<hole>-... are SR's, as
+// srMigrate leaves them), and where SR's frame differs (SR 17, SR 23) its pins and boxes are
+// taken into it; SR's six new holes have no WSR era and are left out.
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 const root = process.argv[2] ?? join(dirname(fileURLToPath(import.meta.url)), "..");
 const { applyDerivedHole, isPipelinePin } = await import(pathToFileURL(join(root, "src/derivedMerge.js")).href);
+const SRM = await import(pathToFileURL(join(root, "src/srMigrate.js")).href);
 const J = (p) => JSON.parse(readFileSync(join(root, p), "utf8"));
 const DERIVED = J("public/derived.json").holes;
 const NSSP = J("tools/nss-pins.json").holes, NSSPL = J("tools/nss-platform.json").holes;
 const WSRP = J("tools/wsr-pins.json").holes, WSRT = J("tools/wsr-truth.json").holes;
 const MAP_W = 250, MAP_H = 304;
+// SR hole n's WSR-era counterpart (WSR's hole = NSS's number; null on SR's new holes), and a point, box, outline or scale of
+// it in SR's frame (the same numbers on every hole but SR 17 and SR 23, whose frames are SR's own)
+const wsrOf = (n) => SRM.nssHoleOf(n);
+const fx = (n, p) => { const [x, y] = SRM.toSrFrame(n, p.x, p.y); return { ...p, x, y }; };
+const boxFx = (n, b) => { const [x0, y0] = SRM.toSrFrame(n, b.x0, b.y0), [x1, y1] = SRM.toSrFrame(n, b.x1, b.y1); return { x0, y0, x1, y1 }; };
+const polyFx = (n, poly) => poly.map(([x, y]) => SRM.toSrFrame(n, x, y));
 let fails = 0, checks = 0; const ok = (c, msg) => { checks++; if (!c) { fails++; console.log("FAIL:", msg); } };
 const eq = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 const clone = (o) => JSON.parse(JSON.stringify(o));
@@ -45,26 +56,26 @@ const px = (a, b) => Math.hypot((a.x - b.x) * MAP_W, (a.y - b.y) * MAP_H);
 const SWITCH_SPOTS = {
   10: [{ id: "x0", x: 0.5227, y: 0.1729, label: "S1", yd: 374, seen: 3 }, { id: "x1", x: 0.5018, y: 0.147, label: "S2", yd: 388, seen: 2 }],
   18: [{ id: "x0", x: 0.4773, y: 0.1588, label: "S1", yd: 458, seen: 2 }],
-  21: [{ id: "x0", x: 0.4518, y: 0.1862, label: "S1", yd: 415, seen: 1 }],
+  25: [{ id: "x0", x: 0.4518, y: 0.1862, label: "S1", yd: 415, seen: 1 }],   // (NSS 21's)
 };
 // the design's nearest-cup table (INTEGRATION.md section 3, unit D), and its ties
 const TABLE = {
-  "d10-x0": "c5", "d10-x1": "c4", "d18-x0": "c1", "d21-x0": "c3", "d11-s0": "c0", "d7-s3": "c2",
+  "d10-x0": "c5", "d10-x1": "c4", "d18-x0": "c1", "d25-x0": "c3", "d11-s0": "c0", "d7-s3": "c2",
   "d3-s1": "c1", "d9-s1": "c0", "d13-s0": "c0", "d16-s2": "c3", "d18-s0": "c0",
-  "d2-s0": "c4", "d2-s1": "c4", "d21-s4": "c0", "d21-s5": "c0",
+  "d2-s0": "c4", "d2-s1": "c4", "d25-s4": "c0", "d25-s5": "c0",
 };
 // the design's most-seen cup per hole (credited at 2.5 px); H7's c2 ties with c5
-const MOST_SEEN = { 1: [0], 2: [0], 3: [4], 4: [1], 5: [0], 6: [1], 7: [2, 5], 8: [1], 9: [0], 10: [5], 11: [4], 12: [2], 13: [1], 14: [3], 15: [3], 16: [5], 17: [1], 18: [1], 19: [0], 20: [1], 21: [3] };
+const MOST_SEEN = { 1: [0], 2: [0], 3: [4], 4: [1], 5: [0], 6: [1], 7: [2, 5], 8: [1], 9: [0], 10: [5], 11: [4], 12: [2], 13: [1], 14: [3], 15: [3], 16: [5], 17: [1], 18: [1], 23: [1], 24: [0], 25: [3], 19: [0], 20: [0], 21: [0], 22: [0], 26: [0], 27: [0] };   // (SR 23 / 24 / 25 are NSS 20 / 19 / 21; the six new holes have no captures: the first cup)
 
 // a WSR-era stored hole: its pipeline pins, the player's pin, WSR's green box, a teeOnline
 const MINE_PIN = (n) => ({ id: 1700000000100 + n, x: 0.46, y: 0.24 });
 const wsrEraPins = (n) => [
-  ...WSRP[n].spots.map((s) => ({ id: `d${n}-s${s.slots[0]}`, x: s.x, y: s.y, label: s.label, set: s.set, yd: s.yd, src: "wsr", seen: 0 })),
-  ...(SWITCH_SPOTS[n] ?? []).map((s) => ({ id: `d${n}-${s.id}`, x: s.x, y: s.y, label: s.label, set: null, yd: s.yd, src: "switch", seen: s.seen })),
+  ...WSRP[wsrOf(n)].spots.map((s) => ({ id: `d${n}-s${s.slots[0]}`, ...fx(n, { x: s.x, y: s.y }), label: s.label, set: s.set, yd: s.yd, src: "wsr", seen: 0 })),
+  ...(SWITCH_SPOTS[n] ?? []).map((s) => ({ id: `d${n}-${s.id}`, ...fx(n, { x: s.x, y: s.y }), label: s.label, set: null, yd: s.yd, src: "switch", seen: s.seen })),
 ];
 const wsrEraHole = (n, curPin) => ({
-  par: 4, note: "", blocked: [], markers: [], scale: WSRT[n].scale,
-  green: { ...emptyGreen(), box: WSRT[n].greenBox, poly: WSRT[n].greenPoly, src: "wsr-00000000" },
+  par: 4, note: "", blocked: [], markers: [], scale: WSRT[wsrOf(n)].scale * SRM.srScaleRatio(n),
+  green: { ...emptyGreen(), box: boxFx(n, WSRT[wsrOf(n)].greenBox), poly: polyFx(n, WSRT[wsrOf(n)].greenPoly), src: "wsr-00000000" },
   pins: [MINE_PIN(n), ...wsrEraPins(n)], curPin,
   teeOnline: { x: 0.5, y: 0.86, lower: { x: 0.5, y: 0.86 }, upper: { x: 0.5, y: 0.87 } },
 });
@@ -108,7 +119,8 @@ const bites = {
 const table = { hit: 0 };
 for (const [name, holeOf] of sources) {
   let migrated = 0;
-  for (let n = 1; n <= 21; n++) {
+  for (let n = 1; n <= 27; n++) {
+    if (wsrOf(n) == null) continue;   // SR's new holes: no WSR era to move a curPin from
     const d = holeOf(n), tag = `${name} H${n}`;
     const cups = d.pins.map((p) => ({ ...p, id: `d${n}-${p.id}` }));
     ok(d.pins.length === 6 && d.pins.every((p, k) => p.id === `c${k}` && p.src === "nss"), `${tag}: the NSS hole does not have the six cups c0..c5`);
@@ -186,10 +198,11 @@ for (const [name, holeOf] of sources) {
 // carried through the boxes onto the matching spot (the merge before the NSS
 // switch, kept for a derived.json from before it)
 let wsrCarried = 0;
-for (let n = 1; n <= 21; n++) {
+for (let n = 1; n <= 27; n++) {
+  if (wsrOf(n) == null) continue;
   const dw = clone(DERIVED[n]);
   delete dw.rev; delete dw.platform; delete dw.teeNss;
-  Object.assign(dw, { source: "wsr", wsrRev: `wsr-test${n}`, scale: WSRT[n].scale, greenBox: WSRT[n].greenBox, greenPoly: WSRT[n].greenPoly,
+  Object.assign(dw, { source: "wsr", wsrRev: `wsr-test${n}`, scale: WSRT[wsrOf(n)].scale * SRM.srScaleRatio(n), greenBox: boxFx(n, WSRT[wsrOf(n)].greenBox), greenPoly: polyFx(n, WSRT[wsrOf(n)].greenPoly),
     pins: wsrEraPins(n).map((p) => ({ ...p, id: p.id.slice(`d${n}-`.length) })) });
   const want = wsrEraPins(n), T = boxXf(dw.greenBox);
   for (const p of want) {

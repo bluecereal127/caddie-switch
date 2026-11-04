@@ -1,26 +1,28 @@
-// node tools/test-nss-export.mjs [--src tools/harness/state/eden/nss-golf-x]
+// node tools/test-nss-export.mjs [--src tools/harness/state/eden/sr-golf-x]
 // Acceptance for tools/nss-export.mjs and its readers (tools/lib/nssreg.mjs,
 // tools/lib/nsscol.mjs) on the committed tools/nss-registration.json,
 // nss-pins.json and nss-platform.json:
-//  1. the registration: 21 holes, unitsPerM 10, yd/px against the fit and
+//  1. the registration: Switch Sports Resort's 27 holes (SR 17 and 23 in capture squares of their own), unitsPerM 10, yd/px against the fit and
 //     derived.json's scale, nssToMap(mapToNss(p)) = p and meshToNss(nssToMesh(p))
 //     = p to 1e-9, bearings, the platform frame (local +x = the player's left)
-//  2. the cups: six per hole, k 0-5; `difficult` on exactly the 16
-//     CupDifficulties cups, `wsr` on exactly the 7 that are WSR spots (each
+//  2. the cups: six per hole, k 0-5; `difficult` on exactly the 20
+//     CupDifficulties cups (NSS's 16 and SR 26's and 27's four), `wsr` on exactly the 7 that are WSR spots (each
 //     within 0.3 yd of that spot in tools/wsr-pins.json, every other cup
 //     further); x/y = the world through the registration; every cup inside
 //     derived.json's greenPoly; mesh = the surface point through the mesh
 //     offset, and through tools/mesh-registration.json's meshToMapFrac (an
 //     independent path, 100-560 yd from the origin) within 0.1 px of x/y; the
-//     surface 0.29-0.345 m over the bone; the cover hub within 4 mm; the
-//     yardages from the WSR start and GlfTeeOBJ; the WSR start (from
-//     tools/wsr-pins.json) within 0.2 px of its own map point and at y 0
+//     surface 0.245-0.345 m over the bone (NSS 0.29-0.345, SR 26's cups 0.25-0.285); the cover hub within 4 mm; the
+//     yardages from the WSR start (the GlfTeeOBJ's on SR's six new holes, which
+//     have none) and GlfTeeOBJ; the WSR start (from
+//     tools/wsr-pins.json: NSS's hole of the same SR number or, SR 24 / 23 / 25, NSS 19 / 20 / 21) within 0.2 px of its own map point (in SR's
+//     frame) and at y 0
 //  3. the platform: 7 standing x per tier from the player's left (3.45 .. -3.45 m:
 //     the four slot bones and the three midpoints), each placed by origin +
 //     Ry(yaw) * local through the registration; neighbours 1.15 m apart and the
 //     bones 2.3 m (2.515 yd via derived.json's scale, +-0.05); the high tier
 //     3.5 m behind the low along facingDeg; z = the mats (0.0996 / 1.668 m, not
-//     the 0.117 / 1.686 rim): 0.1089 / 1.8241 yd, +0.1094 on H3; left-to-right
+//     the 0.117 / 1.686 rim): 0.1089 / 1.8241 yd, + the origin's height (0.1094 on H3, 10.94 on SR 23); left-to-right
 //     order on every map (slot 0 = R2 the rightmost, slot 3 = L2 the leftmost);
 //     the 8 bones within 0.8 px of the decoder's own map points; ground under
 //     every position; every stance (10 * world + O) through mesh-registration.json
@@ -40,9 +42,10 @@
 //  5. with the dump present: a fresh export is identical to the committed
 //     files (line ends aside: core.autocrlf may check them out CRLF; an export
 //     that fails is a FAIL line), their source SHA-1s are the dump's;
-//     slots.json's 399 stands are the stances (1e-4 px) and its 798 balls the
-//     balls (0.002 px, heights 1e-4 yd); and on every hole, with H3's sea, the
-//     ground at the WSR start, Glf_RotateOBJ and GlfTeeOBJ is 0.000 m fairway,
+//     slots.json's 513 stands are the stances (1e-4 px) and its 1026 balls the
+//     balls (0.002 px, heights 1e-4 yd); and on every hole (H3's sea is in its
+//     field mesh: no water extra), the
+//     ground at the WSR start, Glf_RotateOBJ and GlfTeeOBJ is 0.000 m fairway (the tee's own height, 10 m, on SR 23),
 //     each cup's top ground is its own cover at the shipped surface, and the
 //     ground under every stance and ball is the shipped one, not a tie
 import { readFileSync, writeFileSync, existsSync, mkdtempSync, rmSync } from "node:fs";
@@ -53,9 +56,10 @@ import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { regOf, nssToMap, mapToNss, nssToMesh, meshToNss, ydPerPx, pxPerM, bearingOf, platformToWorld, M_PER_YD } from "./lib/nssreg.mjs";
 import { readMeshBin, loadCollision, gridIndex, topGround, rayHits, GROUND_CODES, TIE_ORDER, TIE_M } from "./lib/nsscol.mjs";
+import { nssHoleOf, toSrFrame } from "../src/srMigrate.js";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
-let SRC = join(ROOT, "tools/harness/state/eden/nss-golf-x");
+let SRC = join(ROOT, "tools/harness/state/eden/sr-golf-x");   // the Switch Sports Resort dump (lab/r6work/sr/assemble)
 const argv = process.argv.slice(2);
 for (let i = 0; i < argv.length; i++) if (argv[i] === "--src") SRC = resolve(argv[++i]);
 let fails = 0, checks = 0;
@@ -65,8 +69,14 @@ const REG = J("tools/nss-registration.json"), PINS = J("tools/nss-pins.json"), P
 const WSRP = J("tools/wsr-pins.json"), DER = J("public/derived.json"), MREG = J("tools/mesh-registration.json");
 // an independent path from WSR mesh units to the map: tools/mesh-registration.json's
 // per-hole meshToMapFrac (fitted on the WSR meshes, not through nss-registration)
-const meshFrac = (n, X, Z) => { const M = MREG.holes[n].meshToMapFrac; return { x: M[0][0] * X + M[0][1] * Z + M[0][2], y: M[1][0] * X + M[1][1] * Z + M[1][2] }; };
-const HOLES = Array.from({ length: 21 }, (_, i) => i + 1);
+// (SR hole n is WSR's / NSS's hole nssHoleOf(n); its map fraction goes into SR's frame where that differs, SR 17 and SR 23; null for SR's six new holes)
+const meshFrac = (n, X, Z) => {
+  const wn = nssHoleOf(n), M = wn != null ? MREG.holes[wn]?.meshToMapFrac : null;
+  if (!M) return null;
+  const [x, y] = toSrFrame(n, M[0][0] * X + M[0][1] * Z + M[0][2], M[1][0] * X + M[1][1] * Z + M[1][2]);
+  return { x, y };
+};
+const HOLES = Array.from({ length: 27 }, (_, i) => i + 1);
 const d2 = (ax, az, bx, bz) => Math.sqrt((ax - bx) ** 2 + (az - bz) ** 2);
 const r5 = (v) => +v.toFixed(5);
 const pxDist = (p, q) => Math.sqrt(((p.x - q.x) * 250) ** 2 + ((p.y - q.y) * 304) ** 2);
@@ -83,7 +93,7 @@ function inPoly(poly, x, y) {
 }
 
 // ---- 1. registration -------------------------------------------------------
-ok(Object.keys(REG.holes).join() === HOLES.join(), "nss-registration: holes 1-21");
+ok(Object.keys(REG.holes).join() === HOLES.join(), "nss-registration: holes 1-27");
 for (const n of HOLES) {
   const R = regOf(REG, n);
   ok(["a", "b", "tx", "ty", "originMeshY"].every((k) => Number.isFinite(R[k])) && R.originMesh.length === 2 && R.unitsPerM === 10, `H${n}: registration fields`);
@@ -115,28 +125,32 @@ for (const n of HOLES) {
 }
 
 // ---- 2. cups ------------------------------------------------------------------
-const DIFFICULT = { 5: [4], 6: [5], 7: [4], 8: [3], 9: [2], 14: [5], 16: [0, 4], 17: [0], 18: [3], 19: [1, 5], 20: [2, 4], 21: [0, 5] };
+const DIFFICULT = { 5: [4], 6: [5], 7: [4], 8: [3], 9: [2], 14: [5], 16: [0, 4], 17: [0], 18: [3], 23: [2, 4], 24: [1, 5], 25: [0, 5], 26: [3, 4], 27: [1, 2] };   // (SR 23-25 are NSS 20, 19, 21)
 const WSR_SAME = { 3: { 1: "s1" }, 7: { 2: "s3" }, 9: { 0: "s1" }, 11: { 0: "s0" }, 13: { 0: "s0" }, 16: { 3: "s2" }, 18: { 0: "s0" } };
-ok(Object.keys(PINS.holes).join() === HOLES.join(), "nss-pins: holes 1-21");
+ok(Object.keys(PINS.holes).join() === HOLES.join(), "nss-pins: holes 1-27");
 let nDiff = 0, nWsr = 0, minOther = Infinity, maxSame = 0, maxHubMm = 0, surf = [Infinity, -Infinity], maxStartPx = 0, maxCupMeshPx = 0;
 for (const n of HOLES) {
-  const R = regOf(REG, n), h = PINS.holes[n], dh = DER.holes[n], wh = WSRP.holes[n];
+  const wn = nssHoleOf(n), R = regOf(REG, n), h = PINS.holes[n], dh = DER.holes[n], wh = wn != null ? WSRP.holes[wn] : null;
   ok([3, 4, 5].includes(h.par), `H${n}: par ${h.par}`);
   ok(h.cups.length === 6 && h.cups.every((c, i) => c.k === i), `H${n}: six cups k 0-5`);
-  // the WSR start and the tee bones
-  const ws = h.tees.wsrStart, s0 = wh.starts[0];
-  ok(ws.x === s0.x && ws.y === s0.y && ws.mesh.join() === s0.mesh.join(), `H${n}: tees.wsrStart is wsr-pins.json's start`);
-  const wsw = meshToNss(R, s0.mesh);
-  ok(ws.world.every((v, k) => Math.abs(v - wsw[k]) <= 6e-5), `H${n}: wsrStart.world ${ws.world} against ${wsw}`);
-  const startPx = pxDist(nssToMap(R, wsw[0], wsw[2]), ws);
-  maxStartPx = Math.max(maxStartPx, startPx);
-  ok(startPx <= 0.2, `H${n}: the WSR start maps ${startPx.toFixed(3)} px from its own map point`);
-  ok(Math.abs(wsw[1]) <= 0.013, `H${n}: the WSR start at NSS y ${wsw[1]}, not the datum`);
+  // the WSR start and the tee bones (SR's six new holes have no WSR start: null)
+  const ws = h.tees.wsrStart, s0 = wh?.starts[0];
+  if (!wh) ok(ws === null && !h.cups.some((c) => c.nearestWsr), `H${n}: a new hole has no WSR start (${JSON.stringify(ws)}) and no nearest WSR spot`);
+  else {
+    const [sx, sy] = toSrFrame(n, s0.x, s0.y);   // (wsr-pins.json's map point is NSS's frame's)
+    ok(ws && pxDist(ws, { x: sx, y: sy }) <= 0.1 && ws.mesh.join() === s0.mesh.join(), `H${n}: tees.wsrStart is wsr-pins.json's start (in SR's frame, within 0.1 px: WSR's own map point is 0.016 px from its world point's)`);
+    const wsw = meshToNss(R, s0.mesh);
+    ok(ws.world.every((v, k) => Math.abs(v - wsw[k]) <= 6e-5), `H${n}: wsrStart.world ${ws.world} against ${wsw}`);
+    const startPx = pxDist(nssToMap(R, wsw[0], wsw[2]), ws);
+    maxStartPx = Math.max(maxStartPx, startPx);
+    ok(startPx <= 0.2, `H${n}: the WSR start maps ${startPx.toFixed(3)} px from its own map point`);
+    ok(Math.abs(wsw[1]) <= 0.013, `H${n}: the WSR start at NSS y ${wsw[1]}, not the datum`);
+  }
   for (const b of ["rotateObj", "teeObj"]) {
     const t = h.tees[b], p = nssToMap(R, t.world[0], t.world[2]);
     ok(Math.abs(r5(p.x) - t.x) <= 1e-5 && Math.abs(r5(p.y) - t.y) <= 1e-5, `H${n}: tees.${b} map point`);
   }
-  const spots = wh.spots.map((s) => ({ id: `s${s.slots[0]}`, w: meshToNss(R, s.mesh) }));
+  const spots = (wh?.spots ?? []).map((s) => ({ id: `s${s.slots[0]}`, w: meshToNss(R, s.mesh) }));
   for (const c of h.cups) {
     const tag = `H${n} c${c.k}`;
     const p = nssToMap(R, c.world[0], c.world[2]);
@@ -155,27 +169,31 @@ for (const n of HOLES) {
       maxSame = Math.max(maxSame, yd);
       ok(yd <= 0.3, `${tag}: ${yd.toFixed(3)} yd from WSR ${same}`);
     } else minOther = Math.min(minOther, near);
-    ok(Math.abs(c.nearestWsr.yd - near) <= 0.006, `${tag}: nearestWsr ${c.nearestWsr.yd} yd against ${near}`);
+    if (spots.length) ok(Math.abs(c.nearestWsr.yd - near) <= 0.006, `${tag}: nearestWsr ${c.nearestWsr.yd} yd against ${near}`);
     const m = nssToMesh(R, [c.world[0], c.surfaceY, c.world[2]]);
     ok(m.every((v, k) => Math.abs(v - c.mesh[k]) <= 2e-3), `${tag}: mesh ${c.mesh} against ${m}`);
     // the mesh point 100-560 yd out, where a scale or rotation error in the offset would show
-    const viaMesh = pxDist(meshFrac(n, c.mesh[0], c.mesh[2]), c);
-    maxCupMeshPx = Math.max(maxCupMeshPx, viaMesh);
-    ok(viaMesh <= 0.1, `${tag}: mesh ${c.mesh} through mesh-registration.json lands ${viaMesh.toFixed(3)} px from x/y`);
+    const mf = meshFrac(n, c.mesh[0], c.mesh[2]);
+    if (mf) {
+      const viaMesh = pxDist(mf, c);
+      maxCupMeshPx = Math.max(maxCupMeshPx, viaMesh);
+      ok(viaMesh <= 0.1, `${tag}: mesh ${c.mesh} through mesh-registration.json lands ${viaMesh.toFixed(3)} px from x/y`);
+    }
     const up = c.surfaceY - c.world[1];
     surf = [Math.min(surf[0], up), Math.max(surf[1], up)];
-    ok(up >= 0.29 && up <= 0.345, `${tag}: surface ${up.toFixed(4)} m over the bone`);
+    ok(up >= 0.245 && up <= 0.345, `${tag}: surface ${up.toFixed(4)} m over the bone`);   // (NSS's 0.29-0.345; SR 26's cups are shallower, 0.25-0.285)
     ok(Math.abs(c.surfaceYd - c.surfaceY / M_PER_YD) <= 1e-4, `${tag}: surfaceYd`);
     maxHubMm = Math.max(maxHubMm, c.cover.dxzMm);
     ok(c.cover.dxzMm <= 4 && Math.abs(d2(c.cover.hub[0], c.cover.hub[2], c.world[0], c.world[2]) * 1000 - c.cover.dxzMm) <= 0.2, `${tag}: cover hub ${c.cover.dxzMm} mm`);
-    ok(Math.abs(c.ydFromWsrStart - d2(c.world[0], c.world[2], ws.world[0], ws.world[2]) / M_PER_YD) <= 0.01, `${tag}: ydFromWsrStart`);
+    // (a hole with no WSR start: the GlfTeeOBJ's distance stands in)
+    ok(Math.abs(c.ydFromWsrStart - d2(c.world[0], c.world[2], (ws ?? h.tees.teeObj).world[0], (ws ?? h.tees.teeObj).world[2]) / M_PER_YD) <= 0.01, `${tag}: ydFromWsrStart`);
     ok(Math.abs(c.ydFromTeeObj - d2(c.world[0], c.world[2], h.tees.teeObj.world[0], h.tees.teeObj.world[2]) / M_PER_YD) <= 0.01, `${tag}: ydFromTeeObj`);
   }
 }
-ok(nDiff === 16, `${nDiff} difficult cups, not 16`);
+ok(nDiff === 20, `${nDiff} difficult cups, not 20`);
 ok(nWsr === 7, `${nWsr} cups on WSR spots, not 7`);
 ok(minOther > 0.3, `a cup not marked as a WSR spot is ${minOther} yd from one`);
-console.log(`cups: 126; difficult ${nDiff}; on WSR spots ${nWsr} (0.00-${maxSame.toFixed(2)} yd; the nearest other cup ${minOther.toFixed(2)} yd); surface ${surf[0].toFixed(3)}-${surf[1].toFixed(3)} m over the bone; cover hubs <= ${maxHubMm} mm; WSR start <= ${maxStartPx.toFixed(3)} px; mesh through mesh-registration.json <= ${maxCupMeshPx.toFixed(3)} px`);
+console.log(`cups: ${6 * HOLES.length}; difficult ${nDiff}; on WSR spots ${nWsr} (0.00-${maxSame.toFixed(2)} yd; the nearest other cup ${minOther.toFixed(2)} yd); surface ${surf[0].toFixed(3)}-${surf[1].toFixed(3)} m over the bone; cover hubs <= ${maxHubMm} mm; WSR start <= ${maxStartPx.toFixed(3)} px; mesh through mesh-registration.json <= ${maxCupMeshPx.toFixed(3)} px`);
 
 // ---- 3. platform ------------------------------------------------------------
 const SX = [3.45, 2.3, 1.15, 0, -1.15, -2.3, -3.45], SIDE = ["R2", "R1", "L1", "L2"];
@@ -186,7 +204,7 @@ ok(T.low.rimY - T.low.matY > 0.015 && T.high.rimY - T.high.matY > 0.015, "the ma
 ok(T.low.localZ === 2 && T.high.localZ === -1.5 && T.low.boneY === 0.1 && T.high.boneY === 1.668244, "tier rows: z 2.0 / -1.5, bones at y 0.1 / 1.668244");
 ok(PLAT.slotsLocal.length === 8 && PLAT.slotsLocal.every((s, i) => s.i === i && s.side === SIDE[i % 4] && s.bone === `GlfTeeOBJ_${i + 1}` && s.tier === (i < 4 ? "low" : "high") && s.x === [-3.45, -1.15, 1.15, 3.45][i % 4]), "slotsLocal: GlfTeeOBJ_1..8 = R2 R1 L1 L2 per tier at x -3.45 .. 3.45");
 ok(Math.abs(PLAT.tierOffset.backM - 3.5) < 1e-9 && Math.abs(PLAT.tierOffset.backYd - 3.8276) < 1e-4, "tier offset 3.5 m = 3.83 yd back");
-ok(Object.keys(PLAT.holes).join() === HOLES.join(), "nss-platform: holes 1-21");
+ok(Object.keys(PLAT.holes).join() === HOLES.join(), "nss-platform: holes 1-27");
 // the ball: the stance moved 0.9 m along local x (slots.json ballOffset), to the player's right for a right-hander
 const HANDS = ["rightHanded", "leftHanded"], OFF = { rightHanded: -0.9, leftHanded: 0.9 };
 ok(JSON.stringify(PLAT.ballOffsetM) === JSON.stringify(OFF), `ballOffsetM ${JSON.stringify(PLAT.ballOffsetM)}`);
@@ -227,9 +245,12 @@ for (const n of HOLES) {
       ok(Math.abs(q.z - (t === "low" ? zLow : zHigh)) <= 1e-4, `${tag}: z ${q.z}`);
       ok(q.groundZ !== null && GROUND_CODES.has(q.groundCode) && typeof q.ground === "string", `${tag}: no ground under it`);
       // the stance through the WSR mesh units and mesh-registration.json (an independent path)
-      const viaMesh = pxDist(meshFrac(n, 10 * q.world[0] + R.originMesh[0], 10 * q.world[2] + R.originMesh[1]), q);
-      maxPosMeshPx = Math.max(maxPosMeshPx, viaMesh);
-      ok(viaMesh <= 0.02, `${tag}: through mesh-registration.json ${viaMesh.toFixed(4)} px off`);
+      const mq = meshFrac(n, 10 * q.world[0] + R.originMesh[0], 10 * q.world[2] + R.originMesh[1]);
+      if (mq) {
+        const viaMesh = pxDist(mq, q);
+        maxPosMeshPx = Math.max(maxPosMeshPx, viaMesh);
+        ok(viaMesh <= 0.02, `${tag}: through mesh-registration.json ${viaMesh.toFixed(4)} px off`);
+      }
       // the ball, per hand
       ok(q.ball && JSON.stringify(Object.keys(q.ball)) === JSON.stringify(HANDS), `${tag}: ball ${q.ball && Object.keys(q.ball)}`);
       for (const h of HANDS) {
@@ -249,9 +270,12 @@ for (const n of HOLES) {
         const want = h === "rightHanded" ? 0.9 : -0.9;
         ballSide = [Math.min(ballSide[0], across * Math.sign(want)), Math.max(ballSide[1], across * Math.sign(want))];
         ok(Math.abs(across - want) <= 0.01 && Math.abs(along) <= 0.01, `${bt}: ${across.toFixed(3)} m to the right of the stance, ${along.toFixed(3)} m along`);
-        const bm = pxDist(meshFrac(n, 10 * b.world[0] + R.originMesh[0], 10 * b.world[2] + R.originMesh[1]), b);
-        maxPosMeshPx = Math.max(maxPosMeshPx, bm);
-        ok(bm <= 0.02, `${bt}: through mesh-registration.json ${bm.toFixed(4)} px off`);
+        const mb = meshFrac(n, 10 * b.world[0] + R.originMesh[0], 10 * b.world[2] + R.originMesh[1]);
+        if (mb) {
+          const bm = pxDist(mb, b);
+          maxPosMeshPx = Math.max(maxPosMeshPx, bm);
+          ok(bm <= 0.02, `${bt}: through mesh-registration.json ${bm.toFixed(4)} px off`);
+        }
       }
     });
     // left to right on the map, 1.15 m apart; bones 2.3 m = 2.515 yd through derived.json's scale
@@ -264,7 +288,7 @@ for (const n of HOLES) {
     }
     for (let i = 2; i < 7; i += 2) ok(Math.abs(pxDist(row[i], row[i - 2]) * sc - 2.515) <= 0.05, `H${n} ${t}: bones ${pxDist(row[i], row[i - 2]) * sc} yd apart`);
   }
-  ok(Math.abs(H.tiers.low[0].z - (n === 3 ? 0.2183 : 0.1089)) <= 1e-4 && Math.abs(H.tiers.high[0].z - (n === 3 ? 1.9335 : 1.8241)) <= 1e-4, `H${n}: mats at ${H.tiers.low[0].z} / ${H.tiers.high[0].z} yd`);
+  ok(Math.abs(H.tiers.low[0].z - zLow) <= 1e-4 && Math.abs(H.tiers.high[0].z - zHigh) <= 1e-4, `H${n}: mats at ${H.tiers.low[0].z} / ${H.tiers.high[0].z} yd, expected ${zLow} / ${zHigh} (the origin's height ${H.origin[1]} m + the mat)`);
   // the high tier 3.5 m straight behind the low one along the facing
   for (let i = 0; i < 7; i++) {
     const lo = H.tiers.low[i], hi = H.tiers.high[i], dx = (hi.x - lo.x) * 250, dy = (hi.y - lo.y) * 304;
@@ -291,7 +315,7 @@ for (const n of HOLES) {
 }
 for (const l of lines) console.log(l);
 console.log(`platform: neighbours ${spacing[0].toFixed(3)}-${spacing[1].toFixed(3)} yd apart (1.15 m = ${(1.15 / M_PER_YD).toFixed(3)}); high tier ${backs[0].toFixed(4)}..${backs[1].toFixed(4)} m along; bones <= ${maxDec.toFixed(3)} px from the decoder's; stances and balls <= ${maxPosMeshPx.toFixed(4)} px through mesh-registration.json`);
-console.log(`balls: ${21 * 2 * 7 * 2}, each ${ballSide[0].toFixed(4)}..${ballSide[1].toFixed(4)} m to its hand's side of the stance; ${groundSplit} on another ground than their stance`);
+console.log(`balls: ${HOLES.length * 2 * 7 * 2}, each ${ballSide[0].toFixed(4)}..${ballSide[1].toFixed(4)} m to its hand's side of the stance; ${groundSplit} on another ground than their stance`);
 console.log(`start rotation (GlfTeeOBJ) against the row (Glf_RotateOBJ): ${startDev.filter(([, d]) => Math.abs(d) >= 4).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1])).map(([n, d]) => `H${n} ${d >= 0 ? "+" : ""}${d.toFixed(2)}`).join(", ")} deg (the others under 4)`);
 
 // ---- 4. nsscol, synthetic --------------------------------------------------
@@ -434,7 +458,8 @@ else {
     const t0 = Date.now();
     let ran = false;
     try {
-      execFileSync(process.execPath, [join(ROOT, "tools/nss-export.mjs"), "--src", SRC, "--out-dir", out], { stdio: "pipe" });
+      // (--game: the label the committed files carry in source.game, "Switch Sports Resort 1.0.0"; the script's own default is NSS's)
+      execFileSync(process.execPath, [join(ROOT, "tools/nss-export.mjs"), "--src", SRC, "--out-dir", out, "--game", PINS.source.game], { stdio: "pipe" });
       ran = true;
     } catch (e) {
       ok(false, `tools/nss-export.mjs --src ${SRC} failed (exit ${e.status}): ${String(e.stderr || e.message).trim().split("\n").slice(0, 12).join(" | ")}`);
@@ -457,42 +482,48 @@ else {
     ok(PLAT.source.slotsJsonSha1 === sha(SLOTS_PATH), "slots.json SHA-1");
     const SJ = JSON.parse(readFileSync(SLOTS_PATH, "utf8"));
     ok(JSON.stringify(SJ.ballOffset?.alongLocalX_m) === JSON.stringify({ rightHanded: -0.9, leftHanded: 0.9 }), `slots.json ballOffset ${JSON.stringify(SJ.ballOffset?.alongLocalX_m)}`);
-    let nStand = 0, nBall = 0, worstStand = 0, worstBall = 0, worstH = 0;
+    let nStand = 0, nBall = 0, worstStand = 0, worstBall = 0, worstH = 0, nHoles = 0;
     for (const n of HOLES) {
-      const sh = SJ.perHole?.[String(n).padStart(2, "0")], H = PLAT.holes[n];
-      if (!sh) { ok(false, `slots.json: no hole ${n}`); continue; }
+      const sn = n === 23 || n === 25 ? null : nssHoleOf(n);
+      if (sn == null) continue;
+      const sh = SJ.perHole?.[String(sn).padStart(2, "0")], H = PLAT.holes[n];
+      if (!sh) { ok(false, `slots.json: no hole ${sn} (SR ${n})`); continue; }
+      nHoles++;
+      const at = (p) => { const [x, y] = toSrFrame(n, p.x, p.y); return { ...p, x, y }; }, tolS = n === 17 ? 0.004 : 1e-4, tolB = n === 17 ? 0.006 : 0.002;
       for (const t of ["low", "high"]) for (const [key, e] of Object.entries(sh[t] || {})) {
         const q = H.tiers[t].find((p) => p.localX === e.slotX), tag = `H${n} ${t} ${key}`;
         if (!q) { ok(false, `${tag}: slots.json's standing x ${e.slotX} is none of the shipped positions`); continue; }
-        const ds = pxDist(e.stand, q);
+        const ds = pxDist(at(e.stand), q);
         worstStand = Math.max(worstStand, ds); nStand++;
-        ok(ds <= 1e-4, `${tag}: the stance ${q.x},${q.y} ${ds.toFixed(5)} px from slots.json's stand`);
+        ok(ds <= tolS, `${tag}: the stance ${q.x},${q.y} ${ds.toFixed(5)} px from slots.json's stand`);
         for (const h of HANDS) {
-          const b = q.ball[h], d = pxDist(e[h], b), dh = Math.abs(e[h].heightYd - b.z);
+          const b = q.ball[h], d = pxDist(at(e[h]), b), dh = Math.abs(e[h].heightYd - b.z);
           worstBall = Math.max(worstBall, d); worstH = Math.max(worstH, dh); nBall++;
-          ok(d <= 0.002 && dh <= 1e-4, `${tag} ${h}: the ball ${b.x},${b.y} ${d.toFixed(4)} px from slots.json's, z ${b.z} against ${e[h].heightYd}`);
+          ok(d <= tolB && dh <= 1e-4, `${tag} ${h}: the ball ${b.x},${b.y} ${d.toFixed(4)} px from slots.json's, z ${b.z} against ${e[h].heightYd}`);
         }
       }
     }
-    ok(nStand === 399 && nBall === 798, `slots.json: ${nStand} stands and ${nBall} balls compared, not 399 and 798`);
+    ok(nStand === 19 * nHoles && nBall === 38 * nHoles && nHoles === 19, `slots.json: ${nStand} stands and ${nBall} balls compared on ${nHoles} holes (SR 1-18 and 24), not ${19 * 19} and ${38 * 19}`);
     console.log(`slots.json: ${nStand} stands within ${worstStand.toFixed(5)} px of the shipped stances, ${nBall} balls within ${worstBall.toFixed(4)} px (heights ${worstH.toExponential(1)} yd)`);
   }
   let worst = 0;
   const t1 = Date.now();
   for (const n of HOLES) {
+    // (no water extra: SR's sea, H3's included, is in the field mesh)
     let col;
-    try { col = loadCollision(join(SRC, "collision"), n, { extras: ["water"] }); } catch (e) { ok(false, `H${n}: the dump's collision does not load: ${e.message}`); continue; }
+    try { col = loadCollision(join(SRC, "collision"), n, { extras: [] }); } catch (e) { ok(false, `H${n}: the dump's collision does not load: ${e.message}`); continue; }
     const cs = PINS.source.collisionSha1[n];
     ok(col.sha1.field === cs.field && col.sha1.covers === cs.covers && col.sha1.water === cs.water, `H${n}: collision SHA-1`);
-    if (n === 3) ok(!!col.sha1.water, "H3: its sea (collision/h03-water) is in the dump and read");
     // over the map frame (+ 25 m): H3's sea plane runs ~16 km out
     const R = regOf(REG, n), cn = [[0, 0], [1, 0], [0, 1], [1, 1]].map(([fx, fy]) => mapToNss(R, fx, fy));
     const bbox = [Math.min(...cn.map((c) => c[0])) - 25, Math.min(...cn.map((c) => c[1])) - 25, Math.max(...cn.map((c) => c[0])) + 25, Math.max(...cn.map((c) => c[1])) + 25];
     const idx = gridIndex(col, 4, { codes: GROUND_CODES, bbox }), h = PINS.holes[n];
     for (const b of ["wsrStart", "rotateObj", "teeObj"]) {
-      const w = h.tees[b].world, g = topGround(idx, w[0], w[2]);
-      worst = Math.max(worst, g ? Math.abs(g.y) : Infinity);
-      ok(g && Math.abs(g.y) <= 1e-4 && g.code === 5, `H${n}: ground at ${b} ${g ? `${g.y} code ${g.code}` : "none"}, not 0.000 m fairway`);
+      if (!h.tees[b] || (n === 23 && b === "wsrStart")) continue;   // (no WSR start on SR's six new holes; SR 23's is NSS 20's tee, the area rebuilt)
+      // the ground under the tee bones is the datum, 0.000 m fairway, but under SR 23's tee platform, which stands 10 m up
+      const w = h.tees[b].world, g = topGround(idx, w[0], w[2]), y0 = n === 23 && b !== "wsrStart" ? 10 : 0;
+      worst = Math.max(worst, g ? Math.abs(g.y - y0) : Infinity);
+      ok(g && Math.abs(g.y - y0) <= 1e-4 && g.code === 5, `H${n}: ground at ${b} ${g ? `${g.y} code ${g.code}` : "none"}, not ${y0.toFixed(3)} m fairway`);
     }
     for (const c of h.cups) {
       const g = topGround(idx, c.world[0], c.world[2]), cv = col.covers.find((q) => q.k === c.k);
@@ -503,7 +534,7 @@ else {
       ok(g && Math.abs(g.y / M_PER_YD - p.groundZ) <= 1e-4 && g.code === p.groundCode && !g.tie, `H${n} ${t} #${q.fromLeft}${p === q ? "" : " ball"}: ground`);
     }
   }
-  console.log(`collision (H3 with its sea): ground at the WSR start, Glf_RotateOBJ and GlfTeeOBJ within ${worst.toExponential(1)} m of 0 on all 21 holes; cups on their covers; the ground under every stance and ball as shipped (${Date.now() - t1} ms)`);
+  console.log(`collision (H3's sea in its field mesh): ground at the WSR start, Glf_RotateOBJ and GlfTeeOBJ within ${worst.toExponential(1)} m of 0 (SR 23's tee platform: of its 10 m) on all ${HOLES.length} holes; cups on their covers; the ground under every stance and ball as shipped (${Date.now() - t1} ms)`);
 }
 
 console.log(fails ? `${fails} of ${checks} checks FAILED` : `all ${checks} checks passed`);

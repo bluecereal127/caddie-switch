@@ -13,6 +13,7 @@ import { MAP_SCALES, mapScaleOf, mapFileUrl, loadMapIndex, preloadImage } from "
 import { scrollFor } from "./mapView.js";
 import { liveSolve } from "./live3d.js";
 import { onlineOf, checkOnline, fixOnline, pairWith, ballOf, startOf, onPlatform, slotLift, TIERS, HANDS, HIGH_COUNTS, LOW_COUNTS } from "./platform.js";
+import { SR_HOLES, SR_PARS, srMigrate, srFrameFix } from "./srMigrate.js";
 
 
 /* ============================================================
@@ -45,7 +46,7 @@ const pipelineRow = (r) => {
 };
 
 // holesMeta as the store keeps it: the auto tree markers without `col`
-// (NSS's collision per tree, about 0.5 MB over the 21 holes), which
+// (NSS's collision per tree, about 0.5 MB over the 27 holes), which
 // src/derivedMerge.js puts back from derived.json on every load; the player's
 // own markers (no auto) and everything else as they are.
 const storedHolesMeta = (hm) => {
@@ -67,14 +68,18 @@ const puttRows = (rows, now = Date.now()) => (Array.isArray(rows) ? rows : [])
   .map((r, i) => ({ id: r?.id ?? now + i, hole: Number(r?.hole) || 0, bars: Number(r?.bars), rolled: Number(r?.rolled), flat: r?.flat !== false }))
   .filter((r) => r.bars > 0 && r.bars <= 4 && r.rolled > 0);
 
+// Hole ids are Switch Sports Resort's own 27 (the user, 2026-11-04: "going forward we will adopt SR's 27-hole
+// numbering throughout"): 1-18 are NSS's under the same numbers, 23 is NSS 20 with a new tee (par 5), 24 is NSS 19, 25
+// is NSS 21, and 19, 20, 21, 22, 26 and 27 are new. A state stored before moves 19, 20, 21 to 24, 23, 25 once
+// (src/srMigrate.js, flag srHolesV1).
 const COURSES = [
   { name: "Resort", holes: [1, 2, 3, 4, 5, 6, 7, 8, 9] },
   { name: "Classic", holes: [10, 11, 12, 13, 14, 15, 16, 17, 18] },
-  { name: "Special", holes: [19, 20, 21] },
+  { name: "Special", holes: [19, 20, 21, 22, 23, 24, 25, 26, 27] },
 ];
 
-// pars confirmed from the in-game hole select screen
-const PARS = { 1:4, 2:3, 3:5, 4:3, 5:5, 6:4, 7:4, 8:3, 9:5, 10:4, 11:3, 12:5, 13:3, 14:5, 15:4, 16:4, 17:3, 18:5, 19:4, 20:4, 21:4 };
+// pars confirmed from the in-game hole select screen (src/srMigrate.js SR_PARS, the one list the migration reads too)
+const PARS = SR_PARS;
 
 const NOTES = {
   1:  "Straight hole. Driver 4.00 off tee; 9i ~3.25–3.4 for the eagle look.",
@@ -95,9 +100,15 @@ const NOTES = {
   16: "Driver 3.5 slightly left (4.0 leaves a tree on stroke 2). Shortcut: 4.0 just right of the south bunker → bunker lie but eagle look. Never with headwind ≥5.",
   17: "Driver 4.0 at the hilltop is the only line. Big uphill — plays shorter than the map suggests.",
   18: "Island hop: 4.0 to the SE island's NW edge, then 4.0 to the green island. Tailwind opens the west island; heavy headwind forces the 3-island route. Book: with ≤6 mph headwind, play the left island; expect extra wind effect on stroke 2.",
-  19: "Driver 4.0 to mid north bank; stroke 2 can cut the corner through the trees to green.",
-  20: "Driver 3.5–4.0 up the fairway. Risky line between the tree and rock wall gives a cleaner stroke 2.",
-  21: "Driver 4.0 clears the long downslope; aim slightly right in 5–10 tailwind (bunker). Steep bowl green.",
+  19: "New in Switch Sports Resort.",
+  20: "New in Switch Sports Resort.",
+  21: "New in Switch Sports Resort.",
+  22: "New in Switch Sports Resort.",
+  23: "Nintendo Switch Sports' hole 20, lengthened for Resort: the tee is 73 m back and 10 m up (par 5). From the old tee: driver 3.5–4.0 up the fairway; the risky line between the tree and rock wall gives a cleaner stroke 2.",
+  24: "Driver 4.0 to mid north bank; stroke 2 can cut the corner through the trees to green.",
+  25: "Driver 4.0 clears the long downslope; aim slightly right in 5–10 tailwind (bunker). Steep bowl green.",
+  26: "New in Switch Sports Resort.",
+  27: "New in Switch Sports Resort.",
 };
 
 const LIES = { tee: 1.0, fairway: 1.0, rough: 0.85, bunker: 0.7 };
@@ -125,12 +136,12 @@ const TREE_SEEDS = {
   14:[[.30,.10],[.60,.35],[.68,.42],[.63,.50],[.25,.40],[.55,.70]],
   15:[[.22,.12],[.35,.10],[.18,.35],[.65,.15],[.62,.72],[.70,.60],[.25,.70]],
   16:[[.28,.12],[.20,.25],[.60,.20],[.42,.38],[.60,.58]],
-  17:[[.30,.10],[.20,.35],[.72,.30],[.28,.68],[.40,.78],[.65,.70]],
   18:[[.30,.42],[.72,.30],[.52,.62]],
-  19:[[.48,.30],[.55,.35],[.42,.38],[.70,.25],[.25,.30],[.65,.72]],
-  20:[[.30,.12],[.22,.28],[.66,.20],[.62,.45],[.28,.50],[.45,.78]],
-  21:[[.30,.30],[.28,.50],[.62,.15],[.66,.40],[.45,.75]],
+  24:[[.48,.30],[.55,.35],[.42,.38],[.70,.25],[.25,.30],[.65,.72]],
+  25:[[.30,.30],[.28,.50],[.62,.15],[.66,.40],[.45,.75]],
 };
+// (no seeds for the holes whose map frame is SR's own, 17 and 23: v13's positions were fractions of NSS's frame, and
+// derived.json's trees, which replace every auto marker on load, are in SR's)
 const treeSeedMarkers = (n) => (TREE_SEEDS[n] ?? []).map(([x, y], i) => ({ id: n * 1000 + i, x, y, auto: true }));
 
 // Community "hard truths": route feasibility vs wind, from the Switch Sports wiki
@@ -149,7 +160,7 @@ const WIND_RULES = {
   18: [{ stroke: 1, dir: "tail", min: 0, kind: "open", text: "West island narrowly reachable with driver 4.0 — opens shorter clubs on stroke 2." },
        { stroke: 1, dir: "head", max: 6, kind: "open", text: "Book: with ≤6 mph headwind the left island is the play." },
        { stroke: 1, dir: "head", min: 7, kind: "block", text: "Left island is out — take the 3-island route (SE → NE → green)." }],
-  21: [{ stroke: 1, dir: "tail", min: 5, max: 10, kind: "warn", text: "Aim slightly right of the default line or the downslope run-out finds the bunker." }],
+  25: [{ stroke: 1, dir: "tail", min: 5, max: 10, kind: "warn", text: "Aim slightly right of the default line or the downslope run-out finds the bunker." }],
 };
 
 function windDirClass(relDeg) {
@@ -290,9 +301,10 @@ const boxAspect = (b) => (b && b.y1 > b.y0 ? ((b.x1 - b.x0) * MAP_PX_W) / ((b.y1
 // Pipeline pins say where they came from (tools/build-derived.mjs): src "nss"
 // is one of NSS's own six cups on the hole (the course model's cup bones,
 // decoded from the game files; derived id c0..c5, labelled "1".."6"), with
-// `difficult` on the 16 cups the game's CupDifficulties marks (H5 4, H6 5,
-// H7 4, H8 3, H9 2, H14 5, H16 0 and 4, H17 0, H18 3, H19 1 and 5, H20 2
-// and 4, H21 0 and 5 by k): online a player rated under the game's threshold
+// `difficult` on the 20 cups the game's CupDifficulties marks (H5 4, H6 5,
+// H7 4, H8 3, H9 2, H14 5, H16 0 and 4, H17 0, H18 3, H23 2 and 4, H24 1 and
+// 5, H25 0 and 5, H26 3 and 4, H27 1 and 2 by k; SR's numbering, 23-25 being
+// NSS's 20, 19 and 21): online a player rated under the game's threshold
 // is never drawn one (inferred from the code). They are drawn red. Pins the
 // player adds carry no src and are numbered P1, P2... among themselves, so
 // they never collide with the cups' 1-6 or shift when a load reorders the
@@ -1052,7 +1064,7 @@ export default function App() {
   const [shots, setShots] = useState([]);
   const [holesMeta, setHolesMeta] = useState(() => {
     const m = {};
-    for (let n = 1; n <= 21; n++) m[n] = { par: PARS[n], note: NOTES[n], blocked: [], markers: treeSeedMarkers(n), scale: null, green: emptyGreen(), pins: [], curPin: null };
+    for (let n = 1; n <= SR_HOLES; n++) m[n] = { par: PARS[n], note: NOTES[n], blocked: [], markers: treeSeedMarkers(n), scale: null, green: emptyGreen(), pins: [], curPin: null };
     return m;
   });
   const [rounds, setRounds] = useState([]);
@@ -1126,8 +1138,20 @@ export default function App() {
   /* ---- load ---- */
   useEffect(() => {
     (async () => {
-      let d = null;
-      try { const r = await window.storage.get(STORE_KEY); if (r?.value) d = JSON.parse(r.value); } catch {}
+      let d = null, raw = null;
+      try { const r = await window.storage.get(STORE_KEY); if (r?.value) { raw = r.value; d = JSON.parse(r.value); } } catch {}
+      // srHolesV1 (2026-11-04): hole ids became Switch Sports Resort's 27. A store from before has NSS's numbers, so its
+      // holes 19, 20 and 21 move to 24, 23 and 25 (holesMeta, the shots', putts' and rounds' hole numbers; the new
+      // holes 19, 20, 21, 22, 26, 27 start empty): src/srMigrate.js, pure, run on the parsed state before anything reads
+      // it, so every older migration below sees SR's numbers. The frame change of SR 17 and SR 23 (their own capture
+      // squares) is a state step after those migrations, which work in NSS's frame (srFrameFix, below).
+      const srOld = !!d && !d.srHolesV1;
+      if (srOld) {
+        // the state as it was, kept beside the store under its own key (once; a quota failure is ignored), so the one-way
+        // move below can be undone by hand from it
+        try { await window.storage.set(STORE_KEY + ".pre-sr", raw); } catch {}
+        d = srMigrate(d, { notes: NOTES });
+      }
       if (d) {
         const loadedShots = (d.shots ?? []).map((s) => ({ ...s, club: CLUB_MIGRATE[s.club] ?? s.club, hole: s.hole ?? 0, stroke: s.stroke ?? 1 }));
         setShots(loadedShots);
@@ -1155,7 +1179,7 @@ export default function App() {
         }
         setHolesMeta((prev) => {
           const merged = { ...prev };
-          if (d.holesMeta) for (let n = 1; n <= 21; n++) {
+          if (d.holesMeta) for (let n = 1; n <= SR_HOLES; n++) {
             const old = d.holesMeta[n];
             if (old) merged[n] = {
               par: d.parFixV3 ? old.par : PARS[n],   // one-time par correction from the official screen
@@ -1169,13 +1193,13 @@ export default function App() {
         });
         if (!d.treesV9) setHolesMeta((prev) => {
           const m = { ...prev };
-          for (let n = 1; n <= 21; n++) m[n] = { ...m[n], markers: [...(m[n].markers ?? []), ...treeSeedMarkers(n)] };
+          for (let n = 1; n <= SR_HOLES; n++) m[n] = { ...m[n], markers: [...(m[n].markers ?? []), ...treeSeedMarkers(n)] };
           return m;
         });
         if (d.rounds) setRounds(d.rounds);
         if (!d.mapV4) setHolesMeta((prev) => {
           const m = { ...prev };
-          for (let n = 1; n <= 21; n++) if (m[n]?.scale) m[n] = { ...m[n], scale: m[n].scale / 1.936 };
+          for (let n = 1; n <= SR_HOLES; n++) if (m[n]?.scale) m[n] = { ...m[n], scale: m[n].scale / 1.936 };
           return m;
         });
         if (d.activeRound) setActiveRound(d.activeRound);
@@ -1186,8 +1210,8 @@ export default function App() {
         // the per-hole registration transforms (fNew = fOld*a + b)
         if (!d.mapV5) setHolesMeta((prev) => {
           const m = { ...prev };
-          for (let n = 1; n <= 21; n++) {
-            const t = MAP_XFORM_V5[n];
+          for (let n = 1; n <= SR_HOLES; n++) {
+            const t = MAP_XFORM_V5[n];   // (src/mapxform.js is keyed by SR's numbers since the switch: a migrated hole 24 holds the old 19's positions and its transform sits under 24; SR's six new holes have none)
             if (!t || !m[n]) continue;
             const tx = (p) => ({ ...p, x: p.x * t.ax + t.bx, y: p.y * t.ay + t.by });
             m[n] = { ...m[n],
@@ -1202,6 +1226,10 @@ export default function App() {
           }
           return m;
         });
+        // SR 17 and SR 23 have map frames of their own (SR's capture squares): the stored player's markers and pins,
+        // the green's box and outline and the scale of a store from before the switch are NSS's frame's, and move
+        // here, after the older migrations, which put positions into that frame (src/srMigrate.js srFrameFix)
+        if (srOld) setHolesMeta((prev) => srFrameFix(prev));
       }
       // derived.json: pipeline output shipped with the deploy (scales, green
       // boxes, slope grids, pins, tees). First time it applies wholesale
@@ -1253,7 +1281,7 @@ export default function App() {
   }, []);
 
   const persist = async (patch = {}) => {
-    const data = { clubs, shots, putts, greenSpeed, holesMeta, rounds, activeRound, mapScale, online, parFixV3: true, mapV4: true, treesV9: true, mapV5: true, derivedV1: true, clubsWsrV1: true, clubsNssV1: true, ...patch };
+    const data = { clubs, shots, putts, greenSpeed, holesMeta, rounds, activeRound, mapScale, online, parFixV3: true, mapV4: true, treesV9: true, mapV5: true, derivedV1: true, clubsWsrV1: true, clubsNssV1: true, srHolesV1: true, ...patch };
     data.holesMeta = storedHolesMeta(data.holesMeta);
     try {
       await window.storage.set(STORE_KEY, JSON.stringify(data));
@@ -1703,7 +1731,7 @@ export default function App() {
 
   const holeStats = useMemo(() => {
     const st = {};
-    for (let n = 1; n <= 21; n++) {
+    for (let n = 1; n <= SR_HOLES; n++) {
       const played = rounds.filter((r) => r.scores[n]).map((r) => r.scores[n]);
       st[n] = {
         times: played.length,
@@ -2420,7 +2448,7 @@ export default function App() {
                       </tr>
                     </thead>
                     <tbody>
-                      {Array.from({ length: 21 }, (_, i) => i + 1).filter((n) => holeStats[n].times > 0).map((n) => {
+                      {Array.from({ length: SR_HOLES }, (_, i) => i + 1).filter((n) => holeStats[n].times > 0).map((n) => {
                         const st = holeStats[n], vs = st.avg - holesMeta[n].par;
                         return (
                           <tr key={n} style={{ borderTop: `1px solid ${T.line}` }}>
@@ -2459,7 +2487,7 @@ export default function App() {
                   <label className="text-xs font-bold">Hole</label>
                   <select className={inputCls} style={inputStyle} value={form.hole} onChange={(e) => setForm({ ...form, hole: Number(e.target.value) })}>
                     <option value={0}>Practice / none</option>
-                    {Array.from({ length: 21 }, (_, i) => i + 1).map((n) => <option key={n} value={n}>Hole {n}</option>)}
+                    {Array.from({ length: SR_HOLES }, (_, i) => i + 1).map((n) => <option key={n} value={n}>Hole {n}</option>)}
                   </select>
                 </div>
                 <div>
@@ -2607,7 +2635,7 @@ export default function App() {
                       <th className="px-2 py-1.5">Hole</th>{steps.map(([nm], i) => <th key={i} className="px-1 py-1.5 text-center" title={nm}>{i + 1}</th>)}
                     </tr></thead>
                     <tbody>
-                      {Array.from({ length: 21 }, (_, i) => i + 1).map((n) => (
+                      {Array.from({ length: SR_HOLES }, (_, i) => i + 1).map((n) => (
                         <tr key={n} style={{ borderTop: `1px solid ${T.line}` }}>
                           <td className="px-2 py-1 font-bold">H{n}</td>
                           {steps.map(([nm, done], i) => (
@@ -2678,7 +2706,7 @@ export default function App() {
                   <div>10. You can physically swing past a capped bar — it goes red and the ball curves to a RANDOM side (how far is not decoded for NSS). On tee and fairway the red adds no power; from rough or sand NSS lets the power run up to one bar past the cap. The solver never plans on the red and flags the recs that need the full bar.</div>
                   <div>11. Putts follow NSS's roll on a green (decoded from the Switch game): a steady friction plus a drag that grows with speed, and a slope pulls the ball at about 0.115 yd/s² per degree (NSS's gravity on a green is 6 m/s², not 10), except that a slow ball (under about 0.55 yd/s) more than about a yard from the cup no longer feels the slope. The putter's small loft (1.14°) hops the ball for a few ticks before it rolls, and the read includes that. The slopes come from the course's collision (heights every half yard), or from your painted grid once you edit it (Holes → the green; "use mesh heights" goes back). The cup takes a ball that passes within ~0.21 yd of its centre at up to ~1.75 yd/s, a narrower window faster and none from ~5.4 yd/s; faster ones lip out. greenSpeed is how far a full-gauge putt rolls on a flat green (20.1 yd in NSS); log a few flat putts in the putting panel and it fits yours. Off the green the putter rolls slower: fairway noticeably, sand slowest. No source in 20 years reports any per-bar flight penalty from rough/sand — caps are the whole mechanic until your logs say otherwise.</div>
                   <div>12. Backspin strength scales with swing power ("the harder you swing, the stronger the backspin" — official). Capped lies therefore also cap max spin; that alone explains weaker spin from rough/sand.</div>
-                  <div>13. Pins are NSS's own six cups per hole, read straight from the Switch game's course files and numbered 1–6 (the Specials' cups too, not WSR's spots of the same numbers). The game marks 16 of them difficult (red here: H5 5, H6 6, H7 5, H8 4, H9 3, H14 6, H16 1 and 5, H17 1, H18 4, H19 2 and 6, H20 3 and 5, H21 1 and 6); online a player under its rating threshold is never drawn one (read from the code, not yet seen). Local play tees off from the local tee unless you move it (Shot Position). Online Survival Golf tees off from the same two-tier platform on every hole, the high tier 3.5 m (3.8 yd) behind the low and 1.57 m (1.7 yd) up: NSS counts the players at each hole and seats 1–4 all on the high tier, 5 as 3 high + 2 low, 6 as 3 + 3, 7 as 4 + 3 and 8 as 4 + 4 (never one alone on the low tier), every group centred (an even group on the tier's four spots 2.3 m apart, an odd one between them), and deals the places afresh each hole. Your ball sits 0.9 m (1 yd) to your dominant hand's side of where you stand, on the tier's mat. Turn Online on under the map and say your tier, how many stand on each tier, your place from the left and your hand: the ball goes there, and the solver flies it from that height. The "yd to go" badge is the authority.</div>
+                  <div>13. Pins are NSS's own six cups per hole, read straight from the Switch game's course files and numbered 1–6 (the Specials' cups too, not WSR's spots of the same numbers). The game marks 20 of them difficult (red here: H5 5, H6 6, H7 5, H8 4, H9 3, H14 6, H16 1 and 5, H17 1, H18 4, H23 3 and 5, H24 2 and 6, H25 1 and 6, H26 4 and 5, H27 2 and 3); online a player under its rating threshold is never drawn one (read from the code, not yet seen). Local play tees off from the local tee unless you move it (Shot Position). Online Survival Golf tees off from the same two-tier platform on every hole, the high tier 3.5 m (3.8 yd) behind the low and 1.57 m (1.7 yd) up: NSS counts the players at each hole and seats 1–4 all on the high tier, 5 as 3 high + 2 low, 6 as 3 + 3, 7 as 4 + 3 and 8 as 4 + 4 (never one alone on the low tier), every group centred (an even group on the tier's four spots 2.3 m apart, an odd one between them), and deals the places afresh each hole. Your ball sits 0.9 m (1 yd) to your dominant hand's side of where you stand, on the tier's mat. Turn Online on under the map and say your tier, how many stand on each tier, your place from the left and your hand: the ball goes there, and the solver flies it from that height. The "yd to go" badge is the authority.</div>
                   <div>14. At 0 mph the wind still HAS a direction — read it off the flag cloth on the pin.</div>
                   <div>15. The backswing sets the power (decoded from the Switch game's code, checked in an emulator's memory): a full swing launches at the gauge's white line, the top of your backswing (4 bars at about 150°, times the lie's cap in the rough and sand), whenever the downswing's own power comes within 0.2 bar of it; out to 2 bars away it is pulled part of the way, beyond that not at all. So each rec says "take it back to N bars, then a smooth full swing": a hard hit from a short backswing flies at its own power. The game reads its table at whole percents (0.04 bar), so a rec's bars are the middle of the percent it launches and its stop is that percent's, within a yard or two of your distance.</div>
                   <div>16. The putter assist: while you address the ball on the green and hold the aim still, the game rolls its own ghost putts along your aim and finds the holing strengths there; at the stroke it pulls yours onto them, but only a stroke within 0.03 of its holing power (0.2 inside 3 m), out to 25 m; well over par on a hole it widens. None from the fringe, and a swing while the guide line is still moving gets none. So the putt card leads with the aim and gives the strokes the assist turns into a holing one. The putter runs to 6 bars.</div>

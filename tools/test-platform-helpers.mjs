@@ -1,6 +1,6 @@
 // node tools/test-platform-helpers.mjs [repoRoot]
 // src/platform.js, the online platform's helpers, against the committed files
-// and, when the eden dump is present, its decode (nss-golf-x/slots.json):
+// and, when the eden dump is present, its decode (the Switch Sports Resort dump's slots.json, NSS's rule):
 // a. the rule: the masks (one bit per player), tierStandXs for every player
 //    count and tier (the even counts on the bones, the odd ones between them,
 //    every group centred, from the left), layoutOf = VALID_COUNTS, the tier,
@@ -19,8 +19,8 @@
 //    NSS seats beside it (the table in src/platform.js); fixOnline always a
 //    pair NSS seats with the player's tier, hand and on kept, and the own
 //    count unless the own tier was empty;
-// d. ballOf on all 21 holes, every (tier, counts, place, hand) NSS makes
-//    (72 a hole, 1,512 in all): with the exact geometry (derived.json's
+// d. ballOf on all 27 holes, every (tier, counts, place, hand) NSS makes
+//    (72 a hole, 1,944 in all): with the exact geometry (derived.json's
 //    platform plus tools/nss-platform.json's origin / yawDeg and
 //    tools/nss-registration.json's transform, as derived.json may ship them)
 //    within 0.002 px of slots.json's table (and its heightYd within 1e-4 yd),
@@ -37,7 +37,9 @@
 // f. onPlatform: every ball found (its tier and mat), a nudged ball, the tee
 //    and the standing spots off it;
 // g. slotLift against public/terrain: exactly the mat less the terrain's
-//    ground (never below 0), within 0.1 yd of the mat on every ball; the mat
+//    ground (never below 0), the ground within 0.1 yd of the datum (SR 23 and any
+//    other platform that stands off the datum: within 0.1 yd of the ground under its
+//    spot, derived.json's groundYd) on every ball; the mat
 //    itself without terrain; printed per tier.
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -51,9 +53,12 @@ const NSSPL = J("tools/nss-platform.json").holes;
 const REG = J("tools/nss-registration.json").holes;
 const DERIVED = J("public/derived.json").holes;
 const TERRAIN_INDEX = J("public/terrain/index.json");
-const SLOTS_FILE = join(root, "tools/harness/state/eden/nss-golf-x/slots.json");
+const SLOTS_FILE = join(root, "tools/harness/state/eden/sr-golf-x/slots.json");   // the Switch Sports Resort dump (NSS's seating rule, its 27 holes)
+const HOLES = 27;   // src/srMigrate.js SR_HOLES
 const SLOTS = existsSync(SLOTS_FILE) ? JSON.parse(readFileSync(SLOTS_FILE, "utf8")) : null;
 const MAP_W = 250, MAP_H = 304, PX_TOL = 0.002;
+const SRM = await imp("src/srMigrate.js");
+const slotsHoleOf = (n) => (n === 23 || n === 25 ? null : SRM.nssHoleOf(n));
 let fails = 0, checks = 0; const ok = (c, msg) => { checks++; if (!c) { fails++; if (fails <= 60) console.log("FAIL:", msg); } };
 const eq = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 const near = (a, b, e = 1e-9) => Math.abs(a - b) <= e;
@@ -181,15 +186,15 @@ const shippedExact = Object.values(DERIVED).every((d) => P.geometryOf(d.platform
 const stats = { slots: 0, nssBall: 0, shipped: 0, shippedVsExact: 0, height: 0, n: 0, nSlots: 0 };
 const lifts = { low: [], high: [] };
 const nssTerrain = TERRAIN_INDEX.source === "nss";
-for (let n = 1; n <= 21; n++) {
+for (let n = 1; n <= HOLES; n++) {
   const tag = `H${n}`, dpl = DERIVED[n].platform, npl = NSSPL[n], reg = REG[n];
   const exactPl = { ...dpl, origin: npl.origin, yawDeg: npl.yawDeg, transform: { a: reg.a, b: reg.b, tx: reg.tx, ty: reg.ty } };
   ok(P.geometryOf(exactPl)?.exact === true && P.geometryOf(dpl) && P.geometryOf(npl)?.exact === false, `${tag}: geometryOf forms`);
-  const sh = SLOTS?.perHole[String(n).padStart(2, "0")];
+  const sn = slotsHoleOf(n), sh = sn != null ? SLOTS?.perHole[String(sn).padStart(2, "0")] : undefined;
   const th = (dpl.facingDeg * Math.PI) / 180, right = [Math.cos(th), Math.sin(th)];
   const toRight = (a, b) => (b.x - a.x) * MAP_W * right[0] + (b.y - a.y) * MAP_H * right[1];
   const t = parseTerrain(readFileSync(join(root, `public/terrain/h${String(n).padStart(2, "0")}.bin`)));
-  const zMat = { low: ((n === 3 ? 0.1 : 0) + 0.099609) / 0.9144, high: ((n === 3 ? 0.1 : 0) + 1.667969) / 0.9144 };
+  const zMat = { low: (npl.origin[1] + 0.099609) / 0.9144, high: (npl.origin[1] + 1.667969) / 0.9144 };   // (the origin's own height: H3 0.1 m, SR 23 10 m)
   const rows = new Map();
   for (const v of valid) {
     const b = P.ballOf(exactPl, v), bs = P.ballOf(dpl, v), key = `${v.tier} ${v.place}-of-${b?.count} ${v.hand}`;
@@ -204,13 +209,14 @@ for (let n = 1; n <= 21; n++) {
     const dv = pxOff(b, bs); stats.shippedVsExact = Math.max(stats.shippedVsExact, dv);
     ok(dv <= (shippedExact ? 1e-9 : 0.003), `${tag} ${key}: derived.json's platform puts the ball ${dv.toFixed(4)} px from the exact one`);
     if (sh) {
-      const e = sh[v.tier][`${v.place}-of-${b.count}`]?.[v.hand === "right" ? "rightHanded" : "leftHanded"];
-      ok(e && near(sh[v.tier][`${v.place}-of-${b.count}`].slotX, b.standX, 1e-9), `${tag} ${key}: slots.json has no entry`);
-      if (e) {
+      const e0 = sh[v.tier][`${v.place}-of-${b.count}`]?.[v.hand === "right" ? "rightHanded" : "leftHanded"];
+      ok(e0 && near(sh[v.tier][`${v.place}-of-${b.count}`].slotX, b.standX, 1e-9), `${tag} ${key}: slots.json has no entry`);
+      if (e0) {
+        const [ex, ey] = SRM.toSrFrame(n, e0.x, e0.y), e = { ...e0, x: ex, y: ey }, tolX = n === 17 ? 0.006 : PX_TOL;   // (NSS's frame into SR's)
         const d = pxOff(b, e), ds = pxOff(bs, e);
         stats.slots = Math.max(stats.slots, d); stats.shipped = Math.max(stats.shipped, ds); stats.height = Math.max(stats.height, Math.abs(b.zYd - e.heightYd)); stats.nSlots++;
-        ok(d <= PX_TOL, `${tag} ${key}: ${d.toFixed(4)} px from slots.json's ball`);
-        ok(ds <= (shippedExact ? PX_TOL : 0.004), `${tag} ${key}: derived.json's platform ${ds.toFixed(4)} px from slots.json's ball`);
+        ok(d <= tolX, `${tag} ${key}: ${d.toFixed(4)} px from slots.json's ball`);
+        ok(ds <= (shippedExact ? tolX : 0.004), `${tag} ${key}: derived.json's platform ${ds.toFixed(4)} px from slots.json's ball`);
         ok(Math.abs(b.zYd - e.heightYd) <= 1e-4, `${tag} ${key}: heightYd ${b.zYd} against ${e.heightYd}`);
       }
     }
@@ -232,7 +238,7 @@ for (let n = 1; n <= 21; n++) {
     ok(P.onPlatform({ x: bs.x + 2e-6, y: bs.y }, dpl) === null && P.onPlatform({ x: bs.x, y: bs.y - 2e-6 }, dpl) === null, `${tag} ${key}: a nudged ball on the platform`);
     // g. slotLift
     const g = heightAt(t, bs.x, bs.y), lift = P.slotLift(bs, t, heightAt);
-    ok(g != null && lift === Math.max(0, bs.zYd - g) && Math.abs(lift - bs.zYd) <= 0.1, `${tag} ${key}: lift ${lift} over ground ${g}`);
+    ok(g != null && lift === Math.max(0, bs.zYd - g) && (Math.abs(g) <= 0.1 || Math.abs(g - (bs.groundYd ?? 0)) <= 0.1 || Math.abs(g - dpl.origin[1] / 0.9144) <= 0.1), `${tag} ${key}: lift ${lift} over ground ${g} (the spot's ground ${bs.groundYd}; the platform's origin ${dpl.origin[1]} m)`);   // (SR 23's tee platform stands 10 m up: the terrain under it reads the origin's height)
     ok(P.slotLift(bs) === bs.zYd && P.slotLift(bs, t, () => null) === bs.zYd && P.slotLift(hit, t, heightAt) === lift, `${tag} ${key}: slotLift without terrain`);
     lifts[v.tier].push({ n, lift });
   }
@@ -260,7 +266,7 @@ for (let n = 1; n <= 21; n++) {
 ok(P.slotLift({ x: 0.5, y: 0.5, zYd: 0.1 }, {}, () => 1) === 0 && P.slotLift(null) === 0 && P.slotLift({ x: 0.5, y: 0.5 }) === 0, "slotLift below the ground or without a mat");
 ok(P.zOf({ zYd: 1.8, z: 9 }) === 1.8 && P.zOf({ z: 0.1 }) === 0.1 && Number.isNaN(P.zOf({})) && Number.isNaN(P.zOf(null)) && P.groundOf({ groundYd: 0, groundZ: 5 }) === 0 && P.groundOf({ groundZ: 0.5 }) === 0.5 && P.groundOf({ groundYd: null }) === null, "zOf / groundOf");
 ok(P.slotLift({ x: 0.5, y: 0.5, zYd: 1.8241, groundYd: 0.5 }) === 1.8241 - 0.5 && P.slotLift({ x: 0.5, y: 0.5, zYd: 1.8241, groundYd: 0.5 }, {}, () => 0.2) === 1.8241 - 0.2, "slotLift on a spot's own ground");
-console.log(`d. ${stats.n} balls on 21 holes (exact geometry): ${SLOTS ? `max ${stats.slots.toFixed(4)} px from slots.json's ${stats.nSlots} (heightYd within ${stats.height.toFixed(6)} yd), ` : "slots.json absent, "}max ${stats.nssBall.toFixed(4)} px from tools/nss-platform.json's balls`);
+console.log(`d. ${stats.n} balls on ${HOLES} holes (exact geometry): ${SLOTS ? `max ${stats.slots.toFixed(4)} px from slots.json's ${stats.nSlots} (heightYd within ${stats.height.toFixed(6)} yd), ` : "slots.json absent, "}max ${stats.nssBall.toFixed(4)} px from tools/nss-platform.json's balls`);
 console.log(`d. derived.json's platform as shipped (${shippedExact ? "exact geometry" : "the similarity fitted to its 14 spots: add origin, yawDeg and transform to it for the exact form"}): max ${stats.shippedVsExact.toFixed(4)} px from the exact ball${SLOTS ? `, ${stats.shipped.toFixed(4)} px from slots.json's` : ""}`);
 for (const tier of P.TIERS) {
   const l = lifts[tier].map((q) => q.lift), lo = Math.min(...l), hi = Math.max(...l);

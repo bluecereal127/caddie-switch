@@ -1,6 +1,9 @@
 // Acceptance for the live solver (src/live3d-core.js): NSS's ball (src/nsssim.js)
-// on NSS's course (public/course3d v2 through tools/lib/nss3d.mjs):
-//  1. with the dump present (tools/harness/state/eden/nss-golf-x/collision), a
+// on NSS's course (public/course3d v2 through tools/lib/nss3d.mjs), the course now
+// Switch Sports Resort's 27 holes (src/srMigrate.js numbering; SR 1-18 are NSS 1-18, SR 24,
+// 23, 25 are NSS 19, 20, 21, SR 19-22, 26, 27 are new; the recorded NSS strokes below are on
+// holes 1-18 and replay over SR's course unchanged where SR's collision is NSS's):
+//  1. with the dump present (tools/harness/state/eden/sr-golf-x/collision), a
 //     fresh build of public/course3d is byte-identical to the shipped files, else
 //     "skipped";
 //  2. per hole, the course the solver flies over holds the shipped triangles
@@ -20,7 +23,8 @@
 //     tools/test-nsssim.mjs replays them): each recorded tee shot starts where the
 //     local start puts the ball (1 mm); with the dump, every one of the 73 the same
 //     bits as over the dump's own collision (tools/lib/nsscol.mjs with the TreeLeaf
-//     canopies, H3's sea and the actor trees, the cup in play's cover out); every
+//     canopies and the actor trees, the cup in play's cover out; SR's water is in
+//     its field mesh); every
 //     stroke the model plays to a rest off the cup (tools/test-nsssim.mjs's set: not
 //     its three documented edge cases) rests within REST_TOL_M of the recording, and
 //     the same bits as over the fixture's own triangles when they hold all it met (not
@@ -29,16 +33,21 @@
 //     recording wherever the dump's replay does (r1-h16s1, whose rough bounce after
 //     the canopy the model misses, over the dump too, excepted without the dump), and
 //     nearer it than on the course without them; the solver's own launch (club, gauge
-//     percent, heading) is the recording's to 2e-4;
-//  4. solves from the tee to cup c0 on holes 2, 3, 8, 10, 12, 16, 17, 19, 20, 21
+//     percent, heading) is the recording's to 2e-4; SR's meshes are not NSS's bit for bit
+//     (its cups are 3-5 mm narrower, some greens and landing areas re-cut), so the fixtures
+//     (NSS's triangles near each path) are looked for in the live course: a stroke whose
+//     every fixture triangle is there is held to all of the above (bit for bit as over the
+//     fixture, REST_TOL_M of the recording), one whose mesh differs near its path to SR_TOL_M;
+//  4. solves from the tee to cup c0 on holes 2, 3, 8, 10, 12, 16, 17 and SR's 19-27
 //     (11 mph wind toward 45 deg): a rec per club, sorted (holed for sure first: a
 //     stroke that meets the flagstick is sure only if it holes with the flag out too),
 //     finite numbers, each at a whole gauge percent within its club's range, a rec
 //     that met the flagstick saying so (uncertain, with the stroke as if the flag were
 //     out), at most MAX_S; from the green (the putter alone, the flag out) and from
 //     the platform on two of them; the same solve twice gives the same result;
-//  and prints (does not assert) on every hole the same driver / 7-iron / wedge
-//  full tee strokes toward c0 by NSS's ball on NSS's course and by WSR's ball on
+//  and prints (does not assert) on every hole WSR has (SR 1-18, 24, 25: not SR's new
+//  holes, nor SR 23, whose tee stands 73 m behind WSR's) the same driver / 7-iron /
+//  wedge full tee strokes toward c0 by NSS's ball on the course and by WSR's ball on
 //  WSR's (tools/harness/round-model.mjs, the disc's KCL, when the extracted disc
 //  is there): carry and rest, and their differences.
 //   node tools/test-live3d.mjs
@@ -51,16 +60,18 @@ import * as L from "../src/live3d-core.js";
 import * as S from "../src/nsssim.js";
 import { nssCourse, ATTR_OF_MODEL, culledGround, PLATFORM_TIERS, placeActorTree } from "./lib/nss3d.mjs";
 import { ballOf, VALID_COUNTS, TIERS, HANDS } from "../src/platform.js";
+import { nssHoleOf } from "../src/srMigrate.js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const DIR = path.join(ROOT, "public/course3d");
-const DUMP = path.join(ROOT, "tools/harness/state/eden/nss-golf-x/collision");
+const DUMP = path.join(ROOT, "tools/harness/state/eden/sr-golf-x/collision");   // Switch Sports Resort's dump, holes 1-27
+const HOLES_N = 27;
 const FIX = path.join(ROOT, "tools/fixtures/nss-flights");
 const read = (f) => JSON.parse(fs.readFileSync(f, "utf8"));
 const ab = (f) => { const b = fs.readFileSync(f); return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength); };
 const hh = (n) => String(n).padStart(2, "0");
 const pxOff = (f, x, y) => Math.sqrt(((f[0] - x) * 250) ** 2 + ((f[1] - y) * 304) ** 2);
-const REST_TOL_M = 0.1, TREE_TOL_M = 0.3, MAX_S = 3;
+const REST_TOL_M = 0.1, TREE_TOL_M = 0.3, MAX_S = 3, SR_TOL_M = 2.5;   // (SR_TOL_M: a stroke over a mesh that differs from the NSS fixture near its path: the worst of the 71 is 1.1 m, H2's 7-iron)
 let fails = 0, checks = 0;
 const ok = (c, m) => { checks++; if (!c) { fails++; console.log(`FAIL ${m}`); } };
 const idx = read(path.join(DIR, "index.json"));
@@ -86,7 +97,7 @@ const DERIVED = read(path.join(ROOT, "public/derived.json"));
 
 // ---- 2. the course, the starts ----
 let teeMax = 0, platMax = 0, platN = 0, buildMs = 0;
-for (let hole = 1; hole <= 21; hole++) {
+for (let hole = 1; hole <= HOLES_N; hole++) {
   const meta = metaOf(hole), bin = binOf(hole);
   const t0 = performance.now();
   const C = L.buildCourse(meta, bin);
@@ -106,7 +117,13 @@ for (let hole = 1; hole <= 21; hole++) {
       j++;
     }
   });
-  ok(same && covers.size === 120 && N.nGround === meta.nt - 120 && N.nBaked === meta.ntt && j === N.nGround + N.nBaked, `H${hole}: the course holds the shipped triangles verbatim (${N.nGround} ground, the 120 cover triangles apart; ${N.nBaked} tree pack)`);
+  // the covers nss3d.mjs takes out are 20 triangles each (COVER_TRIS: the fan of green triangles about the cup's hub). SR 27's
+  // cup 0 cover is a two-ring disc of 60: the inner fan comes out and the outer annulus (40 triangles, r 0.15-0.19 m) stays in
+  // the static course, plugging that cup's bevel, until the opening takes the cover's own triangle range (a change to the live
+  // solver's course loader that awaits the user's approval, 2026-11-04; lab/r6work/sr/wire/LEAD-NOTES.md item 2)
+  const coverN = 120, coverTris = () => 20;
+  if (hole === 27) console.log("  H27 cup 0: a 60-triangle two-ring cover; nss3d.mjs opens its inner 20, the outer 40 stay in the course (pending approval)");
+  ok(same && covers.size === coverN && N.nGround === meta.nt - coverN && N.nBaked === meta.ntt && j === N.nGround + N.nBaked, `H${hole}: the course holds the shipped triangles verbatim (${N.nGround} ground, the ${coverN} cover triangles apart; ${N.nBaked} tree pack)`);
   // the actor trees: each its kind's triangles, placed (nss3d.mjs placeActorTree), after the tree pack
   {
     const KV = new Float32Array(bin, o.KV, 3 * meta.nkv), KT = new Uint16Array(bin, o.KT, 3 * meta.nkt), KA = new Uint8Array(bin, o.KA, meta.nkt);
@@ -121,7 +138,7 @@ for (let hole = 1; hole <= 21; hole++) {
     }
     ok(same && t0 === attr.length && N.nActor === meta.trees.reduce((s, t) => s + meta.kinds[t.k].nt, 0), `H${hole}: ${N.trees.length} actor trees, their kinds' meshes placed (${N.nActor} triangles, the course's last)`);
   }
-  ok(Object.values(N.cups).every((c) => c.tris.length === 20 && c.own >= 100) && [...attr.subarray(0, N.nGround)].filter((a) => a === S.ATTR.cup).length === 120, `H${hole}: six covers of 20 triangles, every cup's own walls and bottom (${Object.values(N.cups).map((c) => c.own).join(" ")} triangles) in the course`);
+  ok(Object.values(N.cups).every((c) => c.tris.length === coverTris(c.k) && c.own >= 100) && [...attr.subarray(0, N.nGround)].filter((a) => a === S.ATTR.cup).length === 120, `H${hole}: six covers of ${Object.values(N.cups).map((c) => c.tris.length).join("/")} triangles, every cup's own walls and bottom (${Object.values(N.cups).map((c) => c.own).join(" ")} triangles) in the course`);
   // the cull changes no bit: strokes over the culled course and over the plain mesh
   {
     const S0 = L.ballAtStart(C, { start: { kind: "local" } }), pin = N.cups.c0;
@@ -174,7 +191,7 @@ for (let hole = 1; hole <= 21; hole++) {
     ok(worst <= 0.01 && mat, `H${hole}: the ${n} platform balls src/platform.js places, within ${worst.toFixed(4)} px, 0.1 m over their mats`);
   }
 }
-console.log(`2. 21 courses built in ${(buildMs / 1000).toFixed(1)} s; local starts within ${teeMax.toFixed(4)} px of derived.json's GlfTeeOBJ; ${platN} platform balls within ${platMax.toFixed(4)} px of src/platform.js's`);
+console.log(`2. ${HOLES_N} courses built in ${(buildMs / 1000).toFixed(1)} s; local starts within ${teeMax.toFixed(4)} px of derived.json's GlfTeeOBJ; ${platN} platform balls within ${platMax.toFixed(4)} px of src/platform.js's`);
 
 // ---- 3. the recorded strokes ----
 const fixIndex = read(path.join(FIX, "index.json"));
@@ -206,7 +223,7 @@ const dumpGrounds = new Map();
 function dumpGround(f) {
   const key = `${f.hole}:${f.cup.k}`;
   if (!dumpGrounds.has(key)) {
-    const m = nsscol.loadCollision(DUMP, f.hole, { covers: true, extras: ["leaf", "water", "actors"] });
+    const m = nsscol.loadCollision(DUMP, f.hole, { covers: true, extras: ["leaf", "actors"] });   // (SR: water is in the field mesh)
     const cov = m.covers.find((c) => c.k === f.cup.k);
     dumpGrounds.set(key, S.meshGround({ verts: m.verts, tris: m.tris, attr: Uint8Array.from(m.surface, (c) => S.ATTR_OF_CODE[c] ?? 0) }, { skip: (t) => t >= cov.tri0 && t < cov.tri1 }));
   }
@@ -220,9 +237,36 @@ const replay = (f, ground, extra = {}) => S.run({
 });
 const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
 const sameRun = (a, b) => a.ticks === b.ticks && a.outcome === b.outcome && a.rest.every((v, i) => Object.is(v, b.rest[i]));
+// the fixture's triangles in the shipped course: by their vertices (a triangle's rotations the same) and the ball's attribute, in the ground pack (the six
+// covers included) and the tree pack
+const tkey = (V, T, t) => {
+  const p = [0, 1, 2].map((q) => { const i = 3 * T[3 * t + q]; return `${V[i]},${V[i + 1]},${V[i + 2]}`; });
+  let b = null;
+  for (let r = 0; r < 3; r++) { const k = `${p[r]}|${p[(r + 1) % 3]}|${p[(r + 2) % 3]}`; if (b == null || k < b) b = k; }
+  return b;
+};
+const courseKeys = new Map();
+const keysOf = (hole) => {
+  if (!courseKeys.has(hole)) {
+    const meta = metaOf(hole), bin = binOf(hole), o = meta.offs, m = new Map();
+    const ix = (k, t, n) => (t === "u32" ? new Uint32Array(bin, o[k], n) : new Uint16Array(bin, o[k], n));
+    for (const [V, T, A, n] of [[new Float32Array(bin, o.V, 3 * meta.nv), ix("T", meta.idx, 3 * meta.nt), new Uint8Array(bin, o.A, meta.nt), meta.nt], [new Float32Array(bin, o.TV, 3 * meta.ntv), ix("TT", meta.tidx, 3 * meta.ntt), new Uint8Array(bin, o.TA, meta.ntt), meta.ntt]]) {
+      for (let t = 0; t < n; t++) { const k = tkey(V, T, t); (m.get(k) ?? m.set(k, new Set()).get(k)).add(ATTR_OF_MODEL[A[t]]); }
+    }
+    courseKeys.set(hole, m);
+  }
+  return courseKeys.get(hole);
+};
+const fixtureInCourse = (f) => {
+  if (!f.mesh) return true;
+  const V = b64(f.mesh.verts, Float32Array), T = b64(f.mesh.tris, Uint32Array), K = b64(f.mesh.codes, Uint8Array), m = keysOf(f.hole);
+  for (let t = 0; t < T.length / 3; t++) if (!m.get(tkey(V, T, t))?.has(S.ATTR_OF_CODE[K[t]] ?? 0)) return false;
+  return true;
+};
 {
   const t0 = performance.now();
   let teeN = 0, teeWorst = 0, played = 0, worst = 0, sameBits = 0, fixtureN = 0, holed = 0, launchWorst = 0, dumpSame = 0, dumpN = 0;
+  let exactN = 0, exactBits = 0, worstExact = 0, worstDiff = 0;
   const notes = [], treeRows = [];
   for (const f of [...strokes, ...RPLAY]) {
     const C = course(f.hole), key = `c${f.cup.k}`, q = C.N.cups[key];
@@ -241,6 +285,7 @@ const sameRun = (a, b) => a.ticks === b.ticks && a.outcome === b.outcome && a.re
     }
     const r = replay(f, C.N.ground({ cupKey: key }));
     const err = dist(r.rest, f.rest);
+    const exact = fixtureInCourse(f);   // every fixture triangle is in the course: SR's mesh near the path is NSS's
     // with the dump: the same bits as over the dump's own collision
     let dErr = null;
     if (nsscol) {
@@ -258,7 +303,7 @@ const sameRun = (a, b) => a.ticks === b.ticks && a.outcome === b.outcome && a.re
       treeRows.push(`${f.tag} ${err.toFixed(4)} m (${dErr != null ? `the dump's ${dErr.toFixed(4)}; ` : ""}${e0.toFixed(2)} m without the actor trees)${TREE_KNOWN_OFF[f.tag] && !(err <= TREE_TOL_M) ? `: ${TREE_KNOWN_OFF[f.tag]}` : ""}`);
       if (f.fixture === false || !f.mesh) continue;
     }
-    if (f.tag === "h08s6-sw") ok(r.outcome === "rest" && !r.holed && err < 0.1, `h08s6-sw: the recorded lip-out plays as ${r.outcome} ${err.toFixed(3)} m from its rest`);
+    if (f.tag === "h08s6-sw") ok(r.outcome === "rest" && !r.holed && err < (exact ? 0.1 : SR_TOL_M), `h08s6-sw: the recorded lip-out plays as ${r.outcome} ${err.toFixed(3)} m from its rest`);
     if (EXCEPT[f.tag]) { notes.push(`${f.tag}: rest ${err.toFixed(2)} m off (${r.outcome}, recorded ${f.outcome}): ${EXCEPT[f.tag]}`); continue; }
     if (!f.mesh) continue;
     ok(r.outcome === f.outcome, `${f.tag}: ${r.outcome}, recorded ${f.outcome}`);
@@ -269,22 +314,25 @@ const sameRun = (a, b) => a.ticks === b.ticks && a.outcome === b.outcome && a.re
       continue;
     }
     played++; worst = Math.max(worst, err);
-    ok(err <= REST_TOL_M, `${f.tag}: rest ${err.toFixed(4)} m from the recording`);
+    if (exact) { exactN++; worstExact = Math.max(worstExact, err); } else worstDiff = Math.max(worstDiff, err);
+    ok(err <= (exact ? REST_TOL_M : SR_TOL_M), `${f.tag}: rest ${err.toFixed(4)} m from the recording${exact ? "" : " (SR's mesh differs near its path)"}`);
     if (TREE_STROKES.includes(f.tag)) continue;
     const fx = replay(f, fixtureGround(f));
     fixtureN++;
     if (sameRun(fx, r)) sameBits++;
-    ok(sameRun(fx, r), `${f.tag}: the same bits as over the fixture's triangles (${fx.rest} against ${r.rest})`);
+    if (exact && sameRun(fx, r)) exactBits++;
+    ok(sameRun(fx, r) || !exact, `${f.tag}: the same bits as over the fixture's triangles (${fx.rest} against ${r.rest})`);
   }
   ok(played === 51 && holed === 17 && teeN === 19, `3. ${played} strokes played to a rest off the cup, ${holed} holed putts, ${teeN} tee shots`);
   ok(launchWorst < 2e-4, `the solver's launch from (club, gauge percent, heading) against the recorded launches: worst ${launchWorst.toExponential(2)} relative`);
   console.log(`3. the recorded strokes over the live course, ${((performance.now() - t0) / 1000).toFixed(1)} s: ${teeN} tee shots start within ${(teeWorst * 1000).toFixed(3)} mm of the local start; ${nsscol ? `${dumpSame} of ${dumpN} the same bits as over the dump's own collision; ` : "the dump is not here: not compared with it; "}${played} rests off the cup within ${worst.toFixed(4)} m (${sameBits} of ${fixtureN} the same bits as over the fixture's triangles); ${holed} holed putts all holed; the solver's own launch within ${launchWorst.toExponential(1)} of the recorded`);
   console.log(`   the strokes through actor trees: ${treeRows.join("; ")}`);
+  console.log(`   SR's mesh against NSS's fixtures: ${exactN} of ${played} played strokes have every fixture triangle in the course (rests within ${worstExact.toFixed(4)} m of the recording, ${exactBits} bit for bit as over the fixture); the other ${played - exactN} fly a mesh that differs near their path (worst rest ${worstDiff.toFixed(2)} m of the recording, bound ${SR_TOL_M})`);
   for (const n of notes) console.log(`   ${n}`);
 }
 
 // ---- 4. solves ----
-const HOLES = [2, 3, 8, 10, 12, 16, 17, 19, 20, 21];
+const HOLES = [2, 3, 8, 10, 12, 16, 17, 19, 20, 21, 22, 23, 24, 25, 26, 27];   // SR's numbers: 24, 23, 25 are NSS 19, 20, 21; 19, 20, 21, 22, 26, 27 are new
 const lim = (club) => [Math.round(100 * S.PHYSICS.clubs[S.clubOf(club)].powerMin), club === "putter" ? 150 : 100];
 const sane = (r) => r.recs.every((x) => {
   const [lo, hi] = lim(x.club);
@@ -325,7 +373,7 @@ for (const hole of HOLES) {
   }
 }
 // from the platform (the app's ball: src/platform.js), and the same solve twice
-for (const [hole, tier] of [[10, "high"], [19, "low"]]) {
+for (const [hole, tier] of [[10, "high"], [24, "low"]]) {   // (SR 24 = NSS 19)
   const C = course(hole), P = DERIVED.holes[hole].platform;
   const online = { tier, countHigh: tier === "high" ? 4 : 3, countLow: tier === "high" ? 0 : 3, place: 2, hand: "right" }, b = ballOf(P, online);
   const args = { ball: b, start: { kind: "platform", tier, hand: "right", ballLocalX: b.localX }, cupKey: "c2", windMph: 9, windDeg: 200 };
@@ -345,20 +393,22 @@ try { RM = await import(pathToFileURL(path.join(ROOT, "tools/harness/round-model
 if (RM) {
   const WSRP = read(path.join(ROOT, "tools/wsr-pins.json"));
   console.log("full tee strokes toward c0, NSS's ball on NSS's course against WSR's ball on WSR's (carry yd and its difference; rest; the two rests apart, yd):");
-  for (let hole = 1; hole <= 21; hole++) {
+  for (let hole = 1; hole <= HOLES_N; hole++) {
+    const wn = nssHoleOf(hole);   // the WSR hole under SR's number: none on SR's new holes; SR 23's tee stands 73 m behind WSR's start
+    if (wn == null || hole === 23) continue;
     const C = course(hole), meta = C.meta, S0 = L.ballAtStart(C, { start: { kind: "local" } }), pin = C.N.cups.c0;
     const h = Math.atan2(pin.x - S0.pos[0], -(pin.z - S0.pos[2])) * 180 / Math.PI;
-    const st = WSRP.holes[hole].starts[0].mesh, wc = RM.loadCourse(hole), wg = RM.groundAt(wc, st[0], st[2], { yMax: st[1] + 20 });
+    const st = WSRP.holes[wn].starts[0].mesh, wc = RM.loadCourse(wn), wg = RM.groundAt(wc, st[0], st[2], { yMax: st[1] + 20 });
     const wball = [st[0], wg.y + 0.5, st[2]], pinMesh = meta.pins.c0, wh = Math.atan2(pinMesh[0] - wball[0], pinMesh[2] - wball[2]);
     const row = [`H${hole}`];
     for (const club of ["driver", "7iron", "wedge"]) {
       const a = L.shot(C, { pos: S0.pos, lie: S0.lie, club, pct: 100, heading: h, cupKey: "c0" });
-      const w = RM.predict({ hole, course: wc, ball: wball, heading: wh, club, power: 1, lie: 15, pin: pinMesh });
+      const w = RM.predict({ hole: wn, course: wc, ball: wball, heading: wh, club, power: 1, lie: 15, pin: pinMesh });
       const am = C.N.meshOf(a.rest), dRest = Math.hypot(am[0] - w.rest[0], am[2] - w.rest[1]) / L.YD;
       row.push(`${club} carry ${a.carryYd.toFixed(1)} (${(a.carryYd - w.carry >= 0 ? "+" : "") + (a.carryYd - w.carry).toFixed(1)}) rest ${a.restLie} ${dRest.toFixed(1)} yd from WSR's (${w.restLie})`);
     }
     console.log(`  ${row.join("; ")}`);
-    RM.dropCourse(hole);
+    RM.dropCourse(wn);
   }
 } else console.log("NSS against WSR: skipped (no extracted disc for round-model.mjs)");
 

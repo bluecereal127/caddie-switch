@@ -1,7 +1,7 @@
 // Acceptance for derived.json's online tee platform (tools/build-derived.mjs,
 // `platform`, from tools/nss-platform.json), parts 1 and 2 (part 3, the app's
 // platform helpers, is tools/test-platform-helpers.mjs):
-//   1. on the committed files: every hole ships the platform and no teeOnline;
+//   1. on the committed files: every hole (Switch Sports Resort's 27) ships the platform and no teeOnline;
 //      per tier the seven standing spots from the player's left to the right
 //      as the player faces the green (localX 3.45 ... -3.45 m: the four slot
 //      bones L2, L1, R1, R2 and the midpoints between them), each at
@@ -17,7 +17,9 @@
 //      its shipped point; the low row's centre within 12 yd of the tee
 //      (GlfTeeOBJ);
 //   2. with the captures (captures/derived/pin-observations.json) and
-//      tools/online-rounds.json's 13 judged rounds: a badge is the floor of
+//      tools/online-rounds.json's 13 judged rounds (SR's hole numbers; the round of NSS 20,
+//      whose platform SR 23's tee moved away from, is marked `stale` and skipped): a badge
+//      is the floor of
 //      the flat yards from the ball to the cup, so for each round a standing
 //      spot of the judged tier fits its badges (badge - yards in (-1.1, 0.1])
 //      and no spot of the other tier does; skipped without the captures.
@@ -31,6 +33,7 @@ const J = (...p) => JSON.parse(readFileSync(join(ROOT, ...p), "utf8"));
 const derived = J("public", "derived.json"), D = derived.holes;
 const NPL = J("tools", "nss-platform.json"), PL = NPL.holes, NP = J("tools", "nss-pins.json").holes, REG = J("tools", "nss-registration.json").holes;
 const W = derived.mapW, H = derived.mapH, YD = 0.9144;
+const HOLES = 27;   // Switch Sports Resort's (src/srMigrate.js SR_HOLES)
 let fails = 0, checks = 0;
 const ok = (c, m) => { checks++; if (!c) { fails++; console.log(`FAIL ${m}`); } };
 const STANDING_X = [3.45, 2.3, 1.15, 0, -1.15, -2.3, -3.45];
@@ -46,7 +49,7 @@ const gaps = [], backs = [], lats = [], origLow = [], origHigh = [], fromTee = [
 let poseOff = 0;
 // platform-local z of each tier's row (m): the slot bones' z
 const ROW_Z = { low: LOW_Z, high: HIGH_Z };
-for (let n = 1; n <= 21; n++) {
+for (let n = 1; n <= HOLES; n++) {
   const d = D[n], pf = d?.platform, pl = PL[n], tag = `H${n}`;
   ok(d && !("teeOnline" in d), `${tag}: derived.json still ships teeOnline`);
   ok(pf && Number.isFinite(pf.facingDeg) && pf.facingDeg >= 0 && pf.facingDeg < 360 && pf.facingDeg === pl.facingDeg, `${tag}: facingDeg ${pf?.facingDeg}, nss-platform.json ${pl.facingDeg}`);
@@ -116,8 +119,8 @@ for (let n = 1; n <= 21; n++) {
 }
 const obsHoles = Object.keys(D).filter((n) => D[n].platform?.observed).map(Number).sort((a, b) => a - b);
 const obsGap = obsHoles.map((n) => { const pf = D[n].platform, ob = pf.observed; return Math.min(...[...pf.tiers.low, ...pf.tiers.high].map((p) => Math.hypot((p.x - ob.x) * W, (p.y - ob.y) * H) * D[n].scale)); });
-console.log(`1. 21 holes x 2 tiers x 7 standing spots at nss-platform.json's points, left to right across facingDeg; neighbours ${range(gaps)} yd apart (1.15 m = ${(1.15 / YD).toFixed(3)}); high ${range(backs)} yd behind low (3.5 m = ${(BACK_M / YD).toFixed(3)}), ${range(lats)} across; rows ${range(origLow)} / ${range(origHigh)} yd from Glf_RotateOBJ (2.0 / -1.5 m); zYd low ${range(zs.low)}, high ${range(zs.high)}; the low centre ${range(fromTee)} yd from the tee (GlfTeeOBJ); no teeOnline`);
- console.log(`   origin, yawDeg and transform = nss-platform.json's and nss-registration.json's on all 21 holes; through them every standing spot within ${poseOff.toFixed(4)} px of its shipped point`);
+console.log(`1. ${HOLES} holes x 2 tiers x 7 standing spots at nss-platform.json's points, left to right across facingDeg; neighbours ${range(gaps)} yd apart (1.15 m = ${(1.15 / YD).toFixed(3)}); high ${range(backs)} yd behind low (3.5 m = ${(BACK_M / YD).toFixed(3)}), ${range(lats)} across; rows ${range(origLow)} / ${range(origHigh)} yd from Glf_RotateOBJ (2.0 / -1.5 m); zYd low ${range(zs.low)}, high ${range(zs.high)}; the low centre ${range(fromTee)} yd from the tee (GlfTeeOBJ); no teeOnline`);
+ console.log(`   origin, yawDeg and transform = nss-platform.json's and nss-registration.json's on all ${HOLES} holes; through them every standing spot within ${poseOff.toFixed(4)} px of its shipped point`);
 console.log(`   observed (the online frames' median avatar) on holes ${obsHoles.join(", ")}: ${range(obsGap)} yd from the nearest standing spot`);
 
 // 2. the judged rounds against the badges
@@ -131,6 +134,7 @@ else {
   const rows = [];
   let margin = Infinity;
   for (const r of rounds) {
+    if (r.stale) { rows.push(`H${r.hole} W${r.wind}: skipped (${r.stale})`); continue; }
     const tier = r.tier === "upper" ? "high" : r.tier === "lower" ? "low" : null, other = tier === "high" ? "low" : "high";
     ok(tier, `online-rounds.json: H${r.hole} W${r.wind} tier "${r.tier}"`);
     const os = (PO[r.hole] ?? []).filter((o) => o.online && String(o.wind) === String(r.wind) && /^c\d$/.test(o.result) && o.badges?.length);
@@ -150,7 +154,7 @@ else {
       }
     }
   }
-  console.log(`2. ${rounds.length} judged online rounds: each badge fits a standing spot of its own tier and none of the other's (the nearest other-tier miss ${margin.toFixed(2)} yd outside the window)`);
+  console.log(`2. ${rounds.filter((r) => !r.stale).length} of ${rounds.length} judged online rounds: each badge fits a standing spot of its own tier and none of the other's (the nearest other-tier miss ${margin.toFixed(2)} yd outside the window)`);
   for (const s of rows) console.log(`   ${s}`);
 }
 

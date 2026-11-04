@@ -1,12 +1,13 @@
 // node tools/test-relief.mjs [repoRoot]
 // Acceptance for src/relief.js, the debug contour image over a hole's terrain
 // (the Holes tab's "Contours (debug)" chip). Runs on the committed terrain.
-//  1. every hole's image at the default 250x304 and H21's at the App's
+//  1. every hole's image (Switch Sports Resort's 27) at the default 250x304 and H25's
+//     (NSS's 21) at the App's
 //     500x608: the buffer's size, and every drawn pixel (lines, their light
 //     edge, labels) on a sample with data: none where class 0 or no height
 //  2. the tee's own level: a dark red (0 yd) line within 12 map px of the
-//     WSR start in derived.json on every hole that has one (the datum is the
-//     start's ground height)
+//     tee in derived.json on every hole whose tee stands at the datum (the
+//     datum is NSS y 0, the tee's height on 26 holes; SR 23's tee, 10 m up, is not)
 //  3. a synthetic 20 yd ramp (1 -> 21 yd down the frame): 10 contour lines in
 //     every column, each one dark pixel thick; with labels, the same count in
 //     every column no label touches, and labels on the 10 and 20 yd levels
@@ -29,13 +30,13 @@ const MAP_W = 250, MAP_H = 304;
 const isZero = (d, p) => d[4 * p] === 150 && d[4 * p + 1] === 20 && d[4 * p + 2] === 20 && d[4 * p + 3] > 0;
 
 // 1 + 2
-for (let n = 1; n <= 21; n++) {
+for (let n = 1; n <= 27; n++) {
   const t = read(n);
-  for (const [w, h] of n === 21 ? [[250, 304], [500, 608]] : [[250, 304]]) {
-    const img = n === 21 && w === 250 ? R.contourImage(t) : R.contourImage(t, { w, h });
+  for (const [w, h] of n === 25 ? [[250, 304], [500, 608]] : [[250, 304]]) {
+    const img = n === 25 && w === 250 ? R.contourImage(t) : R.contourImage(t, { w, h });
     ok(img.w === w && img.h === h && img.data.length === w * h * 4, `H${n} ${w}x${h}: buffer size`);
     let drawn = 0, offData = 0, onClass0 = 0, zeroD = Infinity;
-    const tee = derived[n]?.tee;
+    const tee = n === 23 ? null : derived[n]?.tee;   // (SR 23's tee is 10 m above the datum)
     for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) {
       const p = j * w + i;
       if (!img.data[4 * p + 3]) continue;
@@ -90,10 +91,10 @@ for (let n = 1; n <= 21; n++) {
 
 // 4. determinism and the edges
 {
-  const a = R.contourImage(read(21), { w: 500, h: 608 }), b = R.contourImage(read(21), { w: 500, h: 608 });
+  const a = R.contourImage(read(25), { w: 500, h: 608 }), b = R.contourImage(read(25), { w: 500, h: 608 });
   const t = read(17), c = R.contourImage(t), d = R.contourImage(t);
   ok(sha1(a.data) === sha1(b.data) && sha1(c.data) === sha1(d.data), "the same terrain gives other bytes");
-  console.log(`determinism: H21 500x608 ${sha1(a.data).slice(0, 12)} twice from two parses, H17 ${sha1(c.data).slice(0, 12)} twice`);
+  console.log(`determinism: H25 500x608 ${sha1(a.data).slice(0, 12)} twice from two parses, H17 ${sha1(c.data).slice(0, 12)} twice`);
   const blank = R.contourImage(null, { w: 20, h: 30 });
   ok(blank.w === 20 && blank.h === 30 && blank.data.length === 2400 && blank.data.every((v) => v === 0), "no terrain: a blank image");
   ok(R.contourDataUrl(t) === null && R.contourDataUrl(null) === null, "contourDataUrl without a DOM");

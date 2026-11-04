@@ -34,7 +34,7 @@ const NSSPL = JSON.parse(readFileSync(join(root, "tools/nss-platform.json"), "ut
 const shipsPlatform = Object.values(NEW).every((d) => d.platform);
 const platformOf = (n) => NEW[n].platform ?? (({ facingDeg, tiers, slots, centre }) => ({ facingDeg, tiers, slots, centre }))(NSSPL[n]);
 let markers = 0, platforms = 0, cols = 0;
-for (let n = 1; n <= 21; n++) {
+for (let n = 1; n <= 27; n++) {   // Switch Sports Resort's 27 holes (src/srMigrate.js)
   const d = NEW[n];
   ok(Array.isArray(d.trees) && d.trees.length > 0, `H${n} derived.json ships no trees`);
   ok(d.trees.every((t) => [2, 3, 6].includes(t.kind) && t.size > 0 && t.sy > 0 && Number.isFinite(t.z)), `H${n} a tree lacks kind / size / sy / z or has a bad value`);
@@ -88,7 +88,7 @@ for (let n = 1; n <= 21; n++) {
   ok(p4.platform === null && !("teeOnline" in p4), `H${n} a derived.json without platform: platform ${p4.platform && "kept"}, teeOnline ${"teeOnline" in p4 ? "merged" : "gone"}`);
   platforms++;
 }
-console.log(`${markers} auto tree markers over 21 holes carry kind, size, sy and z, ${cols} col; col restored from derived.json on a load of the stored markers`);
+console.log(`${markers} auto tree markers over 27 holes carry kind, size, sy and z, ${cols} col; col restored from derived.json on a load of the stored markers`);
 console.log(`${platforms} holes' platform mirrored whole (${shipsPlatform ? "public/derived.json's" : "tools/nss-platform.json's: derived.json ships none yet"})`);
 console.log(fails ? `${fails} FAILURES` : "all tree-field merge checks passed");
 process.exit(fails ? 1 : 0);

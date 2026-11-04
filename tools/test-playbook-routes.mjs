@@ -5,12 +5,15 @@
 // fallback or legacy one 3) ending holed or within 1 ft, each stroke
 // from the last one's rest, the first from the hole's tee (derived.json's,
 // the WSR start the harness's tee states stand on), and the 8 WSR directions'
-// bearings 45 deg apart on every hole.
+// bearings 45 deg apart on every hole. The playbook's holes are WSR's numbers: derived.json's holes are
+// Switch Sports Resort's (src/srMigrate.js), so WSR 19, 20, 21 are SR 24, 23, 25 there (the tee check goes through
+// SR's map frame where it differs, SR 17's, and skips WSR 20, whose routes start 73 m from SR 23's tee).
 //   node tools/test-playbook-routes.mjs
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { pinKeyOf, routesFor, loadPlaybook } from "../src/playbook.js";
+import { srHoleOf, toSrFrame } from "../src/srMigrate.js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const DIR = path.join(ROOT, "public", "playbook");
@@ -59,7 +62,7 @@ let routes = 0, windy = 0;
 const HOLES = [...Array.from({ length: 18 }, (_, i) => i + 1), ...[19, 20, 21].filter((h) => index.holes[h])];
 for (const h of HOLES) {
   const f = JSON.parse(fs.readFileSync(path.join(DIR, `h${String(h).padStart(2, "0")}.json`), "utf8"));
-  const tee = DERIVED.holes[h].tee;
+  const sh = srHoleOf(h), tee = DERIVED.holes[sh].tee;   // (the playbook's h is a WSR number; derived.json's holes are SR's)
   ok(f.hole === h && f.dirs.length === 8, `h${h}: the file`);
   for (let d = 0; d < 8; d++) {
     const gap = (((f.dirs[(d + 1) % 8] - f.dirs[d]) % 360) + 360) % 360;
@@ -77,7 +80,7 @@ for (const h of HOLES) {
       const n = r.fallback || r.legacy ? 3 : f.target, last = ss[ss.length - 1];
       ok(f.target === (f.par === 3 ? 1 : 2), `h${h}: the target`);
       ok(ss.length >= 1 && ss.length <= n && (last.holed || (!r.legacy && last.near && last.left <= 1 / 3 + 1e-6)) && ss.slice(0, -1).every((s) => !s.holed && !s.near), `${tag}: holed or within 1 ft in at most ${n}`);
-      ok(Math.hypot((ss[0].from[0] - tee.x) * 250, (ss[0].from[1] - tee.y) * 304) < 2, `${tag}: from the tee`);
+      if (h !== 20) { const [fx, fy] = toSrFrame(sh, ss[0].from[0], ss[0].from[1]); ok(Math.hypot((fx - tee.x) * 250, (fy - tee.y) * 304) < 2, `${tag}: from the tee`); }   // (SR 23's tee is not WSR 20's start)
       for (let k = 1; k < ss.length; k++) ok(Math.hypot((ss[k].from[0] - ss[k - 1].rest[0]) * 250, (ss[k].from[1] - ss[k - 1].rest[1]) * 304) < 0.1, `${tag}: stroke ${k + 1} from stroke ${k}'s rest`);
       if (last.holed) ok(Math.hypot((last.rest[0] - p.pin[0]) * 250, (last.rest[1] - p.pin[1]) * 304) < 1e-6, `${tag}: the holed last at the pin`);
       else ok(Math.hypot((last.rest[0] - p.pin[0]) * 250, (last.rest[1] - p.pin[1]) * 304) < 1.5, `${tag}: the tap-in beside the pin on the map`);

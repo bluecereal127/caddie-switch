@@ -41,7 +41,7 @@ const merge = (h, n, d, fresh = false) => applyDerivedHole({ ...clone(h), green:
 const MINE_MARKER = (n) => ({ id: 1700000000000 + n, x: 0.5, y: 0.5 }), MINE_PIN = (n) => ({ id: 1700000000100 + n, x: 0.46, y: 0.24 });
 const painted = Array.from({ length: 9 }, (_, j) => Array.from({ length: 9 }, (_, i) => (i === 4 && j === 4 ? [0, 2] : [1, 0])));
 const pcts = [];
-for (let n = 1; n <= 21; n++) {
+for (let n = 1; n <= 27; n++) {   // Switch Sports Resort's 27 holes (src/srMigrate.js)
   const d = NEW[n];
   ok(typeof d.slopeMaxPct === "number" && d.slopeMaxPct === TRUTH[n].slopeMaxPct, `H${n} derived.json slopeMaxPct ${d.slopeMaxPct}, nss-truth.json ${TRUTH[n].slopeMaxPct}`);
   ok(d.source === "nss" && d.rev === geomRev(TRUTH[n]) && !("wsrRev" in d), `H${n} derived.json source ${d.source} rev ${d.rev}${"wsrRev" in d ? ` wsrRev ${d.wsrRev}` : ""}, want "nss" ${geomRev(TRUTH[n])}`);
@@ -93,6 +93,6 @@ for (let n = 1; n <= 21; n++) {
   const other = merge(wsrStored, n, { ...nd, source: "captures" });
   ok(other.green.src === "wsr-0123abcd" && eq(other.green.grid, painted) && other.green.gridEdited === true && eq(other.green.box, b.green.box), `H${n} an unknown source overwrote the geometry`);
 }
-console.log(`slopeMaxPct on 21 holes, ${Math.min(...pcts)}-${Math.max(...pcts)} %`);
+console.log(`slopeMaxPct on 27 holes, ${Math.min(...pcts)}-${Math.max(...pcts)} %`);
 console.log(fails ? `${fails} FAILURES` : "all slopeMaxPct merge checks passed");
 process.exit(fails ? 1 : 0);

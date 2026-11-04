@@ -59,15 +59,15 @@
 //     profile flies the plane, a 10 yd drop behind the ball changes nothing,
 //     a 3-degree profile flies the tilted plane; a digest of 40 solver flights;
 //     a full driver over a 20 yd step (down: carries over 10 yd further, dh <
-//     0; up: shorter, dh > 0); H21 and H17 on the default line over the
-//     committed terrain (H21 carries further and lands below, H17 less and
-//     above); a level profile gives the table's percent; H21's round trip
+//     0; up: shorter, dh > 0); H25 (NSS's 21) and H17 on the default line over the
+//     committed terrain (H25 carries further and lands below, H17 less and
+//     above); a level profile gives the table's percent; H25's round trip
 //     (its own percent, or one stopping within STOP_TOL of it); stopAt is the
 //     rec's stop (with the solve's
 //     wind), maxReach the top cap flight, ballLift, no heights in calm solves
 //     flat, a bank gets the closest flight flagged approx; a 7-club solve on
-//     H21's line within the budget
-//  i. App.jsx, src/model.js, src/putt.js, src/nsssim.js and src/nssShape.js
+//     H25's line within the budget
+//  i. App.jsx, src/model.js, src/putt.js, src/nsssim.js, src/nssShape.js and src/srMigrate.js
 //     parse with @babel/parser (skipped without it)
 import { readFileSync, mkdtempSync, rmSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -342,7 +342,7 @@ const lineOf = (n) => { const { t, at } = lineGeo(n); return (yd) => lieOf(class
 {
   let recs = 0, edges = 0, worst = 0;
   const seen = {};
-  for (let n = 1; n <= 21; n++) {
+  for (let n = 1; n <= 27; n++) {   // Switch Sports Resort's 27 holes (src/srMigrate.js)
     const surfaceAt = lineOf(n);
     for (const lie of ["tee", "rough"]) for (let d = 30; d <= 270; d += 5) {
       for (const r of ask(DEFAULT_CLUBS, d, lie, { surfaceAt }).recs) {
@@ -355,7 +355,7 @@ const lineOf = (n) => { const { t, at } = lineGeo(n); return (yd) => lieOf(class
       }
     }
   }
-  console.log(`holes: the default lines of all 21 holes from the tee and rough at 30-270 yd: ${recs} recs on the surface their carry reads, the trace's percent, stopping within ${worst.toFixed(2)} yd of the distance; ${edges} off fairway (${Object.entries(seen).map(([s, k]) => `${s} ${k}`).join(", ")})`);
+  console.log(`holes: the default lines of all 27 holes from the tee and rough at 30-270 yd: ${recs} recs on the surface their carry reads, the trace's percent, stopping within ${worst.toFixed(2)} yd of the distance; ${edges} off fairway (${Object.entries(seen).map(([s, k]) => `${s} ${k}`).join(", ")})`);
 }
 
 // ---- d, synthetic holes: random strips of every surface (and water / OB /
@@ -602,24 +602,24 @@ for (const cl of DEFAULT_CLUBS) {
   }
   if (steps[-20] && steps[20]) console.log(`steps: a full driver carries ${carryOf(dr, 4).toFixed(1)} yd on level ground; over a 20 yd step down at 150 yd ${steps[-20].carry.toFixed(1)} (+${(steps[-20].carry - carryOf(dr, 4)).toFixed(1)}, stops ${steps[-20].stop.toFixed(1)}, dh ${steps[-20].dh.toFixed(0)}), up ${steps[20].carry.toFixed(1)} (${(steps[20].carry - carryOf(dr, 4)).toFixed(1)}, stops ${steps[20].stop.toFixed(1)}, dh +${steps[20].dh.toFixed(0)})`);
 
-  // h4. H21 and H17 on the default line over the committed terrain, built as
+  // h4. H25 and H17 on the default line over the committed terrain, built as
   // the App builds ctx (heights relative to the ground under the ball): the
-  // full driver lands far below the tee on H21 and carries further than on
+  // full driver lands far below the tee on H25 and carries further than on
   // level ground, above it on H17 and carries less
   const groundOf = (n) => {
     const { t, ball, at } = lineGeo(n), h0 = terrainHeightAt(t, ball.x, ball.y);
     return { surfaceAt: (yd) => lieOf(classAt(t, ...at(yd))), heightAt: (yd) => { const h = terrainHeightAt(t, ...at(yd)); return h == null ? null : h - h0; } };
   };
-  const g21 = groundOf(21), g17 = groundOf(17), hole = {};
-  for (const [n, ctx] of [[21, g21], [17, g17]]) {
+  const g25 = groundOf(25), g17 = groundOf(17), hole = {};
+  for (const [n, ctx] of [[25, g25], [17, g17]]) {
     const r = ask([dr], stopAt(dr, 4, 0, ctx), "tee", ctx).recs[0];
     ok(r && r.elev && Math.abs(r.power - 4) < 0.01, `H${n}: the full driver's rec ${r ? r.power.toFixed(3) : "missing"}, expected 4.00`);
     if (!r) continue;
     hole[n] = r;
-    if (n === 21) ok(r.carry > carryOf(dr, 4) && r.dh < 0, `H21: the full driver carries ${r.carry.toFixed(1)} (level ${carryOf(dr, 4).toFixed(1)}), dh ${r.dh.toFixed(1)}`);
+    if (n === 25) ok(r.carry > carryOf(dr, 4) && r.dh < 0, `H25: the full driver carries ${r.carry.toFixed(1)} (level ${carryOf(dr, 4).toFixed(1)}), dh ${r.dh.toFixed(1)}`);
     else ok(r.carry < carryOf(dr, 4) && r.dh > 0, `H17: the full driver carries ${r.carry.toFixed(1)} (level ${carryOf(dr, 4).toFixed(1)}), dh ${r.dh.toFixed(1)}`);
   }
-  if (hole[21] && hole[17]) console.log(`holes: the full driver carries ${carryOf(dr, 4).toFixed(1)} / stops ${stopOf(dr, 4).toFixed(1)} yd on level ground; on H21's line ${hole[21].carry.toFixed(1)} / ${hole[21].stop.toFixed(1)}, landing ${(-hole[21].dh).toFixed(1)} yd below the tee on ${hole[21].surface}; on H17's ${hole[17].carry.toFixed(1)} / ${hole[17].stop.toFixed(1)}, ${hole[17].dh.toFixed(1)} yd above (stopping ${hole[17].dhStop.toFixed(1)} above)`);
+  if (hole[25] && hole[17]) console.log(`holes: the full driver carries ${carryOf(dr, 4).toFixed(1)} / stops ${stopOf(dr, 4).toFixed(1)} yd on level ground; on H25's line ${hole[25].carry.toFixed(1)} / ${hole[25].stop.toFixed(1)}, landing ${(-hole[25].dh).toFixed(1)} yd below the tee on ${hole[25].surface}; on H17's ${hole[17].carry.toFixed(1)} / ${hole[17].stop.toFixed(1)}, ${hole[17].dh.toFixed(1)} yd above (stopping ${hole[17].dhStop.toFixed(1)} above)`);
 
   // h5. a level profile changes nothing in calm air: every flat rec comes back
   // at the table's percent (the flight at a percent is the table's entry, to
@@ -647,23 +647,23 @@ for (const cl of DEFAULT_CLUBS) {
     console.log(`level profile: ${same} of ${n} recs at the table's percent, ${moved} at another no farther off (${worse} worse); ${extra} more within ${STOP_TOL} yd past a floor or a step's foot`);
   }
 
-  // h6. H21's round trip: every exact rec (7 clubs from the tee at 30-260 yd)
+  // h6. H25's round trip: every exact rec (7 clubs from the tee at 30-260 yd)
   // solved again at its own stop comes back at its percent, or at one whose
   // flight stops within STOP_TOL of it (the terrain's stop need not rise
   // percent by percent)
   {
     let n = 0, same = 0, worst = 0;
     for (const cl of DEFAULT_CLUBS) for (let d = 30; d <= 260; d += 10) {
-      const r = ask([cl], d, "tee", g21).recs[0];
+      const r = ask([cl], d, "tee", g25).recs[0];
       if (!r || r.approx) continue;
-      const r2 = ask([cl], r.stop, "tee", g21).recs[0];
+      const r2 = ask([cl], r.stop, "tee", g25).recs[0];
       n++;
-      if (r2 && r2.pct === r.pct) { same++; ok(r2.stop === r.stop, `H21 round trip: ${cl.id} at ${r.pct} % flies differently`); continue; }
+      if (r2 && r2.pct === r.pct) { same++; ok(r2.stop === r.stop, `H25 round trip: ${cl.id} at ${r.pct} % flies differently`); continue; }
       const off = r2 ? Math.abs(r2.stop - r.stop) : Infinity;
       worst = Math.max(worst, off);
-      ok(off <= STOP_TOL, `H21 round trip: ${cl.id} at ${d} yd ${r.pct} % stops ${r.stop.toFixed(2)}, which solves to ${r2 ? `${r2.pct} % stopping ${r2.stop.toFixed(2)}` : "nothing"}`);
+      ok(off <= STOP_TOL, `H25 round trip: ${cl.id} at ${d} yd ${r.pct} % stops ${r.stop.toFixed(2)}, which solves to ${r2 ? `${r2.pct} % stopping ${r2.stop.toFixed(2)}` : "nothing"}`);
     }
-    console.log(`H21 round trip: ${n} recs solved again at their own stop, ${same} at their own percent, the rest stopping within ${worst.toFixed(3)} yd of it`);
+    console.log(`H25 round trip: ${n} recs solved again at their own stop, ${same} at their own percent, the rest stopping within ${worst.toFixed(3)} yd of it`);
   }
 
   // h7. the rest of the contract: the rec's stop is stopAt's (the rec card's
@@ -672,10 +672,10 @@ for (const cl of DEFAULT_CLUBS) {
   // solve on the table (elev false, no stop), and a distance inside a jump (a
   // bank the ball rolls back from) gets the closest flight, flagged approx
   {
-    const o = ask(DEFAULT_CLUBS, 180, "tee", g21);
-    for (const r of o.recs) ok(Math.abs(stopAt(r.club, r.power, 0, g21) - r.stop) < 1e-9 && Math.abs(r.carry + r.roll - r.stop) < 1e-9, `H21 at 180 yd: ${r.club.id}'s stop ${r.stop} is not stopAt's`);
-    const top = Math.max(...DEFAULT_CLUBS.map((cl) => stopAt(cl, capFor(cl, "tee"), 0, g21)));
-    ok(o.maxReach && Math.abs(o.maxReach.yd - top) < 1e-9, `H21 maxReach ${o.maxReach?.yd}, the top cap flight ${top}`);
+    const o = ask(DEFAULT_CLUBS, 180, "tee", g25);
+    for (const r of o.recs) ok(Math.abs(stopAt(r.club, r.power, 0, g25) - r.stop) < 1e-9 && Math.abs(r.carry + r.roll - r.stop) < 1e-9, `H25 at 180 yd: ${r.club.id}'s stop ${r.stop} is not stopAt's`);
+    const top = Math.max(...DEFAULT_CLUBS.map((cl) => stopAt(cl, capFor(cl, "tee"), 0, g25)));
+    ok(o.maxReach && Math.abs(o.maxReach.yd - top) < 1e-9, `H25 maxReach ${o.maxReach?.yd}, the top cap flight ${top}`);
     const up = { ...lvl(), ballLift: 1 }, base = lvl();
     const r0 = ask([dr], stopAt(dr, 4, 0, base), "fairway", base).recs[0], r1 = ask([dr], stopAt(dr, 4, 0, up), "fairway", up).recs[0];
     ok(r0 && r1 && r1.carry > r0.carry && Math.abs(r1.dh + 1) < 1e-9 && Math.abs(r1.power - 4) < 0.01, `ballLift 1: carry ${r1?.carry} vs ${r0?.carry}, dh ${r1?.dh}`);
@@ -689,33 +689,33 @@ for (const cl of DEFAULT_CLUBS) {
     console.log(`contract: ballLift 1 yd carries the full driver ${r1 ? (r1.carry - r0.carry).toFixed(2) : "?"} yd further; the 7-iron to 102 yd under a 10 yd bank: ${b ? `the closest flight stops ${b.stop.toFixed(1)} (approx)` : "no rec"}`);
   }
 
-  // h8. the budget: one solve with 7 clubs on H21's line, from the tee at
+  // h8. the budget: one solve with 7 clubs on H25's line, from the tee at
   // 40-300 yd after a warm-up, calm and in a 13 mph crosswind. NSS's flight
   // costs about 0.5 ms (src/nsssim.js: float32 ticks, a profile contact every
   // tick) against WSR's port's 0.09, so the budget is 40 ms (mean and p90)
   {
     const BUDGET = 40;
     const time = (wind) => {
-      for (let d = 40; d <= 300; d += 20) ask(DEFAULT_CLUBS, d, "tee", g21, wind);
+      for (let d = 40; d <= 300; d += 20) ask(DEFAULT_CLUBS, d, "tee", g25, wind);
       const ts = [];
-      for (let rep = 0; rep < 2; rep++) for (let d = 40; d <= 300; d += 5) { const t0 = performance.now(); ask(DEFAULT_CLUBS, d, "tee", g21, wind); ts.push(performance.now() - t0); }
+      for (let rep = 0; rep < 2; rep++) for (let d = 40; d <= 300; d += 5) { const t0 = performance.now(); ask(DEFAULT_CLUBS, d, "tee", g25, wind); ts.push(performance.now() - t0); }
       ts.sort((a, b) => a - b);
       return { mean: ts.reduce((s, x) => s + x, 0) / ts.length, p90: ts[Math.floor(ts.length * 0.9)], max: ts[ts.length - 1], n: ts.length };
     };
     const c = time({}), w = time({ speed: 13, deg: 90 });
-    ok(c.mean < BUDGET && c.p90 < BUDGET && w.mean < BUDGET && w.p90 < BUDGET, `a 7-club solve on H21's line takes ${c.mean.toFixed(2)} / ${w.mean.toFixed(2)} ms mean, ${c.p90.toFixed(2)} / ${w.p90.toFixed(2)} p90 (calm / wind; budget ${BUDGET})`);
-    console.log(`budget: a 7-club solve on H21's line ${c.mean.toFixed(2)} ms mean, ${c.p90.toFixed(2)} p90, ${c.max.toFixed(2)} max calm; ${w.mean.toFixed(2)} / ${w.p90.toFixed(2)} / ${w.max.toFixed(2)} in a 13 mph crosswind, over ${c.n} solves each (budget ${BUDGET} ms)`);
+    ok(c.mean < BUDGET && c.p90 < BUDGET && w.mean < BUDGET && w.p90 < BUDGET, `a 7-club solve on H25's line takes ${c.mean.toFixed(2)} / ${w.mean.toFixed(2)} ms mean, ${c.p90.toFixed(2)} / ${w.p90.toFixed(2)} p90 (calm / wind; budget ${BUDGET})`);
+    console.log(`budget: a 7-club solve on H25's line ${c.mean.toFixed(2)} ms mean, ${c.p90.toFixed(2)} p90, ${c.max.toFixed(2)} max calm; ${w.mean.toFixed(2)} / ${w.p90.toFixed(2)} / ${w.max.toFixed(2)} in a 13 mph crosswind, over ${c.n} solves each (budget ${BUDGET} ms)`);
   }
 }
 
 // ---- i. the parser ----
 try {
   const { parse } = createRequire(join(root, "package.json"))("@babel/parser");
-  for (const f of ["src/App.jsx", "src/model.js", "src/putt.js", "src/nsssim.js", "src/nssShape.js"]) {
+  for (const f of ["src/App.jsx", "src/model.js", "src/putt.js", "src/nsssim.js", "src/nssShape.js", "src/srMigrate.js"]) {
     try { parse(readFileSync(join(root, f), "utf8"), { sourceType: "module", plugins: ["jsx"] }); }
     catch (e) { ok(false, `${f} does not parse: ${e.message}`); }
   }
-  console.log("parse: App.jsx, model.js, putt.js, nsssim.js, nssShape.js");
+  console.log("parse: App.jsx, model.js, putt.js, nsssim.js, nssShape.js, srMigrate.js");
 } catch { console.log("parse: skipped (no @babel/parser here)"); }
 
 console.log(fails ? `${fails} FAILURES` : "all solver checks passed");

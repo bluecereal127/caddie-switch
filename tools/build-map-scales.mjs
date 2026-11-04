@@ -6,15 +6,19 @@
 // 330 CSS px map on a 3x phone screen (990 device px) is upscaled 1.32x
 // instead of 1.98x, and 4x is about one image px per device px there.
 //
-//   node tools/build-map-scales.mjs [--art nss|wsr] [--scales 3,4] [--render <dir>] [--out public/maps]
+//   node tools/build-map-scales.mjs [--art sr|nss|wsr] [--scales 3,4] [--render <dir>] [--out public/maps]
 //        [--q 3:78,4:78] [--check <dir>]
 //
-// --art nss (the default since 2026-10-25, the changeover to NSS's own data):
-// NSS's own minimap, which
+// --art sr (the default since 2026-11-04, the changeover to Switch Sports
+// Resort's 27-hole numbering): SR's own minimap, which
 //   python -P tools/render-nss-maps.py
-// renders at every scale into one directory, captures/derived/render-nss
-// (--render): hNN.png (2x), hNN-3x.png, hNN-4x.png and an index.json whose
-// holes[n].maps[s] names each file ({ file, width, height, scale, ss }).
+// (--game sr, its default) renders at every scale into one directory,
+// captures/derived/render-nss (--render): hNN.png (2x), hNN-3x.png,
+// hNN-4x.png (and hNN-8x.png, which the live advisor serves; not shipped
+// here) and an index.json whose holes[n].maps[s] names each file ({ file,
+// width, height, scale, ss }), n = 1..27.
+// --art nss (the default from 2026-10-25 to 2026-11-04): the same for NSS's
+// 21 holes (render-nss-maps.py --game nss; one index.json layout for both).
 // --art wsr: the renders of WSR's minimap model that shipped before, one
 // directory per scale (--render captures/derived/render-{s}x, {s} = the
 // scale), each written by
@@ -85,16 +89,17 @@ const CHECK_MAD = 1, CHECK_PX = 16, CHECK_PX_SHARE = 0.001;
 // for every scale (holes[n].maps[s]), wsr one directory per scale
 // (holes[n].map), {s} = the scale.
 const ARTS = {
-  nss: { render: "captures/derived/render-nss", rerun: (s, dir, n) => `python -P tools/render-nss-maps.py --out ${dir} --holes ${n}` },
-  wsr: { render: "captures/derived/render-{s}x", check: "captures/derived/render", rerun: (s, dir, n) => `node tools/render-maps.mjs --scale ${s} --out ${dir} --no-green --holes ${n}` },
+  sr: { render: "captures/derived/render-nss", holes: 27, rerun: (s, dir, n) => `python -P tools/render-nss-maps.py --out ${dir} --holes ${n}` },
+  nss: { render: "captures/derived/render-nss", holes: 21, rerun: (s, dir, n) => `python -P tools/render-nss-maps.py --game nss --out ${dir} --holes ${n}` },
+  wsr: { render: "captures/derived/render-{s}x", check: "captures/derived/render", holes: 21, rerun: (s, dir, n) => `node tools/render-maps.mjs --scale ${s} --out ${dir} --no-green --holes ${n}` },
 };
-// the plaid tile an NSS render must carry (tools/render-nss-maps.py
+// the plaid tile an NSS or SR render must carry (tools/render-nss-maps.py
 // PLAID_TILE_M; the first renders drew GreenAreaSize / 25 m)
 const NSS_PLAID_TILE_M = 2;
 
 const args = process.argv.slice(2);
-const opt = { art: "nss", scales: [3, 4], render: null, out: join(ROOT, "public/maps"), q: { ...JPEG_Q }, check: null };
-const usage = "usage: node tools/build-map-scales.mjs [--art nss|wsr] [--scales 3,4] [--render captures/derived/render-nss | captures/derived/render-{s}x] [--out public/maps] [--q 3:78,4:78] [--check <2x render dir>]";
+const opt = { art: "sr", scales: [3, 4], render: null, out: join(ROOT, "public/maps"), q: { ...JPEG_Q }, check: null };
+const usage = "usage: node tools/build-map-scales.mjs [--art sr|nss|wsr] [--scales 3,4] [--render captures/derived/render-nss | captures/derived/render-{s}x] [--out public/maps] [--q 3:78,4:78] [--check <2x render dir>]";
 for (let i = 0; i < args.length; i++) {
   const a = args[i];
   if (a === "--art") opt.art = args[++i];
@@ -107,8 +112,9 @@ for (let i = 0; i < args.length; i++) {
 }
 if (!ARTS[opt.art]) { console.error(`--art: ${opt.art} is not one of ${Object.keys(ARTS).join(", ")}\n${usage}`); process.exit(1); }
 opt.render ??= join(ROOT, ARTS[opt.art].render);
-// NSS's 2x render sits beside its 3x and 4x, in --render itself
-opt.check ??= opt.art === "nss" ? opt.render : join(ROOT, ARTS[opt.art].check);
+// NSS's and SR's 2x render sits beside its 3x and 4x, in --render itself
+opt.check ??= opt.art !== "wsr" ? opt.render : join(ROOT, ARTS[opt.art].check);
+const NHOLES = ARTS[opt.art].holes;
 for (const s of opt.scales) {
   if (!Number.isInteger(s) || s < 3) { console.error(`--scales: ${s} is not an integer of 3 or more (2x is the bundle in src/maps.js)\n${usage}`); process.exit(1); }
   if (!(opt.q[s] >= 1 && opt.q[s] <= 100)) { console.error(`no JPEG quality for ${s}x (--q ${s}:78)\n${usage}`); process.exit(1); }
@@ -168,21 +174,21 @@ for (const s of opt.scales) {
   const dir = resolve(opt.render.replace("{s}", s));
   if (!indexes.has(dir)) {
     try { indexes.set(dir, JSON.parse(readFileSync(join(dir, "index.json"), "utf8"))); }
-    catch { console.error(`${rel(dir)}/index.json is missing: render it first with ${ARTS[opt.art].rerun(s, rel(dir), "1-21").replace(" --holes 1-21", "")}`); process.exit(1); }
+    catch { console.error(`${rel(dir)}/index.json is missing: render it first with ${ARTS[opt.art].rerun(s, rel(dir), `1-${NHOLES}`).replace(` --holes 1-${NHOLES}`, "")}`); process.exit(1); }
   }
   const idx = indexes.get(dir);
   tot[s] = { n: 0, bytes: 0, gz: 0 };
-  for (let n = 1; n <= 21; n++) {
+  for (let n = 1; n <= NHOLES; n++) {
     const e = idx.holes?.[n], art = e?.art ?? idx.art;
-    // the entry's map at this scale: nss lists every scale, wsr one per directory
-    const m = opt.art === "nss" ? e?.maps?.[s] : e?.map;
-    const png = join(dir, m?.file && /^[w.-]+$/.test(m.file) ? m.file : opt.art === "nss" ? `h${nn(n)}-${s}x.png` : `h${nn(n)}.png`);
+    // the entry's map at this scale: sr and nss list every scale, wsr one per directory
+    const m = opt.art !== "wsr" ? e?.maps?.[s] : e?.map;
+    const png = join(dir, m?.file && /^[w.-]+$/.test(m.file) ? m.file : opt.art !== "wsr" ? `h${nn(n)}-${s}x.png` : `h${nn(n)}.png`);
     let why = null;
     if (!e || !m || !existsSync(png)) why = `no render (${rel(png)}${e ? (m ? "" : ` / its index.json entry at ${s}x`) : " / its index.json entry"})`;
     else if (art !== opt.art) why = `rendered as art ${art ?? "unknown"}, not ${opt.art}`;
     else if (opt.art === "wsr" && ((e.wsr ?? idx.wsr)?.mode ?? "model") !== "model") why = `rendered with --wsr ${(e.wsr ?? idx.wsr).mode} (the cross-check), not the WSR model`;
     else if (opt.art === "wsr" && ((e.wsr ?? idx.wsr)?.trees ?? "model") !== "model") why = `rendered with --trees ${(e.wsr ?? idx.wsr).trees}, not the model's sprites the 2x bundle has`;
-    else if (opt.art === "nss" && e.plaid?.tileM !== NSS_PLAID_TILE_M) why = `rendered before the plaid fix (plaid tile ${e.plaid?.tileM ?? "GreenAreaSize / 25"} m, not ${NSS_PLAID_TILE_M})`;
+    else if ((opt.art === "nss" || opt.art === "sr") && e.plaid?.tileM !== NSS_PLAID_TILE_M) why = `rendered before the plaid fix (plaid tile ${e.plaid?.tileM ?? "GreenAreaSize / 25"} m, not ${NSS_PLAID_TILE_M})`;
     else if (m.scale !== s || m.width !== MAP_W * s || m.height !== MAP_H * s) why = `index.json says ${m.width}x${m.height} at ${m.scale}x, not ${MAP_W * s}x${MAP_H * s} at ${s}x`;
     const img = why ? null : loadImage(png);
     if (img && (img.width !== MAP_W * s || img.height !== MAP_H * s)) why = `the PNG is ${img.width}x${img.height}, not ${MAP_W * s}x${MAP_H * s}`;
@@ -215,7 +221,7 @@ for (const [file, buf] of files) writeFileSync(join(OUT, file), buf);
 for (const f of readdirSync(OUT)) if (/^h\d\d-\d+x\.jpg$/.test(f) && !files.has(f) && !keep.has(f)) { rmSync(join(OUT, f)); console.log(`removed ${rel(join(OUT, f))} (not in the index)`); }
 const scales = [...opt.scales, ...kept.filter((s) => Object.values(holes).some((h) => h[s]))].sort((a, b) => a - b);
 const index = {
-  _note: `Hole maps at more than the 2x of the bundle (src/maps.js, 500x608), written by tools/build-map-scales.mjs from ${opt.art === "nss" ? "the renders of NSS's own minimap (tools/render-nss-maps.py: the game's baked capture textures through its layout shaders)" : "the renders of WSR's own minimap model (tools/render-maps.mjs --scale s)"}: the same 250x304 map frame at s px per map px, so every fractional position in derived.json and the app's state places the same on any scale. art: whose minimap. holes[n][s] = the JPEG (file, relative to this index), its size in px, bytes and SHA-1; a hole or scale missing here has no file, and the app shows the 2x bundle image. quality: the JPEG quality per scale.`,
+  _note: `Hole maps at more than the 2x of the bundle (src/maps.js, 500x608), written by tools/build-map-scales.mjs from ${opt.art === "sr" ? "the renders of Switch Sports Resort's own minimap (tools/render-nss-maps.py: the game's baked capture textures through its layout shaders), SR's hole numbers 1-27" : opt.art === "nss" ? "the renders of NSS's own minimap (tools/render-nss-maps.py: the game's baked capture textures through its layout shaders)" : "the renders of WSR's own minimap model (tools/render-maps.mjs --scale s)"}: the same 250x304 map frame at s px per map px, so every fractional position in derived.json and the app's state places the same on any scale. art: whose minimap. holes[n][s] = the JPEG (file, relative to this index), its size in px, bytes and SHA-1; a hole or scale missing here has no file, and the app shows the 2x bundle image. quality: the JPEG quality per scale.`,
   art: opt.art,
   scales,
   quality: Object.fromEntries(scales.map((s) => [s, opt.scales.includes(s) ? opt.q[s] : prev.quality?.[s]])),
@@ -224,5 +230,5 @@ const index = {
 };
 writeFileSync(join(OUT, "index.json"), JSON.stringify(index, null, 1) + "\n");
 const kb = (v) => `${(v / 1024).toFixed(0)} KB`;
-console.log(`wrote ${rel(OUT)}: ${opt.scales.map((s) => `${s}x ${tot[s].n} of 21 holes, ${kb(tot[s].bytes)} (gzip ${kb(tot[s].gz)}), q${opt.q[s]}`).join("; ")}${refused.length ? `; ${refused.length} refused (above)` : ""}${scales.length > opt.scales.length ? `; ${scales.filter((s) => !opt.scales.includes(s)).map((s) => `${s}x`).join(", ")} kept from index.json` : ""}`);
+console.log(`wrote ${rel(OUT)}: ${opt.scales.map((s) => `${s}x ${tot[s].n} of ${NHOLES} holes, ${kb(tot[s].bytes)} (gzip ${kb(tot[s].gz)}), q${opt.q[s]}`).join("; ")}${refused.length ? `; ${refused.length} refused (above)` : ""}${scales.length > opt.scales.length ? `; ${scales.filter((s) => !opt.scales.includes(s)).map((s) => `${s}x`).join(", ")} kept from index.json` : ""}`);
 if (refused.length) process.exitCode = 1;

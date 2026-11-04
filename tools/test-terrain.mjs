@@ -1,4 +1,8 @@
 // node tools/test-terrain.mjs [repoRoot]
+// The holes are Switch Sports Resort's 27 (src/srMigrate.js; the terrain and the green truth are built from its collision, with no
+// separate water actor: H3's sea is in the field mesh). The WSR / NSS references below (wsr-pins.json, wsr-truth.json, the WSR terrain
+// at WSR_TERRAIN_REV, the tee-above-green table, the known spots, the trunks) are of the NSS hole nssHoleOf(n) (SR 24, 23, 25 are
+// NSS 19, 20, 21) and, where SR's map frame differs (SR 17, SR 23), taken through it; SR's six new holes (19-22, 26, 27) have none.
 // Acceptance for the course terrain (tools/build-terrain.mjs -> public/terrain,
 // read through src/terrain.js), built from NSS's own collision by ray casts,
 // and for its green truth (tools/nss-truth.mjs -> tools/nss-truth.json). Runs
@@ -42,7 +46,8 @@
 //     a neighbour steeper than PIT_STEP
 //  6c. the greens against the WSR grids public/terrain shipped before the NSS
 //     swap (git show WSR_TERRAIN_REV, skipped without git): at every WSR mask
-//     node whose NSS read lies inside the NSS mask, within 0.03 yd
+//     node whose NSS read lies inside the NSS mask, within 0.03 yd (SR 10 within 0.07 and SR 13 within 0.035: SR re-cut
+//     those greens, a few rays up to 60 mm from NSS's heights, lab/r6work/sr/wire/exports/green-diff.txt)
 //  7. derived.json's trees: NSS's (tools/nss-trees.json, in order): x, y, z,
 //     kind, size, sy, off, r, dx, dy and col as the file has them
 //  8. lieOf, and the loaders through a fetch stand-in (one fetch per file,
@@ -57,9 +62,9 @@
 //     centre ray's class among them
 // 11. build-terrain on a synthetic one-hole dump written to a temp dir (runs
 //     anywhere): a green with a cup and its closing cover builds; a cover
-//     sunk under the cup (the cup left open), no cover at all, and H3 without
-//     its water actor are refused (exit 1) with nothing written, and
-//     --allow-missing water builds that last one with `missing` in index.json
+//     sunk under the cup (the cup left open) and no cover at all are refused
+//     (exit 1) with nothing written; SR's H3 has no water actor (its sea is in the field
+//     mesh: the synthetic pond is a field quad), so there is no actor to miss
 import { readFileSync, writeFileSync, existsSync, mkdtempSync, readdirSync, rmSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -68,6 +73,8 @@ import { execFileSync, spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 const root = process.argv[2] ?? join(dirname(fileURLToPath(import.meta.url)), "..");
 const T = await import(pathToFileURL(join(root, "src/terrain.js")).href);
+const SRM = await import(pathToFileURL(join(root, "src/srMigrate.js")).href);
+const HOLES = 27, wsrOf = (n) => SRM.nssHoleOf(n), fxp = (n, x, y) => SRM.toSrFrame(n, x, y);   // SR's 27; a hole's WSR / NSS hole; a point of NSS's frame in SR's
 // ray casting, as tools/lib/minimap.mjs pointInPoly (inlined: that module pulls in the image codecs)
 const pointInPoly = (poly, x, y) => {
   let inside = false;
@@ -78,7 +85,7 @@ const pointInPoly = (poly, x, y) => {
   return inside;
 };
 const DIR = join(root, "public/terrain");
-const COLLISION = join(root, "tools/harness/state/eden/nss-golf-x/collision");
+const COLLISION = join(root, "tools/harness/state/eden/sr-golf-x/collision");
 // the last commit whose public/terrain is WSR's (the KCL rasters)
 const WSR_TERRAIN_REV = "9b89649";
 const readJson = (p) => JSON.parse(readFileSync(join(root, p), "utf8"));
@@ -114,28 +121,27 @@ const KNOWN = [
   [12, "OB over WSR's rough strip above that pond: NSS OB, with water at its edge", 140, 257, 154, 266, { 4: 21, 7: 9 }],
   [12, "OB over a WSR rough polygon: NSS OB and rock", 109, 114, 118, 120, { 4: 11, 12: 2 }],
   [6, "OB over a WSR rough triangle: NSS OB", 84, 192, 94, 202, { 4: 25 }],
-  [3, "OB over WSR's sea plane, right edge: NSS OB", 214, 0, 236, 140, { 4: 770 }],
-  [3, "OB over WSR's sea plane, top-left coast: NSS OB and the sea (the water actor)", 55, 0, 93, 28, { 4: 120, 7: 130 }],
+  [3, "OB and rock over WSR's sea plane, right edge: SR OB 628, rock 142 (NSS read OB on all 770)", 214, 0, 236, 140, { 4: 620, 12: 140 }],
+  [3, "OB, the sea and rock over WSR's sea plane, top-left coast: SR OB 135, water 119, rock 26 (NSS 135 / 145 from the water actor)", 55, 0, 93, 28, { 4: 130, 7: 115, 12: 20 }],
   [5, "OB over WSR's sea plane, bottom edge: NSS OB and the sea", 0, 290, 249, 303, { 4: 430, 7: 360 }],
   [7, "OB over WSR's sea plane, top edge (west): NSS OB and the sea", 20, 0, 40, 17, { 4: 34, 7: 47 }],
   [7, "OB over WSR's sea plane, top edge (east): NSS OB and the sea", 189, 0, 216, 17, { 4: 78, 7: 35 }],
-  [21, "OB over WSR's sea plane, bottom-left: NSS OB and the sea", 41, 207, 72, 303, { 4: 370, 7: 330 }],
-  [19, "beach sand over WSR's water plane: NSS water", 0, 266, 56, 303, { 7: 532 }],
-  [17, "OB over a WSR sand sliver: NSS OB and rock", 217, 57, 225, 70, { 4: 27, 12: 4 }],
+  [25, "OB over WSR's sea plane, bottom-left: SR OB (NSS 21 read 413 OB and 371 water here)", 41, 207, 72, 303, { 4: 780 }],   // (NSS 21)
+  [24, "beach sand over WSR's water plane: NSS water", 0, 266, 56, 303, { 7: 532 }],   // (NSS 19)
   [9, "rough over a 7x3 px WSR sand patch behind the tee: NSS rough", 99, 280, 105, 282, { 2: 4 }],
   [12, "a pond where WSR's KCL had nodata (map-style.json: pond): NSS water, rough at its edge, rock", 154, 236, 171, 266, { 7: 90, 2: 20, 12: 9 }],
 ];
 // on-course WSR trunks (wsr-pins.json trees, by index) NSS puts on other
 // ground than the lie WSR's KCL gave them: [hole, tree index, WSR lie, NSS class]
-const TRUNKS = [[1, 28, "rough", 12], [4, 0, "rough", 4], [4, 4, "rough", 4], [7, 61, "rough", 4], [7, 66, "rough", 4], [20, 4, "rough", 4]];
+const TRUNKS = [[1, 28, "rough", 12], [4, 0, "rough", 4], [4, 4, "rough", 4], [7, 61, "rough", 4], [7, 66, "rough", 4], [23, 4, "rough", 4]];   // (by SR hole; 23 is NSS 20's: asserted on holes 1-18 only)
 const LIE_CLASS = { fairway: 1, rough: 2, sand: 3, outer: 4, green: 6, water: 7, fringe: 9 };
 
 ok(index.source === "nss", `index.json source ${index.source}, expected "nss"`);
 const terr = {}, green = {};
 let rawBytes = 0, worstTee = 0, worstDatum = 0, cupsOn = 0, cupsAll = 0;
 const trunkOff = [];
-for (let n = 1; n <= 21; n++) {
-  const e = index.holes[n];
+for (let n = 1; n <= HOLES; n++) {
+  const e = index.holes[n], wn = wsrOf(n);
   ok(e, `H${n} missing from index.json`);
   if (!e) continue;
   const tb = readFileSync(join(DIR, e.file)), gb = readFileSync(join(DIR, e.green.file));
@@ -149,41 +155,49 @@ for (let n = 1; n <= 21; n++) {
   const cs = nssPins.source?.collisionSha1?.[n];
   ok(cs && e.collisionSha1?.field === cs.field && e.collisionSha1?.covers === cs.covers, `H${n} terrain built from another field mesh / covers than tools/nss-pins.json`);
   ok(Math.abs(e.datumY - reg[n].originMeshY) < 1e-6, `H${n} datum ${e.datumY} is not the registration's originMeshY ${reg[n].originMeshY}`);
-  const dd = Math.abs(e.datumY - pins[n].starts[0].mesh[1]);
-  worstDatum = Math.max(worstDatum, dd);
-  ok(dd <= 0.12 + 1e-9 && e.datumWsrMeshY === pins[n].starts[0].mesh[1], `H${n} datum ${e.datumY} u, the WSR start ${pins[n].starts[0].mesh[1]} u`);
+  if (wn != null) {   // (SR's new holes have no WSR start)
+    const dd = Math.abs(e.datumY - pins[wn].starts[0].mesh[1]);
+    worstDatum = Math.max(worstDatum, dd);
+    ok(dd <= 0.12 + 1e-9 && e.datumWsrMeshY === pins[wn].starts[0].mesh[1], `H${n} datum ${e.datumY} u, the WSR start ${pins[wn].starts[0].mesh[1]} u`);
+  }
   // 2. tee above the green's mean height, m
   const drop = -g.z0Yd * M_PER_YD;
-  ok(Math.abs(drop - TEE_ABOVE_GREEN_M[n]) <= 1, `H${n} tee above green ${drop.toFixed(2)} m, mesh ${TEE_ABOVE_GREEN_M[n]} m`);
+  if (wn != null) ok(Math.abs(drop - TEE_ABOVE_GREEN_M[wn]) <= 1, `H${n} tee above green ${drop.toFixed(2)} m, mesh ${TEE_ABOVE_GREEN_M[wn]} m`);
   const mean = (() => { let s = 0, k = 0; for (let i = 0; i < g.w * g.h; i++) if (g.mask[i]) { s += g.data[i]; k++; } return (s / k) * g.unitYd; })();
   ok(Math.abs(mean) < 0.001, `H${n} green heights are not centred on z0Yd (mean ${mean.toFixed(4)} yd)`);
   // 3. the tee points
   const tees = nssPins.holes[n].tees;
   ok(derived[n].tee && Math.abs(derived[n].tee.x - tees.teeObj.x) < 1e-4 && Math.abs(derived[n].tee.y - tees.teeObj.y) < 1e-4, `H${n} derived.json tee is not GlfTeeOBJ (tools/nss-pins.json tees.teeObj)`);
   for (const k of ["wsrStart", "rotateObj", "teeObj"]) {
-    const p = tees[k], h0 = T.heightAt(t, p.x, p.y), c0 = T.classAt(t, p.x, p.y);
-    if (h0 != null) worstTee = Math.max(worstTee, Math.abs(h0));
-    ok(h0 != null && Math.abs(h0) <= 0.05, `H${n} heightAt(${k}) = ${h0} yd, expected 0`);
+    const p = tees[k];
+    if (!p || (n === 23 && k === "wsrStart")) continue;   // (no WSR start on SR's new holes; SR 23's is NSS 20's old tee, the area rebuilt)
+    const h0 = T.heightAt(t, p.x, p.y), c0 = T.classAt(t, p.x, p.y), y0 = n === 23 ? 10 / M_PER_YD : 0;   // (SR 23's tee platform stands 10 m up)
+    if (h0 != null) worstTee = Math.max(worstTee, Math.abs(h0 - y0));
+    ok(h0 != null && Math.abs(h0 - y0) <= 0.05, `H${n} heightAt(${k}) = ${h0} yd, expected ${y0.toFixed(3)}`);
     ok(c0 === 1, `H${n} class at ${k} ${c0}, expected 1 (fairway / tee pad)`);
   }
   // 4. cups, derived.json's NSS pins, trunks
   for (const c of nssPins.holes[n].cups) { cupsAll++; const cl = T.classAt(t, c.x, c.y); if (cl === 6) cupsOn++; else ok(false, `H${n} cup ${c.k} on class ${cl}, not green`); }
   const dPins = (derived[n].pins ?? []).filter((p) => p.src === "nss");
   ok(dPins.every((p) => T.classAt(t, p.x, p.y) === 6), `H${n} derived.json NSS pin off the green: ${dPins.filter((p) => T.classAt(t, p.x, p.y) !== 6).map((p) => p.id).join(", ")}`);
-  pins[n].trees.forEach((tr, i) => {
-    if (!((tr.lie === "rough" || tr.lie === "fairway") && tr.x >= 0 && tr.x < 1 && tr.y >= 0 && tr.y < 1)) return;
-    const c = T.classAt(t, tr.x, tr.y);
+  (pins[wn]?.trees ?? []).forEach((tr, i) => {
+    const [tx, ty] = fxp(n, tr.x, tr.y);   // (WSR's map point is NSS's frame's)
+    if (!((tr.lie === "rough" || tr.lie === "fairway") && tx >= 0 && tx < 1 && ty >= 0 && ty < 1)) return;
+    const c = T.classAt(t, tx, ty);
     if (c !== LIE_CLASS[tr.lie]) trunkOff.push([n, i, tr.lie, c]);
   });
 }
 const trunkKey = (a) => a.join(":");
-ok(trunkKey(trunkOff.map(trunkKey)) === trunkKey(TRUNKS.map(trunkKey)), `on-course trunks on another class than their WSR lie: ${trunkOff.map(([n, i, l, c]) => `H${n} #${i} ${l}->${c}`).join(", ")}, expected ${TRUNKS.map(([n, i, l, c]) => `H${n} #${i} ${l}->${c}`).join(", ")}`);
+// asserted on SR 1-18 (NSS's holes, the same geometry); SR 23-25 (NSS 20, 19, 21: a rebuilt back, re-cut green edges, extra leaf domes) are printed
+const trunkNss = trunkOff.filter(([n]) => n <= 18), trunkRest = trunkOff.filter(([n]) => n > 18);
+ok(trunkKey(trunkNss.map(trunkKey)) === trunkKey(TRUNKS.filter(([n]) => n <= 18).map(trunkKey)), `on-course trunks on another class than their WSR lie: ${trunkNss.map(([n, i, l, c]) => `H${n} #${i} ${l}->${c}`).join(", ")}, expected ${TRUNKS.filter(([n]) => n <= 18).map(([n, i, l, c]) => `H${n} #${i} ${l}->${c}`).join(", ")}`);
+if (trunkRest.length || TRUNKS.some(([n]) => n > 18)) console.log(`on-course WSR trunks on another class than their lie on SR 23-25 (not asserted): ${trunkRest.map(([n, i, l, c]) => `H${n} #${i} ${l}->${c}`).join(", ") || "none"}; NSS 20's was ${TRUNKS.filter(([n]) => n > 18).map(([n, i, l, c]) => `H${n} #${i} ${l}->${c}`).join(", ")}`);
 const treesOn = Object.values(pins).reduce((s, h) => s + h.trees.filter((tr) => (tr.lie === "rough" || tr.lie === "fairway") && tr.x >= 0 && tr.x < 1 && tr.y >= 0 && tr.y < 1).length, 0);
 const dNss = Object.values(derived).reduce((s, d) => s + (d.pins ?? []).filter((p) => p.src === "nss").length, 0);
-ok(cupsAll === 126 && cupsOn === 126, `${cupsOn} of ${cupsAll} NSS cups on the green, expected 126`);
+ok(cupsAll === 6 * HOLES && cupsOn === 6 * HOLES, `${cupsOn} of ${cupsAll} cups on the green, expected ${6 * HOLES}`);
 console.log(`files: ${Object.keys(terr).length} terrain + ${Object.keys(green).length} green grids, ${(rawBytes / 1024).toFixed(0)} KB; datum within ${worstDatum.toFixed(2)} u of the WSR start; the WSR start, Glf_RotateOBJ and GlfTeeOBJ fairway at |h| <= ${worstTee.toFixed(3)} yd; ${cupsOn} of ${cupsAll} NSS cups on the green (derived.json ships ${dNss} NSS pins); ${treesOn - trunkOff.length} of ${treesOn} on-course trunks on their WSR lie, ${trunkOff.length} on other NSS ground (${trunkOff.map(([n, i, l, c]) => `H${n} #${i} ${l}->${c}`).join(", ")})`);
-console.log("tee above the green's mean, m (shipped / WSR mesh): " + Array.from({ length: 21 }, (_, i) => `H${i + 1} ${(-green[i + 1].z0Yd * M_PER_YD).toFixed(1)}/${TEE_ABOVE_GREEN_M[i + 1]}`).join(" "));
-console.log("no ground (class 0 / no height): " + Array.from({ length: 21 }, (_, i) => i + 1).filter((n) => index.holes[n].noHeight || index.holes[n].classes[0]).map((n) => `H${n} ${index.holes[n].classes[0] ?? 0}/${index.holes[n].noHeight}`).join(" "));
+console.log("tee above the green's mean, m (shipped / WSR mesh): " + Array.from({ length: HOLES }, (_, i) => `H${i + 1} ${(-green[i + 1].z0Yd * M_PER_YD).toFixed(1)}/${TEE_ABOVE_GREEN_M[wsrOf(i + 1)] ?? "-"}`).join(" "));
+console.log("no ground (class 0 / no height): " + Array.from({ length: HOLES }, (_, i) => i + 1).filter((n) => index.holes[n].noHeight || index.holes[n].classes[0]).map((n) => `H${n} ${index.holes[n].classes[0] ?? 0}/${index.holes[n].noHeight}`).join(" "));
 
 // 5. the known spots, by the samples whose centre lies in the box
 for (const [n, what, x0, y0, x1, y1, want] of KNOWN) {
@@ -197,9 +211,9 @@ for (const [n, what, x0, y0, x1, y1, want] of KNOWN) {
   for (const [c, min] of Object.entries(want)) ok((got[c] ?? 0) >= min, `H${n} ${what}: ${got[c] ?? 0} of ${all} samples class ${c}, expected at least ${min}`);
   console.log(`known: H${n} ${what} (x${x0}-${x1} y${y0}-${y1}): ${Object.entries(got).map(([c, k]) => `class ${c} ${k}`).join(", ")} of ${all}`);
 }
-// H3's sea is its own actor (Object_BGOBJ_GolfCourse03Water), not in the
-// field mesh, whose sea floor is sand OB: the terrain reads the water over it
-ok(index.holes[3].collisionSha1?.water && (index.holes[3].classes[7] ?? 0) >= 5000 && !index.holes[3].classes[17] && index.holes[3].missing == null, `H3: the sea (water actor ${index.holes[3].collisionSha1?.water ? "read" : "missing"}) on ${index.holes[3].classes[7] ?? 0} samples, sand OB on ${index.holes[3].classes[17] ?? 0}${index.holes[3].missing ? `, built without ${index.holes[3].missing.join(", ")}` : ""}`);
+// H3's sea: NSS had it as its own actor (Object_BGOBJ_GolfCourse03Water) over a sand OB sea floor in the field mesh; SR's is in the field mesh
+// itself (no water extra anywhere): the terrain reads it as water on thousands of samples
+ok((index.holes[3].classes[7] ?? 0) >= 5000 && index.holes[3].collisionSha1?.water == null && index.holes[3].missing == null, `H3: the sea (in the field mesh, no water actor) on ${index.holes[3].classes[7] ?? 0} samples, sand OB on ${index.holes[3].classes[17] ?? 0}, water sha ${index.holes[3].collisionSha1?.water ?? "none"}`);
 ok(Object.values(index.holes).every((e) => e.missing == null), `index.json lists actors a hole was built without (--allow-missing): ${Object.entries(index.holes).filter(([, e]) => e.missing).map(([n, e]) => `H${n} ${e.missing.join(", ")}`).join("; ")}`);
 // H13's sea: NSS's field mesh carries it as one GolfWaterhazard plane at y
 // -139.9 m, -153.0 yd under the tee, the foot of the cliffs round the island
@@ -225,21 +239,23 @@ ok(Object.values(index.holes).every((e) => e.missing == null), `index.json lists
 {
   const det = (r) => Math.sqrt(r.a * r.a + r.b * r.b);
   const boxOff = [], slopeD = [];
-  for (let n = 1; n <= 21; n++) {
-    const tr = truth[n], w = wsrTruth[n];
-    ok(tr.meshId === index.holes[n].meshId && tr.meshId === `Fld_GolfCourse${nn(n)}`, `H${n} nss-truth meshId ${tr.meshId}`);
+  for (let n = 1; n <= HOLES; n++) {
+    const tr = truth[n], w = wsrTruth[wsrOf(n)];
+    ok(tr.meshId === index.holes[n].meshId && tr.meshId.includes(`Course${nn(n)}`), `H${n} nss-truth meshId ${tr.meshId}`);   // (NSS: Fld_GolfCourseNN; SR: Shape_Fld_Glf_CourseNN_Col)
     ok(Math.abs(tr.scale - 1 / (det(reg[n]) * M_PER_YD)) < 1e-6, `H${n} nss-truth scale ${tr.scale} is not the registration's yd per map px`);
     const out = nssPins.holes[n].cups.filter((c) => !pointInPoly(tr.greenPoly, c.x, c.y));
     ok(!out.length, `H${n} cup(s) ${out.map((c) => c.k).join(", ")} outside nss-truth's green outline`);
-    const off = Math.max(...["x0", "x1"].map((k) => Math.abs(tr.greenBox[k] - w.greenBox[k]) * MAP_W), ...["y0", "y1"].map((k) => Math.abs(tr.greenBox[k] - w.greenBox[k]) * MAP_H));
+    if (!w) { slopeD.push(`H${n} new->${tr.slopeMaxPct}`); continue; }   // (SR's new holes have no WSR truth)
+    const [wx0, wy0] = fxp(n, w.greenBox.x0, w.greenBox.y0), [wx1, wy1] = fxp(n, w.greenBox.x1, w.greenBox.y1);   // (wsr-truth's box is NSS's frame's)
+    const off = Math.max(Math.abs(tr.greenBox.x0 - wx0) * MAP_W, Math.abs(tr.greenBox.x1 - wx1) * MAP_W, Math.abs(tr.greenBox.y0 - wy0) * MAP_H, Math.abs(tr.greenBox.y1 - wy1) * MAP_H);
     ok(off <= 1, `H${n} nss-truth green box ${off.toFixed(2)} px from wsr-truth's`);
     boxOff.push(`H${n} ${off.toFixed(2)}`);
     slopeD.push(`H${n} ${w.slopeMaxPct}->${tr.slopeMaxPct}`);
   }
-  console.log(`nss-truth: scales from the registration, all 126 cups inside the outlines; green box against wsr-truth's, worst edge in px: ${boxOff.join(" ")}`);
+  console.log(`nss-truth: scales from the registration, all ${6 * HOLES} cups inside the outlines; green box against wsr-truth's, worst edge in px: ${boxOff.join(" ")}`);
   console.log(`slopeMaxPct, wsr-truth -> nss-truth: ${slopeD.join(" ")}`);
 }
-for (let n = 1; n <= 21; n++) {
+for (let n = 1; n <= HOLES; n++) {
   const g = green[n], tr = truth[n], b = tr.greenBox, N = 9, S = 12;
   const cellH = Array.from({ length: N }, () => new Array(N).fill(null));
   for (let gy = 0; gy < N; gy++) for (let gx = 0; gx < N; gx++) {
@@ -272,8 +288,9 @@ for (let n = 1; n <= 21; n++) {
   const mT = len(...sumT), mG = len(...sumG);
   const mA = Math.abs(((Math.atan2(sumG[1], sumG[0]) - Math.atan2(sumT[1], sumT[0]) + 3 * Math.PI) % (2 * Math.PI)) - Math.PI) * 180 / Math.PI;
   ok(agree >= 0.95 * cmp, `H${n} green slope cells agreeing with gridPct: ${agree} of ${cmp}`);
-  ok(Math.abs(mG / mT - 1) <= 0.1 && mA <= 5, `H${n} the green's mean slope differs from gridPct's (x${(mG / mT).toFixed(2)}, ${mA.toFixed(1)} deg)`);
-  if ([7, 12, 21].includes(n) || agree < cmp) console.log(`slopes: H${n} ${agree} of ${cmp} cells (>= 1%) within 20 deg and 20% of gridPct (worst ${worst.toFixed(1)} deg); the green's mean slope x${(mG / mT).toFixed(3)} at ${mA.toFixed(1)} deg`);
+  ok(Math.abs(mG / mT - 1) <= 0.1 && mA <= (mT < 60 ? 15 : 5),   // (the net slope of SR's H14 is weak, 39: its direction 13.9 deg apart; every other green within 2 deg)
+     `H${n} the green's mean slope differs from gridPct's (x${(mG / mT).toFixed(2)}, ${mA.toFixed(1)} deg)`);
+  if ([7, 12, 25].includes(n) || agree < cmp) console.log(`slopes: H${n} ${agree} of ${cmp} cells (>= 1%) within 20 deg and 20% of gridPct (worst ${worst.toFixed(1)} deg); the green's mean slope x${(mG / mT).toFixed(3)} at ${mA.toFixed(1)} deg`);
   // the two grids agree where both reach: the coarse grid at the green centre
   const [gcx, gcy] = tr.greenCentre, dh = T.heightAt(terr[n], gcx, gcy) - T.greenHeightAt(g, gcx, gcy);
   ok(Math.abs(dh) <= 0.3, `H${n} terrain and green grid differ by ${dh.toFixed(2)} yd at the green centre`);
@@ -294,7 +311,7 @@ for (let n = 1; n <= 21; n++) {
     return len(ax + t * dx - px, ay + t * dy - py);
   };
   let dev = 0, devAt = "", step = 0, stepAt = "", inW = 0, inAt = "", outW = 0, outAt = "";
-  for (let n = 1; n <= 21; n++) {
+  for (let n = 1; n <= HOLES; n++) {
     const g = green[n], e = index.holes[n].green, poly = truth[n].greenPoly, sc = truth[n].scale, tol = 0.25 * sc + 0.05;
     const distYd = (fx, fy) => { let d = Infinity; for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) d = Math.min(d, segD(fx * MAP_W, fy * MAP_H, poly[j][0] * MAP_W, poly[j][1] * MAP_H, poly[i][0] * MAP_W, poly[i][1] * MAP_H)); return d * sc; };
     let inMask = 0;
@@ -337,12 +354,13 @@ for (let n = 1; n <= 21; n++) {
   else {
     const row = [];
     let all = 0, worst = 0, worstAt = "";
-    for (let n = 1; n <= 21; n++) {
-      const og = wsrG[n - 1], ng = green[n], d = [];
+    for (let n = 1; n <= HOLES; n++) {
+      if (wsrOf(n) == null) continue;   // (SR's new holes: no WSR green)
+      const og = wsrG[wsrOf(n) - 1], ng = green[n], d = [];
       for (let j = 0; j < og.h; j++) for (let i = 0; i < og.w; i++) {
         const k = j * og.w + i;
         if (!og.mask[k]) continue;
-        const fx = og.box.x0 + (i / (og.w - 1)) * (og.box.x1 - og.box.x0), fy = og.box.y0 + (j / (og.h - 1)) * (og.box.y1 - og.box.y0);
+        const [fx, fy] = fxp(n, og.box.x0 + (i / (og.w - 1)) * (og.box.x1 - og.box.x0), og.box.y0 + (j / (og.h - 1)) * (og.box.y1 - og.box.y0));   // (WSR's node, in SR's frame)
         const u = ((fx - ng.box.x0) / (ng.box.x1 - ng.box.x0)) * (ng.w - 1), v = ((fy - ng.box.y0) / (ng.box.y1 - ng.box.y0)) * (ng.h - 1);
         if (!(u >= 0 && v >= 0 && u <= ng.w - 1 && v <= ng.h - 1)) continue;
         const i0 = Math.min(ng.w - 2, Math.floor(u)), j0 = Math.min(ng.h - 2, Math.floor(v));
@@ -351,7 +369,8 @@ for (let n = 1; n <= 21; n++) {
       }
       d.sort((a, b) => a - b);
       const mx = d[d.length - 1] ?? Infinity;
-      ok(d.length > 1000 && mx <= 0.03, `H${n} NSS green against WSR's at ${d.length} nodes: up to ${mx.toFixed(3)} yd`);
+      const tol = { 10: 0.07, 13: 0.035 }[n] ?? 0.03;   // (SR's re-cut greens, above)
+      ok(d.length > 1000 && mx <= tol, `H${n} green against WSR's at ${d.length} nodes: up to ${mx.toFixed(3)} yd (at most ${tol})`);
       if (mx > worst) { worst = mx; worstAt = `H${n}`; }
       all += d.length;
       row.push(`H${n} ${d[Math.floor(d.length / 2)]?.toFixed(3)}/${mx.toFixed(3)}`);
@@ -364,7 +383,7 @@ for (let n = 1; n <= 21; n++) {
 {
   let n0 = 0; const dz = [];
   const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
-  for (let n = 1; n <= 21; n++) {
+  for (let n = 1; n <= HOLES; n++) {
     const src = nssTrees[n]?.trees ?? [], d = derived[n].trees ?? [];
     ok(src.length === d.length, `H${n} derived.json has ${d.length} trees, tools/nss-trees.json ${src.length}`);
     d.forEach((t, k) => {
@@ -424,13 +443,15 @@ if (existsSync(join(COLLISION, "h01.json"))) {
   const { loadCollision, gridIndex, topGround } = await import(pathToFileURL(join(root, "tools/lib/nsscol.mjs")).href);
   const { mapToNss } = await import(pathToFileURL(join(root, "tools/lib/nssreg.mjs")).href);
   let worstY = 0, coverHits = 0;
-  for (let n = 1; n <= 21; n++) {
-    const mesh = loadCollision(COLLISION, n, { covers: true, extras: n === 3 ? ["water"] : [] });
-    const idx = gridIndex(mesh, 4);
+  for (let n = 1; n <= HOLES; n++) {
+    const mesh = loadCollision(COLLISION, n, { covers: true, extras: [] });
+    const cn = [[0, 0], [1, 0], [0, 1], [1, 1]].map(([fx, fy]) => mapToNss(reg[n], fx, fy));
+    const idx = gridIndex(mesh, 4, { bbox: [Math.min(...cn.map((c) => c[0])) - 25, Math.min(...cn.map((c) => c[1])) - 25, Math.max(...cn.map((c) => c[0])) + 25, Math.max(...cn.map((c) => c[1])) + 25] });
     for (const k of ["wsrStart", "rotateObj", "teeObj"]) {
-      const w = nssPins.holes[n].tees[k].world, hit = topGround(idx, w[0], w[2]);
-      ok(hit && hit.code === 5 && Math.abs(hit.y) < 1e-6, `H${n} the collision under ${k}: ${hit ? `code ${hit.code} at ${hit.y.toFixed(4)} m` : "nothing"}`);
-      if (hit) worstY = Math.max(worstY, Math.abs(hit.y));
+      if (!nssPins.holes[n].tees[k] || (n === 23 && k === "wsrStart")) continue;   // (no WSR start on SR's new holes; SR 23's is NSS 20's old tee, rebuilt)
+      const y0 = n === 23 ? 10 : 0, w = nssPins.holes[n].tees[k].world, hit = topGround(idx, w[0], w[2]);
+      ok(hit && hit.code === 5 && Math.abs(hit.y - y0) < 1e-6, `H${n} the collision under ${k}: ${hit ? `code ${hit.code} at ${hit.y.toFixed(4)} m` : "nothing"}, expected ${y0} m fairway`);
+      if (hit) worstY = Math.max(worstY, Math.abs(hit.y - y0));
     }
     const covers = new Map(mesh.covers.map((c) => [c.k, c]));
     for (const c of nssPins.holes[n].cups) {
@@ -440,7 +461,7 @@ if (existsSync(join(COLLISION, "h01.json"))) {
       if (onCover) coverHits++;
     }
   }
-  console.log(`collision: the WSR start, Glf_RotateOBJ and GlfTeeOBJ on GolfFairway within ${worstY.toExponential(1)} m of y 0 on all 21 holes; ${coverHits} of 126 cups under their own cover`);
+  console.log(`collision: the WSR start, Glf_RotateOBJ and GlfTeeOBJ on GolfFairway within ${worstY.toExponential(1)} m of y 0 (SR 23's tee platform: of its 10 m) on all ${HOLES} holes; ${coverHits} of ${6 * HOLES} cups under their own cover`);
 } else console.log(`determinism and collision: skipped (no ${COLLISION} here)`);
 function eqList(a, b) { return a.length === b.length && a.every((v, i) => v === b[i]); }
 
@@ -470,11 +491,10 @@ function eqList(a, b) { return a.length === b.length && a.every((v, i) => v === 
   console.log(`classVote: ${cases.length} synthetic vote vectors`);
 }
 
-// 11. build-terrain on a synthetic dump: one hole (3, the hole with a
-// separate water actor), 1 map px = 1 m (x = px - 125, z = py - 152), a flat
+// 11. build-terrain on a synthetic dump: one hole (3), 1 map px = 1 m (x = px - 125, z = py - 152), a flat
 // green ring at y 0 over x, z in [-50, 50] round a cup opening 1.2 m square
 // at the origin, the cup's bottom (GolfCup 31) 0.30 m down, fairway south of
-// the green, the water actor a pond at y -2 m east of it
+// the green, a pond at y -2 m east of it (part of the field mesh: SR has no water actor)
 {
   const dir = mkdtempSync(join(tmpdir(), "terrain-synth-"));
   try {
@@ -500,34 +520,31 @@ function eqList(a, b) { return a.length === b.length && a.every((v, i) => v === 
     for (let i = 0; i < 4; i++) { const j = (i + 1) % 4; field.T.push(i, j, 4 + j, i, 4 + j, 4 + i); field.S.push(18, 18); }
     quad(field, -R, -R, R, R, -0.3, 31);
     quad(field, -50, 50, 50, 120, 0, 5);
+    quad(field, 60, -20, 90, 20, -2, 8);   // the pond, a field quad (SR's water is in the field mesh)
     const fieldPart = part(field.V, field.T, field.S);
-    const water = { V: [], T: [], S: [] };
-    quad(water, 60, -20, 90, 20, -2, 8);
-    const waterPart = part(water.V, water.T, water.S);
     W("truth.json", { holes: { 3: { greenBox: { x0: 0.44, y0: 0.45, x1: 0.56, y1: 0.55 }, scale: 1 / M_PER_YD } } });
     W("reg.json", { holes: { 3: { a: 1, b: 0, tx: 125, ty: 152, unitsPerM: 10, originMesh: [0, 0], originMeshY: 150 } } });
     W("pins.json", { holes: { 3: { tees: { wsrStart: { mesh: [0, 150, 0] } } } } });
-    const dump = ({ cover, water: withWater }) => {
+    const dump = ({ cover }) => {
       for (const f of readdirSync(dir)) if (/^h03/.test(f) || f === "out") rmSync(join(dir, f), { recursive: true, force: true });
       const cv = { V: [], T: [], S: [] };
       if (cover != null) quad(cv, -R, -R, R, R, cover, 18);
       const coverPart = part(cv.V, cv.T, cv.S);
       W("h03.bin", fieldPart.buf); W("h03-covers.bin", coverPart.buf);
       W("h03.json", { shape: "Fld_Synthetic03", hole: 3, layout: fieldPart.layout, binBytes: fieldPart.binBytes, binSha1: fieldPart.binSha1, covers: { bin: "h03-covers.bin", layout: coverPart.layout, binBytes: coverPart.binBytes, binSha1: coverPart.binSha1, items: cover != null ? [{ k: 0, vertexRange: [0, 4], triRange: [0, 2] }] : [] } });
-      if (withWater) { W("h03-water.bin", waterPart.buf); W("h03-water.json", { layout: waterPart.layout, binBytes: waterPart.binBytes, binSha1: waterPart.binSha1 }); }
     };
     const out = join(dir, "out");
     const build = (...extra) => spawnSync(process.execPath, [join(root, "tools/build-terrain.mjs"), "--collision", dir, "--truth", join(dir, "truth.json"), "--registration", join(dir, "reg.json"), "--pins", join(dir, "pins.json"), "--holes", "3", "--out", out, ...extra], { encoding: "utf8" });
     const runs = [];
     // the cup closed by its cover, the water present: builds
-    dump({ cover: 0, water: true });
+    dump({ cover: 0 });
     let r = build();
     ok(r.status === 0, `synthetic: the closed cup did not build (exit ${r.status}): ${r.stderr.trim()}`);
     if (r.status === 0) {
       const ix = JSON.parse(readFileSync(join(out, "index.json"), "utf8")).holes[3];
       const t = T.parseTerrain(readFileSync(join(out, "h03.bin"))), g = T.parseGreenHeights(readFileSync(join(out, "g03.bin")));
       ok(eqList(readdirSync(out).sort(), ["g03.bin", "h03.bin", "index.json"]), `synthetic: wrote ${readdirSync(out).join(", ")}`);
-      ok(ix.missing == null && ix.collisionSha1?.water === waterPart.binSha1 && ix.collisionSha1?.field === fieldPart.binSha1, `synthetic: index entry ${JSON.stringify({ missing: ix.missing, collisionSha1: ix.collisionSha1 })}`);
+      ok(ix.missing == null && ix.collisionSha1?.water == null && ix.collisionSha1?.field === fieldPart.binSha1, `synthetic: index entry ${JSON.stringify({ missing: ix.missing, collisionSha1: ix.collisionSha1 })}`);
       ok((ix.classes[6] ?? 0) >= 2400 && (ix.classes[7] ?? 0) >= 280 && (ix.classes[1] ?? 0) >= 1700 && (ix.classes[0] ?? 0) > 10000 && ix.noHeight === ix.classes[0], `synthetic: classes ${JSON.stringify(ix.classes)}, ${ix.noHeight} with no height`);
       ok(T.classAt(t, 0.5, 0.5) === 6 && T.heightAt(t, 0.5, 0.5) === 0, `synthetic: the cup reads class ${T.classAt(t, 0.5, 0.5)} at ${T.heightAt(t, 0.5, 0.5)} yd, not the green (its cover) at 0`);
       ok(T.classAt(t, 0.8, 0.5) === 7 && Math.abs(T.heightAt(t, 0.8, 0.5) + 2.2) < 0.051 && T.classAt(t, 0.5, 0.78) === 1 && T.heightAt(t, 0.05, 0.5) === null && T.classAt(t, 0.05, 0.5) === 0, "synthetic: the pond (class 7 at -2.2 yd), the fairway, no ground past the mesh");
@@ -536,25 +553,16 @@ function eqList(a, b) { return a.length === b.length && a.every((v, i) => v === 
     }
     // the refusals: exit 1, nothing written
     for (const [what, d, extra, msg] of [
-      ["a cover sunk 100 m under its cup (the cup left open)", { cover: -100, water: true }, [], "a cup its cover does not close"],
-      ["no cover at all (an empty covers bin)", { cover: null, water: true }, [], "no ground under the green grid"],
-      ["H3 without its water actor", { cover: 0, water: false }, [], "--allow-missing water"],
+      ["a cover sunk 100 m under its cup (the cup left open)", { cover: -100 }, [], "a cup its cover does not close"],
+      ["no cover at all (an empty covers bin)", { cover: null }, [], "no ground under the green grid"],
     ]) {
       dump(d);
       r = build(...extra);
       ok(r.status === 1 && r.stderr.includes("REFUSED") && r.stderr.includes(msg) && !existsSync(out), `synthetic: ${what}: exit ${r.status}, ${existsSync(out) ? "files written" : "nothing written"}, stderr ${JSON.stringify(r.stderr.trim().slice(0, 200))}`);
       runs.push(`${what}: ${r.status === 1 ? "refused" : `exit ${r.status}`}`);
     }
-    // ...unless the missing actor is allowed on purpose
-    dump({ cover: 0, water: false });
-    r = build("--allow-missing", "water");
-    const ix = r.status === 0 ? JSON.parse(readFileSync(join(out, "index.json"), "utf8")).holes[3] : null;
-    ok(ix && eqList(ix.missing ?? [], ["water"]) && !ix.classes[7] && ix.collisionSha1?.water == null, `synthetic: --allow-missing water: exit ${r.status}${ix ? `, missing ${JSON.stringify(ix.missing)}, classes ${JSON.stringify(ix.classes)}` : ""}`);
-    runs.push(`--allow-missing water: ${ix ? `built, missing ${JSON.stringify(ix.missing)}` : `exit ${r.status}`}`);
     rmSync(out, { recursive: true, force: true });
-    r = spawnSync(process.execPath, [join(root, "tools/build-terrain.mjs"), "--allow-missing", "sea", "--out", out], { encoding: "utf8" });
-    ok(r.status === 1 && !existsSync(out), `synthetic: --allow-missing sea (no such actor): exit ${r.status}`);
-    console.log(`synthetic dump: ${runs.join("; ")}; --allow-missing with an unknown actor refused`);
+    console.log(`synthetic dump: ${runs.join("; ")}`);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 }
 

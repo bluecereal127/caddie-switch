@@ -2,7 +2,7 @@
 // React, no storage) so it can be exercised outside the app.
 //
 //   cur        the stored hole, with `green` already defaulted
-//   n          hole number
+//   n          hole number (Switch Sports Resort's, 1-27; src/srMigrate.js)
 //   dh         derived.json's entry for the hole
 //   fresh      first load ever (no derivedV1 flag): derived values apply wholesale
 //
@@ -32,14 +32,16 @@
 //   old teeOnline (the platform's two tiers placed from the online captures)
 //   is gone: the merge deletes it. Nothing in the app edits a tee or the
 //   platform; App.jsx's persist writes them with the hole (the platform about
-//   1.5 KB a hole, 32 KB for the 21), but they are never read back: the
+//   1.5 KB a hole, 40 KB for the 27), but they are never read back: the
 //   loader keeps only par, note, blocked, markers, scale, green, pins and
 //   curPin, and this merge sets tee and platform again on every load.
 //   derived.json's teeNss (NSS's tee bones, for audit) is not merged.
 // - Pins the pipeline produced (string ids "d…") mirror derived.json on every
 //   load, so corrections reach the app and stale spots drop out; they keep the
 //   derived fields (label, src, yd, seen; difficult, k and wsr on an NSS cup,
-//   set on a WSR spot) and their id is "d<hole>-<derived id>": c<k> for NSS's
+//   set on a WSR spot) and their id is "d<hole>-<derived id>" (the hole is SR's number: a
+//   store from before the 27-hole numbering has its ids moved by src/srMigrate.js, 19 to 24
+//   and so on, so a curPin on a pipeline pin still names the same id): c<k> for NSS's
 //   cup k (0-5, labelled 1-6), before the NSS switch s<slot> for a WSR spot
 //   and x<k> for a Switch-only one. The player's own pins (numeric ids) are
 //   never touched. If the current pin was a pipeline pin it moves to the

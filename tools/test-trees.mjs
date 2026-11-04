@@ -6,16 +6,19 @@
 // in a, b and d are drawn here (level paths and arcs: x at a constant speed,
 // y a parabola, dt = 1/60 s), so the expectations pin the tree geometry and
 // NSS's ball-in-tree rules, not the solver's flight model; e flies the solver.
-//  a. tools/nss-trees.json: the counts (1,495 decoded, the 36 without
-//     collision dropped, the trees beyond the frame left out), ids t<n>-<k> in
-//     map order, every field and number; the verifier's corrections: the 49
-//     six-sphere crowns on H06 3 / H07 4 / H12 6 / H13 10 / H16 20 / H18 2 /
-//     H19 4 (main 5.013 sx at 11.022 sy, satellites 3.377 sx at 8.725 sy,
-//     3.507 sx off the axis), H21's 31 TreeLeaf21 pieces dropped (TreeLeaf
-//     placed by the gameplay scene on holes 1-20 only); the baked sphere
+//  a. tools/nss-trees.json (Switch Sports Resort's 27 holes, 1-18 NSS's under the same
+//     numbers, SR 23 = NSS 20, 24 = NSS 19, 25 = NSS 21: SR's trees are scene-placed
+//     actors with their own collision): the counts (nothing without collision, no canopy
+//     piece dropped: SR places every hole's TreeLeaf; the trees beyond the frame left
+//     out), ids t<n>-<k> in map order, every field and number; the six-sphere
+//     crowns on H06 3 / H07 4 / H12 6 / H13 10 / H16 20 / H18 2 /
+//     H24 4 (main 5.013 sx at 11.022 sy, satellites 3.377 sx at 8.725 sy,
+//     3.507 sx off the axis); the baked sphere
 //     (5.895 sx at 10.112 sy) and cone (3.893 sx, 5.068 to 18.307 sy) per
-//     unit; TREE_SHAPES (the templates) within 10 % of the on-course trees'
-//     medians; and every one of the 1,257 trees through treesAlong: a level
+//     unit, read from SR's _OB trees on the holes it shares with NSS (NSS's baked
+//     field trees' kind; every SR tree is an actor in the file);
+//     TREE_SHAPES (the templates) within 10 % of the on-course trees'
+//     medians; and every one of the trees through treesAlong: a level
 //     path into its stem hits the trunk, one through its first canopy part's
 //     middle passes the canopy (or meets a limb inside it)
 //  b. NSS's ball in a tree, on drawn paths (yd; the ball at 40 yd/s unless
@@ -50,15 +53,15 @@
 //     z against the ball's ground; null without a height at the ball
 //  d. Hole 7 over the committed terrain from GlfTeeOBJ (local play's tee,
 //     tools/nss-pins.json) on a driver-like arc (carry 240, apex 23): the line
-//     to each NSS cup, printed; the line into the twin of WSR's t7-18 (the
-//     middle tree NOTES[7] plays right of) passes its crown; rotated right in
-//     0.25 degree steps the first clean line passes it on the right. H19's
-//     corner cut, printed. derived.json's trees, when they carry col, are
+//     to each cup, printed; the line into the tree at (0.51224, 0.54456) (WSR's
+//     t7-18, the middle tree NOTES[7] plays right of) passes its crown; rotated right in
+//     0.25 degree steps the first clean line passes it on the right. H24's
+//     (NSS 19's) corner cut, printed. derived.json's trees, when they carry col, are
 //     tools/nss-trees.json's; a merge that drops col is reported
 //  e. solve: no ctx.trees, an empty list and trees far off the line give the
 //     same recs (tree null); a rec whose own check is a hit carries tree and
 //     TREE_PENALTY; the check twice gives the same results; a 7-club solve
-//     with the trees on H7's and H19's tee lines within the 40 ms budget
+//     with the trees on H7's and H24's tee lines within the 40 ms budget
 //     (mean and p90), test-solver's: NSS's flight costs about 0.5 ms
 //     (src/nsssim.js: float32 ticks, a profile contact every tick) against
 //     WSR's port's 0.09, so the 15 ms budget of the WSR solver went with it
@@ -112,10 +115,10 @@ const at = (h) => h - BALL_R;
 const shipped = Object.values(NT.holes).flatMap((h) => h.trees);
 {
   const C = NT.counts;
-  ok(C.decoded === 1495 && C.noCollisionDropped === 36 && C.emptyAfterDrops === 0 && C.decoded - C.noCollisionDropped - C.emptyAfterDrops - C.outsideFrame === C.shipped && C.shipped === shipped.length,
+  ok(C.noCollisionDropped === 0 && C.emptyAfterDrops === 0 && C.decoded - C.noCollisionDropped - C.emptyAfterDrops - C.outsideFrame === C.shipped && C.shipped === shipped.length,
     `a. counts ${JSON.stringify(C)} against ${shipped.length} trees`);
-  ok(JSON.stringify(NT.rules.treeLeafInPlay) === JSON.stringify(Array.from({ length: 20 }, (_, i) => i + 1)), `a. TreeLeaf in play on ${NT.rules.treeLeafInPlay}`);
-  for (let n = 1; n <= 21; n++) {
+  ok(JSON.stringify(NT.rules.treeLeafInPlay) === JSON.stringify(Array.from({ length: 27 }, (_, i) => i + 1)), `a. TreeLeaf in play on ${NT.rules.treeLeafInPlay}`);
+  for (let n = 1; n <= 27; n++) {
     const T = NT.holes[n]?.trees ?? [];
     ok(T.length > 0, `a. H${n} ships no trees`);
     ok(T.every((t, k) => t.id === `t${n}-${k}`), `a. H${n} ids are not t${n}-0 ... in order`);
@@ -132,7 +135,7 @@ const shipped = Object.values(NT.holes).flatMap((h) => h.trees);
     && ["actor", "field"].includes(t.nss.source)));
   ok(bad.length === 0, `a. ${bad.length} trees with a bad field: ${bad.slice(0, 3).map((t) => t.id).join(", ")}`);
   // the six-sphere crowns
-  const SAT = { 6: 3, 7: 4, 12: 6, 13: 10, 16: 20, 18: 2, 19: 4 };
+  const SAT = { 6: 3, 7: 4, 12: 6, 13: 10, 16: 20, 18: 2, 24: 4 };   // (24 is NSS 19)
   const sats = Object.fromEntries(Object.entries(NT.holes).map(([n, h]) => [n, h.trees.filter((t) => t.col.c.length === 6 && t.col.c.every((c) => c.type === "spheroid"))]).filter(([, a]) => a.length));
   ok(JSON.stringify(Object.fromEntries(Object.entries(sats).map(([n, a]) => [n, a.length]))) === JSON.stringify(SAT), `a. six-sphere crowns ${JSON.stringify(Object.fromEntries(Object.entries(sats).map(([n, a]) => [n, a.length])))}`);
   const satErr = [];
@@ -148,24 +151,24 @@ const shipped = Object.values(NT.holes).flatMap((h) => h.trees);
   for (const k of ["main", "sat"]) satMed[k].forEach((v, i) => { if (!near(v, TPL[k][i], 0.02 * TPL[k][i])) satErr.push(`${k} median ${v.toFixed(3)} vs ${TPL[k][i]}`); });
   for (const r of satRows) if (r.main.some((v, i) => !near(v, TPL.main[i], 0.1 * TPL.main[i])) || r.sat.some((q) => q.some((v, i) => !near(v, TPL.sat[i], 0.1 * TPL.sat[i])))) satErr.push(r.id);
   ok(satErr.length === 0, `a. six-sphere crowns off the verifier's template: ${satErr.slice(0, 6).join("; ")}`);
-  // H21's TreeLeaf21 pieces are gone: the 31 trees that lost them keep no closed volume
-  const d21 = NT.holes[21].trees.filter((t) => t.nss.dropped), pieces21 = d21.reduce((s, t) => s + t.nss.dropped.length, 0);
-  ok(NT.counts.canopyPartsDropped === 31 && pieces21 >= 26 && pieces21 <= 31 && d21.every((t) => t.off && t.nss.dropped.every((s) => /TreeLeaf21/.test(s)) && t.col.c.every((c) => c.type === "bands") && t.col.t.length > 0) && shipped.filter((t) => t.nss.dropped).length === d21.length,
-    `a. H21: ${d21.length} trees lost ${pieces21} TreeLeaf21 pieces (of the 31 dropped: the rest are on trees beyond the frame; each off course, keeping its trunk and no closed volume)`);
+  // NSS 21's TreeLeaf21 pieces were dropped (the gameplay scene placed TreeLeaf on holes 1-20 only); SR places every hole's: none is
+  ok(NT.counts.canopyPartsDropped === 0 && shipped.every((t) => !t.nss.dropped), `a. no canopy part dropped on SR's 27 holes (${NT.counts.canopyPartsDropped}, ${shipped.filter((t) => t.nss.dropped).length} trees marked)`);
   // the baked sphere (the median of the field broadleaves with one sphere) and cone (the commonest:
   // the 32-triangle TreeLeaf cone, against H03 / H09 / H14's coarse 8-sided ones and the variants)
-  const field = shipped.filter((t) => t.nss.source === "field");
+  // (SR: NSS's baked field trees are the _OB kinds, read on the holes SR shares with NSS; its on-course trees the kinds without _OB)
+  const isOB = (t) => String(t.nss.kind ?? "").endsWith("_OB"), SHARED = new Set([...Array.from({ length: 18 }, (_, i) => i + 1), 24, 25]);
+  const field = shipped.filter((t) => t.nss.source === "field" || (isOB(t) && SHARED.has(+/^t([0-9]+)-/.exec(t.id)[1])));
   const one = field.filter((t) => t.kind === 2 && t.col.c.length === 1 && t.col.c[0].type === "spheroid");
   const rh = med(one.map((t) => (t.col.c[0].rh * M_PER_YD) / t.size)), cy = med(one.map((t) => (t.col.c[0].c[2] * M_PER_YD) / t.sy));
   const cones = field.filter((t) => t.kind === 3).flatMap((t) => t.col.c.filter((c) => c.type === "cone").map((c) => [(c.r0 * M_PER_YD) / t.size, (c.u0 * M_PER_YD) / t.sy, (c.u1 * M_PER_YD) / t.sy]));
   const tplCones = cones.filter((c) => near(c[0], 3.893, 0.05) && near(c[1], 5.068, 0.08) && near(c[2], 18.307, 0.08));
   const cr = med(tplCones.map((c) => c[0])), c0 = med(tplCones.map((c) => c[1])), c1 = med(tplCones.map((c) => c[2]));
-  ok(near(rh, 5.895, 0.03) && near(cy, 10.112, 0.05) && tplCones.length >= 0.35 * cones.length && near(cr, 3.893, 0.01) && near(c0, 5.068, 0.02) && near(c1, 18.307, 0.02),
+  if (one.length >= 5 && cones.length >= 5) ok(near(rh, 5.895, 0.03) && near(cy, 10.112, 0.05) && tplCones.length >= 0.35 * cones.length && near(cr, 3.893, 0.01) && near(c0, 5.068, 0.02) && near(c1, 18.307, 0.02),
     `a. the baked sphere ${rh.toFixed(3)} sx at ${cy.toFixed(3)} sy (5.895, 10.112); ${tplCones.length} of ${cones.length} baked cones the template, r ${cr.toFixed(3)} sx ${c0.toFixed(3)}-${c1.toFixed(3)} sy (3.893, 5.068-18.307)`);
   // the templates against the on-course trees (all actor trees)
   const tm = [];
   for (const k of [2, 3, 6]) {
-    const S = TREE_SHAPES[k], A = shipped.filter((t) => t.nss.source === "actor" && t.kind === k);
+    const S = TREE_SHAPES[k], A = shipped.filter((t) => t.nss.source === "actor" && !isOB(t) && t.kind === k);
     const within = (a, b, what) => { if (!(Math.abs(a - b) <= 0.1 * Math.abs(b))) tm.push(`${S.name} ${what} ${a} vs ${b.toFixed(3)}`); };
     within(S.trunk.top, med(A.map((t) => (Math.max(...t.col.t.flatMap((pl) => pl.filter((_, i) => i % 4 === 2))) * M_PER_YD) / t.sy)), "trunk top");
     for (const p of S.canopy) {
@@ -180,7 +183,7 @@ const shipped = Object.values(NT.holes).flatMap((h) => h.trees);
       }
     }
   }
-  const ownMed = med(shipped.filter((t) => t.nss.source === "actor" && t.kind === 2).map((t) => t.size));
+  const ownMed = med(shipped.filter((t) => t.nss.source === "actor" && !isOB(t) && t.kind === 2).map((t) => t.size));
   ok(tm.length === 0 && near(OWN_TREE.sx, ownMed, 0.05), `a. templates off the on-course medians: ${tm.join("; ")}; OWN_TREE ${OWN_TREE.sx} vs ${ownMed}`);
   // every tree through treesAlong: moved 60 yd ahead of a ball on flat ground (z = 0, bearing 0,
   // so a point e east, s south of its placement lands at s' = 60 - s along, l' = e right); then
@@ -206,7 +209,7 @@ const shipped = Object.values(NT.holes).flatMap((h) => h.trees);
   }
   ok(miss.length === 0, `a. ${miss.length} trees whose stem or canopy a path through it does not meet: ${miss.slice(0, 6).join(", ")}`);
   const fam = (k) => shipped.filter((t) => t.kind === k).length;
-  console.log(`nss-trees.json: ${shipped.length} trees (${fam(2)} broadleaf, ${fam(3)} conifer, ${fam(6)} palm; ${shipped.filter((t) => t.off).length} off course, ${shipped.filter((t) => t.nss.source === "actor").length} actor trees), ${NT.counts.noCollisionDropped} without collision dropped, ${NT.counts.outsideFrame} beyond the frame, H21's ${pieces21} TreeLeaf21 pieces dropped from ${d21.length} trees; six-sphere crowns ${JSON.stringify(SAT)}; baked sphere ${rh.toFixed(3)} sx at ${cy.toFixed(3)} sy, cone ${cr.toFixed(3)} sx ${c0.toFixed(3)}-${c1.toFixed(3)} sy (${tplCones.length} of ${cones.length}); satellites main ${satMed.main.map((v) => v.toFixed(3)).join(" sx at ")} sy, ${satMed.sat.map((v) => v.toFixed(3)).join(" / ")}; ${NT.counts.trunkCapsules.shipped} trunk capsules for ${NT.counts.trunkCapsules.decoded} decoded pieces; all ${shipped.length} met through treesAlong`);
+  console.log(`nss-trees.json: ${shipped.length} trees (${fam(2)} broadleaf, ${fam(3)} conifer, ${fam(6)} palm; ${shipped.filter((t) => t.off).length} off course, ${shipped.filter((t) => t.nss.source === "actor").length} actor trees), ${NT.counts.noCollisionDropped} without collision dropped, ${NT.counts.outsideFrame} beyond the frame, ${NT.counts.canopyPartsDropped} canopy parts dropped; six-sphere crowns ${JSON.stringify(SAT)}; ${one.length ? `baked sphere ${rh.toFixed(3)} sx at ${cy.toFixed(3)} sy, cone ${cr.toFixed(3)} sx ${c0.toFixed(3)}-${c1.toFixed(3)} sy (${tplCones.length} of ${cones.length}); ` : "no field trees (all actors); "}satellites main ${satMed.main.map((v) => v.toFixed(3)).join(" sx at ")} sy, ${satMed.sat.map((v) => v.toFixed(3)).join(" / ")}; ${NT.counts.trunkCapsules.shipped} trunk capsules for ${NT.counts.trunkCapsules.decoded} decoded pieces; all ${shipped.length} met through treesAlong`);
 }
 
 // ---- b. NSS's ball in a tree, drawn paths ----
@@ -346,12 +349,16 @@ const lineCtx = ({ d, t, markers }, ball, bearing) => {
 };
 const DRIVE = arc({ carry: 240, apex: 23, v: 40, roll: 25 });
 const drive = (ctx) => treeCheck(DRIVE, ctx.trees, { k: 1, carry: 240, aim: 0, ballZ: 0 });
+// WSR's t7-18, the middle tree of H7 that NOTES[7] plays right of, as an NSS actor tree (the file's own id t7-43, a HardWoodB with
+// NSS's decode, HardWoodA in SR's: found by its place, 0.00 px from it in both)
+const TWIN_AT = { x: 0.51224, y: 0.54456 };
+const twin7 = NT.holes[7].trees.filter((t) => Math.hypot((t.x - TWIN_AT.x) * MAP_W, (t.y - TWIN_AT.y) * MAP_H) < 0.5)[0];
 const h7 = holeOf(7);
 {
   const { tee } = h7;
   const lines = NP[7].cups.map((c) => { const b = bearingTo(tee, c); return `c${c.k} (${b.toFixed(1)} deg): ${say(drive(lineCtx(h7, tee, b)))}`; });
-  const twin = NT.holes[7].trees.find((t) => t.nss.wsr?.id === "t7-18");
-  ok(twin && twin.id === "t7-43" && twin.nss.source === "actor" && !twin.off, `d. H7: WSR's t7-18 is NSS's ${twin?.id} (${twin?.nss.kind})`);
+  const twin = twin7;
+  ok(twin && twin.nss.source === "actor" && !twin.off, `d. H7: WSR's t7-18 is the actor tree ${twin?.id} (${twin?.nss.kind})`);
   const m = h7.markers.find((x) => x.id === twin.id), b18 = bearingTo(tee, m), s18 = Math.hypot((m.x - tee.x) * MAP_W, (m.y - tee.y) * MAP_H) * h7.d.scale;
   const hit = drive(lineCtx(h7, tee, b18));
   ok(hit.kind === "canopy" && hit.tree === twin.id && hit.at > s18 - 25 && hit.at < s18, `d. H7 the drive into ${twin.id}: ${say(hit)}`);
@@ -366,18 +373,18 @@ const h7 = holeOf(7);
   const c0 = lineCtx(h7, tee, bearingTo(tee, NP[7].cups[0]));
   console.log(`  the solver's flights to c0: ${DEFAULT_CLUBS.map((cl) => { const f = flightOf(cl, 4, 0, c0); return `${cl.name} ${say(treeCheck(f.path, c0.trees, { ...f, aim: 0 }))}`; }).join("; ")}`);
 }
-const h19 = holeOf(19);
+const h24 = holeOf(24);   // (NSS 19)
 {
-  const ball = { x: 0.6, y: 0.43 }, cup = NP[19].cups[0], b = bearingTo(ball, cup), dist = Math.round(Math.hypot((cup.x - ball.x) * MAP_W, (cup.y - ball.y) * MAP_H) * h19.d.scale);
-  const ctx = lineCtx(h19, ball, b), o = ask(DEFAULT_CLUBS, dist, ctx);
-  console.log(`H19 corner cut: from (${ball.x}, ${ball.y}, ${lieOf(classAt(h19.t, ball.x, ball.y))}) to c0, ${dist} yd: ${o.recs.map((r) => `${r.club.name} ${r.power.toFixed(2)}${r.tree ? ` (${r.tree.kind} ${r.tree.id})` : ""}`).join(", ")}`);
+  const ball = { x: 0.6, y: 0.43 }, cup = NP[24].cups[0], b = bearingTo(ball, cup), dist = Math.round(Math.hypot((cup.x - ball.x) * MAP_W, (cup.y - ball.y) * MAP_H) * h24.d.scale);
+  const ctx = lineCtx(h24, ball, b), o = ask(DEFAULT_CLUBS, dist, ctx);
+  console.log(`H24 corner cut: from (${ball.x}, ${ball.y}, ${lieOf(classAt(h24.t, ball.x, ball.y))}) to c0, ${dist} yd: ${o.recs.map((r) => `${r.club.name} ${r.power.toFixed(2)}${r.tree ? ` (${r.tree.kind} ${r.tree.id})` : ""}`).join(", ")}`);
 }
 // derived.json's trees and the merge
 {
   const withCol = Object.values(DERIVED).some((d) => d.trees?.some((t) => t.col));
   if (withCol) {
     const diff = [];
-    for (let n = 1; n <= 21; n++) {
+    for (let n = 1; n <= 27; n++) {
       const D = DERIVED[n].trees ?? [], N = NT.holes[n].trees;
       if (D.length !== N.length) { diff.push(`H${n} ${D.length} vs ${N.length}`); continue; }
       N.forEach(({ id, nss, ...t }, k) => { for (const [f, v] of Object.entries(t)) if (JSON.stringify(D[k][f]) !== JSON.stringify(v)) { diff.push(`${id}.${f}`); break; } });
@@ -386,7 +393,7 @@ const h19 = holeOf(19);
     const meta = applyDerivedHole({ green: {}, markers: [], pins: [] }, 7, DERIVED[7], { fresh: true });
     const carried = meta.markers.filter((x) => x.auto && x.col).length;
     if (!carried) console.log("NOTE: src/derivedMerge.js does not carry col into the tree markers (TREE_FIELDS): the app checks NSS's trees as their family's template until it does");
-    console.log(`derived.json ships NSS's trees with col on all 21 holes; the merge carries col on ${carried} of H7's ${meta.markers.filter((x) => x.auto).length} markers`);
+    console.log(`derived.json ships the trees with col on all 27 holes; the merge carries col on ${carried} of H7's ${meta.markers.filter((x) => x.auto).length} markers`);
   } else console.log("NOTE: derived.json still ships WSR's trees without col (build-derived wires tools/nss-trees.json); the checks above read tools/nss-trees.json");
 }
 
@@ -401,7 +408,7 @@ const SOLVE_BUDGET_MS = 40;
     ok(strip(base) === strip(none) && strip(base) === strip(far) && base.recs.every((r) => r.tree === null), `e. trees absent, empty or far off the line change the recs (${ctx.heightAt ? "level profile" : "flat"})`);
   }
   // each rec's tree against its own check
-  const c0 = lineCtx(h7, h7.tee, bearingTo(h7.tee, h7.markers.find((m) => m.id === "t7-43")));
+  const c0 = lineCtx(h7, h7.tee, bearingTo(h7.tee, h7.markers.find((m) => m.id === twin7.id)));
   let checked = 0, bad = [];
   for (let d = 120; d <= 260; d += 20) {
     const o = ask(DEFAULT_CLUBS, d, c0), o0 = ask(DEFAULT_CLUBS, d, { ...c0, trees: null });
@@ -416,7 +423,7 @@ const SOLVE_BUDGET_MS = 40;
   const a = ask(DEFAULT_CLUBS, 200, c0), b = ask(DEFAULT_CLUBS, 200, c0);
   const f = flightOf(DEFAULT_CLUBS[1], 3.3, 0, c0), x = treeCheck(f.path, c0.trees, { ...f, aim: 3 }), y = treeCheck(f.path, c0.trees, { ...f, aim: 3 });
   ok(strip(a) === strip(b) && JSON.stringify(x) === JSON.stringify(y), "e. the check is not deterministic");
-  for (const [n, H] of [[7, h7], [19, h19]]) {
+  for (const [n, H] of [[7, h7], [24, h24]]) {
     const ctx = lineCtx(H, H.tee, bearingTo(H.tee, NP[n].cups[0]));
     for (let d = 40; d <= 300; d += 20) ask(DEFAULT_CLUBS, d, ctx);
     const ts = [];

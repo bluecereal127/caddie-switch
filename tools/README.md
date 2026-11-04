@@ -15,7 +15,9 @@ tees, the platform's seating). The generators that read the dump or the RomFS
 run on the dump machine and commit their outputs; everything below them runs
 from committed files. The order for the app's data:
 
-1. When the dump changes (on the dump machine):
+1. When the dump changes (on the dump machine; the Switch Sports Resort
+   dump `tools/harness/state/eden/sr-golf-x`, 27 holes, is every generator's
+   default since 2026-11-04):
    `node tools/nss-export.mjs` (→ `nss-registration.json`, `nss-pins.json`,
    `nss-platform.json`) → `node tools/nss-truth.mjs` (→ `nss-truth.json`, the
    green truth) → `node tools/build-terrain.mjs` (→ `public/terrain/`) →
@@ -26,15 +28,17 @@ from committed files. The order for the app's data:
    `node tools/build-nss-shape.mjs` (→ src/nssShape.js).
 2. The maps (needs the RomFS, and Python with numpy, Pillow, zstandard and
    texture2ddecoder; scipy for the comparison and the backdrop):
-   `python -P tools/render-nss-maps.py --jobs 7` renders NSS's own minimap at
-   2x, 3x and 4x plus each green crop into `captures/derived/render-nss/`
-   (about 3.5 min for 21 holes; `--derive-backdrop` first when the capture
-   stacks change, which writes `nss-map-backdrop.json`, the off-course colours),
+   `python -P tools/render-nss-maps.py --jobs 4` renders SR's own minimap
+   (`--game sr`, the default; `--game nss` NSS's 21 holes as before) at 2x,
+   3x, 4x and 8x plus each green crop into `captures/derived/render-nss/`
+   (about 15 min for 27 holes; `--derive-backdrop --stacks <dir>` first when
+   the SR screen stacks change, which writes `nss-map-backdrop.json`, the
+   off-course colours),
    then `node tools/build-map-scales.mjs` encodes the 3x and 4x maps as JPEG
-   q78 into `public/maps/` (`hNN-3x.jpg` 750×912, `hNN-4x.jpg` 1000×1216; 1.4
-   and 2.4 MB for the 21 holes) with an `index.json` (`art: "nss"`, size,
+   q78 into `public/maps/` (`hNN-3x.jpg` 750×912, `hNN-4x.jpg` 1000×1216; 1.75
+   and 2.9 MB for the 27 holes) with an `index.json` (`art: "sr"`, size,
    bytes, SHA-1 per hole and scale) that the app reads only when its map
-   setting asks for more than 2x. It ships only NSS's art with the 2 m plaid,
+   setting asks for more than 2x. It ships only the art asked (`--art sr`) with the 2 m plaid,
    and it box-filters each scale and the 2x render to the 250×304 frame to
    warn about a scale left stale. `--scales 3` refreshes one scale and keeps
    the other's files; `--art wsr` rebuilds the WSR maps of before from
@@ -43,8 +47,10 @@ from committed files. The order for the app's data:
 4. `node tools/build-derived.mjs` last (after build-terrain: the shot rows
    are flown over `public/terrain/`): `public/derived.json` (geometry from
    nss-truth, the six cups, the tee, the platform, the trees, the shot rows),
-   `src/maps.js` and `src/greens.js` (from render-nss). It exits 1 when any
-   NSS input is missing rather than fall back to WSR's.
+   `src/maps.js` and `src/greens.js` (from render-nss), for SR's 27 holes (the
+   capture records, keyed by NSS's numbers, are renumbered 19 → 24, 20 → 23,
+   21 → 25 as they are read: src/srMigrate.js). It exits 1 when any
+   input is missing rather than fall back to WSR's.
 
 The tests: `test-nss-export`, `test-terrain`, `test-course3d`, `test-live3d`,
 `test-nsssim`, `test-solver`, `test-putt`, `test-trees`, `test-pins`,

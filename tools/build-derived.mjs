@@ -32,12 +32,45 @@ import { fileMs } from "./lib/ulid.mjs";
 import { exifMs } from "./lib/exif.mjs";
 import { parseTerrain, heightAt as terrainHeightAt, classAt, lieOf } from "../src/terrain.js";
 import { lineProfile, elevFlight } from "../src/model.js";
+import { SR_HOLES, srHoleOf, nssHoleOf, toSrFrame, FRAME_CHANGE } from "../src/srMigrate.js";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const INBOX = join(ROOT, "captures", "inbox");
 const D = join(ROOT, "captures", "derived");
-const mapsMeta = JSON.parse(readFileSync(join(D, "maps.json"), "utf8")).holes;
-const register = JSON.parse(readFileSync(join(D, "register.json"), "utf8"));
+// The capture pipeline's records (captures/derived/maps.json, register.json, greens/hNN.json, maps/hNN.png, shots.json and
+// pin-observations, captures/classification.json) are the user's NSS captures, keyed by NSS's hole numbers; the shipped
+// holes are Switch Sports Resort's (the user, 2026-11-04: "adopt SR's 27-hole numbering throughout", src/srMigrate.js): NSS
+// 19, 20 and 21 are SR 24, 23 and 25, holes 1-18 keep their numbers, and SR 19, 20, 21, 22, 26 and 27 have no captures. The
+// records are renumbered where they are read, so the loop below (SR's hole numbers) finds them under SR's. SR 17 and SR 23
+// have map frames of their own (SR's capture squares): a position in a capture's 250x304 frame goes through the frame change
+// (src/srMigrate.js toSrFrame) where it meets SR's data: the tee frames' avatars and cups below, a shot row's pos, the
+// capture-projected green box. The capture stack and the zoom projection onto it (meta.pin, meta.scaleYdPerPx, det) stay in
+// NSS's frame, which they pair with; the stack ships nowhere for SR 17 and SR 23 (their renders are SR's).
+const MAPW = 250, MAPH = 304;
+const srAt = (hole, p) => {
+  if (!FRAME_CHANGE[hole] || !p || !Number.isFinite(p.x) || !Number.isFinite(p.y)) return p;
+  const [x, y] = toSrFrame(hole, p.x / MAPW, p.y / MAPH);
+  return { ...p, x: +(x * MAPW).toFixed(2), y: +(y * MAPH).toFixed(2) };
+};
+const srMeta = (m) => {
+  const hole = srHoleOf(m.hole);
+  if (hole === m.hole && !FRAME_CHANGE[hole]) return m;
+  return { ...m, hole, nssHole: m.hole,
+    ...(FRAME_CHANGE[hole] ? { teeFrames: (m.teeFrames ?? []).map((f) => ({ ...f, ptrs: (f.ptrs ?? []).map((q) => srAt(hole, q)), cup: srAt(hole, f.cup) })) } : {}) };
+};
+const srRow = (r) => {   // a shot row (tools/assemble-shots.mjs): its hole, and its pos on SR 17 / SR 23
+  const hole = srHoleOf(r.hole);
+  if (hole === r.hole && !(FRAME_CHANGE[hole] && r.pos)) return r;
+  const o = { ...r, hole };
+  if (FRAME_CHANGE[hole] && r.pos) { const [x, y] = toSrFrame(hole, r.pos.x, r.pos.y); o.pos = { ...r.pos, x: +x.toFixed(5), y: +y.toFixed(5) }; }
+  return o;
+};
+const capBox = (hole, b, W, H) => {   // the capture-projected green box (px of the capture's frame) as a box of SR's frame
+  const [x0, y0] = toSrFrame(hole, b.x0 / W, b.y0 / H), [x1, y1] = toSrFrame(hole, b.x1 / W, b.y1 / H);
+  return { x0: +x0.toFixed(4), y0: +y0.toFixed(4), x1: +x1.toFixed(4), y1: +y1.toFixed(4) };
+};
+const mapsMeta = JSON.parse(readFileSync(join(D, "maps.json"), "utf8")).holes.map(srMeta);
+const register = Object.fromEntries(Object.entries(JSON.parse(readFileSync(join(D, "register.json"), "utf8"))).map(([k, v]) => [srHoleOf(+k), v]));
 // The rendered hole maps and green crops (tools/render-nss-maps.py: NSS's own
 // minimap, the baked textures of Model/MiniMap_Field_Fld_GolfCourseNN with the
 // game's minimap shaders and the green's 2 m plaid, placed through
@@ -53,7 +86,9 @@ const RENDER = join(D, "render-nss");
 let renderIdx = {};
 try { renderIdx = JSON.parse(readFileSync(join(RENDER, "index.json"), "utf8")); } catch {}
 const renderIndex = renderIdx.holes ?? {};
-const RENDER_ART = "nss", RENDER_PLAID_M = 2;
+// the art the shipped renders must carry: Switch Sports Resort's own minimap (tools/render-nss-maps.py --game sr, its
+// default since 2026-11-04; "nss" was NSS's, from 2026-10-25), with the 2 m plaid
+const RENDER_ART = "sr", RENDER_PLAID_M = 2;
 // JPEG quality of the shipped renders. A map at 2x has four times the pixels
 // of the stack it replaces, so a 500x608 frame of WSR's dense textures ran
 // 62-108 KB at q82 against ~18 KB for a 250x304 stack; at q78 (55-96 KB per
@@ -80,7 +115,7 @@ catch (e) { console.error(`tools/nss-truth.json: ${e.message}. It is required (r
 {
   const box = (b) => b && ["x0", "y0", "x1", "y1"].every((k) => Number.isFinite(b[k])) && b.x1 > b.x0 && b.y1 > b.y0;
   const bad = [];
-  for (let hole = 1; hole <= 21; hole++) {
+  for (let hole = 1; hole <= SR_HOLES; hole++) {
     const t = TRUTH?.[hole];
     if (!t || !(t.scale > 0) || !box(t.greenBox) || !Array.isArray(t.greenPoly) || t.greenPoly.length < 3
       || !Array.isArray(t.grid) || t.grid.length !== 9 || !t.grid.every((r) => Array.isArray(r) && r.length === 9) || !Number.isFinite(t.slopeMaxPct))
@@ -495,7 +530,7 @@ const STANDING_X = [3.45, 2.3, 1.15, 0, -1.15, -2.3, -3.45];
   const bad = [];
   const fin = (v) => typeof v === "number" && Number.isFinite(v);
   const pt = (p) => p && fin(p.x) && fin(p.y) && Array.isArray(p.world) && p.world.length === 3 && p.world.every(fin);
-  for (let hole = 1; hole <= 21; hole++) {
+  for (let hole = 1; hole <= SR_HOLES; hole++) {
     const np = NSSP?.[hole], pl = NSSPL?.[hole], reg = NSSREG?.[hole], cups = np?.cups;
     if (!["a", "b", "tx", "ty"].every((k) => fin(reg?.[k])) || !(reg.a ** 2 + reg.b ** 2 > 0)) bad.push(`H${hole}: no NSS -> map transform (a, b, tx, ty) in tools/nss-registration.json`);
     if (!Array.isArray(cups) || cups.length !== 6) { bad.push(`H${hole}: ${Array.isArray(cups) ? cups.length : "no"} cups in tools/nss-pins.json, not six`); continue; }
@@ -533,7 +568,7 @@ const TREES = nssFile("nss-trees.json", "tools/nss-trees-export.mjs");
 {
   const bad = [];
   const fin = (v) => typeof v === "number" && Number.isFinite(v);
-  for (let hole = 1; hole <= 21; hole++) {
+  for (let hole = 1; hole <= SR_HOLES; hole++) {
     const ts = TREES?.[hole]?.trees;
     if (!Array.isArray(ts) || !ts.length) { bad.push(`H${hole}: no trees in tools/nss-trees.json`); continue; }
     ts.forEach((t, k) => {
@@ -571,7 +606,7 @@ try { classified = JSON.parse(readFileSync(join(ROOT, "captures", "classificatio
     let ms = null;
     try { ms = exifMs(join(INBOX, f.file)); } catch {}
     if (ms == null) { ms = fileMs(f.originalFile ?? f.file) ?? 0; noExif++; }
-    FRAMES.set(f.file, { hole: f.hole, ms, wind: f.windMph ?? "?" });
+    FRAMES.set(f.file, { hole: f.hole != null ? srHoleOf(f.hole) : f.hole, ms, wind: f.windMph ?? "?" });
   }
   const byHole = {};
   for (const [file, f] of FRAMES) if (f.hole != null) (byHole[f.hole] ??= []).push({ file, ...f });
@@ -686,7 +721,7 @@ const xform = {};
 const derived = { version: 1, mapW: 250, mapH: 304, holes: {} };
 mkdirSync(join(D, "boxes"), { recursive: true });
 
-for (let hole = 1; hole <= 21; hole++) {
+for (let hole = 1; hole <= SR_HOLES; hole++) {
   const id = `h${String(hole).padStart(2, "0")}`;
   // the hole's render and green crop (tools/render-nss-maps.py), when it has
   // them: the files its index.json entry names (the 2x map, maps["2"], and
@@ -704,7 +739,7 @@ for (let hole = 1; hole <= 21; hole++) {
   const renderArt = rIdx?.art ?? renderIdx.art, plaidM = rIdx?.plaid?.tileM ?? null;
   const renderImg = renderMap ? loadImage(renderMap) : null;
   const renderWhy = !(renderMap || renderGreen) ? null
-    : renderArt !== RENDER_ART ? `is art ${renderArt ?? "unknown"}, not NSS's (${RENDER_ART})`
+    : renderArt !== RENDER_ART ? `is art ${renderArt ?? "unknown"}, not Switch Sports Resort's (${RENDER_ART})`
     : plaidM !== RENDER_PLAID_M ? `was rendered with a ${plaidM ?? "unrecorded"} m plaid tile, not ${RENDER_PLAID_M} m (before the plaid fix)`
     : renderImg && (renderImg.width !== 2 * MAP_W || renderImg.height !== 2 * MAP_H) ? `is ${renderImg.width}x${renderImg.height}, not the ${MAP_W}x${MAP_H} frame at 2x`
     : null;
@@ -720,15 +755,17 @@ for (let hole = 1; hole <= 21; hole++) {
   // the detection stack because the display stack has the flag inpainted
   // away, which starves the matcher of its strongest dark landmark on
   // pin-less holes.
-  const stack = () => loadImage(join(D, "maps", `${id}.png`));
-  let det;
-  try { det = loadImage(join(D, "maps", `${id}.det.png`)); } catch { det = stack(); }
-  const meta = mapsMeta.find((m) => m.hole === hole);
-  const g = JSON.parse(readFileSync(join(D, "greens", `${id}.json`), "utf8"));
+  // (the capture files are the NSS hole's: hNN of nssHoleOf(hole); SR 19, 20, 21, 22, 26 and 27 have none)
+  const nssN = nssHoleOf(hole), cid = nssN != null ? `h${String(nssN).padStart(2, "0")}` : null;
+  const stack = () => { if (!cid) throw new Error(`H${hole}: no capture stack (SR's new holes have no captures) and no render: python -P tools/render-nss-maps.py --holes ${hole}`); return loadImage(join(D, "maps", `${cid}.png`)); };
+  let det = null;
+  if (cid) { try { det = loadImage(join(D, "maps", `${cid}.det.png`)); } catch { det = stack(); } }
+  const meta = mapsMeta.find((m) => m.hole === hole) ?? { hole, yards: null, scaleYdPerPx: null, pin: null, teeFrames: [] };
+  const g = cid ? JSON.parse(readFileSync(join(D, "greens", `${cid}.json`), "utf8")) : { sessions: [], pins: [], pinSources: [], panelBbox: { x0: 0, y0: 0, x1: 1, y1: 1 } };
 
   // migration transform (fractional)
   const r = register[hole];
-  xform[hole] = { ax: r.fx.a, bx: r.fx.b, ay: r.fy.a, by: r.fy.b };
+  if (r) xform[hole] = { ax: r.fx.a, bx: r.fx.b, ay: r.fy.a, by: r.fy.b };
 
   // green box on map: pin-anchored projection of the zoom bbox; when the pin
   // moved between sessions, the session whose pin matches the map's pin wins
@@ -750,7 +787,7 @@ for (let hole = 1; hole <= 21; hole++) {
   }
   let greenBox = null, greenPoly = null, sightings = [], greenPins = 0;
   let box = null, captureBox = null;
-  const W = det.width, H = det.height; // the 250x304 map frame
+  const W = det?.width ?? MAP_W, H = det?.height ?? MAP_H; // the 250x304 map frame
   if (anchor && anchor.r > 0.22) {
     const { k, session, ox, oy } = anchor;
     const proj = (zx, zy) => ({ x: meta.pin.x + ox + (zx - session.pinPx.x) * k,
@@ -807,7 +844,8 @@ for (let hole = 1; hole <= 21; hole++) {
     // (the pin zones, clusters of the sightings in green-local space, are gone
     // with the capture-built pins: a hole's pins are its six NSS cups)
     greenPins = g.pins.length;
-    // debug overlay
+    // debug overlay (where there is a stack, in the frame the truth box is in: not SR 17 and SR 23)
+    if (det && !FRAME_CHANGE[hole]) {
     const dbg = { width: W, height: H, data: Buffer.from(det.data) };
     const set = (x, y) => { if (x < 0 || y < 0 || x >= W || y >= H) return; const i = (y * W + x) * 4; dbg.data[i] = 30; dbg.data[i + 1] = 120; dbg.data[i + 2] = 255; };
     for (let x = box.x0; x <= box.x1; x++) { set(x, box.y0); set(x, box.y1); }
@@ -815,6 +853,7 @@ for (let hole = 1; hole <= 21; hole++) {
     for (const p of sightings) { const bx = Math.round(p.x * W), by = Math.round(p.y * H);
       for (let d = -4; d <= 4; d++) { set(bx + d, by); set(bx, by + d); } }
     savePng(join(D, "boxes", `${id}.png`), dbg);
+    }
   }
   const zoomAspect = (g.panelBbox.x1 - g.panelBbox.x0) / (g.panelBbox.y1 - g.panelBbox.y0);
   const mapAspect = box ? (box.x1 - box.x0) / (box.y1 - box.y0) : null;
@@ -1016,8 +1055,7 @@ for (let hole = 1; hole <= 21; hole++) {
     // collision; rev: its revision (geomRev), which the app's merge re-applies
     // the geometry on (it replaced wsrRev); captureGreenBox: the capture
     // projection, for comparison
-    source: "nss", rev: geomRev(wt, "nss"), captureGreenBox: captureBox ? { x0: +(captureBox.x0 / W).toFixed(4), y0: +(captureBox.y0 / H).toFixed(4),
-      x1: +(captureBox.x1 / W).toFixed(4), y1: +(captureBox.y1 / H).toFixed(4) } : null };
+    source: "nss", rev: geomRev(wt, "nss"), captureGreenBox: captureBox ? capBox(hole, captureBox, W, H) : null };
   console.log(`H${hole}: k=${anchor?.k?.toFixed(2)} r=${anchor?.r?.toFixed(2)} box=${box.x0},${box.y0}..${box.x1},${box.y1} (NSS; capture box ${captureBox ? `${captureBox.x0},${captureBox.y0}..${captureBox.x1},${captureBox.y1}` : "MISS"}) aspect map=${mapAspect?.toFixed(2) ?? "-"} zoom=${zoomAspect.toFixed(2)} pins=${pins.length}${teeNote}`);
 
   // The images the app ships. The hole map is the render of NSS's own minimap
@@ -1089,6 +1127,7 @@ for (let hole = 1; hole <= 21; hole++) {
     // With the NSS box the placement is known, not estimated; transplantGreen
     // still checks the texture against the overview before painting. The
     // outline mask is the NSS outline (box-normalized).
+    if (FRAME_CHANGE[hole]) throw new Error(`H${hole}: no render, and the capture stack is in NSS's frame, not SR's: python -P tools/render-nss-maps.py --holes ${hole}`);
     const img = stack();
     const mask = wt.greenPoly.map(([x, y]) => [(x * W - pb.x0) / (pb.x1 - pb.x0), (y * H - pb.y0) / (pb.y1 - pb.y0)]);
     transplantGreen(hole, img, pb, mask, gtex);
@@ -1172,7 +1211,7 @@ else {
     const shots = JSON.parse(readFileSync(SHOTS, "utf8"));
     const drop = new Set(excludedShots);
     derived.shots = shots.rows.filter((r) => r.importable && !drop.has(r.id))
-      .map(({ flags, importable, spot, posWhy, ...r }) => ({ ...r, ...flyShot({ ...r, posWhy }) }));
+      .map(({ flags, importable, spot, posWhy, ...r0 }) => { const r = srRow(r0); return { ...r, ...flyShot({ ...r, posWhy }) }; });
   } catch (e) {
     console.error(`shot rows not attached: ${e.stack ?? e.message}; derived.json not written`);
     process.exit(1);
@@ -1188,4 +1227,4 @@ writeFileSync(join(ROOT, "public", "derived.json"), JSON.stringify(derived));
 // and every pin observation with its outcome (tools/PINS.md)
 writeFileSync(join(D, "tee-frames-used.json"), JSON.stringify(teeFramesUsed, null, 1));
 writeFileSync(join(D, "pin-observations.json"), JSON.stringify(pinObservations, null, 1));
-console.log(`wrote src/maps.js (${mapsFromRender} of 21 maps from the renders, ${(mapBytes / 1024).toFixed(0)} KB of JPEG), src/greens.js (${greensFromRender} of ${Object.keys(greenMeta).length} green views from the render crops, ${(greenBytes / 1024).toFixed(0)} KB), src/mapxform.js, public/derived.json`);
+console.log(`wrote src/maps.js (${mapsFromRender} of ${SR_HOLES} maps from the renders, ${(mapBytes / 1024).toFixed(0)} KB of JPEG), src/greens.js (${greensFromRender} of ${Object.keys(greenMeta).length} green views from the render crops, ${(greenBytes / 1024).toFixed(0)} KB), src/mapxform.js, public/derived.json`);
