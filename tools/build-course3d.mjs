@@ -84,7 +84,7 @@ const readJson = (f) => JSON.parse(fs.readFileSync(f, "utf8"));
 const REG = readJson(path.resolve(arg("--registration", path.join(HERE, "nss-registration.json"))));
 const PINS = readJson(path.resolve(arg("--pins", path.join(HERE, "nss-pins.json"))));
 const PLAT = readJson(path.resolve(arg("--platform", path.join(HERE, "nss-platform.json"))));
-const NO_WATER = !process.argv.includes("--nss-water");   // SR: the water is in the field mesh (--nss-water: NSS's H3 sea actor)   // SR: the water is in the field mesh, H3's sea included
+const NO_WATER = !process.argv.includes("--nss-water");   // SR: the water, H3's sea included, is in the field mesh (--nss-water: NSS's H3 sea actor)
 const GAME = arg("--game", "Switch Sports Resort 1.0.0");
 // the holes are the pins file's (NSS 1-21, SR 1-27)
 const HOLES = Object.keys(PINS.holes).map(Number).filter(Number.isInteger).sort((a, b) => a - b);
@@ -247,7 +247,7 @@ for (const hole of HOLES) {
   }
   // ---- duplicates in the ground pack (the same three positions): the up-facing copy
   // kept, then the first; the tree pack keeps every copy (see the head of this file) ----
-  const groups = new Map(), mixed = {};
+  const groups = new Map(), mixed = {}, mixedKept = {};
   const pkey = (i) => `${V[3 * i]},${V[3 * i + 1]},${V[3 * i + 2]}`;
   let treeDup = 0;
   for (let t = 0; t < nt; t++) {
@@ -260,6 +260,7 @@ for (const hole of HOLES) {
       const mk = `${code[g]}+${code[t]}`; mixed[mk] = (mixed[mk] ?? 0) + 1;
       if (!tree) {   // two ground codes on one triangle: TIE_ORDER decides, as in public/terrain
         const rg = rankOf(code[g]), rt = rankOf(code[t]);
+        mixedKept[mk] = rt < rg ? code[t] : code[g];
         if (rt < rg) { keep[g] = 0; groups.set(k, t); drop.dup++; continue; }
         if (rg < rt) { keep[t] = 0; drop.dup++; continue; }
       }
@@ -402,7 +403,7 @@ for (const hole of HOLES) {
   index.source[hole] = { ...m.sha1, ...(dump ? { actors: dump.sha1 } : {}) };
   total += buf.length;
   const fmt = (o) => Object.entries(o).map(([k, v]) => `${k} ${v}`).join(", ");
-  console.log(`hole ${hole}: ${G.nt} ground + ${TP.nt} tree tris (${G.nv} + ${TP.nv} verts; ${treeDup} double-sided tree copies kept) + ${trees.length} actor trees of ${kinds.length} kinds (${kt0} kind tris, ${placedTris} placed${checked ? ", the dump's to the bit" : ", NOT checked"}), ${(buf.length / 1024).toFixed(0)} KB; dropped ${fmt(drop)}${Object.keys(cropByPart).length ? ` (crop: ${fmt(cropByPart)})` : ""}${Object.keys(mixed).length ? `; mixed-code duplicates ${fmt(mixed)}` : ""}${Object.keys(otherDown).length ? `; down-facing kept ${fmt(otherDown)}` : ""}; cups ${Math.max(...cupAudit).toFixed(4)} px, platform ${slotOff.toFixed(4)} px; trees: ${fmt(tally.actor)} actor, ${tally.field} baked, ${tally.none} decor left out${m.sha1.leaf ? "" : "; NO leaf canopies"}`);
+  console.log(`hole ${hole}: ${G.nt} ground + ${TP.nt} tree tris (${G.nv} + ${TP.nv} verts; ${treeDup} double-sided tree copies kept) + ${trees.length} actor trees of ${kinds.length} kinds (${kt0} kind tris, ${placedTris} placed${checked ? ", the dump's to the bit" : ", NOT checked"}), ${(buf.length / 1024).toFixed(0)} KB; dropped ${fmt(drop)}${Object.keys(cropByPart).length ? ` (crop: ${fmt(cropByPart)})` : ""}${Object.keys(mixed).length ? `; mixed-code duplicates ${fmt(mixed)} (kept ${Object.entries(mixedKept).map(([k, c]) => `${k} -> ${c}`).join(", ")})` : ""}${Object.keys(otherDown).length ? `; down-facing kept ${fmt(otherDown)}` : ""}; cups ${Math.max(...cupAudit).toFixed(4)} px, platform ${slotOff.toFixed(4)} px; trees: ${fmt(tally.actor)} actor, ${tally.field} baked, ${tally.none} decor left out${m.sha1.leaf ? "" : "; NO leaf canopies"}`);
 }
 index.kinds = Object.fromEntries([...kindsUsed.entries()].sort());
 // v1's palm mesh has no place in v2

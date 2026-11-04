@@ -13,7 +13,7 @@ import { MAP_SCALES, mapScaleOf, mapFileUrl, loadMapIndex, preloadImage } from "
 import { scrollFor } from "./mapView.js";
 import { liveSolve } from "./live3d.js";
 import { onlineOf, checkOnline, fixOnline, pairWith, ballOf, startOf, onPlatform, slotLift, TIERS, HANDS, HIGH_COUNTS, LOW_COUNTS } from "./platform.js";
-import { SR_HOLES, SR_PARS, srMigrate, srFrameFix } from "./srMigrate.js";
+import { SR_HOLES, SR_PARS, srMigrate, srNeedsMove, srRow, srFrameFix } from "./srMigrate.js";
 
 
 /* ============================================================
@@ -1145,11 +1145,13 @@ export default function App() {
       // holes 19, 20, 21, 22, 26, 27 start empty): src/srMigrate.js, pure, run on the parsed state before anything reads
       // it, so every older migration below sees SR's numbers. The frame change of SR 17 and SR 23 (their own capture
       // squares) is a state step after those migrations, which work in NSS's frame (srFrameFix, below).
-      const srOld = !!d && !d.srHolesV1;
+      // (srNeedsMove: no flag and no hole past 21 yet; a flagless store that already holds SR's holes is only flagged by
+      // persist, neither backed up over nor moved through the frame change below a second time)
+      const srOld = srNeedsMove(d);
       if (srOld) {
-        // the state as it was, kept beside the store under its own key (once; a quota failure is ignored), so the one-way
-        // move below can be undone by hand from it
-        try { await window.storage.set(STORE_KEY + ".pre-sr", raw); } catch {}
+        // the state as it was, kept beside the store under its own key, written once (never over an earlier copy; a quota
+        // failure is ignored), so the one-way move below can be undone by hand from it
+        try { const prev = await window.storage.get(STORE_KEY + ".pre-sr"); if (!prev?.value) await window.storage.set(STORE_KEY + ".pre-sr", raw); } catch {}
         d = srMigrate(d, { notes: NOTES });
       }
       if (d) {
@@ -1345,7 +1347,9 @@ export default function App() {
     if (contourCache.current.has(n)) { setContourImg({ hole: n, url: contourCache.current.get(n) }); return; }
     let live = true;
     loadTerrain(n).then((t) => {
-      const url = t ? contourDataUrl(t, CONTOUR_PX) : null;
+      // (the tee's own level dark red: the terrain under GlfTeeOBJ, the datum but on SR 23)
+      const tee = holesMeta[n]?.tee, teeYd = (t && tee && heightAt(t, tee.x, tee.y)) || 0;
+      const url = t ? contourDataUrl(t, { ...CONTOUR_PX, teeYd }) : null;
       if (url) contourCache.current.set(n, url);
       if (live) setContourImg({ hole: n, url });
     });
@@ -1470,8 +1474,9 @@ export default function App() {
   }, [terrain, scale, line.ball, shotBearing, holeMarkers]);
   const solveCtx = useMemo(() => ({ surfaceAt, heightAt: heightAlong, ballLift, trees: treesOnLine }), [surfaceAt, heightAlong, ballLift, treesOnLine]);
   // the readouts under the distance field: the ball's height against the tee
-  // (the heights' datum is NSS's hole origin, y 0, the local tee's level; the ball's lift
-  // included) and the target's against the ball, the target being the point
+  // (the terrain under the hole's tee, GlfTeeOBJ: the heights' datum, y 0, on
+  // every hole but SR 23, whose datum is NSS 20's old start 10.9 yd below its
+  // tee; the ball's lift included) and the target's against the ball, the target being the point
   // dist along the line, where the solver aims to stop (the drawn target
   // unless max reach clamped dist). null without terrain or a height under
   // the ball; target null where the line has none there
@@ -1479,9 +1484,10 @@ export default function App() {
     if (!terrain || !line.ball) return null;
     const hb = heightAt(terrain, line.ball.x, line.ball.y);
     if (hb == null) return null;
+    const tee = holesMeta[hole]?.tee, h0 = (tee && heightAt(terrain, tee.x, tee.y)) || 0;   // the tee's own ground
     const ht = heightAlong && dist > 0 ? heightAlong(dist) : null;
-    return { ball: hb + ballLift, target: ht == null ? null : ht - ballLift };
-  }, [terrain, line.ball, heightAlong, dist, ballLift]);
+    return { ball: hb + ballLift - h0, target: ht == null ? null : ht - ballLift };
+  }, [terrain, line.ball, heightAlong, dist, ballLift, holesMeta, hole]);
   const { recs, maxReach } = useMemo(
     () => solve(clubs, { dist, windSpeed, relWindDeg, lie, hole, stroke }, blockedRules, solveCtx),
     [clubs, dist, windSpeed, relWindDeg, lie, hole, stroke, blockedRules, solveCtx]
@@ -2540,7 +2546,7 @@ export default function App() {
                 Save shot & recalibrate
               </button>
               <div className="flex gap-2">
-                <button onClick={() => { setIoOpen(!ioOpen); setIoText(JSON.stringify(putts.length ? { shots, putts, greenSpeed } : shots)); }} className="flex-1 py-1.5 rounded-xl border-2 text-xs font-bold" style={chip(ioOpen)}>⇅ Import / Export</button>
+                <button onClick={() => { setIoOpen(!ioOpen); setIoText(JSON.stringify({ shots, putts, greenSpeed, srHolesV1: true })); }} className="flex-1 py-1.5 rounded-xl border-2 text-xs font-bold" style={chip(ioOpen)}>⇅ Import / Export</button>
               </div>
               {ioOpen && (
                 <div className="space-y-1">
@@ -2554,8 +2560,12 @@ export default function App() {
                           // from the putt rows, so it travels for reference only)
                           const got = JSON.parse(ioText);
                           if (!got || typeof got !== "object") return;
-                          const arr = Array.isArray(got) ? got : Array.isArray(got.shots) ? got.shots : [];
-                          const inPutts = Array.isArray(got) ? [] : puttRows(got.putts);
+                          // an export from before the 27-hole numbering (the object form without srHolesV1) carries NSS's hole
+                          // numbers: its rows move 19 -> 24, 20 -> 23, 21 -> 25 (a hole 17 / 20 row's pos through the frame change)
+                          // as the store's did; a bare array is rows typed now, under SR's numbers
+                          const nssNumbered = !Array.isArray(got) && got.srHolesV1 !== true;
+                          const arr = (Array.isArray(got) ? got : Array.isArray(got.shots) ? got.shots : []).map((r) => (nssNumbered ? srRow(r, true) : r));
+                          const inPutts = Array.isArray(got) ? [] : puttRows(Array.isArray(got.putts) ? got.putts.map((r) => (nssNumbered ? srRow(r, false) : r)) : got.putts);
                           const conv = arr.map((r, i) => {
                             if (r.wAlong != null) return r;
                             const sp = r.windSpeed ?? 0, dg = r.windDeg ?? 0, rad = (dg * Math.PI) / 180;
@@ -2575,7 +2585,7 @@ export default function App() {
                         } catch {}
                       }} className="flex-1 py-1 rounded-lg border-2 font-bold" style={chip(false)}>Import (replace box first)</button>
                   </div>
-                  <div className="opacity-60 text-[10px]">Copy the box to back up. To import, paste a JSON array — either exported shots, or simple rows like {"{"}"club":"driver","power":4,"lie":"tee","windSpeed":9,"windDeg":180,"ended":242,"hole":10,"stroke":1{"}"} (side optional; "landed":"green" etc. says where it finished, fairway when left out). I can generate these from your screenshots in chat. With putts logged the box holds {"{"}"shots":[…],"putts":[…],"greenSpeed":…{"}"}; putt rows are {"{"}"bars":2,"rolled":10.1,"flat":true,"hole":4{"}"}, and greenSpeed is refitted from them.</div>
+                  <div className="opacity-60 text-[10px]">Copy the box to back up. To import, paste a JSON array — either exported shots, or simple rows like {"{"}"club":"driver","power":4,"lie":"tee","windSpeed":9,"windDeg":180,"ended":242,"hole":10,"stroke":1{"}"} (side optional; "landed":"green" etc. says where it finished, fairway when left out). I can generate these from your screenshots in chat. The box holds {"{"}"shots":[…],"putts":[…],"greenSpeed":…,"srHolesV1":true{"}"} (an export from before the 27-hole numbering, without srHolesV1, is renumbered on import: 19 → 24, 20 → 23, 21 → 25); putt rows are {"{"}"bars":2,"rolled":10.1,"flat":true,"hole":4{"}"}, and greenSpeed is refitted from them.</div>
                 </div>
               )}
             </section>
@@ -2607,7 +2617,7 @@ export default function App() {
         {tab === "guide" && (() => {
           const steps = [
             ["Green box + slopes", (n) => !!holesMeta[n].green?.box && (holesMeta[n].green?.grid ?? []).some((r) => r.some(([x, y]) => x || y)), "AUTO: boundary + slope grid come from the Switch game's own collision (NSS's course files); your zoomed green captures only confirm them. Manual paint in Holes → ⚙ stays available as an override."],
-            ["Pins", (n) => (holesMeta[n].pins?.length ?? 0) > 0, "AUTO: NSS's own six cups per hole are built in (from the game files), numbered 1–6; the 16 difficult ones are red. Your captures only count which cup each round played. Add your own pin in Holes → ⚙ if a cup ever looks off."],
+            ["Pins", (n) => (holesMeta[n].pins?.length ?? 0) > 0, "AUTO: NSS's own six cups per hole are built in (from the game files), numbered 1–6; the 20 difficult ones are red. Your captures only count which cup each round played. Add your own pin in Holes → ⚙ if a cup ever looks off."],
             ["Map scale", (n) => !!holesMeta[n].scale, "AUTO: yards per map pixel from the NSS→map fit (the game's own trees and cups registered on the hole maps); the tee 'yd to go' badges confirm it. (Manual fallback: Solver → tap ball, tap target, type the in-game distance → Set.)"],
             ["Trees", (n) => (holesMeta[n].markers ?? []).some((m) => m.auto && m.r > 0 && !m.off), "AUTO: the map is the game's own minimap, rendered from the Switch game's files (NSS's minimap textures) with its trees as the game paints them. The app keeps those trees (the ones on the course; a tree out on the outer ground or water, where a ball is out of bounds anyway, doesn't count) so that a tap on a canopy in Edit trees mode adds no marker on top of it. Add your own markers in Holes → ⚙ for anything else that blocks a line."],
             ["Log shots", (n) => holeStats[n].shots > 0, "Phase 2: two captures per shot (address + result pop-up) — the pipeline turns them into Log rows."],

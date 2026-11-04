@@ -71,7 +71,7 @@ const read = (f) => JSON.parse(fs.readFileSync(f, "utf8"));
 const ab = (f) => { const b = fs.readFileSync(f); return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength); };
 const hh = (n) => String(n).padStart(2, "0");
 const pxOff = (f, x, y) => Math.sqrt(((f[0] - x) * 250) ** 2 + ((f[1] - y) * 304) ** 2);
-const REST_TOL_M = 0.1, TREE_TOL_M = 0.3, MAX_S = 3, SR_TOL_M = 2.5;   // (SR_TOL_M: a stroke over a mesh that differs from the NSS fixture near its path: the worst of the 71 is 1.1 m, H2's 7-iron)
+const REST_TOL_M = 0.1, TREE_TOL_M = 0.3, MAX_S = 3, SR_TOL_M = 1.5;   // (SR_TOL_M: a stroke over a mesh that differs from the NSS fixture near its path: the worst of the 71 is 1.11 m, H2's 7-iron, every other but one within 0.21)
 let fails = 0, checks = 0;
 const ok = (c, m) => { checks++; if (!c) { fails++; console.log(`FAIL ${m}`); } };
 const idx = read(path.join(DIR, "index.json"));

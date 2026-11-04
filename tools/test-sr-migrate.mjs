@@ -220,5 +220,26 @@ ok(eq(JSON.parse(JSON.stringify(out)), out), "the migrated store survives JSON")
   }
   console.log(`5. ${n5} stored holes (SR 17, 23, 24, 25) through the merge on public/derived.json`);
 }
+// ---- 6. srNeedsMove and srRow (the guard App.jsx gates the pre-sr backup and srFrameFix on; the Log import's renumbering) ----
+{
+  const nss = store();
+  ok(M.srNeedsMove(nss) === true, "srNeedsMove: an NSS-numbered store moves");
+  ok(M.srNeedsMove(M.srMigrate(nss, { notes: NOTES })) === false, "srNeedsMove: a migrated (flagged) store does not");
+  ok(M.srNeedsMove({ ...nss, srHolesV1: true }) === false, "srNeedsMove: a flagged store does not");
+  const raced = { ...nss, holesMeta: { ...nss.holesMeta, 24: hole(24) } };   // (a store this build wrote whose flag a racing write dropped)
+  ok(M.srNeedsMove(raced) === false, "srNeedsMove: a flagless store already holding a hole past 21 does not move");
+  const flagged = M.srMigrate(raced);
+  ok(flagged.srHolesV1 === true && flagged.holesMeta === raced.holesMeta && flagged.shots === raced.shots, "srMigrate only flags such a store, its holes and rows untouched");
+  ok(M.srNeedsMove(null) === false && M.srNeedsMove(undefined) === false && M.srNeedsMove("x") === false && M.srNeedsMove({}) === true, "srNeedsMove: nothing does not move; an empty flagless store does (trivially: its rows, if any, need the numbers)");
+  // srRow: a shot row's hole and, on 17 / 20, its pos; a putt row's hole only
+  const s20 = { id: 2, hole: 20, pos: { x: OLD[23].cups[0][0], y: OLD[23].cups[0][1] }, bearing: 10 }, r20 = M.srRow(s20, true);
+  ok(r20.hole === 23 && r20 !== s20 && px([r20.pos.x, r20.pos.y], [NP[23].cups[0].x, NP[23].cups[0].y]) <= 0.004 && r20.bearing === 10 && s20.hole === 20, "srRow: a hole 20 shot row to SR 23, its pos through the frame change");
+  const s17 = { id: 4, hole: 17, pos: { x: OLD[17].cups[2][0], y: OLD[17].cups[2][1] } };
+  ok(M.srRow(s17, true).hole === 17 && px([M.srRow(s17, true).pos.x, M.srRow(s17, true).pos.y], [NP[17].cups[2].x, NP[17].cups[2].y]) <= 0.004 && M.srRow(s17, false) === s17, "srRow: a hole 17 row keeps its number; its pos moves with posToo only");
+  ok(M.srRow({ id: 1, hole: 19 }, true).hole === 24 && M.srRow({ id: 3, hole: 21 }, false).hole === 25 && M.srRow({ id: 8, hole: "20" }, false).hole === 23, "srRow: 19 -> 24, 21 -> 25, a numeric string 20 -> 23");
+  const s5 = { id: 5, hole: 5, pos: { x: 0.3, y: 0.3 } }, s0 = { id: 6, hole: 0 }, sn = { id: 7 };
+  ok(M.srRow(s5, true) === s5 && M.srRow(s0, true) === s0 && M.srRow(sn, true) === sn && M.srRow(null, true) === null, "srRow: an unmoved row is the same object");
+  console.log("6. srNeedsMove and srRow");
+}
 console.log(fails ? `${fails} of ${checks} checks FAILED` : `all ${checks} checks passed`);
 process.exit(fails ? 1 : 0);

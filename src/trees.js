@@ -4,9 +4,11 @@
 // (and how much of its speed that costs) or into a trunk (src/model.js
 // solve). Pure (no React, DOM or Node API).
 //
-// The trees are NSS's (since 2026-10-25; WSR's PMP trees before): the dump's
-// tree decode (tools/harness/state/eden/nss-golf-x/trees.json, trees.md, and
-// the tree verifier's corrections) exported by tools/nss-trees-export.mjs into
+// The trees are Switch Sports Resort's (since 2026-11-04; NSS's from 2026-10-25,
+// WSR's PMP trees before): the SR dump's scene-placed tree actors
+// (tools/harness/state/eden/sr-golf-x/trees.json) with their collision fitted by
+// lab/r6work/sr/wire/trees/sr-trees.py (NSS's own fitting routines on SR's kind
+// meshes; trees-fit.json), exported by tools/nss-trees-export.mjs into
 // tools/nss-trees.json, which tools/build-derived.mjs ships as derived.json
 // `trees` (ids t<hole>-<k>, the order of nss-trees.json). Each tree carries
 // `col`, its collision as primitives in yd about its placement (x, y on the
@@ -65,11 +67,13 @@
 // 96 % for the actor broadleaves' blob; the stem segments and limbs the trunk
 // polylines hold miss no line the trunk triangles stop and stop 7 % of those
 // that pass, a little more after the simplification's 0.1-0.15 m; the sheet
-// envelopes are "may touch"). Not in the set (tools/nss-trees-export.mjs):
-// the 36 trees NSS gives no collision, H21's TreeLeaf21 crowns (placed only
-// by the scenery scene GolfDesign_GolfCourse21Hub, so absent in play: those
-// 28 off-course trees keep their trunks), the bushes and the leaf sheets on
-// the ground.
+// envelopes are "may touch"). Every SR tree ships with `col`. Not in the set
+// (tools/nss-trees-export.mjs): the 504 actors beyond the map frame, the
+// orphan TreeLeaf pieces (flat ground sheets, bushes under 4 m) and SR 23's
+// field-mesh foliage (cliff cover with no trunk actor; the live solver's
+// course3d carries them all). NSS's file left out the 36 trees NSS gave no
+// collision and H21's TreeLeaf21 crowns, absent in play; SR places every
+// TreeLeaf canopy in play.
 //
 // A tree without `col` (a derived.json from before the NSS export, or a
 // merge that does not carry col) and a player's own marker are checked as

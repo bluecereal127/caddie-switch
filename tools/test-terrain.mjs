@@ -130,6 +130,7 @@ const KNOWN = [
   [24, "beach sand over WSR's water plane: NSS water", 0, 266, 56, 303, { 7: 532 }],   // (NSS 19)
   [9, "rough over a 7x3 px WSR sand patch behind the tee: NSS rough", 99, 280, 105, 282, { 2: 4 }],
   [12, "a pond where WSR's KCL had nodata (map-style.json: pond): NSS water, rough at its edge, rock", 154, 236, 171, 266, { 7: 90, 2: 20, 12: 9 }],
+  [17, "OB over a WSR sand sliver: NSS OB and rock (NSS 17's window through the frame change: SR 17's frame is 0.94x, so 24 samples where NSS's had 31: OB 23, rock 1)", 217, 57, 225, 70, { 4: 22, 12: 1 }],
 ];
 // on-course WSR trunks (wsr-pins.json trees, by index) NSS puts on other
 // ground than the lie WSR's KCL gave them: [hole, tree index, WSR lie, NSS class]
@@ -200,7 +201,11 @@ console.log("tee above the green's mean, m (shipped / WSR mesh): " + Array.from(
 console.log("no ground (class 0 / no height): " + Array.from({ length: HOLES }, (_, i) => i + 1).filter((n) => index.holes[n].noHeight || index.holes[n].classes[0]).map((n) => `H${n} ${index.holes[n].classes[0] ?? 0}/${index.holes[n].noHeight}`).join(" "));
 
 // 5. the known spots, by the samples whose centre lies in the box
-for (const [n, what, x0, y0, x1, y1, want] of KNOWN) {
+for (const [n, what, ...win] of KNOWN) {
+  const want = win[4];
+  // the window (px of NSS's frame) in SR's: the same points on holes whose frame did not change
+  const [ax, ay] = fxp(n, win[0] / MAP_W, win[1] / MAP_H), [bx, by] = fxp(n, (win[2] + 1) / MAP_W, (win[3] + 1) / MAP_H);
+  const x0 = ax * MAP_W, y0 = ay * MAP_H, x1 = bx * MAP_W - 1, y1 = by * MAP_H - 1;
   const t = terr[n], got = {};
   let all = 0;
   for (let j = 0; j < t.h; j++) for (let i = 0; i < t.w; i++) {

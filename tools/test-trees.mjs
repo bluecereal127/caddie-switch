@@ -115,7 +115,8 @@ const at = (h) => h - BALL_R;
 const shipped = Object.values(NT.holes).flatMap((h) => h.trees);
 {
   const C = NT.counts;
-  ok(C.noCollisionDropped === 0 && C.emptyAfterDrops === 0 && C.decoded - C.noCollisionDropped - C.emptyAfterDrops - C.outsideFrame === C.shipped && C.shipped === shipped.length,
+  ok(C.noCollisionDropped === 0 && C.emptyAfterDrops === 0 && C.decoded - C.noCollisionDropped - C.emptyAfterDrops - C.outsideFrame === C.shipped && C.shipped === shipped.length
+    && C.decoded === 2254 && C.outsideFrame === 504 && C.shipped === 1750 && C.off === 1167,   // (SR's 2,254 scene actors, 504 beyond the frame)
     `a. counts ${JSON.stringify(C)} against ${shipped.length} trees`);
   ok(JSON.stringify(NT.rules.treeLeafInPlay) === JSON.stringify(Array.from({ length: 27 }, (_, i) => i + 1)), `a. TreeLeaf in play on ${NT.rules.treeLeafInPlay}`);
   for (let n = 1; n <= 27; n++) {
@@ -163,7 +164,7 @@ const shipped = Object.values(NT.holes).flatMap((h) => h.trees);
   const cones = field.filter((t) => t.kind === 3).flatMap((t) => t.col.c.filter((c) => c.type === "cone").map((c) => [(c.r0 * M_PER_YD) / t.size, (c.u0 * M_PER_YD) / t.sy, (c.u1 * M_PER_YD) / t.sy]));
   const tplCones = cones.filter((c) => near(c[0], 3.893, 0.05) && near(c[1], 5.068, 0.08) && near(c[2], 18.307, 0.08));
   const cr = med(tplCones.map((c) => c[0])), c0 = med(tplCones.map((c) => c[1])), c1 = med(tplCones.map((c) => c[2]));
-  if (one.length >= 5 && cones.length >= 5) ok(near(rh, 5.895, 0.03) && near(cy, 10.112, 0.05) && tplCones.length >= 0.35 * cones.length && near(cr, 3.893, 0.01) && near(c0, 5.068, 0.02) && near(c1, 18.307, 0.02),
+  ok(one.length >= 5 && cones.length >= 5 && near(rh, 5.895, 0.03) && near(cy, 10.112, 0.05) && tplCones.length >= 0.35 * cones.length && near(cr, 3.893, 0.01) && near(c0, 5.068, 0.02) && near(c1, 18.307, 0.02),
     `a. the baked sphere ${rh.toFixed(3)} sx at ${cy.toFixed(3)} sy (5.895, 10.112); ${tplCones.length} of ${cones.length} baked cones the template, r ${cr.toFixed(3)} sx ${c0.toFixed(3)}-${c1.toFixed(3)} sy (3.893, 5.068-18.307)`);
   // the templates against the on-course trees (all actor trees)
   const tm = [];

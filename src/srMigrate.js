@@ -74,6 +74,28 @@ const rekeyScores = (s) => {
   return out;
 };
 
+// a stored hole set that already holds one of SR's numbers past 21 (a store this build wrote whose flag a racing write dropped)
+const holdsSrHole = (hm) => !!hm && typeof hm === "object" && Object.keys(hm).some((k) => +k > 21);
+// whether srMigrate would move a parsed store's holes: no flag and no hole past 21 yet. App.jsx gates the pre-sr backup
+// and srFrameFix on it, so a store srMigrate only flags is neither backed up over nor moved through the frame change again
+export function srNeedsMove(d) { return !!d && typeof d === "object" && !d.srHolesV1 && !holdsSrHole(d.holesMeta); }
+// a shot or putt row of a store (or of a Log export) from before the switch under its SR hole number; posToo also moves a
+// shot row's pos (a map fraction of the address frame's minimap) of hole 17 or 20 through the frame change
+export function srRow(r, posToo) {
+  if (!r || typeof r !== "object") return r;
+  const from = Number(r.hole) || 0, to = srHoleOf(from);
+  // (NSS 17 is SR 17 and NSS 20 is SR 23: FRAME_CHANGE is keyed by the SR number)
+  const fix = posToo && FRAME_CHANGE[to] && r.pos && Number.isFinite(r.pos.x) && Number.isFinite(r.pos.y);
+  if (to === from && !fix) return r;
+  const o = { ...r };
+  if (to !== from) o.hole = to;
+  if (fix) {
+    const [x, y] = toSrFrame(to, r.pos.x, r.pos.y);
+    o.pos = { ...r.pos, x, y };
+  }
+  return o;
+}
+
 // The stored state (the parsed JSON of caddie:sss-golf-solver-v2) onto SR's numbering, once: holesMeta re-keyed
 // (and each moved hole as rekeyHole says), shots' and putts' hole, the rounds' and the active round's scores keys;
 // a row's pos (a map fraction of the address frame's minimap) of SR 17 or of NSS 20 (SR 23) goes through the frame
@@ -84,8 +106,8 @@ const rekeyScores = (s) => {
 // notes: App.jsx's NOTES (the new default note of SR 23).
 export function srMigrate(d, { notes } = {}) {
   if (!d || typeof d !== "object" || d.srHolesV1) return d;
+  if (!srNeedsMove(d)) return { ...d, srHolesV1: true };
   const hm = d.holesMeta && typeof d.holesMeta === "object" ? d.holesMeta : null;
-  if (hm && Object.keys(hm).some((k) => +k > 21)) return { ...d, srHolesV1: true };
   const out = { ...d, srHolesV1: true };
   if (hm) {
     const m = {};
@@ -93,22 +115,8 @@ export function srMigrate(d, { notes } = {}) {
     for (const [from, to] of Object.entries(SR_OF_NSS)) if (hm[from]) m[to] = rekeyHole(hm[from], +from, to, notes);
     out.holesMeta = m;
   }
-  const row = (r, posToo) => {
-    if (!r || typeof r !== "object") return r;
-    const from = Number(r.hole) || 0, to = srHoleOf(from);
-    // (NSS 17 is SR 17 and NSS 20 is SR 23: FRAME_CHANGE is keyed by the SR number)
-    const fix = posToo && FRAME_CHANGE[to] && r.pos && Number.isFinite(r.pos.x) && Number.isFinite(r.pos.y);
-    if (to === from && !fix) return r;
-    const o = { ...r };
-    if (to !== from) o.hole = to;
-    if (fix) {
-      const [x, y] = toSrFrame(to, r.pos.x, r.pos.y);
-      o.pos = { ...r.pos, x, y };
-    }
-    return o;
-  };
-  if (Array.isArray(d.shots)) out.shots = d.shots.map((r) => row(r, true));
-  if (Array.isArray(d.putts)) out.putts = d.putts.map((r) => row(r, false));
+  if (Array.isArray(d.shots)) out.shots = d.shots.map((r) => srRow(r, true));
+  if (Array.isArray(d.putts)) out.putts = d.putts.map((r) => srRow(r, false));
   if (Array.isArray(d.rounds)) out.rounds = d.rounds.map((r) => (r && r.scores ? { ...r, scores: rekeyScores(r.scores) } : r));
   if (d.activeRound && d.activeRound.scores) out.activeRound = { ...d.activeRound, scores: rekeyScores(d.activeRound.scores) };
   return out;

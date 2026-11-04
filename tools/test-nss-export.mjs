@@ -56,7 +56,7 @@ import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { regOf, nssToMap, mapToNss, nssToMesh, meshToNss, ydPerPx, pxPerM, bearingOf, platformToWorld, M_PER_YD } from "./lib/nssreg.mjs";
 import { readMeshBin, loadCollision, gridIndex, topGround, rayHits, GROUND_CODES, TIE_ORDER, TIE_M } from "./lib/nsscol.mjs";
-import { nssHoleOf, toSrFrame } from "../src/srMigrate.js";
+import { nssHoleOf, toSrFrame, FRAME_CHANGE } from "../src/srMigrate.js";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 let SRC = join(ROOT, "tools/harness/state/eden/sr-golf-x");   // the Switch Sports Resort dump (lab/r6work/sr/assemble)
@@ -138,7 +138,7 @@ for (const n of HOLES) {
   if (!wh) ok(ws === null && !h.cups.some((c) => c.nearestWsr), `H${n}: a new hole has no WSR start (${JSON.stringify(ws)}) and no nearest WSR spot`);
   else {
     const [sx, sy] = toSrFrame(n, s0.x, s0.y);   // (wsr-pins.json's map point is NSS's frame's)
-    ok(ws && pxDist(ws, { x: sx, y: sy }) <= 0.1 && ws.mesh.join() === s0.mesh.join(), `H${n}: tees.wsrStart is wsr-pins.json's start (in SR's frame, within 0.1 px: WSR's own map point is 0.016 px from its world point's)`);
+    ok(ws && (FRAME_CHANGE[n] ? pxDist(ws, { x: sx, y: sy }) <= 0.1 : ws.x === s0.x && ws.y === s0.y) && ws.mesh.join() === s0.mesh.join(), `H${n}: tees.wsrStart is wsr-pins.json's start (exactly on a hole in NSS's frame; in SR's frame within 0.1 px on 17 and 23, WSR's own map point being 0.016 px from its world point's)`);
     const wsw = meshToNss(R, s0.mesh);
     ok(ws.world.every((v, k) => Math.abs(v - wsw[k]) <= 6e-5), `H${n}: wsrStart.world ${ws.world} against ${wsw}`);
     const startPx = pxDist(nssToMap(R, wsw[0], wsw[2]), ws);
@@ -181,7 +181,7 @@ for (const n of HOLES) {
     }
     const up = c.surfaceY - c.world[1];
     surf = [Math.min(surf[0], up), Math.max(surf[1], up)];
-    ok(up >= 0.245 && up <= 0.345, `${tag}: surface ${up.toFixed(4)} m over the bone`);   // (NSS's 0.29-0.345; SR 26's cups are shallower, 0.25-0.285)
+    ok(up >= (n === 26 ? 0.245 : 0.29) && up <= (n === 26 ? 0.29 : 0.345), `${tag}: surface ${up.toFixed(4)} m over the bone (${n === 26 ? "SR 26's shallower cups, 0.245-0.29" : "0.29-0.345"})`);   // (0.29-0.345 as NSS's; SR 26's cups are 0.251-0.285 m)
     ok(Math.abs(c.surfaceYd - c.surfaceY / M_PER_YD) <= 1e-4, `${tag}: surfaceYd`);
     maxHubMm = Math.max(maxHubMm, c.cover.dxzMm);
     ok(c.cover.dxzMm <= 4 && Math.abs(d2(c.cover.hub[0], c.cover.hub[2], c.world[0], c.world[2]) * 1000 - c.cover.dxzMm) <= 0.2, `${tag}: cover hub ${c.cover.dxzMm} mm`);
@@ -305,7 +305,7 @@ for (const n of HOLES) {
     const wb = platformToWorld(H.origin, H.yawDeg, [PLAT.slotsLocal[i].x, PLAT.slotsLocal[i].y, PLAT.slotsLocal[i].z]);
     const dec = { x: H.decoderMapSlots[i][0], y: H.decoderMapSlots[i][1] }, pd = pxDist(nssToMap(R, wb[0], wb[2]), dec);
     maxDec = Math.max(maxDec, pd);
-    ok(pd <= 0.8, `H${n} slot ${i}: ${pd.toFixed(3)} px from the decoder's point`);
+    ok(pd <= 0.8, `H${n} slot ${i}: ${pd.toFixed(3)} px from the decoder's point`);   // (vacuous on the SR dump: its decoder points are the assembler's, through the same registration; NSS's came from the tree-ICP path)
   });
   const side = (s) => (s.x * 250 - cx) * right[0] + (s.y * 304 - cy) * right[1];
   ok(side(H.slots[0]) > 0 && side(H.slots[1]) > 0 && side(H.slots[2]) < 0 && side(H.slots[3]) < 0, `H${n}: R2 R1 not right of the facing line or L1 L2 not left`);
@@ -484,6 +484,8 @@ else {
     ok(JSON.stringify(SJ.ballOffset?.alongLocalX_m) === JSON.stringify({ rightHanded: -0.9, leftHanded: 0.9 }), `slots.json ballOffset ${JSON.stringify(SJ.ballOffset?.alongLocalX_m)}`);
     let nStand = 0, nBall = 0, worstStand = 0, worstBall = 0, worstH = 0, nHoles = 0;
     for (const n of HOLES) {
+      // (slots.json is NSS's decode: SR 23's platform moved with its tee and SR 25's yaw is 0.733 deg off NSS 21's, so those
+      // two and the six new holes are checked only by the exporter's own 1e-4 m world check of the slot bones)
       const sn = n === 23 || n === 25 ? null : nssHoleOf(n);
       if (sn == null) continue;
       const sh = SJ.perHole?.[String(sn).padStart(2, "0")], H = PLAT.holes[n];

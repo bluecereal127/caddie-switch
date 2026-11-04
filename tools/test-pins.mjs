@@ -92,7 +92,7 @@ for (let n = 1; n <= HOLES; n++) {
     ok(Number.isInteger(p.seen) && p.seen >= 0, `${tag}: seen ${p.seen}`);
   });
   // the cups stand apart (no two one spot)
-  for (let a = 0; a < 6; a++) for (let b = a + 1; b < 6; b++) ok(pxTo(d.pins[a], d.pins[b]) >= 1.5, `H${n}: c${a} and c${b} ${pxTo(d.pins[a], d.pins[b]).toFixed(2)} px apart`);   // (NSS's closest pair 2.06 px, H9; SR 27's c1 / c2 1.76 px = 4.3 yd)
+  for (let a = 0; a < 6; a++) for (let b = a + 1; b < 6; b++) ok(pxTo(d.pins[a], d.pins[b]) >= (n === 27 ? 1.5 : 2), `H${n}: c${a} and c${b} ${pxTo(d.pins[a], d.pins[b]).toFixed(2)} px apart (at least ${n === 27 ? 1.5 : 2})`);   // (NSS's closest pair 2.06 px, H9; SR 27's c1 / c2 1.76 px = 4.3 yd)
 }
 ok(nDiff === 20, `${nDiff} difficult cups, not 20`);
 ok(nWsr === 7, `${nWsr} cups on a WSR spot, not 7`);

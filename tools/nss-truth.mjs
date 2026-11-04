@@ -9,12 +9,14 @@
 // green box / outline and slope grid it ships. wsr-truth.mjs stays for the
 // WSR side (the minimap renderer, the Dolphin harness).
 //
-//   node tools/nss-truth.mjs [--collision tools/harness/state/eden/nss-golf-x/collision]
-//        [--registration tools/nss-registration.json] [--out tools/nss-truth.json] [--game "NSS 1.5.0"]
+//   node tools/nss-truth.mjs [--collision tools/harness/state/eden/sr-golf-x/collision]
+//        [--registration tools/nss-registration.json] [--out tools/nss-truth.json] [--game "Switch Sports Resort 1.0.0"]
 //
-// The holes are the registration's (1..21 for NSS, 1..27 for Switch Sports Resort: point --collision at the SR dump's collision
-// folder and --registration at the nss-registration.json tools/nss-export.mjs wrote from it; `meshId` is then the SR field shape,
-// Shape_Fld_Glf_CourseNN_Col). --game "<label>" (omitted for NSS) records the game in `source.game` and in the note.
+// The holes are the registration's (1..27 for Switch Sports Resort, the default since 2026-11-04; 1..21 for NSS: point
+// --collision at tools/harness/state/eden/nss-golf-x/collision and --registration at the nss-registration.json
+// tools/nss-export.mjs wrote from that dump, with --game "" to leave the label out, which gives the NSS file of before byte for
+// byte). `meshId` is the field shape (Shape_Fld_Glf_CourseNN_Col; NSS's Fld_GolfCourseNN). --game "<label>" records the game in
+// `source.game` and in the note.
 //
 // The collision dump is git-ignored (on the dump machine only), so the output
 // is committed. Reads per hole collision/hNN.json + hNN.bin (the field) and

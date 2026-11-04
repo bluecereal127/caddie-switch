@@ -2,8 +2,9 @@
 // Holes tab's "Contours (debug)" chip lays them over the hole map so the
 // heights the solver flies (src/model.js, "elevation") can be checked by eye
 // against the real hole. A line every CONTOUR_YD yd of height relative to the
-// hole's datum (NSS y 0, the WSR start's height, where local play tees off),
-// the ones on every LABEL_EVERY-th level darker and labelled with their
+// tee's own ground (`teeYd`, the terrain under GlfTeeOBJ: 0, the hole's datum,
+// on every hole but SR 23, whose datum is NSS 20's old start 10.9 yd below its
+// tee), the ones on every LABEL_EVERY-th level darker and labelled with their
 // height, the tee's own level (0) dark red, each with a faint light edge on
 // its low side so it reads on the dark OB rough and the sea too. Transparent
 // elsewhere and wherever the terrain has no data (class 0 or no height: no
@@ -34,7 +35,7 @@ const GLYPH = {
 // and their box fits on data, a third of the width from another label of the
 // same level and clear of every other label, found in raster order, so
 // mostly at each contour's top.
-export function contourImage(t, { w = 250, h = 304, labels = true } = {}) {
+export function contourImage(t, { w = 250, h = 304, labels = true, teeYd = 0 } = {}) {
   const data = new Uint8ClampedArray(w * h * 4);
   if (!t) return { w, h, data };
   const n = w * h, has = new Uint8Array(n), band = new Int32Array(n);
@@ -47,7 +48,7 @@ export function contourImage(t, { w = 250, h = 304, labels = true } = {}) {
       const z = heightAt(t, x, y);
       if (z == null) continue;
       has[j * w + i] = 1;
-      band[j * w + i] = Math.floor(z / CONTOUR_YD);
+      band[j * w + i] = Math.floor((z - teeYd) / CONTOUR_YD);
     }
   }
   // per line pixel crossing one LABEL_EVERY level alone, that level (in bands), else NaN

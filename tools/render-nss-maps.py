@@ -16,10 +16,11 @@
 #    y2 x5): decoded with X1's, a BC7 or ASTC texture comes out with 4x4-block scrambles at every high-contrast
 #    edge (ragged course and green outlines, a plaid with misplaced blocks). The platform tag picks the layout.
 #  * the alpha is the coverage itself (255 on the course, a per-hole constant off it: 16 the OB tint, 10 the sea's,
-#    28 on H26, 0 where nothing was captured) and the colour is straight; NSS's is premultiplied with A = 1 - coverage.
-#    The loader hands the shader NSS's convention for A (255 - A), shade(conv = "sr") takes the colour as it is (no
-#    Min(rgb, 1 - A) guard). SR's shader is a compiled binary (NSS's archive carries the GLSL): its Vec3 is fitted to
-#    SR's own screen (see VEC3).
+#    28 on H26, 0 where nothing was captured); the colour is premultiplied by the coverage at the course and green edges,
+#    as NSS's is, but texels with nothing captured keep a fill colour; NSS's A is 1 - coverage. The loader hands the shader
+#    NSS's convention for A (255 - A); shade(conv = "sr") skips the Min(rgb, 1 - A) guard, which changes only a 1-px rim at
+#    coverage edges (SR's shader is a compiled binary, so whether it keeps the guard is unknown; NSS's archive carries the
+#    GLSL): its Vec3 is fitted to SR's own screen (see VEC3).
 #  * the plaid's tile is GreenAreaSize / the scale LGlfMiniMap_TypeHoleNum.bflan sets for the hole (frame = hole - 1):
 #    2.000 m on SR 1-20, 23, 25, 1.969 / 1.990 / 1.976 / 1.978 / 1.997 on 21, 22, 24, 26, 27. The render keeps 2 m on every
 #    hole (--plaid-tile 2, the default, so plaid.tileM is 2 as every consumer checks); the layout's own value is recorded
@@ -747,7 +748,7 @@ INDEX_NOTE = ("Written by tools/render-nss-maps.py: NSS's own minimap, the baked
 
 INDEX_NOTE_SR = ("Written by tools/render-nss-maps.py --game sr: Switch Sports Resort's own minimap, the baked capture textures "
     "Tex/AnnaGolfMiniMapCapture__GolfCourseNN_{MiniMap,Green}_Msk.bntx.zs (SR 1.0.0 RomFS; BC7, Turing / Ampere tiling, "
-    "alpha = coverage, straight colour: put into NSS's convention for A on load) drawn with LGlfMiniMap.bflyt's P_Map / "
+    "alpha = coverage (the colour premultiplied by it at the edges): put into NSS's convention for A on load) drawn with LGlfMiniMap.bflyt's P_Map / "
     "P_MapGreen shader (NSS's Glf_MiniMap.glsl structure; SR's own is a compiled binary, so its Vec3 is fitted to SR's "
     "screen: shader.map / shader.green), P_MapGreenGrid's plaid on the green (Glf_MiniMapGreen^_A, ASTC 6x6; a tile of "
     "2 m (plaid.tileM; the layout's own tile, GreenAreaSize / its LGlfMiniMap_TypeHoleNum scale, is plaid.layoutTileM: 2 m "

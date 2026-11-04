@@ -58,7 +58,7 @@ const HOLES = 27;   // src/srMigrate.js SR_HOLES
 const SLOTS = existsSync(SLOTS_FILE) ? JSON.parse(readFileSync(SLOTS_FILE, "utf8")) : null;
 const MAP_W = 250, MAP_H = 304, PX_TOL = 0.002;
 const SRM = await imp("src/srMigrate.js");
-const slotsHoleOf = (n) => (n === 23 || n === 25 ? null : SRM.nssHoleOf(n));
+const slotsHoleOf = (n) => (n === 23 || n === 25 ? null : SRM.nssHoleOf(n));   // (slots.json is NSS's decode: SR 23's platform moved with its tee, SR 25's yaw is 0.733 deg off NSS 21's; those and the six new holes have no table)
 let fails = 0, checks = 0; const ok = (c, msg) => { checks++; if (!c) { fails++; if (fails <= 60) console.log("FAIL:", msg); } };
 const eq = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 const near = (a, b, e = 1e-9) => Math.abs(a - b) <= e;
@@ -212,7 +212,7 @@ for (let n = 1; n <= HOLES; n++) {
       const e0 = sh[v.tier][`${v.place}-of-${b.count}`]?.[v.hand === "right" ? "rightHanded" : "leftHanded"];
       ok(e0 && near(sh[v.tier][`${v.place}-of-${b.count}`].slotX, b.standX, 1e-9), `${tag} ${key}: slots.json has no entry`);
       if (e0) {
-        const [ex, ey] = SRM.toSrFrame(n, e0.x, e0.y), e = { ...e0, x: ex, y: ey }, tolX = n === 17 ? 0.006 : PX_TOL;   // (NSS's frame into SR's)
+        const [ex, ey] = SRM.toSrFrame(n, e0.x, e0.y), e = { ...e0, x: ex, y: ey }, tolX = PX_TOL;   // (NSS's frame into SR's: SR 17's worst is 0.0019 px)
         const d = pxOff(b, e), ds = pxOff(bs, e);
         stats.slots = Math.max(stats.slots, d); stats.shipped = Math.max(stats.shipped, ds); stats.height = Math.max(stats.height, Math.abs(b.zYd - e.heightYd)); stats.nSlots++;
         ok(d <= tolX, `${tag} ${key}: ${d.toFixed(4)} px from slots.json's ball`);
