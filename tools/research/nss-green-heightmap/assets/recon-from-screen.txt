@@ -1,0 +1,17 @@
+H01 coverage 100 %: height error RMS 5.5 cm | slope error RMS 1.30 % (median 1.15) on a median slope of 2.4 %
+H02 coverage 100 %: height error RMS 7.0 cm | slope error RMS 4.99 % (median 1.81) on a median slope of 6.6 %
+H03 coverage 100 %: height error RMS 5.8 cm | slope error RMS 2.11 % (median 1.51) on a median slope of 6.6 %
+H05 coverage 100 %: height error RMS 22.9 cm | slope error RMS 8.48 % (median 4.36) on a median slope of 10.3 %
+H06 coverage 100 %: height error RMS 11.7 cm | slope error RMS 5.24 % (median 2.13) on a median slope of 8.9 %
+H07 coverage 100 %: height error RMS 5.6 cm | slope error RMS 2.78 % (median 2.17) on a median slope of 6.0 %
+H08 coverage 100 %: height error RMS 9.9 cm | slope error RMS 8.62 % (median 3.57) on a median slope of 10.3 %
+H10 coverage 100 %: height error RMS 4.6 cm | slope error RMS 1.59 % (median 1.10) on a median slope of 2.8 %
+H11 coverage 100 %: height error RMS 9.1 cm | slope error RMS 7.07 % (median 2.40) on a median slope of 5.5 %
+H12 coverage 100 %: height error RMS 6.2 cm | slope error RMS 2.97 % (median 2.52) on a median slope of 4.8 %
+H13 coverage 100 %: height error RMS 8.2 cm | slope error RMS 7.08 % (median 2.14) on a median slope of 5.4 %
+H14 coverage 100 %: height error RMS 7.8 cm | slope error RMS 3.52 % (median 3.06) on a median slope of 5.3 %
+H15 coverage 100 %: height error RMS 6.5 cm | slope error RMS 2.50 % (median 1.93) on a median slope of 6.7 %
+H16 coverage 100 %: height error RMS 7.0 cm | slope error RMS 5.35 % (median 1.96) on a median slope of 6.1 %
+H17 coverage 100 %: height error RMS 8.4 cm | slope error RMS 6.46 % (median 2.20) on a median slope of 5.5 %
+H18 coverage 100 %: height error RMS 10.6 cm | slope error RMS 10.18 % (median 4.73) on a median slope of 6.4 %
+16 holes: height RMS median 7.4 cm (max 22.9); slope error RMS median 5.11 %; node slope error median 2.16 % on a median slope of 6.0 %

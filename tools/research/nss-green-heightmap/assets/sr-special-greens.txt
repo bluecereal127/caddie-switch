@@ -1,0 +1,26 @@
+ramp spans -1.28 .. 1.32 m
+screen RGB every 0.5 m from the middle: -1.0: 53,179,191  -0.5: 53,224,164  +0.0: 61,253,107  +0.5: 231,254,92  +1.0: 255,241,97
+known holes (check), per hole: read p2 / p98, centre, read relief vs true window
+  H01 read -0.24 .. +0.24 m, centre -0.00, relief 0.48 (window 0.51), colour distance median 3.0
+  H02 read -0.52 .. +0.44 m, centre -0.04, relief 0.96 (window 1.15), colour distance median 3.0
+  H03 read -0.74 .. +0.69 m, centre -0.03, relief 1.43 (window 1.76), colour distance median 2.8
+  H05 read -1.18 .. +1.31 m, centre +0.06, relief 2.49 (window 3.03), colour distance median 2.2
+  H06 read -1.28 .. +1.32 m, centre +0.02, relief 2.60 (window 3.03), colour distance median 2.4
+  H07 read -0.43 .. +0.49 m, centre +0.03, relief 0.92 (window 0.98), colour distance median 2.4
+  H08 read -0.77 .. +1.08 m, centre +0.15, relief 1.85 (window 1.95), colour distance median 3.0
+  H10 read -0.45 .. +0.40 m, centre -0.03, relief 0.85 (window 1.01), colour distance median 3.2
+  H11 read -0.54 .. +0.53 m, centre -0.01, relief 1.07 (window 1.12), colour distance median 3.0
+  H12 read -0.39 .. +0.44 m, centre +0.02, relief 0.83 (window 0.90), colour distance median 3.6
+  H13 read -0.47 .. +0.49 m, centre +0.01, relief 0.96 (window 0.99), colour distance median 2.8
+  H14 read -0.38 .. +0.15 m, centre -0.12, relief 0.53 (window 0.99), colour distance median 2.4
+  H15 read -0.71 .. +0.71 m, centre -0.00, relief 1.42 (window 1.57), colour distance median 2.8
+  H16 read -0.70 .. +0.66 m, centre -0.02, relief 1.36 (window 1.45), colour distance median 3.0
+  H17 read -0.51 .. +0.54 m, centre +0.01, relief 1.05 (window 1.12), colour distance median 3.0
+  H18 read -0.31 .. +0.36 m, centre +0.02, relief 0.66 (window 0.80), colour distance median 3.2
+Special greens: per hole over its unclipped frames
+  hole 19: 33 frames, read -0.55 .. +0.44 m, centre -0.06 (frames -0.06 .. -0.05), relief 0.99 m, colour distance median 3.2
+  hole 20: 1 frames, read -0.41 .. +0.54 m, centre +0.06 (frames +0.06 .. +0.06), relief 0.95 m, colour distance median 3.0
+  hole 21: 5 frames, read -0.83 .. +1.18 m, centre +0.17 (frames +0.17 .. +0.17), relief 2.01 m, colour distance median 2.4
+  hole 22: every frame clipped
+  hole 26: 7 frames, read -1.11 .. +1.32 m, centre +0.10 (frames +0.10 .. +0.11), relief 2.43 m, colour distance median 3.2
+  hole 27: 3 frames, read -1.07 .. +1.32 m, centre +0.12 (frames +0.12 .. +0.12), relief 2.39 m, colour distance median 4.1

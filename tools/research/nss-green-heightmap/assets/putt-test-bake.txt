@@ -1,0 +1,28 @@
+dist  putts | holed %: colours  aim-holes  x0.5  x2  flat | median miss yd: colours x0.5 x2 flat
+   3    378 |  97  99  82  77  35 | 0.00 0.00 0.00 0.44
+   6    377 |  81  91  47  43  19 | 0.00 1.53 1.58 0.97
+  10    378 |  67  87  27  22   9 | 0.00 2.39 2.20 1.66
+  15    370 |  47  77  16  10   5 | 1.62 2.63 2.45 2.05
+  22    269 |  43  78   9   8   3 | 1.58 2.71 2.69 2.68
+ all   1772 |  69  87  38  33  15 | 0.00 1.90 1.89 1.27
+H1: 90 putts, colours  83% aim  89% flat  41%, median miss 0.00 yd
+H2: 87 putts, colours  68% aim  76% flat  16%, median miss 0.00 yd
+H3: 89 putts, colours  85% aim  98% flat   9%, median miss 0.00 yd
+H4: 85 putts, colours  81% aim  91% flat  13%, median miss 0.00 yd
+H5: 86 putts, colours  80% aim  97% flat   6%, median miss 0.00 yd
+H6: 88 putts, colours  77% aim  86% flat   9%, median miss 0.00 yd
+H7: 89 putts, colours  61% aim  89% flat  19%, median miss 0.00 yd
+H8: 85 putts, colours  61% aim  84% flat   4%, median miss 0.00 yd
+H9: 88 putts, colours  60% aim  88% flat   8%, median miss 0.00 yd
+H10: 90 putts, colours  81% aim  91% flat  21%, median miss 0.00 yd
+H11: 78 putts, colours  68% aim  88% flat  24%, median miss 0.00 yd
+H12: 74 putts, colours  73% aim  84% flat  14%, median miss 0.00 yd
+H13: 81 putts, colours  69% aim  84% flat  17%, median miss 0.00 yd
+H14: 74 putts, colours  61% aim  73% flat  16%, median miss 0.00 yd
+H15: 86 putts, colours  74% aim  92% flat  15%, median miss 0.00 yd
+H16: 84 putts, colours  65% aim  82% flat  19%, median miss 0.00 yd
+H17: 90 putts, colours  79% aim  94% flat  31%, median miss 0.00 yd
+H18: 72 putts, colours  64% aim  78% flat  14%, median miss 0.00 yd
+H19: 86 putts, colours  64% aim  88% flat   3%, median miss 0.00 yd
+H20: 83 putts, colours  51% aim  83% flat   7%, median miss 0.00 yd
+H21: 87 putts, colours  29% aim  84% flat   1%, median miss 1.71 yd

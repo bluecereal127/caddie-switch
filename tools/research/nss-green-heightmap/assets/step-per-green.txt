@@ -1,0 +1,23 @@
+Per green: the contour step D and its offset from the green's lowest point (fine.py, D searched 9.5-11 cm), by the riser score
+(mean colour jump across predicted contours / between same-step neighbours); and lattice.py's fixed checks, the score of 0.100 m from world y = 0 and of the best normalised step SizeY / N
+H01 D 0.1035 m score 7.44 | offset from the bottom +0.0070 m, from world 0 -0.0338 m | world-anchored 0.100 m score 0.28 | best SizeY/5 = 0.1019 m score 2.74
+H02 D 0.1013 m score 4.05 | offset from the bottom +0.0180 m, from world 0 +0.0132 m | world-anchored 0.100 m score 3.27 | best SizeY/11 = 0.1049 m score 1.93
+H03 D 0.1023 m score 8.37 | offset from the bottom -0.0128 m, from world 0 +0.0391 m | world-anchored 0.100 m score 0.67 | best SizeY/5 = 0.3512 m score 3.08
+H04 D 0.1021 m score 7.97 | offset from the bottom -0.0021 m, from world 0 -0.0320 m | world-anchored 0.100 m score 0.39 | best SizeY/31 = 0.0509 m score 3.58
+H05 D 0.1014 m score 3.16 | offset from the bottom -0.0304 m, from world 0 +0.0490 m | world-anchored 0.100 m score 2.33 | best SizeY/31 = 0.0976 m score 2.21
+H06 D 0.0990 m score 2.20 | offset from the bottom -0.0325 m, from world 0 -0.0435 m | world-anchored 0.100 m score 1.56 | best SizeY/31 = 0.0976 m score 2.03
+H07 D 0.1026 m score 2.01 | offset from the bottom +0.0270 m, from world 0 +0.0048 m | world-anchored 0.100 m score 1.25 | best SizeY/3 = 0.3282 m score 1.96
+H08 D 0.1005 m score 2.79 | offset from the bottom -0.0085 m, from world 0 +0.0300 m | world-anchored 0.100 m score 1.02 | best SizeY/5 = 0.3904 m score 1.84
+H09 D 0.0993 m score 1.81 | offset from the bottom -0.0183 m, from world 0 -0.0238 m | world-anchored 0.100 m score 1.29 | best SizeY/5 = 0.5764 m score 2.11
+H10 D 0.1031 m score 11.17 | offset from the bottom -0.0076 m, from world 0 -0.0357 m | world-anchored 0.100 m score 2.81 | best SizeY/5 = 0.2021 m score 10.04
+H11 D 0.1022 m score 12.56 | offset from the bottom -0.0037 m, from world 0 -0.0240 m | world-anchored 0.100 m score 2.04 | best SizeY/11 = 0.1019 m score 8.07
+H12 D 0.1008 m score 9.11 | offset from the bottom -0.0023 m, from world 0 +0.0442 m | world-anchored 0.100 m score 2.51 | best SizeY/3 = 0.3000 m score 10.16
+H13 D 0.1020 m score 9.19 | offset from the bottom -0.0010 m, from world 0 -0.0495 m | world-anchored 0.100 m score 0.46 | best SizeY/29 = 0.0341 m score 2.45
+H14 D 0.1017 m score 6.58 | offset from the bottom -0.0027 m, from world 0 +0.0195 m | world-anchored 0.100 m score 2.00 | best SizeY/10 = 0.0994 m score 3.43
+H15 D 0.1011 m score 4.80 | offset from the bottom +0.0230 m, from world 0 -0.0261 m | world-anchored 0.100 m score 2.18 | best SizeY/5 = 0.3134 m score 3.68
+H16 D 0.1027 m score 5.40 | offset from the bottom +0.0090 m, from world 0 +0.0234 m | world-anchored 0.100 m score 3.06 | best SizeY/14 = 0.1038 m score 3.94
+H17 D 0.1011 m score 3.22 | offset from the bottom +0.0060 m, from world 0 -0.0335 m | world-anchored 0.100 m score 1.69 | best SizeY/11 = 0.1021 m score 2.75
+H18 D 0.1022 m score 24.43 | offset from the bottom +0.0000 m, from world 0 +0.0168 m | world-anchored 0.100 m score 1.02 | best SizeY/47 = 0.0170 m score 5.14
+H19 D 0.1029 m score 4.44 | offset from the bottom -0.0214 m, from world 0 +0.0041 m | world-anchored 0.100 m score 2.22 | best SizeY/4 = 0.6960 m score 2.12
+H20 D 0.1018 m score 2.12 | offset from the bottom +0.0450 m, from world 0 -0.0015 m | world-anchored 0.100 m score 1.00 | best SizeY/11 = 0.2143 m score 2.16
+H21 D 0.1061 m score 1.40 | offset from the bottom +0.0020 m, from world 0 +0.0064 m | world-anchored 0.100 m score 1.20 | best SizeY/26 = 0.0934 m score 1.35

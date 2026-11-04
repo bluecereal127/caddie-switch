@@ -1,0 +1,7 @@
+metres from the window middle                    across-hole spread R 1.9 G 3.5 (raw levels; 54 shared bins)
+metres from the green's mean height              across-hole spread R 6.4 G 7.0 (raw levels; 50 shared bins)
+metres from the bottom (y0)                      across-hole spread R 7.9 G 11.9 (raw levels; 56 shared bins)
+fraction of the own window                       across-hole spread R 7.5 G 9.1 (raw levels; 30 shared bins)
+fraction of a 3.066 m window about the middle    across-hole spread R 2.0 G 3.5 (raw levels; 55 shared bins)
+pooled raw RGB against metres from the green's middle (every 0.1 m):
+  -1.4:2,20,21  -1.4:5,23,21  -1.2:5,27,21  -1.1:5,31,22  -1.1:5,34,22  -0.9:5,37,24  -0.8:5,41,24  -0.8:5,48,24  -0.7:5,54,24  -0.6:5,62,24  -0.5:5,69,24  -0.3:8,76,24  -0.2:8,84,24  -0.1:8,90,24  -0.1:8,96,24  +0.1:8,103,24  +0.1:13,104,22  +0.2:19,105,21  +0.3:27,106,19  +0.5:32,108,18  +0.6:38,108,16  +0.7:49,109,16  +0.8:55,109,16  +0.8:65,109,16  +0.9:71,111,18  +1.1:79,113,21  +1.1:85,113,24  +1.2:90,112,27  +1.4:96,113,29  +1.4:104,115,32
